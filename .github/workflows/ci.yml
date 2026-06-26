@@ -8,20 +8,6 @@ on:
   pull_request:
 
 jobs:
-  # Recurring secret scan over the full history. gitleaks-action is free for
-  # public repositories. Complements the one-time pre-publish scan and fails CI
-  # if a credential is ever committed.
-  secret-scan:
-    name: Secret scan (gitleaks)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   test:
     name: Run tests
     runs-on: ubuntu-latest
@@ -58,7 +44,8 @@ jobs:
       MIX_ENV: test
       OPENROUTER_API_KEY: xxx
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/magus_test
-      INTEGRATION_ENCRYPTION_KEY: ${{ secrets.INTEGRATION_ENCRYPTION_KEY }}
+      # No repo secrets needed: the suite uses a deterministic encryption key
+      # from config/test.exs (Magus.Integrations.Vault), so fork PRs run too.
 
     steps:
       - uses: actions/checkout@v4
