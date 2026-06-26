@@ -1,0 +1,62 @@
+# Self-host stack for Magus: Postgres (pgvector) + FalkorDB + the app release.
+#
+# This is SEPARATE from docker-compose.yml, which provides dev dependencies only
+# (and uses the dev database `omnios_dev`). This file is a self-contained
+# deployment you can run on a server.
+#
+#   1. cp .env.example .env   and fill in the required values
+#        (DATABASE_URL must point at the `db` service, e.g.
+#         ecto://postgres:postgres@db:5432/magus)
+#   2. docker compose -f docker-compose.selfhost.yml up --build -d
+#   3. first run only, seed baseline data (usage plans, model catalog):
+#        docker compose -f docker-compose.selfhost.yml exec app \
+#          /app/bin/magus eval "Magus.Release.seed"
+#
+# The app container runs database migrations on every start, then boots the
+# Phoenix server on port 4000. Check configuration health with:
+#   docker compose -f docker-compose.selfhost.yml exec app \
+#     /app/bin/magus eval "IO.puts(Magus.Config.Health.report())"
+
+services:
+  db:
+    image: pgvector/pgvector:pg18-trixie
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: magus
+    volumes:
+      - magus_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d magus"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  falkordb:
+    image: falkordb/falkordb:v4.18.7
+    # Optional: only used when SUPER_BRAIN_ENABLED=true. Password-protected via
+    # FALKORDB_PASSWORD from .env (leave the password unset to run open on the
+    # internal compose network).
+    environment:
+      REDIS_ARGS: "--requirepass ${FALKORDB_PASSWORD:-} --appendonly yes --appendfsync everysec --dir /var/lib/falkordb/data --save 900 1 --save 300 10"
+    volumes:
+      - magus_falkordata:/var/lib/falkordb/data
+    restart: unless-stopped
+
+  app:
+    build: .
+    command: ["sh", "-c", "/app/bin/magus eval 'Magus.Release.migrate' && /app/bin/server"]
+    env_file: .env
+    environment:
+      PHX_SERVER: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    restart: unless-stopped
+
+volumes:
+  magus_pgdata:
+  magus_falkordata:

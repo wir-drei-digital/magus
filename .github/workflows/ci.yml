@@ -1,0 +1,140 @@
+# CI: compile, test, and build the SvelteKit workbench on push to main and on PRs.
+
+name: CI
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: magus_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      # FalkorDB (Magus.Graph / Super Brain). Pinned to match docker-compose.yml
+      # and fly-falkordb.toml. Host port 6380 maps to the container's 6379 so the
+      # config/test.exs default (127.0.0.1:6380) connects with no env overrides.
+      falkordb:
+        image: falkordb/falkordb:v4.18.7
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      MIX_ENV: test
+      OPENROUTER_API_KEY: xxx
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/magus_test
+      INTEGRATION_ENCRYPTION_KEY: ${{ secrets.INTEGRATION_ENCRYPTION_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        id: beam
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.18.1"
+          otp-version: "27.2"
+
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: deps
+          key: deps-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: deps-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-
+
+      - name: Restore build cache
+        uses: actions/cache@v4
+        with:
+          path: _build
+          key: build-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: build-${{ runner.os }}-${{ steps.beam.outputs.otp-version }}-${{ steps.beam.outputs.elixir-version }}-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Compile dependencies
+        run: mix deps.compile
+
+      - name: Compile
+        run: mix compile --warnings-as-errors
+
+      - name: Check codegen is up to date (migrations + TypeScript client)
+        run: mix ash.codegen --check
+
+      - name: Setup database
+        run: |
+          mix ecto.create
+          mix ecto.migrate
+
+      - name: Run tests
+        run: mix test
+
+  frontend:
+    name: Frontend (SvelteKit workbench)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # tiptap-phoenix is a mix git dep consumed by the frontend as an npm
+      # file: dependency (file:../deps/tiptap_phoenix/assets). This job never
+      # runs mix deps.get, so fetch the lockfile-pinned rev directly; without
+      # it the npm symlink dangles and the vite build can't resolve the package.
+      - name: Fetch tiptap-phoenix mix dep
+        working-directory: .
+        run: |
+          rev="$(sed -n 's/.*tiptap-phoenix\.git", "\([0-9a-f]\{40\}\)".*/\1/p' mix.lock)"
+          git clone --no-checkout https://github.com/wir-drei-digital/tiptap-phoenix.git deps/tiptap_phoenix
+          git -C deps/tiptap_phoenix checkout "$rev"
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Type check (svelte-check)
+        run: npm run check
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke tests (Playwright)
+        run: npm run test:e2e

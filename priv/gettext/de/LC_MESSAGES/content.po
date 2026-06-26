@@ -1,0 +1,1526 @@
+## "msgid"s in this file come from POT (.pot) files.
+###
+### Do not add, change, or remove "msgid"s manually here as
+### they're tied to the ones in the corresponding POT file
+### (with the same domain).
+###
+### Use "mix gettext.extract --merge" or "mix gettext.merge"
+### to merge POT files into PO files.
+msgid ""
+msgstr ""
+"Language: de\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: lib/magus_web/content/blog_live.ex:219
+#, elixir-autogen, elixir-format
+msgid "Back to Blog"
+msgstr "Zurück zum Blog"
+
+#: lib/magus_web/content/support_live.ex:98
+#, elixir-autogen, elixir-format
+msgid "Billing & Subscription"
+msgstr "Abrechnung & Abo"
+
+#: lib/magus_web/components/layouts.ex:62
+#: lib/magus_web/components/layouts.ex:128
+#: lib/magus_web/content/blog_live.ex:24
+#: lib/magus_web/content/page_html/marketing_components.ex:109
+#, elixir-autogen, elixir-format
+msgid "Blog"
+msgstr "Blog"
+
+#: lib/magus_web/content/support_live.ex:99
+#, elixir-autogen, elixir-format
+msgid "Bug report"
+msgstr "Fehlerbericht"
+
+#: lib/magus_web/content/help_live.ex:88
+#: lib/magus_web/content/support_live.ex:24
+#, elixir-autogen, elixir-format
+msgid "Contact Support"
+msgstr "Support kontaktieren"
+
+#: lib/magus_web/content/help_live.ex:76
+#: lib/magus_web/content/impressum_live.ex:55
+#: lib/magus_web/content/privacy_live.ex:49
+#: lib/magus_web/content/terms_live.ex:52
+#, elixir-autogen, elixir-format
+msgid "Content is currently unavailable. Please try again later."
+msgstr "Der Inhalt ist derzeit nicht verfügbar. Bitte versuche es später erneut."
+
+#: lib/magus_web/content/support_live.ex:110
+#, elixir-autogen, elixir-format
+msgid "Describe your question or issue..."
+msgstr "Beschreibe deine Frage oder dein Anliegen..."
+
+#: lib/magus_web/content/help_live.ex:63
+#, elixir-autogen, elixir-format
+msgid "Discord Community"
+msgstr "Discord Community"
+
+#: lib/magus_web/content/support_live.ex:85
+#, elixir-autogen, elixir-format
+msgid "Email"
+msgstr "E-Mail"
+
+#: lib/magus_web/content/support_live.ex:151
+#, elixir-autogen, elixir-format
+msgid "Failed to send message. Please try again."
+msgstr "Nachricht konnte nicht gesendet werden. Bitte versuche es erneut."
+
+#: lib/magus_web/content/support_live.ex:100
+#, elixir-autogen, elixir-format
+msgid "Feature request"
+msgstr "Feature-Wunsch"
+
+#: lib/magus_web/content/support_live.ex:97
+#, elixir-autogen, elixir-format
+msgid "General question"
+msgstr "Allgemeine Frage"
+
+#: lib/magus_web/components/layouts.ex:93
+#, elixir-autogen, elixir-format
+msgid "Get Started"
+msgstr "Loslegen"
+
+#: lib/magus_web/content/help_live.ex:24
+#, elixir-autogen, elixir-format
+msgid "Help & FAQ"
+msgstr "Hilfe & FAQ"
+
+#: lib/magus_web/content/impressum_live.ex:24
+#: lib/magus_web/content/page_html/marketing_components.ex:116
+#, elixir-autogen, elixir-format
+msgid "Impressum"
+msgstr "Impressum"
+
+#: lib/magus_web/content/support_live.ex:109
+#, elixir-autogen, elixir-format
+msgid "Message"
+msgstr "Nachricht"
+
+#: lib/magus_web/content/support_live.ex:60
+#, elixir-autogen, elixir-format
+msgid "Message sent!"
+msgstr "Nachricht gesendet!"
+
+#: lib/magus_web/content/support_live.ex:78
+#, elixir-autogen, elixir-format
+msgid "Name"
+msgstr "Name"
+
+#: lib/magus_web/content/blog_live.ex:293
+#, elixir-autogen, elixir-format
+msgid "Next post"
+msgstr "Nächster Beitrag"
+
+#: lib/magus_web/content/blog_live.ex:79
+#, elixir-autogen, elixir-format
+msgid "No blog posts yet. Check back soon!"
+msgstr "Noch keine Blog-Beiträge. Schau bald wieder vorbei!"
+
+#: lib/magus_web/content/support_live.ex:101
+#, elixir-autogen, elixir-format
+msgid "Other"
+msgstr "Sonstiges"
+
+#: lib/magus_web/content/blog_live.ex:281
+#, elixir-autogen, elixir-format
+msgid "Previous post"
+msgstr "Vorheriger Beitrag"
+
+#: lib/magus_web/components/layouts.ex:56
+#: lib/magus_web/components/layouts.ex:122
+#: lib/magus_web/content/page_html/marketing_components.ex:100
+#, elixir-autogen, elixir-format
+msgid "Pricing"
+msgstr "Preise"
+
+#: lib/magus_web/content/privacy_live.ex:24
+#, elixir-autogen, elixir-format
+msgid "Privacy Policy"
+msgstr "Datenschutzerklärung"
+
+#: lib/magus_web/content/blog_live.ex:112
+#: lib/magus_web/content/blog_live.ex:165
+#, elixir-autogen, elixir-format
+msgid "Read more"
+msgstr "Mehr lesen"
+
+#: lib/magus_web/content/support_live.ex:95
+#, elixir-autogen, elixir-format
+msgid "Select a topic"
+msgstr "Thema auswählen"
+
+#: lib/magus_web/content/support_live.ex:118
+#, elixir-autogen, elixir-format
+msgid "Send Message"
+msgstr "Nachricht senden"
+
+#: lib/magus_web/content/support_live.ex:69
+#, elixir-autogen, elixir-format
+msgid "Send another message"
+msgstr "Weitere Nachricht senden"
+
+#: lib/magus_web/content/terms_live.ex:24
+#, elixir-autogen, elixir-format
+msgid "Terms of Service"
+msgstr "AGBs"
+
+#: lib/magus_web/content/support_live.ex:63
+#, elixir-autogen, elixir-format
+msgid "Thank you for reaching out. We'll get back to you as soon as possible."
+msgstr "Danke für deine Nachricht. Wir melden uns so schnell wie möglich bei dir."
+
+#: lib/magus_web/content/blog_live.ex:267
+#, elixir-autogen, elixir-format
+msgid "This article is not yet available. Check back soon!"
+msgstr "Dieser Artikel ist noch nicht verfügbar. Schau bald wieder vorbei!"
+
+#: lib/magus_web/content/support_live.ex:94
+#, elixir-autogen, elixir-format
+msgid "Topic"
+msgstr "Thema"
+
+#: lib/magus_web/content/support_live.ex:79
+#, elixir-autogen, elixir-format
+msgid "Your name"
+msgstr "Dein Name"
+
+#: lib/magus_web/content/support_live.ex:86
+#, elixir-autogen, elixir-format
+msgid "your@email.com"
+msgstr "deine@email.de"
+
+#: lib/magus_web/content/help_live.ex:53
+#, elixir-autogen, elixir-format
+msgid "Documentation"
+msgstr "Dokumentation"
+
+#: lib/magus_web/components/layouts.ex:89
+#, elixir-autogen, elixir-format
+msgid "Chat"
+msgstr "Chat"
+
+#: lib/magus_web/components/layouts.ex:81
+#: lib/magus_web/components/layouts.ex:141
+#, elixir-autogen, elixir-format
+msgid "Community"
+msgstr "Community"
+
+#: lib/magus_web/components/layouts.ex:50
+#: lib/magus_web/components/layouts.ex:116
+#, elixir-autogen, elixir-format
+msgid "Features"
+msgstr "Features"
+
+#: lib/magus_web/components/layouts.ex:134
+#: lib/magus_web/content/page_html/marketing_components.ex:108
+#, elixir-autogen, elixir-format
+msgid "Help"
+msgstr "Hilfe"
+
+#: lib/magus_web/components/layouts.ex:68
+#: lib/magus_web/content/page_html/marketing_components.ex:102
+#, elixir-autogen, elixir-format
+msgid "Models"
+msgstr "Modelle"
+
+#: lib/magus_web/components/layouts.ex:74
+#, elixir-autogen, elixir-format
+msgid "Prompts"
+msgstr "Prompts"
+
+#: lib/magus_web/content/page_html/product.html.heex:16
+#, elixir-autogen, elixir-format
+msgid " instrument"
+msgstr " Instrument"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:66
+#, elixir-autogen, elixir-format
+msgid " of usage included to try, no card games."
+msgstr " Nutzungsguthaben zum Ausprobieren inklusive, ohne Kartenspiele."
+
+#: lib/magus_web/content/page_html/open.html.heex:136
+#, elixir-autogen, elixir-format
+msgid "+ %{n} more"
+msgstr "+ %{n} weitere"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:63
+#, elixir-autogen, elixir-format
+msgid "+ model usage"
+msgstr "+ Modellnutzung"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:64
+#, elixir-autogen, elixir-format
+msgid ", billed at provider cost · "
+msgstr ", zum Anbieterpreis abgerechnet · "
+
+#: lib/magus_web/content/page_html/home.html.heex:26
+#, elixir-autogen, elixir-format
+msgid "-made · zürich"
+msgstr "-gemacht · zürich"
+
+#: lib/magus_web/content/page_html/home.html.heex:129
+#, elixir-autogen, elixir-format
+msgid "15+ models"
+msgstr "15+ Modelle"
+
+#: lib/magus_web/content/page_html/product.html.heex:229
+#, elixir-autogen, elixir-format
+msgid "15+ models, auto-routed"
+msgstr "15+ Modelle, automatisch geroutet"
+
+#: lib/magus_web/content/page_html/home.html.heex:109
+#: lib/magus_web/content/page_html/product.html.heex:135
+#, elixir-autogen, elixir-format
+msgid "A markdown knowledge base with"
+msgstr "Eine Markdown-Wissensbasis mit"
+
+#: lib/magus_web/content/page_html/home.html.heex:93
+#: lib/magus_web/content/page_html/product.html.heex:40
+#, elixir-autogen, elixir-format
+msgid "Agents"
+msgstr "Agenten"
+
+#: lib/magus_web/content/page_html/home.html.heex:32
+#, elixir-autogen, elixir-format
+msgid "Agents draft documents, run code, search the web, and remember your context, working beside you in one place."
+msgstr "Agenten verfassen Dokumente, führen Code aus, durchsuchen das Web und merken sich deinen Kontext, alles an einem Ort neben dir."
+
+#: lib/magus_web/content/page_html/product.html.heex:59
+#, elixir-autogen, elixir-format
+msgid "Agents spawn sub-agents, coordinate, and report back."
+msgstr "Agenten starten Unteragenten, koordinieren sich und berichten zurück."
+
+#: lib/magus_web/content/page_html/home.html.heex:214
+#: lib/magus_web/content/page_html/open.html.heex:61
+#, elixir-autogen, elixir-format
+msgid "Any model"
+msgstr "Jedes Modell"
+
+#: lib/magus_web/content/page_html/product.html.heex:147
+#, elixir-autogen, elixir-format
+msgid "Author links in-text; the graph indexes them on save."
+msgstr "Links direkt im Text verfassen; der Graph indiziert sie beim Speichern."
+
+#: lib/magus_web/content/page_html/product.html.heex:65
+#, elixir-autogen, elixir-format
+msgid "Autonomy"
+msgstr "Autonomie"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:40
+#, elixir-autogen, elixir-format
+msgid "Base fee + usage at cost"
+msgstr "Grundgebühr + Nutzung zum Selbstkostenpreis"
+
+#: lib/magus_web/content/page_html/home.html.heex:107
+#: lib/magus_web/content/page_html/product.html.heex:133
+#, elixir-autogen, elixir-format
+msgid "Brain"
+msgstr "Brain"
+
+#: lib/magus_web/content/page_html/home.html.heex:95
+#: lib/magus_web/content/page_html/product.html.heex:42
+#, elixir-autogen, elixir-format
+msgid "Build named specialists, @mention them, and let them work autonomously, even waking themselves to finish long jobs."
+msgstr "Benannte Spezialisten anlegen, per @mention ansprechen und autonom arbeiten lassen, die sich sogar selbst wecken, um lange Aufgaben zu erledigen."
+
+#: lib/magus_web/content/page_html/marketing_components.ex:93
+#, elixir-autogen, elixir-format
+msgid "Built by"
+msgstr "Gebaut von"
+
+#: lib/magus_web/content/page_html/home.html.heex:202
+#: lib/magus_web/content/page_html/open.html.heex:85
+#, elixir-autogen, elixir-format
+msgid "CH / EU / nDSG"
+msgstr "CH / EU / nDSG"
+
+#: lib/magus_web/content/page_html/home.html.heex:21
+#, elixir-autogen, elixir-format
+msgid "CH · EU · self-host"
+msgstr "CH · EU · selbst hosten"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:15
+#, elixir-autogen, elixir-format
+msgid "CHF 1 included"
+msgstr "CHF 1 inklusive"
+
+#: lib/magus_web/content/page_html/home.html.heex:84
+#, elixir-autogen, elixir-format
+msgid "Chat is the surface. Underneath: autonomous agents, a knowledge brain, a sandbox, and your whole team, sharing one context."
+msgstr "Chat ist die Oberfläche. Darunter: autonome Agenten, ein Wissens-Brain, eine Sandbox und dein ganzes Team, die sich einen Kontext teilen."
+
+#: lib/magus_web/content/page_html/open.html.heex:167
+#, elixir-autogen, elixir-format
+msgid "Chat, agents, brain, sandbox, collaboration"
+msgstr "Chat, Agenten, Brain, Sandbox, Kollaboration"
+
+#: lib/magus_web/content/page_html/home.html.heex:172
+#, elixir-autogen, elixir-format
+msgid "Chat, brain, agents, files, your team. A single context that never loses your place."
+msgstr "Chat, Brain, Agenten, Dateien, dein Team. Ein einziger Kontext, der nie den Platz verliert."
+
+#: lib/magus_web/content/page_html.ex:61
+#, elixir-autogen, elixir-format
+msgid "China"
+msgstr "China"
+
+#: lib/magus_web/content/page_html/open.html.heex:118
+#, elixir-autogen, elixir-format
+msgid "Choose where each task runs."
+msgstr "Bestimme, wo jede Aufgabe ausgeführt wird."
+
+#: lib/magus_web/content/page_html/home.html.heex:135
+#: lib/magus_web/content/page_html/product.html.heex:284
+#, elixir-autogen, elixir-format
+msgid "Collaboration"
+msgstr "Kollaboration"
+
+#: lib/magus_web/content/page_html/home.html.heex:198
+#, elixir-autogen, elixir-format
+msgid "Data stays in Switzerland, or the jurisdiction you choose. Built for revDSG from the ground up."
+msgstr "Deine Daten bleiben in der Schweiz oder in der Jurisdiktion deiner Wahl. Von Grund auf für das revDSG gebaut."
+
+#: lib/magus_web/content/page_html/marketing_components.ex:375
+#, elixir-autogen, elixir-format
+msgid "Diagram: a central agent connected to brain, memory, web, sandbox, files and draft"
+msgstr "Diagramm: ein zentraler Agent verbunden mit Brain, Memory, Web, Sandbox, Dateien und Entwurf"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:107
+#, elixir-autogen, elixir-format
+msgid "Docs"
+msgstr "docs"
+
+#: lib/magus_web/content/page_html/product.html.heex:236
+#, elixir-autogen, elixir-format
+msgid "Draft Mode"
+msgstr "Entwurfsmodus"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:316
+#, elixir-autogen, elixir-format
+msgid "Draft a Q3 board update from the attached numbers, then export a PDF."
+msgstr "Erstelle ein Q3-Vorstandsupdate aus den angehängten Zahlen und exportiere es als PDF."
+
+#: lib/magus_web/content/page_html.ex:59
+#, elixir-autogen, elixir-format
+msgid "Europe"
+msgstr "Europa"
+
+#: lib/magus_web/content/page_html/open.html.heex:120
+#, elixir-autogen, elixir-format
+msgid "Every provider is classified by country of origin. The default allow-list is US, EU and Switzerland; others are gated behind explicit consent."
+msgstr "Jeder Anbieter ist nach Herkunftsland klassifiziert. Die Standard-Freigabeliste umfasst USA, EU und die Schweiz; andere erfordern explizite Zustimmung."
+
+#: lib/magus_web/content/page_html/open.html.heex:165
+#, elixir-autogen, elixir-format
+msgid "Everything that makes Magus work, free to run and read."
+msgstr "Alles, was Magus zum Laufen bringt, frei einsehbar und ausführbar."
+
+#: lib/magus_web/content/page_html/home.html.heex:82
+#: lib/magus_web/content/page_html/product.html.heex:20
+#, elixir-autogen, elixir-format
+msgid "Everything the work needs, in one instrument."
+msgstr "Alles, was die Arbeit braucht, in einem Instrument."
+
+#: lib/magus_web/content/page_html/home.html.heex:170
+#, elixir-autogen, elixir-format
+msgid "Everything you work with, held in one orbit."
+msgstr "Alles, womit du arbeitest, in einer einzigen Umlaufbahn."
+
+#: lib/magus_web/content/page_html/product.html.heex:345
+#, elixir-autogen, elixir-format
+msgid "Five instruments. One context."
+msgstr "Fünf Instrumente. Ein Kontext."
+
+#: lib/magus_web/content/page_html/product.html.heex:66
+#, elixir-autogen, elixir-format
+msgid "Heartbeat wake-ups process the inbox and long tasks."
+msgstr "Heartbeat-Wakeups verarbeiten den Posteingang und lange Aufgaben."
+
+#: lib/magus_web/content/page_html/pricing.html.heex:107
+#, elixir-autogen, elixir-format
+msgid "How does usage billing work?"
+msgstr "Wie funktioniert die Nutzungsabrechnung?"
+
+#: lib/magus_web/content/page_html/product.html.heex:275
+#, elixir-autogen, elixir-format
+msgid "Humans and agents work the same surface; the agent reaches the tools you already run."
+msgstr "Menschen und Agenten arbeiten auf derselben Oberfläche; der Agent greift auf die Tools zu, die du bereits verwendest."
+
+#: lib/magus_web/content/page_html/home.html.heex:149
+#: lib/magus_web/content/page_html/product.html.heex:298
+#, elixir-autogen, elixir-format
+msgid "Integrations"
+msgstr "Integrationen"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:114
+#, elixir-autogen, elixir-format
+msgid "Is there a free plan?"
+msgstr "Gibt es einen kostenlosen Plan?"
+
+#: lib/magus_web/content/page_html/product.html.heex:237
+#, elixir-autogen, elixir-format
+msgid "Iterate a document with the agent, export to PDF."
+msgstr "Ein Dokument gemeinsam mit dem Agenten überarbeiten und als PDF exportieren."
+
+#: lib/magus_web/content/page_html/marketing_components.ex:112
+#, elixir-autogen, elixir-format
+msgid "Legal"
+msgstr "rechtliches"
+
+#: lib/magus_web/content/page_html/product.html.heex:164
+#, elixir-autogen, elixir-format
+msgid "Local, user, and agent scopes the agent can recall."
+msgstr "Lokale, Nutzer- und Agenten-Scopes, auf die der Agent zurückgreifen kann."
+
+#: lib/magus_web/content/page_html/marketing_components.ex:39
+#: lib/magus_web/content/page_html/marketing_components.ex:80
+#: lib/magus_web/content/page_html/marketing_components.ex:120
+#, elixir-autogen, elixir-format
+msgid "MAGUS"
+msgstr "MAGUS"
+
+#: lib/magus_web/content/page_html/product.html.heex:273
+#, elixir-autogen, elixir-format
+msgid "Made for teams, wired to your tools."
+msgstr "Für Teams gebaut, mit deinen Tools verdrahtet."
+
+#: lib/magus_web/content/page_html/product.html.heex:22
+#, elixir-autogen, elixir-format
+msgid "Magus is one workbench with five instruments, sharing a single context: autonomous agents, a knowledge brain, a sandbox, real-time collaboration, and the integrations that reach your existing tools."
+msgstr "Magus ist eine Workbench mit fünf Instrumenten, die sich einen einzigen Kontext teilen: autonome Agenten, ein Wissens-Brain, eine Sandbox, Echtzeit-Kollaboration und Integrationen, die deine bestehenden Tools erreichen."
+
+#: lib/magus_web/content/page_html/open.html.heex:25
+#, elixir-autogen, elixir-format
+msgid "Magus is open at the core: an auditable, self-hostable codebase, your choice of models, and your data in the jurisdiction you choose. The capability is the point. Owning it is the spine."
+msgstr "Magus ist im Kern offen: eine prüfbare, selbst hostbare Codebasis, deine Wahl der Modelle und deine Daten in der Jurisdiktion deiner Wahl. Die Fähigkeit ist der Kern. Sie zu besitzen ist das Rückgrat."
+
+#: lib/magus_web/content/page_html/open.html.heex:180
+#, elixir-autogen, elixir-format
+msgid "Managed Swiss hosting & support"
+msgstr "Verwaltetes Schweizer Hosting & Support"
+
+#: lib/magus_web/content/page_html/open.html.heex:179
+#, elixir-autogen, elixir-format
+msgid "Marketing, CMS, this website"
+msgstr "Marketing, CMS, diese Website"
+
+#: lib/magus_web/content/page_html/product.html.heex:162
+#, elixir-autogen, elixir-format
+msgid "Memory"
+msgstr "Memory"
+
+#: lib/magus_web/content/page_html/open.html.heex:169
+#, elixir-autogen, elixir-format
+msgid "Model catalog & provider config"
+msgstr "Modellkatalog & Anbieterkonfiguration"
+
+#: lib/magus_web/content/page_html/product.html.heex:211
+#, elixir-autogen, elixir-format
+msgid "Modes, panes, and a companion view. 15+ models with auto-routing, Draft Mode, and image and video, without losing your place."
+msgstr "Modi, Bereiche und eine Companion-Ansicht. 15+ Modelle mit Auto-Routing, Entwurfsmodus sowie Bild und Video, ohne den Platz zu verlieren."
+
+#: lib/magus_web/content/page_html/home.html.heex:123
+#, elixir-autogen, elixir-format
+msgid "Modes, panes, and a companion view. 15+ models with auto-routing, Draft Mode, image and video, without losing your place."
+msgstr "Modi, Bereiche und eine Companion-Ansicht. 15+ Modelle mit Auto-Routing, Entwurfsmodus, Bild und Video, ohne den Platz zu verlieren."
+
+#: lib/magus_web/content/page_html/product.html.heex:58
+#, elixir-autogen, elixir-format
+msgid "Multi-agent"
+msgstr "Multi-Agent"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:25
+#, elixir-autogen, elixir-format
+msgid "No seats, no tiers, no custom quotes. A single subscription: a base fee that shrinks as the Magus user base grows, plus model usage billed at provider cost, with no markup. Or self-host the open core, free."
+msgstr "Keine Plätze, keine Stufen, keine Sonderangebote. Ein einziges Abonnement: eine Grundgebühr, die sinkt, je mehr Magus-Nutzer es gibt, plus Modellnutzung zum Anbieterpreis ohne Aufschlag. Oder den Open Core selbst hosten, kostenlos."
+
+#: lib/magus_web/content/page_html/pricing.html.heex:116
+#, elixir-autogen, elixir-format
+msgid "No, and we'd rather be honest about it. Every account includes CHF 1 of usage to try things out, but the sustainable free option is to self-host the open core."
+msgstr "Nein, und das sagen wir lieber direkt. Jedes Konto enthält CHF 1 Nutzungsguthaben zum Ausprobieren, aber die nachhaltig kostenlose Option ist das Selbst-Hosten des Open Core."
+
+#: lib/magus_web/content/page_html/open.html.heex:102
+#, elixir-autogen, elixir-format
+msgid "Not a black box. Yours to inspect, run, and own."
+msgstr "Keine Black Box. Zum Prüfen, Betreiben und Besitzen."
+
+#: lib/magus_web/content/page_html/open.html.heex:44
+#, elixir-autogen, elixir-format
+msgid "Not promises in a pitch deck, things you can verify: the license, the repo, the compose file, the model-residency table."
+msgstr "Keine Versprechen in einer Präsentation, sondern Dinge, die du prüfen kannst: die Lizenz, das Repo, die Compose-Datei, die Modell-Residenztabelle."
+
+#: lib/magus_web/content/page_html/pricing.html.heex:124
+#, elixir-autogen, elixir-format
+msgid "Nothing to us. The open core is Apache-2.0; you bring the hardware and the model API keys, and run it with one compose file."
+msgstr "Für uns nichts. Der Open Core ist Apache-2.0; du bringst die Hardware und die Modell-API-Schlüssel und startest alles mit einer einzigen Compose-Datei."
+
+#: lib/magus_web/content/page_html/pricing.html.heex:131
+#, elixir-autogen, elixir-format
+msgid "On the hosted plan, in Switzerland or the EU; self-hosted, wherever you run it. Add any OpenAI-compatible endpoint, open weights, or a local model, no code changes."
+msgstr "Im gehosteten Plan in der Schweiz oder der EU; selbst gehostet, wo auch immer du es betreibst. Füge jeden OpenAI-kompatiblen Endpunkt, offene Gewichte oder ein lokales Modell hinzu, ohne Code-Änderungen."
+
+#: lib/magus_web/content/page_html/home.html.heex:63
+#, elixir-autogen, elixir-format
+msgid "One agent, wired to everything you work with."
+msgstr "Ein Agent, verbunden mit allem, womit du arbeitest."
+
+#: lib/magus_web/content/page_html/pricing.html.heex:43
+#, elixir-autogen, elixir-format
+msgid "One base fee for your whole account. It drops as the Magus cloud grows: the more people on the platform, the less everyone pays. Usage is passed straight through at provider cost."
+msgstr "Eine Grundgebühr für dein gesamtes Konto. Sie sinkt, wenn die Magus-Cloud wächst: je mehr Menschen die Plattform nutzen, desto weniger zahlt jeder. Die Nutzung wird direkt zum Anbieterpreis weitergegeben."
+
+#: lib/magus_web/content/page_html/pricing.html.heex:23
+#, elixir-autogen, elixir-format
+msgid "One plan. Base fee, plus what you use."
+msgstr "Ein Plan. Grundgebühr, plus was du nutzt."
+
+#: lib/magus_web/content/page_html/open.html.heex:176
+#, elixir-autogen, elixir-format
+msgid "Only the parts a self-hoster doesn't need."
+msgstr "Nur die Teile, die ein Selbst-Hoster nicht braucht."
+
+#: lib/magus_web/content/page_html/marketing_components.ex:101
+#, elixir-autogen, elixir-format
+msgid "Open & self-host"
+msgstr "Offen & selbst hosten"
+
+#: lib/magus_web/content/page_html/product.html.heex:347
+#, elixir-autogen, elixir-format
+msgid "Open a page beside a chat, hand a file to an agent, watch a sandbox run, all without losing your place."
+msgstr "Eine Seite neben einem Chat öffnen, eine Datei an einen Agenten übergeben, einer Sandbox-Ausführung zusehen, alles ohne den Platz zu verlieren."
+
+#: lib/magus_web/content/page_html/home.html.heex:205
+#: lib/magus_web/content/page_html/open.html.heex:52
+#, elixir-autogen, elixir-format
+msgid "Open core"
+msgstr "Open Core"
+
+#: lib/magus_web/content/page_html/product.html.heex:358
+#, elixir-autogen, elixir-format
+msgid "Open the workbench, or run it yourself."
+msgstr "Workbench öffnen oder selbst betreiben."
+
+#: lib/magus_web/content/page_html/open.html.heex:155
+#, elixir-autogen, elixir-format
+msgid "Open-core, stated plainly. The product is open; the commercial wrapper is not. No motte-and-bailey."
+msgstr "Open-Core, klar ausgedrückt. Das Produkt ist offen; der kommerzielle Wrapper nicht. Kein Bait-and-Switch."
+
+#: lib/magus_web/content/page_html/open.html.heex:81
+#, elixir-autogen, elixir-format
+msgid "Or let us host it in Switzerland, built for revDSG from the ground up, no US cloud silo."
+msgstr "Oder lass es uns in der Schweiz hosten, von Grund auf für das revDSG gebaut, kein US-Cloud-Silo."
+
+#: lib/magus_web/content/page_html/pricing.html.heex:87
+#, elixir-autogen, elixir-format
+msgid "Or run the whole thing yourself, for nothing."
+msgstr "Oder betreibe alles selbst, kostenlos."
+
+#: lib/magus_web/content/page_html/product.html.heex:230
+#, elixir-autogen, elixir-format
+msgid "Pick the model, or let the router choose by task."
+msgstr "Wähle das Modell selbst, oder lass den Router nach Aufgabe entscheiden."
+
+#: lib/magus_web/content/page_html/product.html.heex:220
+#, elixir-autogen, elixir-format
+msgid "Primary + companion"
+msgstr "Primär + Companion"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:114
+#, elixir-autogen, elixir-format
+msgid "Privacy"
+msgstr "Datenschutz"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:97
+#: lib/magus_web/content/page_html/marketing_components.ex:99
+#, elixir-autogen, elixir-format
+msgid "Product"
+msgstr "produkt"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:103
+#, elixir-autogen, elixir-format
+msgid "Prompt library"
+msgstr "Prompt-Bibliothek"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:338
+#: lib/magus_web/content/page_html/marketing_components.ex:352
+#, elixir-autogen, elixir-format
+msgid "Q3 Board Update"
+msgstr "Q3 Board Update"
+
+#: lib/magus_web/content/page_html/product.html.heex:222
+#, elixir-autogen, elixir-format
+msgid "Read a brain page beside a running conversation."
+msgstr "Eine Brain-Seite neben einem laufenden Gespräch lesen."
+
+#: lib/magus_web/content/page_html/home.html.heex:137
+#: lib/magus_web/content/page_html/product.html.heex:286
+#, elixir-autogen, elixir-format
+msgid "Real-time multiplayer conversations, shared workspaces, and tasks that humans and agents work on together."
+msgstr "Echtzeit-Multiplayer-Gespräche, gemeinsame Arbeitsbereiche und Aufgaben, an denen Menschen und Agenten gemeinsam arbeiten."
+
+#: lib/magus_web/content/page_html/product.html.heex:52
+#, elixir-autogen, elixir-format
+msgid "Reason, call a tool, observe, repeat, streamed live."
+msgstr "Denken, Tool aufrufen, beobachten, wiederholen, live gestreamt."
+
+#: lib/magus_web/content/page_html/marketing_components.ex:105
+#, elixir-autogen, elixir-format
+msgid "Resources"
+msgstr "ressourcen"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:354
+#, elixir-autogen, elixir-format
+msgid "Revenue grew 18% QoQ, driven by net retention of 112%."
+msgstr "Umsatz stieg um 18 % QoQ, getrieben von einer Net Retention von 112 %."
+
+#: lib/magus_web/content/page_html/home.html.heex:216
+#, elixir-autogen, elixir-format
+msgid "Route to open weights or frontier models. Every provider is country-classified; you hold data residency per task."
+msgstr "Routen zu offenen Gewichten oder Frontier-Modellen. Jeder Anbieter ist nach Land klassifiziert; du bestimmst die Datenresidenz pro Aufgabe."
+
+#: lib/magus_web/content/page_html/open.html.heex:63
+#, elixir-autogen, elixir-format
+msgid "Route to open weights or frontier models. Every provider is country-classified; you hold residency per task."
+msgstr "Routen zu offenen Gewichten oder Frontier-Modellen. Jeder Anbieter ist nach Land klassifiziert; du bestimmst die Residenz pro Aufgabe."
+
+#: lib/magus_web/content/page_html/open.html.heex:189
+#, elixir-autogen, elixir-format
+msgid "Run it yourself, or let us host it in Switzerland."
+msgstr "Selbst betreiben oder von uns in der Schweiz hosten lassen."
+
+#: lib/magus_web/content/page_html/home.html.heex:225
+#: lib/magus_web/content/page_html/open.html.heex:72
+#, elixir-autogen, elixir-format
+msgid "Run the whole stack yourself with one compose file. Your hardware, your rules, fully offline-capable."
+msgstr "Den ganzen Stack selbst betreiben mit einer einzigen Compose-Datei. Deine Hardware, deine Regeln, vollständig offline-fähig."
+
+#: lib/magus_web/content/page_html/pricing.html.heex:120
+#, elixir-autogen, elixir-format
+msgid "See what's open →"
+msgstr "Sieh, was offen ist →"
+
+#: lib/magus_web/content/page_html/open.html.heex:170
+#, elixir-autogen, elixir-format
+msgid "Self-host docs, install script, compose file"
+msgstr "Self-Host-Doku, Installationsskript, Compose-Datei"
+
+#: lib/magus_web/content/page_html/home.html.heex:223
+#: lib/magus_web/content/page_html/open.html.heex:70
+#, elixir-autogen, elixir-format
+msgid "Self-hostable"
+msgstr "Selbst hostbar"
+
+#: lib/magus_web/content/page_html/product.html.heex:153
+#, elixir-autogen, elixir-format
+msgid "Semantic search"
+msgstr "Semantische Suche"
+
+#: lib/magus_web/content/page_html.ex:62
+#, elixir-autogen, elixir-format
+msgid "Singapore"
+msgstr "Singapur"
+
+#: lib/magus_web/content/page_html/open.html.heex:23
+#, elixir-autogen, elixir-format
+msgid "Software you can read is software you can trust."
+msgstr "Software, die du lesen kannst, ist Software, der du vertrauen kannst."
+
+#: lib/magus_web/content/page_html/open.html.heex:178
+#, elixir-autogen, elixir-format
+msgid "Stripe billing, subscriptions, metering"
+msgstr "Stripe-Abrechnung, Abonnements, Metering"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:110
+#, elixir-autogen, elixir-format
+msgid "Support"
+msgstr "Support"
+
+#: lib/magus_web/content/page_html/home.html.heex:196
+#: lib/magus_web/content/page_html/open.html.heex:79
+#, elixir-autogen, elixir-format
+msgid "Swiss-hosted"
+msgstr "Schweizer Hosting"
+
+#: lib/magus_web/content/page_html.ex:60
+#, elixir-autogen, elixir-format
+msgid "Switzerland"
+msgstr "Schweiz"
+
+#: lib/magus_web/content/page_html/product.html.heex:300
+#, elixir-autogen, elixir-format
+msgid "Telegram, Google Drive and Calendar, Notion, RSS, webhooks, and MCP servers, reaching the tools you already use."
+msgstr "Telegram, Google Drive und Calendar, Notion, RSS, Webhooks und MCP-Server, die deine bestehenden Tools erreichen."
+
+#: lib/magus_web/content/page_html/home.html.heex:151
+#, elixir-autogen, elixir-format
+msgid "Telegram, Google Drive and Calendar, Notion, RSS, webhooks, and MCP servers. Your agents reach into the tools you already use."
+msgstr "Telegram, Google Drive und Calendar, Notion, RSS, Webhooks und MCP-Server. Deine Agenten greifen auf die Tools zu, die du bereits verwendest."
+
+#: lib/magus_web/content/page_html/marketing_components.ex:115
+#, elixir-autogen, elixir-format
+msgid "Terms"
+msgstr "AGB"
+
+#: lib/magus_web/content/page_html/product.html.heex:51
+#, elixir-autogen, elixir-format
+msgid "The ReAct loop"
+msgstr "Die ReAct-Schleife"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:82
+#, elixir-autogen, elixir-format
+msgid "The agentic AI workbench. Open at the core, sovereign by design, made in Zürich."
+msgstr "Die agentische KI-Workbench. Im Kern offen, souverän von Design, gemacht in Zürich."
+
+#: lib/magus_web/content/page_html/open.html.heex:104
+#, elixir-autogen, elixir-format
+msgid "The best AI tools are built in the open, with the people who use them. Magus is yours too, shape it with us."
+msgstr "Die besten KI-Tools entstehen offen, mit den Menschen, die sie nutzen. Magus gehört auch dir, gestalte es mit uns."
+
+#: lib/magus_web/content/page_html/home.html.heex:188
+#, elixir-autogen, elixir-format
+msgid "The capability is the point. Owning it is the spine. Magus is open at the core and runs where you choose."
+msgstr "Die Fähigkeit ist der Kern. Sie zu besitzen ist das Rückgrat. Magus ist im Kern offen und läuft, wo du es möchtest."
+
+#: lib/magus_web/content/page_html/home.html.heex:207
+#: lib/magus_web/content/page_html/open.html.heex:54
+#, elixir-autogen, elixir-format
+msgid "The codebase is Apache-2.0 and auditable. No black box, no lock-in. Inspect exactly what runs."
+msgstr "Die Codebasis ist Apache-2.0 und prüfbar. Keine Black Box, kein Lock-in. Prüfe genau, was ausgeführt wird."
+
+#: lib/magus_web/content/page_html/open.html.heex:175
+#, elixir-autogen, elixir-format
+msgid "The commercial wrapper"
+msgstr "Der kommerzielle Wrapper"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:103
+#, elixir-autogen, elixir-format
+msgid "The honest answers."
+msgstr "Die ehrlichen Antworten."
+
+#: lib/magus_web/content/page_html/pricing.html.heex:89
+#, elixir-autogen, elixir-format
+msgid "The open core is Apache-2.0. One compose file, your hardware, your model keys. No base fee, no per-person cost, ever."
+msgstr "Der Open Core ist Apache-2.0. Eine Compose-Datei, deine Hardware, deine Modell-Schlüssel. Keine Grundgebühr, keine Kosten pro Person, nie."
+
+#: lib/magus_web/content/page_html/open.html.heex:164
+#, elixir-autogen, elixir-format
+msgid "The product"
+msgstr "Das Produkt"
+
+#: lib/magus_web/content/page_html/home.html.heex:30
+#, elixir-autogen, elixir-format
+msgid "The workbench where AI does the work."
+msgstr "Die Workbench, wo KI die Arbeit erledigt."
+
+#: lib/magus_web/content/page_html/pricing.html.heex:142
+#, elixir-autogen, elixir-format
+msgid "Try it for a franc. Scale when it earns its keep."
+msgstr "Für einen Franken testen. Skalieren, wenn es sich bewährt."
+
+#: lib/magus_web/content/page_html/home.html.heex:220
+#: lib/magus_web/content/page_html/open.html.heex:67
+#, elixir-autogen, elixir-format
+msgid "US / EU / CH / gated"
+msgstr "US / EU / CH / gesperrt"
+
+#: lib/magus_web/content/page_html.ex:58
+#, elixir-autogen, elixir-format
+msgid "United States"
+msgstr "Vereinigte Staaten"
+
+#: lib/magus_web/content/page_html/open.html.heex:168
+#, elixir-autogen, elixir-format
+msgid "Usage governance: spend caps, limits, audit"
+msgstr "Nutzungssteuerung: Ausgabenlimits, Beschränkungen, Audit"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:122
+#, elixir-autogen, elixir-format
+msgid "What does self-hosting cost?"
+msgstr "Was kostet das Selbst-Hosten?"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:104
+#, elixir-autogen, elixir-format
+msgid "What you'd ask before putting your team's work on it."
+msgstr "Was du fragen würdest, bevor du die Arbeit deines Teams darauf ablegst."
+
+#: lib/magus_web/content/page_html/open.html.heex:153
+#, elixir-autogen, elixir-format
+msgid "What's open, and what's not."
+msgstr "Was offen ist und was nicht."
+
+#: lib/magus_web/content/page_html/pricing.html.heex:129
+#, elixir-autogen, elixir-format
+msgid "Where does my data live, and can I bring my own models?"
+msgstr "Wo liegen meine Daten, und kann ich eigene Modelle mitbringen?"
+
+#: lib/magus_web/content/page_html/product.html.heex:146
+#, elixir-autogen, elixir-format
+msgid "Wikilinks & backlinks"
+msgstr "Wikilinks & Backlinks"
+
+#: lib/magus_web/content/page_html/home.html.heex:121
+#: lib/magus_web/content/page_html/product.html.heex:209
+#, elixir-autogen, elixir-format
+msgid "Workbench"
+msgstr "Workbench"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:109
+#, elixir-autogen, elixir-format
+msgid "You pay one monthly base fee, which is lower the more people use Magus, then the exact provider cost of the models you run, with no markup. Spend caps and per-workspace limits are built in, so there are no surprises."
+msgstr "Du zahlst eine monatliche Grundgebühr, die sinkt, je mehr Menschen Magus nutzen, dann den exakten Anbieterpreis der Modelle, die du verwendest, ohne Aufschlag. Ausgabenlimits und Workspace-Beschränkungen sind eingebaut, also keine Überraschungen."
+
+#: lib/magus_web/content/page_html/home.html.heex:66
+#, elixir-autogen, elixir-format
+msgid "Your agent reaches the brain, your files, a sandbox, and the web, then reports back. One context, no copy-paste between tools."
+msgstr "Dein Agent greift auf das Brain, deine Dateien, eine Sandbox und das Web zu und berichtet zurück. Ein Kontext, kein Kopieren zwischen Tools."
+
+#: lib/magus_web/content/page_html/home.html.heex:186
+#: lib/magus_web/content/page_html/open.html.heex:42
+#, elixir-autogen, elixir-format
+msgid "Your data. Your models. Your jurisdiction."
+msgstr "Deine Daten. Deine Modelle. Deine Jurisdiktion."
+
+#: lib/magus_web/content/page_html/marketing_components.ex:122
+#, elixir-autogen, elixir-format
+msgid "Zürich, Switzerland · arcane, precise, sovereign · © 2026"
+msgstr "Zürich, Schweiz · arkan, präzise, souverän · © 2026"
+
+#: lib/magus_web/content/page_html/product.html.heex:190
+#, elixir-autogen, elixir-format
+msgid "[[Board]]"
+msgstr "[[Vorstand]]"
+
+#: lib/magus_web/content/page_html/product.html.heex:198
+#, elixir-autogen, elixir-format
+msgid "[[Metrics]]"
+msgstr "[[Kennzahlen]]"
+
+#: lib/magus_web/content/page_html/product.html.heex:181
+#, elixir-autogen, elixir-format
+msgid "[[Q3 Plan]]"
+msgstr "[[Q3-Plan]]"
+
+#: lib/magus_web/content/page_html/product.html.heex:186
+#, elixir-autogen, elixir-format
+msgid "[[Revenue]]"
+msgstr "[[Umsatz]]"
+
+#: lib/magus_web/content/page_html/product.html.heex:194
+#, elixir-autogen, elixir-format
+msgid "[[Risks]]"
+msgstr "[[Risiken]]"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:424
+#: lib/magus_web/content/page_html/product.html.heex:122
+#, elixir-autogen, elixir-format
+msgid "agent"
+msgstr "agent"
+
+#: lib/magus_web/content/page_html/product.html.heex:72
+#, elixir-autogen, elixir-format
+msgid "agent graph"
+msgstr "agentengraph"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:304
+#, elixir-autogen, elixir-format
+msgid "agent running"
+msgstr "agent läuft"
+
+#: lib/magus_web/content/page_html/home.html.heex:8
+#, elixir-autogen, elixir-format
+msgid "agentic ai workbench · zürich"
+msgstr "agentische ki-workbench · zürich"
+
+#: lib/magus_web/content/page_html/home.html.heex:13
+#, elixir-autogen, elixir-format
+msgid "agentic workbench"
+msgstr "agentische workbench"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:312
+#, elixir-autogen, elixir-format
+msgid "agents"
+msgstr "agenten"
+
+#: lib/magus_web/content/page_html/open.html.heex:140
+#, elixir-autogen, elixir-format
+msgid "allowed"
+msgstr "erlaubt"
+
+#: lib/magus_web/content/page_html/product.html.heex:12
+#, elixir-autogen, elixir-format
+msgid "also"
+msgstr "auch"
+
+#: lib/magus_web/content/page_html/product.html.heex:272
+#, elixir-autogen, elixir-format
+msgid "also in the box"
+msgstr "auch dabei"
+
+#: lib/magus_web/content/page_html/product.html.heex:137
+#, elixir-autogen, elixir-format
+msgid "and a cross-resource graph that searches everything you've written, uploaded, or said."
+msgstr "und ein ressourcenübergreifender Graph, der alles durchsucht, was du geschrieben, hochgeladen oder gesagt hast."
+
+#: lib/magus_web/content/page_html/home.html.heex:111
+#, elixir-autogen, elixir-format
+msgid "and a graph that searches everything you've written, uploaded, or said."
+msgstr "und ein Graph, der alles durchsucht, was du geschrieben, hochgeladen oder gesagt hast."
+
+#: lib/magus_web/content/page_html/open.html.heex:15
+#, elixir-autogen, elixir-format
+msgid "any · country-classified"
+msgstr "beliebig · nach Land klassifiziert"
+
+#: lib/magus_web/content/page_html/home.html.heex:211
+#: lib/magus_web/content/page_html/open.html.heex:14
+#: lib/magus_web/content/page_html/open.html.heex:58
+#, elixir-autogen, elixir-format
+msgid "apache-2.0"
+msgstr "apache-2.0"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:52
+#, elixir-autogen, elixir-format
+msgid "base / month"
+msgstr "basis / monat"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:344
+#, elixir-autogen, elixir-format
+msgid "board-update.pdf"
+msgstr "board-update.pdf"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:310
+#: lib/magus_web/content/page_html/marketing_components.ex:399
+#: lib/magus_web/content/page_html/product.html.heex:92
+#, elixir-autogen, elixir-format
+msgid "brain"
+msgstr "brain"
+
+#: lib/magus_web/content/page_html/product.html.heex:324
+#, elixir-autogen, elixir-format
+msgid "calendar"
+msgstr "kalender"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:309
+#, elixir-autogen, elixir-format
+msgid "chat"
+msgstr "chat"
+
+#: lib/magus_web/content/page_html/product.html.heex:11
+#, elixir-autogen, elixir-format
+msgid "chat · agents · brain"
+msgstr "chat · agenten · brain"
+
+#: lib/magus_web/content/page_html/open.html.heex:174
+#, elixir-autogen, elixir-format
+msgid "cloud edition"
+msgstr "cloud-edition"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:351
+#, elixir-autogen, elixir-format
+msgid "companion · draft"
+msgstr "companion · entwurf"
+
+#: lib/magus_web/content/page_html/open.html.heex:141
+#, elixir-autogen, elixir-format
+msgid "consent required"
+msgstr "zustimmung erforderlich"
+
+#: lib/magus_web/content/page_html/home.html.heex:18
+#: lib/magus_web/content/page_html/home.html.heex:47
+#: lib/magus_web/content/page_html/open.html.heex:14
+#, elixir-autogen, elixir-format
+msgid "core"
+msgstr "kern"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:347
+#, elixir-autogen, elixir-format
+msgid "delivered to thread →"
+msgstr "in thread geliefert →"
+
+#: lib/magus_web/content/page_html/home.html.heex:229
+#: lib/magus_web/content/page_html/open.html.heex:76
+#, elixir-autogen, elixir-format
+msgid "docker compose up"
+msgstr "docker compose up"
+
+#: lib/magus_web/content/page_html/home.html.heex:235
+#: lib/magus_web/content/page_html/open.html.heex:91
+#, elixir-autogen, elixir-format
+msgid "docker-compose.yml"
+msgstr "docker-compose.yml"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:52
+#, elixir-autogen, elixir-format
+msgid "docs"
+msgstr "docs"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:418
+#: lib/magus_web/content/page_html/product.html.heex:116
+#, elixir-autogen, elixir-format
+msgid "draft"
+msgstr "entwurf"
+
+#: lib/magus_web/content/page_html/home.html.heex:130
+#, elixir-autogen, elixir-format
+msgid "draft mode"
+msgstr "entwurfsmodus"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:337
+#, elixir-autogen, elixir-format
+msgid "draft.write"
+msgstr "draft.write"
+
+#: lib/magus_web/content/page_html/product.html.heex:321
+#, elixir-autogen, elixir-format
+msgid "drive"
+msgstr "drive"
+
+#: lib/magus_web/content/page_html/product.html.heex:126
+#, elixir-autogen, elixir-format
+msgid "fig. a · agent + tools"
+msgstr "abb. a · agent + tools"
+
+#: lib/magus_web/content/page_html/product.html.heex:202
+#, elixir-autogen, elixir-format
+msgid "fig. b · wikilink graph"
+msgstr "abb. b · wikilink-graph"
+
+#: lib/magus_web/content/page_html/product.html.heex:263
+#, elixir-autogen, elixir-format
+msgid "fig. c · primary + companion panes"
+msgstr "abb. c · primär + companion-bereiche"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:311
+#: lib/magus_web/content/page_html/marketing_components.ex:413
+#: lib/magus_web/content/page_html/product.html.heex:110
+#, elixir-autogen, elixir-format
+msgid "files"
+msgstr "dateien"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:343
+#, elixir-autogen, elixir-format
+msgid "files.export"
+msgstr "files.export"
+
+#: lib/magus_web/content/page_html/open.html.heex:41
+#, elixir-autogen, elixir-format
+msgid "four guarantees"
+msgstr "vier garantien"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:19
+#, elixir-autogen, elixir-format
+msgid "free"
+msgstr "kostenlos"
+
+#: lib/magus_web/content/page_html/open.html.heex:152
+#, elixir-autogen, elixir-format
+msgid "honest by default"
+msgstr "ehrlich als standard"
+
+#: lib/magus_web/content/page_html/home.html.heex:20
+#: lib/magus_web/content/page_html/home.html.heex:48
+#, elixir-autogen, elixir-format
+msgid "hosting"
+msgstr "hosting"
+
+#: lib/magus_web/content/page_html/home.html.heex:61
+#, elixir-autogen, elixir-format
+msgid "how it works"
+msgstr "wie es funktioniert"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:75
+#, elixir-autogen, elixir-format
+msgid "illustrative base fees; the live figure tracks the current size of the Magus user base. No free plan and no custom plan, just this, or self-host."
+msgstr "illustrative grundgebühren; die live-zahl folgt der aktuellen größe der Magus-nutzerbasis. Kein kostenloser und kein individueller Plan, nur dieser, oder selbst hosten."
+
+#: lib/magus_web/content/page_html/product.html.heex:11
+#, elixir-autogen, elixir-format
+msgid "instruments"
+msgstr "instrumente"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:113
+#, elixir-autogen, elixir-format
+msgid "legal"
+msgstr "rechtliches"
+
+#: lib/magus_web/content/page_html/home.html.heex:16
+#: lib/magus_web/content/page_html/open.html.heex:12
+#, elixir-autogen, elixir-format
+msgid "license"
+msgstr "lizenz"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:51
+#, elixir-autogen, elixir-format
+msgid "magus users"
+msgstr "magus-nutzer"
+
+#: lib/magus_web/content/page_html/home.html.heex:158
+#: lib/magus_web/content/page_html/product.html.heex:307
+#: lib/magus_web/content/page_html/product.html.heex:333
+#, elixir-autogen, elixir-format
+msgid "mcp"
+msgstr "mcp"
+
+#: lib/magus_web/content/page_html/home.html.heex:116
+#: lib/magus_web/content/page_html/marketing_components.ex:395
+#: lib/magus_web/content/page_html/product.html.heex:86
+#, elixir-autogen, elixir-format
+msgid "memory"
+msgstr "memory"
+
+#: lib/magus_web/content/page_html/open.html.heex:92
+#, elixir-autogen, elixir-format
+msgid "mix magus.doctor"
+msgstr "mix magus.doctor"
+
+#: lib/magus_web/content/page_html/open.html.heex:117
+#, elixir-autogen, elixir-format
+msgid "model residency"
+msgstr "modell-residenz"
+
+#: lib/magus_web/content/page_html/home.html.heex:236
+#, elixir-autogen, elixir-format
+msgid "model residency table"
+msgstr "modell-residenztabelle"
+
+#: lib/magus_web/content/page_html/home.html.heex:46
+#: lib/magus_web/content/page_html/open.html.heex:15
+#, elixir-autogen, elixir-format
+msgid "models"
+msgstr "modelle"
+
+#: lib/magus_web/content/page_html/home.html.heex:101
+#, elixir-autogen, elixir-format
+msgid "multi-agent"
+msgstr "multi-agent"
+
+#: lib/magus_web/content/page_html/home.html.heex:142
+#: lib/magus_web/content/page_html/product.html.heex:291
+#, elixir-autogen, elixir-format
+msgid "multiplayer"
+msgstr "multiplayer"
+
+#: lib/magus_web/content/page_html/home.html.heex:157
+#: lib/magus_web/content/page_html/product.html.heex:306
+#: lib/magus_web/content/page_html/product.html.heex:327
+#, elixir-autogen, elixir-format
+msgid "notion"
+msgstr "notion"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:14
+#: lib/magus_web/content/page_html/product.html.heex:16
+#, elixir-autogen, elixir-format
+msgid "one"
+msgstr "ein"
+
+#: lib/magus_web/content/page_html/home.html.heex:169
+#: lib/magus_web/content/page_html/product.html.heex:344
+#, elixir-autogen, elixir-format
+msgid "one context"
+msgstr "ein kontext"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:46
+#: lib/magus_web/content/page_html/open.html.heex:10
+#, elixir-autogen, elixir-format
+msgid "open"
+msgstr "offen"
+
+#: lib/magus_web/content/page_html/open.html.heex:192
+#, elixir-autogen, elixir-format
+msgid "open the workbench"
+msgstr "workbench öffnen"
+
+#: lib/magus_web/content/page_html/home.html.heex:39
+#: lib/magus_web/content/page_html/marketing_components.ex:58
+#: lib/magus_web/content/page_html/marketing_components.ex:89
+#: lib/magus_web/content/page_html/pricing.html.heex:69
+#: lib/magus_web/content/page_html/pricing.html.heex:144
+#: lib/magus_web/content/page_html/product.html.heex:28
+#: lib/magus_web/content/page_html/product.html.heex:360
+#, elixir-autogen, elixir-format
+msgid "open the workbench →"
+msgstr "Workbench öffnen →"
+
+#: lib/magus_web/content/page_html/open.html.heex:22
+#, elixir-autogen, elixir-format
+msgid "openness"
+msgstr "offenheit"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:17
+#, elixir-autogen, elixir-format
+msgid "or"
+msgstr "oder"
+
+#: lib/magus_web/content/page_html/home.html.heex:24
+#, elixir-autogen, elixir-format
+msgid "origin"
+msgstr "herkunft"
+
+#: lib/magus_web/content/page_html/home.html.heex:128
+#, elixir-autogen, elixir-format
+msgid "panes"
+msgstr "bereiche"
+
+#: lib/magus_web/content/page_html/product.html.heex:155
+#, elixir-autogen, elixir-format
+msgid "pgvector over pages, files, drafts, and memories."
+msgstr "pgvector über Seiten, Dateien, Entwürfe und Memories."
+
+#: lib/magus_web/content/page_html/pricing.html.heex:12
+#, elixir-autogen, elixir-format
+msgid "plan"
+msgstr "plan"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:322
+#, elixir-autogen, elixir-format
+msgid "planning 4 steps"
+msgstr "planung 4 schritte"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:49
+#: lib/magus_web/content/page_html/pricing.html.heex:10
+#: lib/magus_web/content/page_html/pricing.html.heex:22
+#, elixir-autogen, elixir-format
+msgid "pricing"
+msgstr "preise"
+
+#: lib/magus_web/content/page_html/home.html.heex:12
+#: lib/magus_web/content/page_html/marketing_components.ex:43
+#: lib/magus_web/content/page_html/marketing_components.ex:98
+#: lib/magus_web/content/page_html/product.html.heex:10
+#, elixir-autogen, elixir-format
+msgid "product"
+msgstr "produkt"
+
+#: lib/magus_web/content/page_html/open.html.heex:129
+#, elixir-autogen, elixir-format
+msgid "providers"
+msgstr "anbieter"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:302
+#, elixir-autogen, elixir-format
+msgid "q3 board update"
+msgstr "q3-vorstandsupdate"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:102
+#, elixir-autogen, elixir-format
+msgid "questions"
+msgstr "fragen"
+
+#: lib/magus_web/content/page_html/home.html.heex:100
+#, elixir-autogen, elixir-format
+msgid "react"
+msgstr "react"
+
+#: lib/magus_web/content/page_html/home.html.heex:233
+#: lib/magus_web/content/page_html/open.html.heex:89
+#, elixir-autogen, elixir-format
+msgid "read the license"
+msgstr "lizenz lesen"
+
+#: lib/magus_web/content/page_html/open.html.heex:31
+#, elixir-autogen, elixir-format
+msgid "read the source →"
+msgstr "quellcode lesen →"
+
+#: lib/magus_web/content/page_html/open.html.heex:128
+#, elixir-autogen, elixir-format
+msgid "region"
+msgstr "region"
+
+#: lib/magus_web/content/page_html/home.html.heex:81
+#, elixir-autogen, elixir-format
+msgid "register"
+msgstr "registrieren"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:106
+#, elixir-autogen, elixir-format
+msgid "resources"
+msgstr "ressourcen"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:326
+#, elixir-autogen, elixir-format
+msgid "retention benchmarks"
+msgstr "retention-benchmarks"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:332
+#, elixir-autogen, elixir-format
+msgid "revenue.csv → chart"
+msgstr "revenue.csv → diagramm"
+
+#: lib/magus_web/content/page_html/product.html.heex:330
+#, elixir-autogen, elixir-format
+msgid "rss"
+msgstr "rss"
+
+#: lib/magus_web/content/page_html/open.html.heex:17
+#, elixir-autogen, elixir-format
+msgid "run it"
+msgstr "ausführen"
+
+#: lib/magus_web/content/page_html/home.html.heex:102
+#: lib/magus_web/content/page_html/marketing_components.ex:408
+#: lib/magus_web/content/page_html/product.html.heex:104
+#, elixir-autogen, elixir-format
+msgid "sandbox"
+msgstr "sandbox"
+
+#: lib/magus_web/content/page_html/product.html.heex:12
+#, elixir-autogen, elixir-format
+msgid "sandbox · collaboration"
+msgstr "sandbox · kollaboration"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:331
+#, elixir-autogen, elixir-format
+msgid "sandbox.run"
+msgstr "sandbox.run"
+
+#: lib/magus_web/content/page_html/open.html.heex:10
+#: lib/magus_web/content/page_html/pricing.html.heex:10
+#: lib/magus_web/content/page_html/product.html.heex:10
+#, elixir-autogen, elixir-format
+msgid "section"
+msgstr "bereich"
+
+#: lib/magus_web/content/page_html/open.html.heex:19
+#: lib/magus_web/content/page_html/pricing.html.heex:19
+#, elixir-autogen, elixir-format
+msgid "self-host"
+msgstr "selbst hosten"
+
+#: lib/magus_web/content/page_html/home.html.heex:42
+#: lib/magus_web/content/page_html/open.html.heex:32
+#: lib/magus_web/content/page_html/pricing.html.heex:145
+#: lib/magus_web/content/page_html/product.html.heex:29
+#: lib/magus_web/content/page_html/product.html.heex:361
+#, elixir-autogen, elixir-format
+msgid "self-host it"
+msgstr "selbst hosten"
+
+#: lib/magus_web/content/page_html/open.html.heex:191
+#, elixir-autogen, elixir-format
+msgid "self-host it →"
+msgstr "selbst hosten →"
+
+#: lib/magus_web/content/page_html/home.html.heex:115
+#, elixir-autogen, elixir-format
+msgid "semantic"
+msgstr "semantisch"
+
+#: lib/magus_web/content/page_html/product.html.heex:14
+#, elixir-autogen, elixir-format
+msgid "shape"
+msgstr "form"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:56
+#, elixir-autogen, elixir-format
+msgid "sign in"
+msgstr "anmelden"
+
+#: lib/magus_web/content/page_html/home.html.heex:185
+#, elixir-autogen, elixir-format
+msgid "sovereignty"
+msgstr "souveränität"
+
+#: lib/magus_web/content/page_html/open.html.heex:130
+#, elixir-autogen, elixir-format
+msgid "status"
+msgstr "status"
+
+#: lib/magus_web/content/page_html/home.html.heex:144
+#: lib/magus_web/content/page_html/product.html.heex:293
+#, elixir-autogen, elixir-format
+msgid "tasks"
+msgstr "aufgaben"
+
+#: lib/magus_web/content/page_html/home.html.heex:156
+#: lib/magus_web/content/page_html/product.html.heex:305
+#: lib/magus_web/content/page_html/product.html.heex:318
+#, elixir-autogen, elixir-format
+msgid "telegram"
+msgstr "telegram"
+
+#: lib/magus_web/content/page_html/open.html.heex:101
+#, elixir-autogen, elixir-format
+msgid "the bet"
+msgstr "die wette"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:39
+#, elixir-autogen, elixir-format
+msgid "the magus plan"
+msgstr "der magus-plan"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:86
+#, elixir-autogen, elixir-format
+msgid "the other option"
+msgstr "die andere option"
+
+#: lib/magus_web/content/page_html/product.html.heex:19
+#, elixir-autogen, elixir-format
+msgid "the product"
+msgstr "das produkt"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:15
+#, elixir-autogen, elixir-format
+msgid "try it"
+msgstr "testen"
+
+#: lib/magus_web/content/page_html/home.html.heex:234
+#: lib/magus_web/content/page_html/open.html.heex:90
+#, elixir-autogen, elixir-format
+msgid "view the source"
+msgstr "quellcode ansehen"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:403
+#: lib/magus_web/content/page_html/product.html.heex:98
+#, elixir-autogen, elixir-format
+msgid "web"
+msgstr "web"
+
+#: lib/magus_web/content/page_html/marketing_components.ex:325
+#, elixir-autogen, elixir-format
+msgid "web.search"
+msgstr "web.search"
+
+#: lib/magus_web/content/page_html/home.html.heex:114
+#, elixir-autogen, elixir-format
+msgid "wikilinks"
+msgstr "wikilinks"
+
+#: lib/magus_web/content/page_html/home.html.heex:143
+#: lib/magus_web/content/page_html/product.html.heex:292
+#, elixir-autogen, elixir-format
+msgid "workspaces"
+msgstr "arbeitsbereiche"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:14
+#, elixir-autogen, elixir-format
+msgid "· base + usage"
+msgstr "· basis + nutzung"
+
+#: lib/magus_web/content/page_html/open.html.heex:19
+#, elixir-autogen, elixir-format
+msgid "· swiss"
+msgstr "· schweiz"
+
+#: lib/magus_web/content/page_html/open.html.heex:163
+#, elixir-autogen, elixir-format
+msgid "◬ open core · apache-2.0"
+msgstr "◬ open core · apache-2.0"
+
+#: lib/magus_web/content/page_html/open.html.heex:8
+#, elixir-autogen, elixir-format
+msgid "◬ open · sovereign by design"
+msgstr "◬ offen · souverän von Design"
+
+#: lib/magus_web/content/page_html/pricing.html.heex:8
+#, elixir-autogen, elixir-format
+msgid "◬ pricing · simple, transparent"
+msgstr "◬ preise · einfach, transparent"
+
+#: lib/magus_web/content/page_html/product.html.heex:8
+#, elixir-autogen, elixir-format
+msgid "◬ product · agentic workbench"
+msgstr "◬ produkt · agentische workbench"

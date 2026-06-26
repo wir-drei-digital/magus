@@ -1,0 +1,72 @@
+# The directory Mix will write compiled artifacts to.
+/_build/
+
+# If you run "mix test --cover", coverage assets end up here.
+/cover/
+
+# The directory Mix downloads your dependencies sources to.
+/deps/
+
+# Where 3rd-party dependencies like ExDoc output generated docs.
+/doc/
+
+# Ignore .fetch files in case you like to edit your project deps locally.
+/.fetch
+
+# If the VM crashes, it generates a dump, let's ignore it too.
+erl_crash.dump
+
+# Also ignore archive artifacts (built via "mix archive.build").
+*.ez
+
+# Temporary files, for example, from tests.
+/tmp/
+
+# Ignore package tarball (built via "mix hex.build").
+magus-*.tar
+
+# Ignore assets that are produced by build tools.
+/priv/static/assets/
+
+# Ignore digested assets cache.
+/priv/static/cache_manifest.json
+
+# SvelteKit workbench build output (built from frontend/ via `npm run build`)
+/priv/static/next/
+
+# In case you use Node.js/npm, you want to ignore these.
+npm-debug.log
+/assets/node_modules/
+
+.rules
+
+.env
+
+priv/static/uploads/
+
+native/pdfrs/target/
+
+priv/native
+
+.DS_Store
+
+.sprite
+.worktrees/
+.superpowers/
+
+.claude/scheduled_tasks.lock
+.claude/plans
+
+# Eval benchmark dataset cache (downloaded datasets, never committed)
+/eval/cache/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+
+# Language server / editor caches
+/.elixir_ls/
+
+# Eval harness dataset cache (results are committed; cache is not)
+/eval/cache/

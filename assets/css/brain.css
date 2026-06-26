@@ -1,0 +1,31 @@
+/* ============================================
+   Brain Editor Styles
+   ============================================ */
+
+/* Highlight animation for remote block edits */
+.brain-remote-update {
+    animation: brain-remote-flash 1.5s ease-out;
+}
+
+@keyframes brain-remote-flash {
+    0% {
+        background-color: oklch(var(--p) / 0.15);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+/* Page reference links [[Page Name]] */
+.brain-page-ref {
+    color: oklch(var(--p));
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+}
+
+.brain-page-ref:hover {
+    text-decoration-style: solid;
+    opacity: 0.85;
+}

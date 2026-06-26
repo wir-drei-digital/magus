@@ -1,0 +1,128 @@
+/* ============================================================================
+   MAGUS DESIGN TOKENS  ·  paper-Swiss
+   One design language for the marketing site AND the app (light + dark).
+   Primitives are raw values; semantics are what components consume.
+   Components must ONLY use the semantic layer (var(--bg), var(--accent), ...),
+   never primitives or raw oklch. OKLCH throughout.
+
+   Token blocks are global (:root / [data-theme]); the app themes via a
+   `data-theme` attribute on <html>. Var names were verified collision-free
+   against the existing app CSS. The marketing COMPONENT layer lives in
+   magus-design.css, scoped under `.magus-site`, so it never touches the
+   classic workbench.
+   ============================================================================ */
+
+:root {
+  /* ---- PRIMITIVES ------------------------------------------------------- */
+  /* Neutral ramp — violet-cast (hue 300, the brand hue), NOT warm cream/sand.
+     The tint is subtle on the light end (a violet-cast paper) and the ramp
+     stays the light-oriented neutral spine; the dark theme overrides its own
+     surfaces with stronger chroma below, so this ramp need not carry both. */
+  --n-0:  oklch(99%   0.002 300);
+  --n-50: oklch(97.6% 0.006 300);   /* paper            */
+  --n-100:oklch(95.2% 0.008 300);
+  --n-150:oklch(92%   0.01  300);
+  --n-200:oklch(86%   0.011 300);
+  --n-300:oklch(72%   0.012 300);
+  --n-400:oklch(60%   0.013 300);
+  --n-500:oklch(45%   0.012 300);
+  --n-600:oklch(32%   0.013 300);
+  --n-700:oklch(23%   0.013 300);
+  --n-800:oklch(17%   0.014 300);   /* ink              */
+  --n-850:oklch(15%   0.013 300);   /* dark canvas      */
+  --n-900:oklch(12%   0.012 300);
+
+  /* Signal accent — ONE disciplined violet (amethyst/imperial, hue 300). Used flat for
+     actions, active state, emphasis, AND the logomark. Never a gradient, never glow.
+     Discipline + neutral-dominant layout is what keeps it from reading as generic-AI purple. */
+  --acc-500:oklch(52% 0.27 300);  --acc-600:oklch(47% 0.27 300);
+  --acc-400:oklch(62% 0.24 300);  --acc-350:oklch(67% 0.23 300);
+  /* Brand-mark variant (◬) — a touch brighter/more saturated than the accent. */
+  --mark-500:oklch(56% 0.28 300); --mark-300:oklch(73% 0.20 300);
+  /* Status */
+  --ok-500:oklch(52% 0.15 158); --ok-300:oklch(72% 0.15 160);
+  --warn-500:oklch(64% 0.15 70);
+  --danger-500:oklch(55% 0.22 27); --danger-400:oklch(64% 0.21 27);  /* errors/destructive (red) only */
+
+  /* ---- TYPE ------------------------------------------------------------- */
+  --f-display:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif; /* headings */
+  --f-mono:"Martian Mono",ui-monospace,Menlo,monospace;               /* labels, code, spec */
+  --f-body:"Inter",ui-sans-serif,system-ui,sans-serif;                /* prose, UI */
+  /* Fluid modular scale (>=1.25 between steps) */
+  --t-label: clamp(0.66rem,0.64rem+0.10vw,0.72rem);
+  --t-sm:    clamp(0.80rem,0.78rem+0.12vw,0.88rem);
+  --t-body:  clamp(0.95rem,0.92rem+0.20vw,1.05rem);
+  --t-lead:  clamp(1.04rem,0.98rem+0.30vw,1.20rem);
+  --t-h3:    clamp(1.30rem,1.10rem+0.60vw,1.70rem);
+  --t-h2:    clamp(1.90rem,1.40rem+2.00vw,3.30rem);
+  --t-display:clamp(2.90rem,1.90rem+4.60vw,5.90rem);
+  --track-display:-0.04em; --track-tight:-0.02em; --track-label:0.16em;
+  --leading-display:0.92; --leading-head:0.98; --leading-body:1.55;
+
+  /* ---- SPACE (4px base) ------------------------------------------------- */
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:24px;
+  --space-6:32px;--space-7:48px;--space-8:64px;--space-9:96px;--space-10:128px;
+
+  /* ---- RADIUS / BORDER / GRID / MOTION ---------------------------------- */
+  --radius-1:4px; --radius-2:8px; --radius-3:12px; --radius-4:18px;
+  --border-width:1px;
+  --grid-cols:12; --grid-max:1240px; --gutter:clamp(22px,5vw,60px);
+  --ease:cubic-bezier(0.16,1,0.3,1);
+  --dur-fast:0.15s; --dur-mid:0.30s; --dur-slow:0.70s;
+}
+
+/* ---- SEMANTIC · LIGHT (paper-Swiss; landing default + app light) -------- */
+:root, [data-theme="light"] {
+  --bg:var(--n-50); --surface:var(--n-100); --surface-2:var(--n-150);
+  --frame:var(--n-0); --frame-2:var(--n-100);              /* product UI panels */
+  --ink:var(--n-800); --ink-2:var(--n-600); --muted:var(--n-500);
+  --faint:oklch(51% 0.012 300); /* darkened from n-400 so small uppercase labels clear WCAG AA 4.5:1 */
+  --rule:oklch(20% 0.01 300 /0.14); --rule-2:oklch(20% 0.01 300 /0.26);
+  --hover:oklch(20% 0.01 300 /0.04); --grid:oklch(20% 0.01 300 /0.045);
+  --accent:var(--acc-500); --accent-h:var(--acc-600); --on-accent:var(--n-0);
+  --accent-soft:oklch(52% 0.27 300 /0.10);
+  --brand:var(--mark-500);                                  /* the ◬ — same family as accent */
+  --ok:var(--ok-500); --danger:var(--danger-500);
+  --card:var(--n-800); --on-card:var(--n-0);                /* invert block */
+  --card-pre:oklch(74% 0.16 300); --card-sub:oklch(80% 0.012 300);
+  --bar:oklch(97.6% 0.006 300 /0.86);
+  --shadow:0 30px 60px -34px oklch(20% 0.02 300 /0.30), 0 2px 6px -2px oklch(20% 0.02 300 /0.14);
+}
+
+/* ---- SEMANTIC · DARK (clean Swiss dark; app dark mode) ------------------ */
+[data-theme="dark"] {
+  /* Violet-tinted ink canvas (hue 300): the dark surfaces carry a real amethyst
+     tint so they harmonise with the accent. Overridden directly (not from the
+     light-oriented --n-* ramp) so the dark end can hold more chroma. */
+  --bg:oklch(16% 0.03 300); --surface:oklch(20% 0.04 300); --surface-2:oklch(24% 0.038 300);
+  --frame:oklch(20% 0.03 300); --frame-2:oklch(23.5% 0.035 300);
+  --ink:oklch(95% 0.008 300); --ink-2:oklch(80% 0.018 300); --muted:oklch(64% 0.022 300);
+  --faint:oklch(58% 0.016 300); /* lightened so small labels clear WCAG AA on the dark canvas */
+  --rule:oklch(100% 0 0 /0.11); --rule-2:oklch(100% 0 0 /0.21);
+  --hover:oklch(100% 0 0 /0.05); --grid:oklch(100% 0 0 /0.04);
+  --accent:var(--acc-400); --accent-h:var(--acc-350); --on-accent:var(--n-0);
+  --accent-soft:oklch(62% 0.24 300 /0.16);
+  --brand:var(--mark-300);
+  --ok:var(--ok-300); --danger:var(--danger-400);
+  --card:var(--n-50); --on-card:var(--n-800);               /* inverts: light card on dark */
+  --card-pre:oklch(56% 0.26 300); --card-sub:oklch(42% 0.014 300);
+  --bar:oklch(16% 0.03 300 /0.82);
+  --shadow:0 30px 70px -34px oklch(0% 0 0 /0.60), 0 2px 6px -2px oklch(0% 0 0 /0.45);
+}
+
+/* ============================================================================
+   APP ADOPTION (reference) — the SPA maps its own :root/.dark vars to these
+   VALUES in frontend/src/app.css (Task 3). The classic LiveView workbench is
+   intentionally NOT remapped here (spec §9). Kept as a comment so the DaisyUI
+   target names are documented in one place:
+
+   [data-theme="light"], [data-theme="dark"] {
+     --color-base-100: var(--bg);   --color-base-200: var(--surface);
+     --color-base-300: var(--surface-2); --color-base-content: var(--ink);
+     --color-primary: var(--accent);  --color-primary-content: var(--on-accent);
+     --color-secondary: var(--surface-2); --color-secondary-content: var(--ink);
+     --color-success: var(--ok); --color-error: var(--danger); --color-warning: var(--warn-500);
+     --color-primary-link: var(--brand);
+     --radius-box: var(--radius-3); --radius-field: var(--radius-2); --radius-selector: var(--radius-1);
+   }
+   ============================================================================ */

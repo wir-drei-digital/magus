@@ -1,0 +1,312 @@
+/* ============================================================================
+   MAGUS paper-Swiss — shared marketing component layer.
+   Consumes ONLY the semantic tokens from magus-tokens.css.
+   EVERYTHING is scoped under `.magus-site` (set on the marketing layout root)
+   so these resets + component classes never reach the classic workbench UI.
+   Ported from the approved comp `magus_shared.css`.
+   ============================================================================ */
+
+.magus-site, .magus-site * { box-sizing: border-box; margin: 0; padding: 0; }
+/* Paint the document canvas paper whenever a marketing page is present, so
+   overscroll / short-viewport areas below .magus-site don't reveal the app's
+   (possibly dark) body background. Scoped via :has() so the classic app is
+   unaffected. */
+html:has(.magus-site), body:has(.magus-site) { background: var(--bg); }
+.magus-site {
+  -webkit-font-smoothing: antialiased;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 16px;
+  line-height: 1.6;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  position: relative;
+}
+.magus-site a { color: inherit; text-decoration: none; }
+/* Keyboard focus: a clear violet ring on every interactive element. */
+.magus-site a:focus-visible, .magus-site .btn:focus-visible, .magus-site button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.magus-site .mono { font-family: var(--f-mono); font-weight: 500; }
+.magus-site .wrap { max-width: var(--grid-max); margin-inline: auto; padding-inline: var(--gutter); position: relative; }
+.magus-site .swiss { font-family: var(--f-display); font-weight: 800; letter-spacing: var(--track-display); line-height: .98; }
+
+/* Background grid — faint 12-col rule lines, identical site-wide. */
+.magus-site .gridlines { position: fixed; inset: 0; z-index: 0; pointer-events: none; max-width: var(--grid-max); margin-inline: auto; padding-inline: var(--gutter); }
+.magus-site .gridlines::before { content: ""; position: absolute; inset: 0 var(--gutter); background: repeating-linear-gradient(90deg, var(--grid) 0 1px, transparent 1px calc(100% / 12)); }
+.magus-site .app { position: relative; z-index: 1; }
+
+/* Nav bar */
+.magus-site .bar { position: sticky; top: 0; z-index: 40; background: var(--bar); backdrop-filter: blur(10px); border-bottom: 1px solid var(--rule); }
+.magus-site .bar .row { display: flex; align-items: center; gap: 28px; height: 60px; }
+.magus-site .brand { display: flex; align-items: baseline; gap: 9px; font-family: var(--f-display); font-weight: 800; letter-spacing: var(--track-tight); font-size: 20px; }
+.magus-site .brand .g { color: var(--brand); font-size: 24px; line-height: 1; transform: translateY(5px); }
+.magus-site .bar nav { display: flex; gap: 24px; margin-left: auto; font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.magus-site .bar nav a:hover { color: var(--ink); }
+.magus-site .bar nav a.on { color: var(--accent); }
+.magus-site .bar .sep { width: 1px; height: 18px; background: var(--rule-2); }
+
+/* Buttons */
+.magus-site .btn { display: inline-flex; align-items: center; gap: 7px; font-family: var(--f-mono); font-weight: 600; font-size: 12px; letter-spacing: .02em; padding: 9px 15px; cursor: pointer; border: 1px solid transparent; transition: transform .15s, background .18s, border-color .18s, color .18s; }
+.magus-site .btn-primary { background: var(--accent); color: var(--on-accent); }
+.magus-site .btn-primary:hover { background: var(--accent-h); transform: translateY(-1px); }
+.magus-site .btn-ghost { border-color: var(--rule-2); color: var(--ink); }
+.magus-site .btn-ghost:hover { border-color: var(--ink); background: var(--hover); }
+
+/* Invoice-style spec header */
+.magus-site .specrow { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 2px solid var(--ink); border-bottom: 1px solid var(--rule); margin: 24px 0 clamp(28px, 4vw, 50px); font-family: var(--f-mono); }
+.magus-site .specrow .cell { padding: 11px 16px 12px 0; border-right: 1px solid var(--rule); }
+.magus-site .specrow .cell:last-child { border-right: 0; }
+.magus-site .specrow .cell .l { font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+.magus-site .specrow .cell .v { font-size: 13px; color: var(--ink-2); margin-top: 4px; }
+.magus-site .specrow .cell .v b { color: var(--accent); font-weight: 600; }
+.magus-site .specrow .r { color: var(--accent); }
+
+/* Vertical rotated label */
+.magus-site .vlabel { position: absolute; left: 16px; top: 132px; writing-mode: vertical-rl; rotate: 180deg; font-family: var(--f-mono); font-size: 10px; letter-spacing: .3em; text-transform: uppercase; color: var(--faint); pointer-events: none; z-index: 2; }
+.magus-site .astx { color: var(--accent); letter-spacing: .3em; }
+@media (max-width: 1280px) { .magus-site .vlabel { display: none; } }
+@media (max-width: 600px) { .magus-site .specrow { grid-template-columns: repeat(2, 1fr); } .magus-site .specrow .cell:nth-child(2) { border-right: 0; } }
+
+/* Page head */
+.magus-site .phead { padding-top: clamp(8px, 2vw, 20px); padding-bottom: clamp(40px, 5vw, 68px); }
+.magus-site .phead .k { font-family: var(--f-mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); margin-bottom: 18px; }
+.magus-site .phead h1 { font-family: var(--f-display); font-weight: 800; font-size: clamp(3rem, 8vw, 6.6rem); line-height: .9; letter-spacing: -0.045em; max-width: 15ch; }
+.magus-site .phead p { margin-top: 22px; max-width: 54ch; font-size: clamp(1.04rem, 1.4vw, 1.2rem); color: var(--ink-2); line-height: 1.5; }
+.magus-site .phead .cta { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
+.magus-site .phead .cta .btn { padding: 13px 20px; font-size: 13px; }
+
+/* Section + section header */
+.magus-site .section { padding-block: clamp(56px, 7vw, 104px); position: relative; }
+.magus-site .shdr { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: clamp(20px, 3vw, 44px); align-items: end; border-top: 1px solid var(--rule-2); padding-top: 20px; }
+.magus-site .shdr .no { font-family: var(--f-mono); font-size: 11px; letter-spacing: .16em; color: var(--accent); text-transform: uppercase; }
+.magus-site .shdr h2 { font-family: var(--f-display); font-weight: 800; font-size: clamp(2.1rem, 4.6vw, 4rem); letter-spacing: -0.035em; line-height: .95; }
+.magus-site .shdr .d { margin-top: 14px; color: var(--muted); max-width: 50ch; font-size: 1.04rem; }
+
+/* Ruled register */
+.magus-site .reg { margin-top: clamp(26px, 3vw, 44px); border-top: 1px solid var(--ink); }
+.magus-site .row-p { display: grid; grid-template-columns: 40px minmax(150px, 3fr) minmax(0, 6fr) minmax(0, 3fr); gap: 24px; align-items: baseline; padding: 22px 0; border-bottom: 1px solid var(--rule); transition: background .15s; }
+.magus-site .row-p:hover { background: var(--hover); }
+.magus-site .row-p .n { font-family: var(--f-mono); font-size: 12px; color: var(--accent); }
+.magus-site .row-p h3 { font-family: var(--f-display); font-weight: 800; font-size: var(--t-h3); letter-spacing: var(--track-tight); }
+.magus-site .row-p .d { color: var(--muted); font-size: .98rem; line-height: 1.5; }
+.magus-site .row-p .t { display: flex; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+.magus-site .tag { font-family: var(--f-mono); font-size: 10.5px; color: var(--ink-2); border: 1px solid var(--rule-2); padding: 4px 8px; white-space: nowrap; }
+@media (max-width: 780px) { .magus-site .row-p { grid-template-columns: 28px 1fr; gap: 10px; } .magus-site .row-p .d, .magus-site .row-p .t { grid-column: 2 / -1; } .magus-site .row-p .t { justify-content: flex-start; } }
+
+/* Contained bold contrast card (the one inverting "orbit"/creed card per view) */
+.magus-site .creed { padding-block: clamp(36px, 5vw, 72px); }
+.magus-site .creedcard { position: relative; overflow: hidden; background: var(--card); color: var(--on-card); border-radius: 18px; padding: clamp(50px, 7vw, 92px) clamp(28px, 5vw, 60px); text-align: center; }
+.magus-site .creedcard::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--accent); }
+.magus-site .creedcard .pre { font-family: var(--f-mono); font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--card-pre); margin-bottom: 18px; }
+.magus-site .creedcard h2 { font-family: var(--f-display); font-weight: 800; font-size: clamp(2rem, 5vw, 4.2rem); letter-spacing: var(--track-display); line-height: .96; max-width: 20ch; margin-inline: auto; color: var(--on-card); }
+.magus-site .creedcard .ps { margin-top: 18px; max-width: 52ch; margin-inline: auto; color: var(--card-sub); font-size: 1.04rem; line-height: 1.5; }
+
+/* Manifest grid */
+.magus-site .man { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: clamp(26px, 3vw, 44px); border-top: 1px solid var(--ink); }
+.magus-site .man .c { padding: 24px 22px 0 0; border-right: 1px solid var(--rule); }
+.magus-site .man .c:last-child { border-right: 0; padding-right: 0; }
+.magus-site .man h4 { font-family: var(--f-display); font-weight: 800; font-size: 1.16rem; letter-spacing: var(--track-tight); margin-bottom: 9px; }
+.magus-site .man p { color: var(--muted); font-size: .92rem; line-height: 1.5; }
+.magus-site .man .meta { margin-top: 12px; font-family: var(--f-mono); font-size: 10px; letter-spacing: .04em; color: var(--accent); }
+
+/* Proof bar */
+.magus-site .proofbar { margin-top: clamp(24px, 3vw, 36px); display: flex; flex-wrap: wrap; border: 1px solid var(--rule-2); font-family: var(--f-mono); font-size: 11px; color: var(--ink-2); }
+.magus-site .proofbar a { padding: 12px 16px; border-right: 1px solid var(--rule); display: inline-flex; gap: 8px; align-items: center; }
+.magus-site .proofbar a:last-child { border-right: 0; }
+.magus-site .proofbar a:hover { background: var(--hover); }
+.magus-site .proofbar .r { color: var(--accent); }
+@media (max-width: 820px) { .magus-site .man { grid-template-columns: repeat(2, 1fr); } .magus-site .man .c { border-right: 0; padding-right: 18px; } }
+@media (max-width: 560px) {
+  .magus-site .man { grid-template-columns: 1fr; }
+  /* Compact nav: drop the center links, separator, and the secondary sign-in
+     ghost button so the brand + primary CTA fit a phone row (the CTA leads to
+     sign-in anyway). Tighten button sizing for the remaining controls. */
+  .magus-site .bar nav, .magus-site .bar .sep, .magus-site .bar .btn-ghost { display: none; }
+  .magus-site .bar .row { gap: 12px; }
+  .magus-site .btn { padding: 8px 11px; font-size: 11px; }
+}
+
+/* Footer */
+.magus-site footer { border-top: 1px solid var(--ink); padding-block: clamp(40px, 5vw, 64px) 26px; font-family: var(--f-mono); font-size: 11px; letter-spacing: .04em; color: var(--muted); }
+.magus-site .foot-grid { display: grid; grid-template-columns: minmax(0, 2.2fr) repeat(3, minmax(0, 1fr)); gap: clamp(24px, 4vw, 56px); padding-bottom: 32px; border-bottom: 1px solid var(--rule); }
+.magus-site .foot-brand .g { font-family: var(--f-display); font-weight: 800; color: var(--ink); font-size: 19px; letter-spacing: var(--track-tight); }
+.magus-site .foot-brand .g b { color: var(--brand); font-weight: 800; }
+.magus-site .foot-brand p { margin-top: 13px; max-width: 34ch; font-family: var(--f-body); font-size: 12.5px; line-height: 1.6; letter-spacing: 0; color: var(--muted); }
+.magus-site .foot-cta { margin-top: 18px; }
+.magus-site .foot-cta .btn { padding: 10px 16px; font-size: 12px; }
+.magus-site .foot-by { margin-top: 16px; font-size: 11.5px; letter-spacing: .02em; color: var(--muted); }
+.magus-site .foot-by a { color: var(--brand); transition: color .15s; }
+.magus-site .foot-by a:hover { color: var(--accent); }
+.magus-site .foot-col { display: flex; flex-direction: column; gap: 11px; }
+.magus-site .foot-h { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); margin-bottom: 3px; }
+.magus-site .foot-col a { font-family: var(--f-body); font-size: 13px; letter-spacing: 0; color: var(--ink-2); transition: color .15s; }
+.magus-site .foot-col a:hover { color: var(--accent); }
+.magus-site .foot-base { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding-top: 24px; }
+.magus-site .foot-base .g { font-family: var(--f-display); font-weight: 800; color: var(--ink); font-size: 14px; letter-spacing: var(--track-tight); }
+.magus-site .foot-base .g b { color: var(--brand); font-weight: 800; }
+@media (max-width: 760px) { .magus-site .foot-grid { grid-template-columns: 1fr 1fr; } .magus-site .foot-brand { grid-column: 1 / -1; } }
+@media (max-width: 460px) { .magus-site .foot-grid { grid-template-columns: 1fr; } }
+
+/* ============================================================================
+   HOME-SPECIFIC COMPONENT LAYER
+   Ported from the home comp `magus_home.html`. The shared `.specrow`/`.vlabel`
+   above are kept; the hero only adds a wrapper + a hero-placement `.vlabel`
+   override. Token aliases from the comp are translated to repo names:
+   --ok-c → --ok · --r3 → --radius-3 · --r4 → --radius-4
+   --dur1 → --dur-fast · --dur2 → --dur-mid · --dur3 → --dur-slow
+   ============================================================================ */
+
+/* Hero */
+.magus-site .hero { position: relative; padding-top: clamp(30px, 4vw, 58px); padding-bottom: clamp(48px, 6vw, 84px); }
+.magus-site .hero .vlabel { top: 50%; transform: translateY(-50%); }
+.magus-site .hgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(26px, 4vw, 54px); align-items: center; }
+.magus-site .htitle { font-family: var(--f-display); font-weight: 800; font-size: clamp(3rem, 8.8vw, 7.1rem); line-height: .88; letter-spacing: -0.045em; }
+.magus-site .hsub { margin-top: 24px; max-width: 42ch; font-size: var(--t-lead); color: var(--ink-2); line-height: 1.5; }
+.magus-site .hcta { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
+.magus-site .hcta .btn { padding: 13px 20px; font-size: 13px; }
+.magus-site .proof { margin-top: 24px; font-family: var(--f-mono); font-size: 11px; letter-spacing: .03em; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; }
+.magus-site .proof b { color: var(--ink-2); font-weight: 600; }
+
+/* Product frame (static hero mock) */
+.magus-site .frame { border: 1px solid var(--rule-2); border-radius: var(--radius-3); overflow: hidden; background: var(--frame); box-shadow: var(--shadow); }
+.magus-site .ftop { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 14px; border-bottom: 1px solid var(--rule); font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+.magus-site .ftop .g { color: var(--brand); font-size: 13px; }
+.magus-site .ftop .run { margin-left: auto; color: var(--accent); display: inline-flex; gap: 6px; align-items: center; }
+.magus-site .ftop .run i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.magus-site .fbody { display: grid; grid-template-columns: 54px 1fr 150px; height: 336px; }
+.magus-site .rail { border-right: 1px solid var(--rule); padding: 12px 0; display: flex; flex-direction: column; gap: 3px; align-items: center; }
+.magus-site .rail .m { width: 38px; height: 34px; border-radius: 7px; display: grid; place-items: center; font-family: var(--f-mono); font-size: 9px; color: var(--muted); gap: 2px; }
+.magus-site .rail .m b { display: block; width: 15px; height: 15px; border: 1.4px solid var(--muted); border-radius: 4px; }
+.magus-site .rail .m.on { background: var(--accent-soft); color: var(--accent); }
+.magus-site .rail .m.on b { border-color: var(--accent); }
+.magus-site .conv { padding: 16px; overflow: hidden; border-right: 1px solid var(--rule); }
+.magus-site .umsg { font-size: 12.5px; color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 9px; padding: 9px 11px; max-width: 90%; }
+.magus-site .arun { margin-top: 12px; font-family: var(--f-mono); font-size: 11px; line-height: 1.85; color: var(--ink-2); }
+.magus-site .arun .pl { color: var(--muted); }
+.magus-site .arun .st { display: grid; grid-template-columns: 18px 92px 1fr auto; gap: 8px; align-items: baseline; }
+.magus-site .arun .tl { color: var(--brand); }
+.magus-site .arun .ok { color: var(--ok); }
+.magus-site .arun .ix { color: var(--accent); }
+.magus-site .arun .dn { color: var(--ink); margin-top: 5px; }
+.magus-site .comp { padding: 14px 13px; background: var(--frame-2); }
+.magus-site .comp .ct { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-bottom: 9px; }
+.magus-site .comp h6 { font-family: var(--f-display); font-weight: 800; font-size: 13px; letter-spacing: var(--track-tight); margin-bottom: 7px; }
+.magus-site .comp p { font-size: 10.5px; color: var(--muted); line-height: 1.5; }
+.magus-site .comp .ln { height: 7px; background: var(--rule); border-radius: 3px; margin-top: 6px; }
+.magus-site .comp .ln.s { width: 70%; }
+
+/* How it works */
+.magus-site .how { padding-block: clamp(64px, 8vw, 104px); border-top: 1px solid var(--rule); }
+.magus-site .howgrid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(24px, 4vw, 52px); align-items: center; }
+.magus-site .how .k { font-family: var(--f-mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
+.magus-site .how h2 { font-family: var(--f-display); font-weight: 800; font-size: clamp(1.7rem, 3.2vw, 2.6rem); letter-spacing: var(--track-tight); line-height: 1; }
+.magus-site .how p { margin-top: 14px; color: var(--muted); max-width: 42ch; }
+.magus-site .gnode { fill: var(--frame); stroke: var(--ink); stroke-width: 1.3; }
+.magus-site .gnode.agent { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.6; }
+.magus-site .glabel { font-family: var(--f-mono); font-size: 11px; fill: var(--ink); letter-spacing: .01em; }
+.magus-site .glabel.a { fill: var(--accent); font-weight: 600; }
+.magus-site .gedge { stroke: var(--rule-2); stroke-width: 1; fill: none; }
+.magus-site .gedge.hot { stroke: var(--accent); stroke-width: 1.4; }
+
+/* Illustration SVGs scale to their container width (else the intrinsic viewBox
+   width overflows narrow viewports and clips on the right). */
+.magus-site .howgrid svg, .magus-site .viz svg { width: 100%; height: auto; }
+
+/* Home responsive overrides */
+@media (max-width: 560px) {
+  .magus-site .hgrid, .magus-site .howgrid { grid-template-columns: 1fr; }
+  .magus-site .fbody { grid-template-columns: 46px 1fr; }
+  .magus-site .comp { display: none; }
+  /* Pull the big display headings down so long words fit a phone column. */
+  .magus-site .htitle { font-size: clamp(2.4rem, 11vw, 7.1rem); }
+  .magus-site .phead h1 { font-size: clamp(2.3rem, 10vw, 6.6rem); }
+}
+
+@keyframes magus-pulse { 50% { opacity: .4; } }
+@media (prefers-reduced-motion: no-preference) {
+  .magus-site .ftop .run i { animation: magus-pulse 1.6s ease-in-out infinite; }
+}
+
+/* ── Product page ─────────────────────────────────────────────────────────── */
+.magus-site .pillsec { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(28px, 4vw, 60px); align-items: center; padding-block: clamp(46px, 6vw, 84px); border-top: 1px solid var(--rule); }
+.magus-site .pillsec.rev .txt { order: 2; }
+.magus-site .pillsec .nm { font-family: var(--f-display); font-weight: 800; font-size: clamp(1.8rem, 3vw, 2.6rem); letter-spacing: -0.03em; line-height: 1; }
+.magus-site .pillsec .lead { margin-top: 14px; color: var(--ink-2); font-size: 1.06rem; max-width: 46ch; line-height: 1.5; }
+.magus-site .pillsec .feat { margin-top: 22px; border-top: 1px solid var(--rule); }
+.magus-site .pillsec .feat .f { display: grid; grid-template-columns: 20px 1fr; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--rule); }
+.magus-site .pillsec .feat .f .n { display: block; width: 14px; height: 2px; background: var(--accent); margin-top: 10px; }
+.magus-site .pillsec .feat .f b { font-weight: 600; font-size: .96rem; }
+.magus-site .pillsec .feat .f p { color: var(--muted); font-size: .9rem; margin-top: 1px; }
+.magus-site .viz { border: 1px solid var(--rule-2); border-radius: 14px; background: var(--frame); box-shadow: var(--shadow); aspect-ratio: 4 / 3.1; display: grid; place-items: center; overflow: hidden; position: relative; }
+.magus-site .viz .vlbl { position: absolute; left: 13px; bottom: 11px; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); writing-mode: initial; rotate: initial; top: initial; }
+.magus-site .wl { width: 80%; height: 74%; position: relative; }
+.magus-site .wl svg { width: 100%; height: 100%; overflow: visible; }
+.magus-site .wnode { fill: var(--frame); stroke: var(--rule-2); stroke-width: 1.2; }
+.magus-site .wnode.hot { stroke: var(--accent); }
+.magus-site .wlabel { font-family: var(--f-mono); font-size: 10px; fill: var(--ink-2); }
+.magus-site .wedge { stroke: var(--rule-2); stroke-width: 1; stroke-dasharray: 3 3; fill: none; }
+.magus-site .intg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+.magus-site .intg .ig { background: var(--frame); display: flex; align-items: center; justify-content: center; font-family: var(--f-mono); font-size: 12px; color: var(--ink-2); gap: 6px; padding: 8px; }
+.magus-site .intg .ig b { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.magus-site .cta-band { text-align: center; padding-block: clamp(56px, 7vw, 100px); border-top: 1px solid var(--rule); }
+.magus-site .cta-band h2 { font-family: var(--f-display); font-weight: 800; font-size: var(--t-h2); letter-spacing: var(--track-display); max-width: 18ch; margin: 0 auto 24px; }
+.magus-site .cta-band .btn { padding: 13px 22px; font-size: 13px; }
+.magus-site .cta-band .btn + .btn { margin-left: 8px; }
+/* ── /open page: model-residency table ──────────────────────────────────── */
+.magus-site .res { margin-top: clamp(26px, 3vw, 44px); border: 1px solid var(--rule-2); font-family: var(--f-mono); font-size: 12.5px; }
+.magus-site .res .r { display: grid; grid-template-columns: 120px 1fr 130px; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--rule); align-items: center; }
+.magus-site .res .r:first-child { border-top: 0; color: var(--muted); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; }
+.magus-site .res .cc { font-weight: 600; }
+.magus-site .res .ok { color: var(--ok); }
+.magus-site .res .gated { color: var(--accent); }
+.magus-site .res .prov { color: var(--ink-2); }
+
+/* ── /open page: open-vs-cloud split ────────────────────────────────────── */
+.magus-site .split { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-top: clamp(26px, 3vw, 44px); border: 1px solid var(--rule-2); }
+.magus-site .split .col { padding: clamp(22px, 3vw, 34px); }
+.magus-site .split .col:first-child { border-right: 1px solid var(--rule-2); }
+.magus-site .split .col .h { font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+.magus-site .split .col.cloud .h { color: var(--muted); }
+.magus-site .split .col h3 { font-family: var(--f-display); font-weight: 800; font-size: 1.3rem; letter-spacing: var(--track-tight); margin-bottom: 6px; }
+.magus-site .split .col p { color: var(--muted); font-size: .96rem; margin-bottom: 14px; }
+.magus-site .split .col li { list-style: none; padding: 8px 0; border-top: 1px solid var(--rule); font-size: .94rem; display: flex; gap: 9px; align-items: baseline; }
+.magus-site .split .col li::before { content: ""; width: 12px; height: 2px; background: var(--accent); flex: none; transform: translateY(6px); }
+.magus-site .split .col.cloud li::before { background: var(--muted); }
+
+@media (max-width: 760px) {
+  .magus-site .pillsec { grid-template-columns: 1fr; }
+  .magus-site .pillsec.rev .txt { order: 0; }
+  .magus-site .split { grid-template-columns: 1fr; }
+  .magus-site .split .col:first-child { border-right: 0; border-bottom: 1px solid var(--rule-2); }
+  .magus-site .res .r { grid-template-columns: 90px 1fr; }
+  .magus-site .res .r span:nth-child(2) { display: none; }
+}
+
+/* ── /pricing page: plan block + declining base-fee table ───────────────── */
+.magus-site .plan { margin-top: clamp(26px, 3vw, 44px); border: 2px solid var(--ink); }
+.magus-site .plan .top { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; padding: clamp(22px, 3vw, 34px); border-bottom: 1px solid var(--rule); }
+.magus-site .plan .top .l .k { font-family: var(--f-mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+.magus-site .plan .top .l .big { font-family: var(--f-display); font-weight: 800; font-size: clamp(2rem, 3.6vw, 3rem); letter-spacing: var(--track-display); line-height: .95; }
+.magus-site .plan .top .r { font-family: var(--f-mono); font-size: .95rem; color: var(--muted); max-width: 34ch; text-align: right; }
+.magus-site .ptable { font-family: var(--f-mono); font-size: 13.5px; }
+.magus-site .ptable .row { display: grid; grid-template-columns: 1.6fr 1fr; border-top: 1px solid var(--rule); padding: 15px clamp(22px, 3vw, 34px); align-items: baseline; }
+.magus-site .ptable .row.h { border-top: 0; color: var(--faint); font-size: 10px; letter-spacing: .13em; text-transform: uppercase; }
+.magus-site .ptable .row .team { color: var(--ink); font-weight: 600; }
+.magus-site .ptable .row .base { color: var(--ink); }
+.magus-site .ptable .row .pu { color: var(--accent); }
+.magus-site .plan .foot { display: flex; justify-content: space-between; align-items: center; gap: 18px; flex-wrap: wrap; padding: 18px clamp(22px, 3vw, 34px); border-top: 2px solid var(--ink); font-family: var(--f-mono); font-size: 13px; color: var(--ink-2); }
+.magus-site .plan .foot b { color: var(--accent); font-weight: 600; }
+.magus-site .plan .foot .btn { padding: 11px 18px; font-size: 12.5px; }
+.magus-site .note { margin-top: 14px; font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+.magus-site .note .a { color: var(--accent); }
+
+/* ── /pricing page: FAQ ─────────────────────────────────────────────────── */
+.magus-site .faq dt { font-family: var(--f-display); font-weight: 800; font-size: 1.2rem; letter-spacing: -0.02em; padding-top: 20px; border-top: 1px solid var(--rule); }
+.magus-site .faq dd { color: var(--muted); font-size: .98rem; padding: 8px 0 20px; max-width: 64ch; }
+.magus-site .faq a { color: var(--accent); }
+
+@media (max-width: 620px) {
+  .magus-site .plan .top .r { text-align: left; }
+  .magus-site .ptable .row { grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+  .magus-site .ptable .row .pu { grid-column: 2; }
+}

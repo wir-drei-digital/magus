@@ -1,0 +1,29 @@
+[
+  {
+    "id": "home-city",
+    "ingest_items": [
+      {"role": "user", "text": "Quick bit of context about me before we start: I moved to Lisbon last year and I work as a marine biologist studying octopus cognition."},
+      {"role": "assistant", "text": "Thanks for the context. Lisbon is a wonderful base, and octopus cognition is a fascinating field. I will keep your background in mind."}
+    ],
+    "question": "Which city do I live in?",
+    "gold": "Lisbon"
+  },
+  {
+    "id": "profession",
+    "ingest_items": [
+      {"role": "user", "text": "Quick bit of context about me before we start: I moved to Lisbon last year and I work as a marine biologist studying octopus cognition."},
+      {"role": "assistant", "text": "Thanks for the context, that is really helpful. I will remember that you are a marine biologist whose research focuses on studying octopus cognition, and I will keep that in mind going forward."}
+    ],
+    "question": "What is my profession?",
+    "gold": "marine biologist"
+  },
+  {
+    "id": "dietary",
+    "ingest_items": [
+      {"role": "user", "text": "Important standing preference for any food suggestions you ever give me: I am strictly vegetarian and I am allergic to peanuts."},
+      {"role": "assistant", "text": "Understood. I will only suggest vegetarian options and will always avoid peanuts in anything I recommend."}
+    ],
+    "question": "Do I have any dietary restrictions?",
+    "gold": "vegetarian"
+  }
+]

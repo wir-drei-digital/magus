@@ -1,0 +1,21 @@
+{
+  "name": "magus-assets",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@univerjs/core": "^0.21.1",
+    "@univerjs/sheets": "^0.21.1",
+    "@univerjs/sheets-ui": "^0.21.1",
+    "html-to-image": "^1.11.13",
+    "lucide-static": "^0.562.0",
+    "pdfjs-dist": "^4.10.38",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "rxjs": "^7.8.0",
+    "tiptap-phoenix": "file:../deps/tiptap_phoenix/assets",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0"
+  }
+}

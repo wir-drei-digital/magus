@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg18-trixie
+    container_name: omnios_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: omnios_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    restart: unless-stopped
+
+  falkordb:
+    image: falkordb/falkordb:v4.18.7
+    container_name: magus_falkordb
+    ports:
+      - "6380:6379"
+      - "3000:3000"
+    volumes:
+      - falkordb_data:/var/lib/falkordb/data
+    environment:
+      REDIS_ARGS: "--appendonly yes --appendfsync everysec --dir /var/lib/falkordb/data --save 900 1 --save 300 10 --save 60 10000"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  falkordb_data:

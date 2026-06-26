@@ -1,0 +1,293 @@
+/* ============================================
+   Chat UI Styles
+   Message bubbles, streaming, thinking, spacing
+   ============================================ */
+
+/* Thinking spinner animation for AI responses */
+.thinking-spinner {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    color: var(--color-primary);
+    animation: thinking-spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes thinking-spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    50% {
+        transform: rotate(360deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* Typing dots animation for multiplayer */
+.thinking-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.thinking-dots .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: currentColor;
+    opacity: 0.4;
+    animation: thinking-pulse 1.4s ease-in-out infinite;
+}
+
+.thinking-dots .dot:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.thinking-dots .dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.thinking-dots .dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes thinking-pulse {
+    0%,
+    60%,
+    100% {
+        opacity: 0.4;
+        transform: scale(1);
+    }
+
+    30% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+}
+
+/* ============================================
+   Message Bubbles
+   ============================================ */
+
+.message-bubble {
+    padding: 0.75rem 1rem;
+}
+
+.prose a,
+.message-bubble a {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.prose a:hover,
+.message-bubble a:hover {
+    text-decoration: none;
+    transition: text-decoration 0.2s ease-in-out;
+}
+
+.prose a.card,
+.message-bubble a.card {
+    text-decoration: none;
+}
+
+.end .message-bubble {
+    background: oklch(from var(--color-primary) l c h / 0.3);
+    border-color: oklch(from var(--color-primary) l c h / 0.4);
+}
+
+/* Multiplayer: avatar sits at bottom-left -> sharp bottom-left corner */
+.multiplayer.start .message-bubble {
+    border-bottom-left-radius: 0;
+}
+
+/* Multiplayer: avatar sits at bottom-right -> sharp top-right corner */
+.multiplayer.end .message-bubble {
+    border-top-right-radius: 0;
+}
+
+/* Light mode: AI message background */
+[data-theme="light"] .start .message-bubble {
+    background: #e7e2ec;
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme]) .chat-start .message-bubble {
+        background: #e7e2ec;
+    }
+}
+
+.message-bubble.highlighted {
+    border-color: var(--color-yellow-400);
+}
+
+/* Prevent content overflow in message bubbles */
+.message-bubble table {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+.message-bubble img {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Message text selection popup */
+.message-selection-popup {
+    pointer-events: auto;
+    animation: fade-in-up 0.15s ease-out;
+}
+
+@keyframes fade-in-up {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -100%) translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -100%) translateY(0);
+    }
+}
+
+
+/* ============================================
+   Message Stream Spacing
+   All spacing via padding-top on sibling selectors
+   With flex-col-reverse: A + B means B is visually below A
+   ============================================ */
+
+/* Reset base */
+.msg-type-event,
+.msg-type-bubble {
+    margin: 0;
+    padding: 0.75rem 0;
+    /* 8px */
+}
+
+.msg-type-event {
+    padding: 0.5rem 0;
+    /* 4px */
+}
+
+/* Events: 4px between each other */
+.msg-type-event + .msg-type-event {
+    padding: 0.5rem 0;
+    /* 4px */
+}
+
+/* Messages: 8px between each other */
+.msg-type-bubble + .msg-type-bubble {
+    padding: 0.75rem 0;
+    /* 8px */
+}
+
+.msg-type-bubble:first-child {
+    padding-top: 0.75rem;
+}
+
+/* Event below message: 8px */
+.msg-type-bubble + .msg-type-event {
+    padding-top: 0.5rem;
+    padding-bottom: 0.75rem;
+    /* 8px */
+}
+
+.msg-type-bubble:has(+ .msg-type-event) {
+    padding-bottom: 0.75rem;
+}
+
+/* Message below events: 8px */
+.msg-type-event + .msg-type-bubble {
+    padding-top: 0.75rem;
+    /* 8px */
+    padding-bottom: 0.75rem;
+}
+
+.msg-type-event:has(+ .msg-type-bubble) {
+    padding-top: 0.75rem;
+    /* 8px */
+}
+
+/* ============================================
+   @Mention Highlight Backdrop
+   Mirror div behind textarea to render <mark> highlights
+   ============================================ */
+
+.mention-highlight-backdrop {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    /* Match textarea font/padding - inherits from parent */
+    font: inherit;
+    padding: inherit;
+    border: 1px solid transparent;
+    pointer-events: none;
+    color: transparent;
+    z-index: 0;
+}
+
+.mention-hl {
+    color: transparent;
+    background: oklch(from var(--color-primary) l c h / 0.15);
+    border-radius: 0.25rem;
+    padding: 1px 0;
+}
+
+.mention-agent,
+.slash-command {
+    color: oklch(from var(--color-primary) l c h);
+    font-weight: 500;
+}
+
+/* Chat title bar - glassmorphism effect */
+.chat-title-blur {
+    backdrop-filter: blur(12px);
+    /*-webkit-backdrop-filter: blur(12px);*/
+}
+
+/* Chat input specific - glassmorphism effect */
+.chat-input-card {
+    padding: 0.5rem;
+    background: oklch(from var(--color-base-100) l c h / 0.85);
+    backdrop-filter: blur(20px);
+    /*-webkit-backdrop-filter: blur(20px);*/
+}
+
+/* Light mode: glassmorphism effect with translucent background */
+[data-theme="light"] .chat-input-card {
+    background: oklch(from var(--color-base-100) l c h / 0.5);
+    backdrop-filter: blur(20px);
+    /*-webkit-backdrop-filter: blur(20px);*/
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme]) .chat-input-card {
+        background: oklch(from var(--color-base-100) l c h / 0.5);
+        backdrop-filter: blur(20px);
+        /*-webkit-backdrop-filter: blur(20px);*/
+    }
+}
+
+.chat-input-card:focus-within {
+    border-color: oklch(from var(--color-primary) l c h / 0.4);
+    box-shadow: 0 4px 16px oklch(from var(--color-primary) l c h / 0.12);
+}
+
+/* Dynamic viewport height support for mobile keyboard */
+@supports (height: 100dvh) {
+    .min-h-screen-dynamic {
+        min-height: 100dvh;
+    }
+}
+
+/* Fixed chat input - safe area padding for notched devices */
+#chat-input-fixed {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+}

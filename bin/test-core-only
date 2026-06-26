@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+#
+# Open-core gate: prove the pure open-core edition compiles and its composition
+# holds with NO billing/Stripe/Postmark dependency.
+#
+# Boots the build with MAGUS_CORE_ONLY=1, which makes config/config.exs compose
+# the open-core edition (no `Magus.Billing` Ash domain, no billing Oban work, the
+# Usage cloud-seam adapters fall back to their in-core no-op/Identity defaults,
+# `billing_edition?` false) and config/test.exs omit the Stripe test config. The
+# cloud env vars are unset first so a green run proves they are not required.
+#
+# This is the pre-split form of the Phase-4 core-only CI gate (magus-mxj5.1).
+# Until the web layer is carved (magus-mxj5.2-.5) it runs the boundary +
+# composition guards by default; pass extra test paths to widen the run, e.g.
+#   bin/test-core-only test/magus/usage
+#
+# Usage:
+#   bin/test-core-only                 # compile + open-core guard tests
+#   bin/test-core-only test/magus/...  # compile + the given test paths
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+export MIX_ENV=test
+export MAGUS_CORE_ONLY=1
+
+# Pull in DB/test secrets (INTEGRATION_ENCRYPTION_KEY, etc.) but NOT the cloud
+# keys: we unset those below to prove the open-core edition needs none of them.
+ENV_FILE="${ENV_FILE:-.env}"
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+
+unset STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET POSTMARK_API_KEY
+
+echo "==> Compiling open-core edition (--warnings-as-errors)"
+mix compile --warnings-as-errors --force
+
+if [ "$#" -gt 0 ]; then
+  TARGETS=("$@")
+else
+  TARGETS=(
+    test/magus/domains_test.exs
+    test/magus/open_core_boundary_test.exs
+  )
+fi
+
+echo "==> Running open-core guard tests: ${TARGETS[*]}"
+exec mix test "${TARGETS[@]}"

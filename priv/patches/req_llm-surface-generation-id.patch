@@ -1,0 +1,73 @@
+diff --git a/lib/req_llm/provider/defaults.ex b/lib/req_llm/provider/defaults.ex
+index 56a7506..482bd1c 100644
+--- a/lib/req_llm/provider/defaults.ex
++++ b/lib/req_llm/provider/defaults.ex
+@@ -1148,6 +1148,7 @@ defmodule ReqLLM.Provider.Defaults do
+ 
+               meta = %{finish_reason: normalized_reason}
+               meta = if normalized_reason, do: Map.put(meta, :terminal?, true), else: meta
++              meta = maybe_put_generation_id(meta, data)
+ 
+               content_chunks ++
+                 reasoning_details_chunks ++ logprobs_chunks ++ [ReqLLM.StreamChunk.meta(meta)]
+@@ -1169,6 +1170,7 @@ defmodule ReqLLM.Provider.Defaults do
+           normalized_usage = parse_openai_usage(usage)
+           meta = %{usage: normalized_usage, model: model.id}
+           meta = if is_final, do: Map.put(meta, :terminal?, true), else: meta
++          meta = maybe_put_generation_id(meta, data)
+ 
+           [ReqLLM.StreamChunk.meta(meta)]
+ 
+@@ -1186,6 +1188,20 @@ defmodule ReqLLM.Provider.Defaults do
+ 
+   def default_decode_stream_event(_, _model), do: []
+ 
++  # Capture the provider's generation id (e.g. OpenRouter "gen-...") onto a
++  # terminal metadata chunk so callers can reconcile usage/cost against the
++  # provider's authoritative record (GET /api/v1/generation) after the stream
++  # completes. Rides on every SSE chunk; we only attach it to terminal metas
++  # (finish_reason / usage) to avoid flooding the stream.
++  defp maybe_put_generation_id(meta, data) when is_map(data) do
++    case Map.get(data, "id") do
++      id when is_binary(id) and id != "" -> Map.put(meta, :id, id)
++      _ -> meta
++    end
++  end
++
++  defp maybe_put_generation_id(meta, _data), do: meta
++
+   defp decode_openai_message(message) when is_map(message) do
+     content_chunks = decode_openai_content(message)
+     reasoning_chunks = decode_openai_reasoning(message)
+diff --git a/lib/req_llm/stream_response.ex b/lib/req_llm/stream_response.ex
+index 32aa79a..f8aa3c0 100644
+--- a/lib/req_llm/stream_response.ex
++++ b/lib/req_llm/stream_response.ex
+@@ -489,6 +489,27 @@ defmodule ReqLLM.StreamResponse do
+     end
+   end
+ 
++  @doc """
++  Await the metadata task and return the provider's generation id.
++
++  For OpenRouter this is the `gen-...` id used to query the generation endpoint
++  (`GET /api/v1/generation?id=...`) for authoritative usage and cost. Returns
++  `nil` when the provider did not supply one.
++
++  ## Timeout
++
++  Blocks until metadata collection completes, like `usage/1`.
++  """
++  @spec provider_id(t()) :: String.t() | nil
++  def provider_id(%__MODULE__{metadata_handle: handle}) do
++    metadata = MetadataHandle.await(handle)
++
++    case metadata do
++      %{id: id} when is_binary(id) and id != "" -> id
++      _ -> nil
++    end
++  end
++
+   @doc """
+   Await the metadata task and return the finish reason.
+ 

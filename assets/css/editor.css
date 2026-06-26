@@ -1,0 +1,163 @@
+/* ============================================
+   TipTap / ProseMirror Editor Styles
+   ============================================ */
+
+/* Make tables in the editor horizontally scrollable */
+.ProseMirror table {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+/* Enhanced code block with edit/preview toggle (mermaid, math) */
+.ProseMirror .enhanced-code-block {
+    position: relative;
+    margin: 1rem 0;
+    border: 1px solid var(--color-base-300);
+    border-radius: 0.5rem;
+}
+
+.ProseMirror .enhanced-code-block .code-block-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.25rem 0.5rem;
+    background: var(--color-base-200);
+    border-bottom: 1px solid var(--color-base-300);
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.ProseMirror .enhanced-code-block .code-block-toggle {
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 0.15rem 0.5rem;
+    border-radius: 0.25rem;
+    color: var(--color-base-content);
+    opacity: 0.6;
+    background: transparent;
+    cursor: pointer;
+    transition:
+        opacity 0.1s ease,
+        background-color 0.1s ease;
+}
+
+.ProseMirror .enhanced-code-block .code-block-toggle:hover {
+    opacity: 1;
+    background: var(--color-base-300);
+}
+
+.ProseMirror .enhanced-code-block pre {
+    margin: 0;
+    border-radius: 0;
+}
+
+/* Edit mode: show source, hide preview */
+.ProseMirror .enhanced-code-block[data-mode="edit"] .code-preview {
+    display: none;
+}
+
+/* Preview mode: hide source, show preview */
+.ProseMirror .enhanced-code-block[data-mode="preview"] pre {
+    display: none;
+}
+
+.ProseMirror .enhanced-code-block .code-preview {
+    padding: 1rem;
+    background: var(--color-base-200);
+    border-radius: 0 0 0.5rem 0.5rem;
+    overflow-x: auto;
+    min-height: 3rem;
+}
+
+.ProseMirror .enhanced-code-block[data-language="mermaid"] .code-preview svg {
+    max-width: 100%;
+    height: auto;
+}
+
+.ProseMirror .enhanced-code-block .code-preview .katex-display {
+    margin: 0;
+}
+
+/* ============================================
+   Code Block Theme
+   ============================================
+   We ship the github-dark highlight.js theme (root.html.heex), which is
+   designed for dark backgrounds. tiptap-phoenix's default styles set
+   `.ProseMirror pre { background: var(--ttp-bg-muted) }`, which in
+   light mode resolves to a near-white `--color-base-200` — so the
+   near-white prose `--tw-prose-pre-code` text becomes unreadable.
+   Force code blocks to use the daisyui neutral pair, which is dark in
+   both themes, so hljs tokens stay legible regardless of color scheme. */
+.ProseMirror pre {
+    background: var(--color-neutral);
+    color: var(--color-neutral-content);
+}
+
+/* ============================================
+   Highlight.js Overrides
+   ============================================ */
+
+pre code.hljs {
+    padding: 0;
+}
+
+code.hljs {
+    padding: 0;
+}
+
+.hljs {
+    font-size: 12px;
+    background: none;
+}
+
+/* ============================================
+   Content Accordion (details/summary from CMS)
+   ============================================ */
+
+.prose details {
+    border-bottom: 1px solid oklch(from var(--color-base-300) l c h / 0.6);
+    border-radius: 0;
+    padding: 0;
+}
+
+.prose details summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    list-style: none;
+    padding: 1rem 0;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--color-base-content);
+    transition: color 0.15s ease;
+}
+
+.prose details summary::-webkit-details-marker,
+.prose details summary::marker {
+    display: none;
+    content: "";
+}
+
+.prose details summary::after {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform 0.2s ease;
+    opacity: 0.5;
+    flex-shrink: 0;
+    margin-left: 1rem;
+}
+
+.prose details[open] summary::after {
+    transform: rotate(-135deg);
+}
+
+.prose details > *:not(summary) {
+    padding-bottom: 1rem;
+    font-size: 0.875rem;
+    line-height: 1.625;
+    color: oklch(from var(--color-base-content) l c h / 0.7);
+}

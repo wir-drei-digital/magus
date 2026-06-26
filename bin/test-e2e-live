@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#
+# Run live E2E tests with .env variables exported.
+#
+# Usage:
+#   bin/test-e2e-live                        # run all live E2E tests
+#   bin/test-e2e-live --include sandbox      # include sandbox tests
+#   bin/test-e2e-live --exclude multiplayer  # exclude multiplayer tests
+#   bin/test-e2e-live test/e2e_live/chat_test.exs  # run a specific file
+#
+set -euo pipefail
+
+ENV_FILE="${ENV_FILE:-.env}"
+
+if [ ! -f "$ENV_FILE" ]; then
+  echo "Error: $ENV_FILE not found. Copy .env.example to .env and fill in your keys." >&2
+  exit 1
+fi
+
+# Export all variables from .env (skip comments and blank lines)
+set -a
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+set +a
+
+# If first arg looks like a file path, pass it directly; otherwise use the mix alias
+if [[ "${1:-}" == test/* ]]; then
+  file="$1"
+  shift
+  exec mix test --include e2e_live "$file" "$@"
+else
+  exec mix test.e2e.live "$@"
+fi

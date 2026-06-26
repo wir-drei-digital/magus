@@ -1,0 +1,8 @@
+Magus
+Copyright 2026 wir drei digital
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Magus is the open-core edition of the Magus AI chat platform. The commercial
+"Magus Cloud" edition (Stripe billing, marketing/CMS, hosted operations) is a
+separate, private wrapper that composes this core and is not included here.

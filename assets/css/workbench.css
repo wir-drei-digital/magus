@@ -1,0 +1,307 @@
+/* ============================================
+   Workbench Design System
+   ============================================
+   Self-contained tokens for the new Workbench shell.
+   Independent of daisyUI so the rest of the app keeps
+   its existing styling.
+
+   Tokens are exposed as Tailwind utilities via `@theme`
+   (e.g. bg-wb-surface, text-wb-text-muted, border-wb-border).
+   Light/dark resolution uses CSS `light-dark()`, which follows
+   the document's `color-scheme` (set by daisyUI's active theme).
+*/
+
+@theme {
+    /* Backgrounds */
+    --color-wb-bg: light-dark(#ffffff, #0e0b1a);
+    --color-wb-surface: light-dark(#f5f5f7, #181227);
+    --color-wb-surface-2: light-dark(#efeff3, #1a1528);
+
+    /* Borders */
+    --color-wb-border: light-dark(#e5e5ea, #1f1a2e);
+    --color-wb-border-strong: light-dark(#d5d5dc, #2e2744);
+
+    /* Hover/active states */
+    --color-wb-hover: light-dark(#ede5ff, #2a1e4a);
+
+    /* Text */
+    --color-wb-text: light-dark(#1a1a1f, #ffffff);
+    --color-wb-text-secondary: light-dark(#3a3a45, #cdc8dc);
+    --color-wb-text-muted: light-dark(#6e6e78, #8b86a0);
+    --color-wb-text-dim: light-dark(#8b8b95, #6a6480);
+
+    /* Accents */
+    --color-wb-accent: #7c3aed;
+    --color-wb-accent-soft: light-dark(#a855f7, #b794f6);
+
+    /* Radii */
+    --radius-wb-sm: 0.375rem;
+    --radius-wb-md: 0.5rem;
+    --radius-wb-lg: 0.75rem;
+    --radius-wb-xl: 1rem;
+}
+
+/* Workbench scope: inherit `color-scheme` from `:root`, where the
+   daisyUI theme sets it (`light` for `[data-theme="light"]`, `dark`
+   for `[data-theme="dark"]`, and the matching `@media (prefers-color-scheme)`
+   default when no explicit theme is set). We deliberately do NOT
+   hard-code `color-scheme: light dark` here, because that would
+   override the user's explicit theme choice and force the browser
+   to follow the system preference instead. */
+.workbench {
+    /* Spectral radial gradients layered over the workbench base color.
+       Mirrors the .bg-spectral aesthetic from landing.css but applied
+       directly to the workbench root (not via a fixed ::before) since
+       .workbench is itself a position: fixed container with its own
+       opaque base background that would otherwise occlude a pseudo-
+       element. light-dark() picks the right stops for the active theme. */
+    background:
+        radial-gradient(
+            ellipse 80% 50% at 20% 80%,
+            light-dark(oklch(82% 0.08 295 / 0.15), oklch(30% 0.1 295 / 0.3)) 0%,
+            transparent 50%
+        ),
+        radial-gradient(
+            ellipse 60% 40% at 80% 20%,
+            light-dark(oklch(85% 0.06 280 / 0.12), oklch(28% 0.08 280 / 0.25))
+                0%,
+            transparent 50%
+        ),
+        radial-gradient(
+            ellipse 70% 60% at 60% 60%,
+            light-dark(oklch(87% 0.04 310 / 0.1), oklch(30% 0.06 310 / 0.2)) 0%,
+            transparent 50%
+        ),
+        var(--color-wb-bg);
+    color: var(--color-wb-text);
+    font-family:
+        "Inter",
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        sans-serif;
+
+    /* Rebind daisyUI base tokens inside the workbench so any shared
+       components that still use `bg-base-*`, `border-base-*`,
+       `text-base-content` (e.g. components reused from the old chat
+       layout) automatically inherit the workbench palette. The old
+       layout (outside `.workbench`) keeps its original daisyUI values. */
+    --color-base-100: var(--color-wb-bg);
+    --color-base-200: var(--color-wb-surface);
+    --color-base-300: var(--color-wb-surface-2);
+    --color-base-content: var(--color-wb-text);
+    --color-primary: var(--color-wb-accent);
+    --color-primary-content: #ffffff;
+}
+
+/* Match the chat input background to the nav search input inside the workbench. */
+.workbench .chat-input-card {
+    background: var(--color-wb-surface-2);
+    border-color: var(--color-wb-border-strong);
+}
+
+.workbench .chat-input-card:focus-within {
+    border-color: oklch(from var(--color-wb-accent) l calc(c * 0.65) h);
+    box-shadow: 0 4px 16px
+        oklch(from var(--color-wb-accent) l calc(c * 0.55) h / 0.18);
+}
+
+/* Agent message bubbles share the nav pane's surface color. */
+.workbench [data-role="agent"] .message-bubble {
+    background: var(--color-wb-surface);
+    border-color: var(--color-wb-border-strong);
+}
+
+/* Modals inside the workbench use the surface color and the stronger border
+   so they read clearly in dark mode (daisyUI's default modal-box maps to
+   base-100 + base-300, both of which sit too close together in our palette). */
+.workbench .modal .modal-box {
+    background-color: var(--color-wb-surface);
+    border: 1px solid var(--color-wb-border-strong);
+}
+
+/* Typography scale for workbench (matches design system).
+   Display/heading/subheading use Space Grotesk; body/caption use Inter. */
+.wb-display {
+    font-family: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+    font-size: 2.25rem; /* 36px */
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+}
+.wb-heading {
+    font-family: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+    font-size: 1.375rem; /* 22px */
+    font-weight: 700;
+    line-height: 1.25;
+}
+.wb-subheading {
+    font-family: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+    font-size: 1rem; /* 16px */
+    font-weight: 600;
+    line-height: 1.35;
+}
+.wb-body {
+    font-size: 0.875rem; /* 14px */
+    font-weight: 400;
+    line-height: 1.5;
+}
+.wb-caption {
+    font-size: 0.75rem; /* 12px */
+    font-weight: 400;
+    line-height: 1.4;
+}
+.wb-mono {
+    font-size: 0.75rem;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* Tab strip: hide scrollbar (still scrollable via wheel/trackpad) */
+.wb-tab-strip {
+    scrollbar-width: none; /* Firefox */
+}
+.wb-tab-strip::-webkit-scrollbar {
+    height: 0;
+    width: 0;
+}
+
+/* Hide scrollbar in nav panes while keeping wheel/trackpad scrolling. */
+.wb-no-scrollbar {
+    scrollbar-width: none; /* Firefox */
+}
+.wb-no-scrollbar::-webkit-scrollbar {
+    height: 0;
+    width: 0;
+}
+
+/* Workbench overrides the global h1..h6 + .font-heading rule (Space Grotesk)
+   so all workbench headings render in Inter for a calmer, neutral look. */
+.workbench :is(h1, h2, h3, h4, h5, h6),
+.workbench .font-heading {
+    font-family:
+        "Inter",
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        sans-serif;
+}
+
+/* Workbench popover/dropdown surfaces share the same surface tone, regardless
+   of the bg-* utility set by shared components (popover_menu, header_dropdown,
+   DaisyUI dropdown-content). Increased specificity beats single-class utilities. */
+.workbench [popover],
+.workbench .dropdown-content {
+    background-color: var(--color-wb-surface);
+}
+
+/* Right-rail popovers reuse shared sidebar components (sidebar-card, etc.) that
+   paint themselves with var(--color-base-100). Inside the workbench that token
+   maps to --color-wb-bg, which is darker than the panel's bg-wb-surface and
+   creates a "two backgrounds" effect. Rebind base-100 inside rail panels so
+   nested cards blend into the popover surface, and strip the redundant card
+   chrome (borders, shadows, rounded corners) so sections sit flush against the
+   panel without an extra "box-in-box" frame. */
+.workbench [data-rail-panel] {
+    --color-base-100: var(--color-wb-surface);
+}
+
+.workbench [data-rail-panel] .sidebar-card {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.workbench [data-rail-panel] .sidebar-card:hover {
+    border-color: transparent;
+    box-shadow: none;
+}
+
+/* Drop the outer p-2 from shared sidebar components so sections sit flush
+   inside the popover panel (which already has its own border + radius). */
+.workbench [data-rail-panel] > * {
+    padding: 0;
+}
+
+/* ============================================
+   Pill button — generic header action style
+   ============================================
+   Compact outlined pill used for header-level actions across resource
+   views (Share with workspace, Open chat, Review draft, …). Designed
+   to sit alongside icons and small text without competing with the
+   content. Keep margin/positioning at the call site; this class only
+   owns shape, color, and hover. */
+.wb-pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    border: 1px solid var(--color-wb-border-strong);
+    background-color: transparent;
+    color: var(--color-wb-text-secondary);
+    font-size: 0.75rem;
+    line-height: 1.25;
+    cursor: pointer;
+    transition:
+        background-color 150ms,
+        color 150ms,
+        border-color 150ms;
+}
+
+.wb-pill-btn:hover {
+    background-color: var(--color-wb-hover);
+    color: var(--color-wb-text);
+    border-color: var(--color-wb-accent-soft);
+}
+
+/* Square variant for icon-only header buttons (e.g. Close on a
+   companion). Same outline/hover, no horizontal stretching. */
+.wb-pill-btn-square {
+    padding: 0.25rem;
+    aspect-ratio: 1 / 1;
+    justify-content: center;
+}
+
+/* Active state for toggle-style pill buttons (e.g. Open chat / Close
+   chat in the file view header — the same button rendered in two
+   states rather than mounted/unmounted). Mirrors the hover styling
+   so the button reads as "engaged". */
+.wb-pill-btn-active,
+.wb-pill-btn-active:hover {
+    background-color: var(--color-wb-hover);
+    color: var(--color-wb-text);
+    border-color: var(--color-wb-accent-soft);
+}
+
+/* Pill variant for native <select> elements in resource headers. Mirrors
+   wb-pill-btn but keeps a bit of right padding for the OS-rendered
+   dropdown caret. We deliberately don't strip `appearance: none` because
+   replicating the caret in CSS would just be visual noise — the native
+   one matches the platform. */
+.wb-pill-select {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem 0.25rem 0.625rem;
+    border-radius: 9999px;
+    border: 1px solid var(--color-wb-border-strong);
+    background-color: transparent;
+    color: var(--color-wb-text-secondary);
+    font-size: 0.75rem;
+    line-height: 1.25;
+    cursor: pointer;
+    transition:
+        background-color 150ms,
+        color 150ms,
+        border-color 150ms;
+}
+
+.wb-pill-select:hover {
+    background-color: var(--color-wb-hover);
+    color: var(--color-wb-text);
+    border-color: var(--color-wb-accent-soft);
+}
+
+.wb-pill-select:focus {
+    outline: none;
+    border-color: var(--color-wb-accent);
+}

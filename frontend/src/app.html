@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+		/>
+		<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f0eaf2" />
+		<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#211d2b" />
+		<!-- Standalone/bundled (WebView) hints: run chromeless, respect the notch. -->
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
+		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
+		<link rel="apple-touch-icon" href="%sveltekit.assets%/icons/icon-192.png" />
+		<title>Magus</title>
+		<script>
+			// Theme bootstrap, inline to avoid a flash of the wrong theme. Reads
+			// the SAME localStorage key as the classic LiveView UI (`phx:theme`,
+			// set by root.html.heex): "dark" | "light" | absent = follow system.
+			// The storage listener keeps the SPA in sync when the user switches
+			// theme in a classic-UI tab, and vice versa.
+			(() => {
+				const media = window.matchMedia('(prefers-color-scheme: dark)');
+				const apply = () => {
+					const stored = localStorage.getItem('phx:theme');
+					const dark = stored === 'dark' || (!stored && media.matches);
+					document.documentElement.classList.toggle('dark', dark);
+				};
+				apply();
+				window.addEventListener('storage', (e) => {
+					if (e.key === 'phx:theme') apply();
+				});
+				media.addEventListener('change', apply);
+			})();
+		</script>
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover" class="bg-background text-secondary-foreground">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>

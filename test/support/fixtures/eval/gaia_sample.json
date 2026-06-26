@@ -1,0 +1,5 @@
+[
+  {"task_id": "t1", "Question": "What is 2 plus 2?", "Level": 1, "Final answer": "4", "file_name": ""},
+  {"task_id": "t2", "Question": "Name the capital of France.", "Level": 1, "Final answer": "Paris", "file_name": ""},
+  {"task_id": "t3", "Question": "See attached spreadsheet.", "Level": 2, "Final answer": "42", "file_name": "data.xlsx"}
+]

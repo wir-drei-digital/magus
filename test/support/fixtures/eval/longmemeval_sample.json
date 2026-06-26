@@ -1,0 +1,23 @@
+[
+  {
+    "question_id": "q1",
+    "question_type": "single-session-user",
+    "question": "What city did I move to?",
+    "answer": "Lisbon",
+    "haystack_dates": ["2026-01-02", "2026-01-01"],
+    "haystack_sessions": [
+      [{"role": "user", "content": "Reminder, I now live in Lisbon."}, {"role": "assistant", "content": "Noted, Lisbon."}],
+      [{"role": "user", "content": "Hello there."}, {"role": "assistant", "content": "Hi!"}]
+    ]
+  },
+  {
+    "question_id": "q2_abs",
+    "question_type": "knowledge-update",
+    "question": "What is my cat's name?",
+    "answer": "No information available.",
+    "haystack_dates": ["2026-01-01"],
+    "haystack_sessions": [
+      [{"role": "user", "content": "I like coffee."}, {"role": "assistant", "content": "Good to know."}]
+    ]
+  }
+]

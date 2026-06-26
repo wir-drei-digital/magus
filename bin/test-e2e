@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#
+# Run browser-based E2E tests (Playwright).
+#
+# E2E=1 must be set as a real environment variable (not System.put_env)
+# because config/test.exs evaluates it at compile time.
+#
+# Usage:
+#   bin/test-e2e                              # run all E2E tests
+#   bin/test-e2e test/e2e/chat_flow_test.exs  # run a specific file
+#
+set -euo pipefail
+
+export E2E=1
+
+# If first arg looks like a file path, pass it directly; otherwise use the mix alias
+if [[ "${1:-}" == test/* ]]; then
+  file="$1"
+  shift
+  exec mix test --include e2e "$file" "$@"
+else
+  exec mix test.e2e "$@"
+fi

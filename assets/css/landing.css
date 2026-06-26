@@ -1,0 +1,729 @@
+/* ============================================
+   Spectral Gradient Backgrounds
+   Smooth, dreamy gradients with multiple color stops
+   ============================================ */
+
+/* Base spectral gradient - light mode with magenta-tinted base */
+.bg-spectral {
+    position: relative;
+}
+
+.bg-spectral::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+        radial-gradient(
+            ellipse 80% 50% at 20% 80%,
+            oklch(82% 0.08 295 / 0.15) 0%,
+            transparent 50%
+        ),
+        radial-gradient(
+            ellipse 60% 40% at 80% 20%,
+            oklch(85% 0.06 280 / 0.12) 0%,
+            transparent 50%
+        ),
+        radial-gradient(
+            ellipse 70% 60% at 60% 60%,
+            oklch(87% 0.04 310 / 0.1) 0%,
+            transparent 50%
+        ),
+        linear-gradient(
+            135deg,
+            oklch(90.5% 0.015 310) 0%,
+            oklch(90% 0.02 295) 25%,
+            oklch(90.5% 0.015 315) 50%,
+            oklch(90% 0.02 300) 75%,
+            oklch(90.5% 0.015 310) 100%
+        );
+}
+
+/* Dark mode spectral gradient */
+[data-theme="dark"] .bg-spectral::before,
+.bg-spectral-dark::before {
+    background:
+        radial-gradient(
+            ellipse 80% 50% at 20% 80%,
+            oklch(30% 0.1 295 / 0.3) 0%,
+            transparent 50%
+        ),
+        radial-gradient(
+            ellipse 60% 40% at 80% 20%,
+            oklch(28% 0.08 280 / 0.25) 0%,
+            transparent 50%
+        ),
+        radial-gradient(
+            ellipse 70% 60% at 60% 60%,
+            oklch(30% 0.06 310 / 0.2) 0%,
+            transparent 50%
+        ),
+        linear-gradient(
+            135deg,
+            oklch(18% 0.02 295) 0%,
+            oklch(19% 0.025 285) 25%,
+            oklch(18% 0.02 300) 50%,
+            oklch(19% 0.025 290) 75%,
+            oklch(18% 0.02 295) 100%
+        );
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) .bg-spectral::before {
+        background:
+            radial-gradient(
+                ellipse 80% 50% at 20% 80%,
+                oklch(30% 0.1 295 / 0.3) 0%,
+                transparent 50%
+            ),
+            radial-gradient(
+                ellipse 60% 40% at 80% 20%,
+                oklch(28% 0.08 280 / 0.25) 0%,
+                transparent 50%
+            ),
+            radial-gradient(
+                ellipse 70% 60% at 60% 60%,
+                oklch(30% 0.06 310 / 0.2) 0%,
+                transparent 50%
+            ),
+            linear-gradient(
+                135deg,
+                oklch(18% 0.02 295) 0%,
+                oklch(19% 0.025 285) 25%,
+                oklch(18% 0.02 300) 50%,
+                oklch(19% 0.025 290) 75%,
+                oklch(18% 0.02 295) 100%
+            );
+    }
+}
+
+/* Animated spectral gradient for hero sections */
+.bg-spectral-animated {
+    background:
+        radial-gradient(
+            ellipse 80% 50% at 20% 80%,
+            oklch(85% 0.1 295 / 0.2) 0%,
+            transparent 50%
+        ),
+        radial-gradient(
+            ellipse 60% 40% at 80% 20%,
+            oklch(80% 0.08 280 / 0.15) 0%,
+            transparent 50%
+        ),
+        radial-gradient(
+            ellipse 70% 60% at 60% 60%,
+            oklch(90% 0.06 310 / 0.12) 0%,
+            transparent 50%
+        ),
+        linear-gradient(
+            135deg,
+            oklch(94% 0.01 310) 0%,
+            oklch(93.5% 0.02 295) 50%,
+            oklch(94% 0.01 315) 100%
+        );
+    background-size: 200% 200%;
+    animation: spectral-shift 15s ease-in-out infinite;
+}
+
+@keyframes spectral-shift {
+    0%,
+    100% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+}
+
+/* Landing page section headers */
+.bg-spectral h1,
+.bg-spectral h2 {
+    font-family: "Space Grotesk", sans-serif;
+}
+
+/* ============================================
+   Landing Page Hero Animation
+   Floating layers for the exploded view
+   ============================================ */
+
+@keyframes hero-float {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+.hero-layer {
+    animation: hero-float 5s ease-in-out infinite;
+    will-change: transform;
+}
+
+/* New chat page - animated logo */
+
+@keyframes magus-hover {
+    0%,
+    100% {
+        transform: translateY(0) rotate(0deg);
+    }
+    25% {
+        transform: translateY(-6px) rotate(0deg);
+    }
+    50% {
+        transform: translateY(-3px) rotate(0deg);
+    }
+    75% {
+        transform: translateY(-8px) rotate(0deg);
+    }
+}
+
+@keyframes magus-spin {
+    0% {
+        transform: translateY(-5px) rotate(0deg);
+    }
+    100% {
+        transform: translateY(-5px) rotate(360deg);
+    }
+}
+
+.magus-logo-animated {
+    animation: magus-hover 4s ease-in-out infinite;
+    will-change: transform;
+    display: inline-block;
+}
+
+.magus-logo-animated.is-spinning {
+    animation: magus-spin 0.6s ease-in-out 1;
+}
+
+/* ============================================
+   Landing Page Hero Chat Demo
+   Animated walkthrough of MAGUS workflow
+   ============================================ */
+
+.hero-demo-container {
+    position: relative;
+}
+
+.hero-demo-glow {
+    position: absolute;
+    inset: -25%;
+    background: radial-gradient(
+        ellipse at center,
+        oklch(from var(--color-primary) l c h / 0.1) 0%,
+        transparent 70%
+    );
+    z-index: 0;
+    filter: blur(60px);
+    pointer-events: none;
+}
+
+.hero-demo-window {
+    position: relative;
+    z-index: 1;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    border: 1px solid oklch(from var(--color-base-300) l c h / 0.8);
+    box-shadow:
+        0 0 0 1px oklch(from var(--color-primary) l c h / 0.06),
+        0 25px 80px oklch(0 0 0 / 0.15),
+        0 0 40px oklch(from var(--color-primary) l c h / 0.04);
+}
+
+[data-theme="dark"] .hero-demo-window {
+    box-shadow:
+        0 0 0 1px oklch(from var(--color-primary) l c h / 0.1),
+        0 25px 80px oklch(0 0 0 / 0.4),
+        0 0 60px oklch(from var(--color-primary) l c h / 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) .hero-demo-window {
+        box-shadow:
+            0 0 0 1px oklch(from var(--color-primary) l c h / 0.1),
+            0 25px 80px oklch(0 0 0 / 0.4),
+            0 0 60px oklch(from var(--color-primary) l c h / 0.08);
+    }
+}
+
+/* Hero step animations - elements start hidden and collapsed, reveal on schedule */
+.hero-step {
+    opacity: 0;
+    transform: translateY(8px);
+    transition:
+        opacity 0.5s ease-out,
+        transform 0.5s ease-out,
+        max-height 0.5s ease-out,
+        margin-bottom 0.5s ease-out;
+}
+
+.hero-step.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.hero-step-fast {
+    opacity: 0;
+    transform: translateY(4px);
+    transition:
+        opacity 0.25s ease-out,
+        transform 0.25s ease-out,
+        max-height 0.3s ease-out,
+        margin-bottom 0.3s ease-out;
+}
+
+.hero-step-fast.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Inside the chat scroll area, hidden steps collapse to zero height */
+#hero-chat-messages > .hero-step,
+#hero-chat-messages > .hero-step-fast {
+    max-height: 0;
+    overflow: hidden;
+    margin-bottom: 0;
+}
+
+#hero-chat-messages > .hero-step.visible,
+#hero-chat-messages > .hero-step-fast.visible {
+    max-height: 200px;
+    overflow: visible;
+    margin-bottom: 10px;
+}
+
+.hero-draft-panel {
+    opacity: 0;
+    transform: translateX(16px);
+    transition:
+        opacity 0.6s ease-out,
+        transform 0.6s ease-out;
+}
+
+.hero-draft-panel.visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.hero-draft-refining {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.hero-draft-refining.visible {
+    opacity: 1;
+}
+
+.hero-chat-scroll {
+    scroll-behavior: smooth;
+}
+
+/* Gradient text for hero headline */
+.text-gradient-hero {
+    background: linear-gradient(135deg, #4b2d8e 0%, #9b30a0 40%, #d4247a 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Feature card with glowing border (for draft mode highlight) */
+.feature-card-glow {
+    position: relative;
+    overflow: hidden;
+}
+
+.feature-card-glow::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: linear-gradient(
+        135deg,
+        oklch(from var(--color-primary) l c h / 0.5),
+        oklch(from var(--color-secondary) l c h / 0.3),
+        oklch(from var(--color-accent) l c h / 0.4)
+    );
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.feature-card-glow:hover::before {
+    opacity: 1;
+}
+
+/* Scroll-triggered section reveal */
+.reveal-section {
+    opacity: 0;
+    transform: translateY(24px);
+    transition:
+        opacity 0.6s ease-out,
+        transform 0.6s ease-out;
+}
+
+.reveal-section.revealed {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* ============================================
+   Bento Feature Cards
+   ============================================ */
+
+.bento-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+@media (max-width: 768px) {
+    .bento-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.bento-card {
+    border-radius: 0.875rem;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 11rem;
+    overflow: hidden;
+}
+
+.bento-card.wide {
+    grid-column: span 2;
+    flex-direction: row;
+    gap: 1.5rem;
+    align-items: center;
+}
+
+@media (max-width: 768px) {
+    .bento-card.wide {
+        grid-column: span 1;
+        flex-direction: column;
+    }
+}
+
+.bento-card.wide .bento-illus {
+    width: 45%;
+    flex-shrink: 0;
+    min-height: 8.75rem;
+}
+
+@media (max-width: 768px) {
+    .bento-card.wide .bento-illus {
+        width: 100%;
+    }
+}
+
+.bento-illus {
+    border-radius: 0.625rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+}
+
+/* Light theme bento colors */
+.bento-flat-light {
+    background: oklch(95% 0.01 80);
+    color: oklch(20% 0.02 280);
+}
+
+.bento-flat-purple {
+    background: oklch(78% 0.12 295);
+    color: oklch(20% 0.02 280);
+}
+
+.bento-grad-purple {
+    background: linear-gradient(
+        160deg,
+        oklch(78% 0.12 295) 0%,
+        oklch(95% 0.01 80) 100%
+    );
+    color: oklch(20% 0.02 280);
+}
+
+.bento-grad-light {
+    background: linear-gradient(
+        160deg,
+        oklch(95% 0.01 80) 0%,
+        oklch(82% 0.1 295) 100%
+    );
+    color: oklch(20% 0.02 280);
+}
+
+.bento-flat-light .bento-illus {
+    background: oklch(20% 0.02 280 / 0.04);
+    color: oklch(20% 0.02 280 / 0.2);
+}
+
+.bento-flat-purple .bento-illus {
+    background: oklch(20% 0.02 280 / 0.06);
+    color: oklch(20% 0.02 280 / 0.2);
+}
+
+.bento-grad-purple .bento-illus,
+.bento-grad-light .bento-illus {
+    background: oklch(20% 0.02 280 / 0.04);
+    color: oklch(20% 0.02 280 / 0.2);
+}
+
+/* Dark theme bento overrides */
+[data-theme="dark"] .bento-flat-light {
+    background: oklch(25% 0.01 280);
+    color: oklch(90% 0.01 280);
+}
+
+[data-theme="dark"] .bento-flat-purple {
+    background: oklch(35% 0.08 295);
+    color: oklch(90% 0.01 280);
+}
+
+[data-theme="dark"] .bento-grad-purple {
+    background: linear-gradient(
+        160deg,
+        oklch(35% 0.08 295) 0%,
+        oklch(25% 0.01 280) 100%
+    );
+    color: oklch(90% 0.01 280);
+}
+
+[data-theme="dark"] .bento-grad-light {
+    background: linear-gradient(
+        160deg,
+        oklch(25% 0.01 280) 0%,
+        oklch(35% 0.08 295) 100%
+    );
+    color: oklch(90% 0.01 280);
+}
+
+[data-theme="dark"] .bento-flat-light .bento-illus {
+    background: oklch(90% 0.01 280 / 0.04);
+    color: oklch(90% 0.01 280 / 0.15);
+}
+
+[data-theme="dark"] .bento-flat-purple .bento-illus,
+[data-theme="dark"] .bento-grad-purple .bento-illus,
+[data-theme="dark"] .bento-grad-light .bento-illus {
+    background: oklch(90% 0.01 280 / 0.04);
+    color: oklch(90% 0.01 280 / 0.15);
+}
+
+/* Bento detail list */
+.bento-details {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0;
+    font-size: 0.6875rem;
+}
+
+.bento-details li {
+    padding: 0.1875rem 0;
+}
+
+.bento-details li::before {
+    content: ">";
+    margin-right: 0.375rem;
+    font-weight: 700;
+    color: oklch(50% 0.2 295);
+}
+
+[data-theme="dark"] .bento-details li::before {
+    color: oklch(75% 0.15 295);
+}
+
+/* Tool tag pills */
+.tool-tag {
+    display: inline-block;
+    font-size: 0.625rem;
+    font-weight: 600;
+    padding: 0.1875rem 0.5rem;
+    border-radius: 0.3125rem;
+    color: oklch(20% 0.02 280 / 0.5);
+    background: oklch(20% 0.02 280 / 0.05);
+    border: 1px solid oklch(20% 0.02 280 / 0.08);
+}
+
+[data-theme="dark"] .tool-tag {
+    color: oklch(90% 0.01 280 / 0.55);
+    background: oklch(90% 0.01 280 / 0.08);
+    border-color: oklch(90% 0.01 280 / 0.1);
+}
+
+/* Model logo dots */
+.model-dot {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.5625rem;
+    font-weight: 600;
+    background: oklch(20% 0.02 280 / 0.06);
+    border: 1px solid oklch(20% 0.02 280 / 0.08);
+    color: oklch(20% 0.02 280 / 0.4);
+}
+
+[data-theme="dark"] .model-dot {
+    background: oklch(90% 0.01 280 / 0.06);
+    border-color: oklch(90% 0.01 280 / 0.08);
+    color: oklch(90% 0.01 280 / 0.4);
+}
+
+/* ============================================
+   Pricing Columns
+   ============================================ */
+
+.pricing-columns {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.pricing-column {
+    padding: 1.5rem 2rem;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+/* Colorful gradient divider between columns */
+.pricing-column + .pricing-column {
+    border-left: 1px solid transparent;
+    border-image: linear-gradient(
+            180deg,
+            oklch(70% 0.2 295) 0%,
+            oklch(65% 0.15 220) 50%,
+            oklch(70% 0.2 295 / 0.15) 100%
+        )
+        1;
+}
+
+@media (max-width: 768px) {
+    .pricing-columns {
+        grid-template-columns: 1fr;
+    }
+
+    .pricing-column + .pricing-column {
+        border-left: none;
+        border-top: 1px solid transparent;
+        border-image: linear-gradient(
+                90deg,
+                oklch(70% 0.2 295 / 0.15) 0%,
+                oklch(65% 0.15 220) 50%,
+                oklch(70% 0.2 295 / 0.15) 100%
+            )
+            1;
+    }
+}
+
+/* Pricing accent colors for plan names and check icons */
+.pricing-accent-free {
+    color: oklch(72% 0.18 220);
+}
+
+.pricing-accent-pro {
+    color: oklch(72% 0.28 295);
+}
+
+.pricing-accent-business {
+    color: oklch(72% 0.22 350);
+}
+
+/* ============================================
+   Pay-as-you-go pricing (flat fee + usage)
+   ============================================ */
+
+/* Free + Pay-as-you-go reuse the original column treatment (gradient divider
+   between columns); there are just two columns now instead of three. */
+.pricing-columns-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 768px) {
+    .pricing-columns-2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Hidden radios that drive the CSS-only billing-interval toggle */
+.payg-radio {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Subtle monthly / annual text toggle (active option accented + underlined) */
+.payg-toggle {
+    display: inline-flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.8rem;
+}
+
+.payg-toggle-opt {
+    cursor: pointer;
+    padding-bottom: 0.1rem;
+    border-bottom: 1px solid transparent;
+    opacity: 0.55;
+    color: var(--color-base-content, oklch(85% 0 0));
+    transition:
+        opacity 0.15s ease,
+        color 0.15s ease,
+        border-color 0.15s ease;
+}
+
+.payg-radio-monthly:checked ~ .payg-body .payg-toggle-opt-monthly,
+.payg-radio-annual:checked ~ .payg-body .payg-toggle-opt-annual {
+    opacity: 1;
+    color: oklch(72% 0.28 295);
+    border-bottom-color: oklch(72% 0.28 295);
+}
+
+.payg-radio-monthly:focus-visible ~ .payg-body .payg-toggle-opt-monthly,
+.payg-radio-annual:focus-visible ~ .payg-body .payg-toggle-opt-annual {
+    outline: 2px solid oklch(72% 0.28 295);
+    outline-offset: 2px;
+}
+
+/* Default: monthly price + CTA visible, annual hidden */
+.payg-price-annual,
+.payg-cta-annual {
+    display: none;
+}
+
+.payg-radio-annual:checked ~ .payg-body .payg-price-monthly {
+    display: none;
+}
+
+.payg-radio-annual:checked ~ .payg-body .payg-price-annual {
+    display: block;
+}
+
+.payg-radio-annual:checked ~ .payg-cta-group .payg-cta-monthly {
+    display: none;
+}
+
+.payg-radio-annual:checked ~ .payg-cta-group .payg-cta-annual {
+    display: inline-flex;
+}
+
+/* Declining base-fee schedule: flat text cells, current tier underlined */
+.pricing-tier-cell {
+    padding: 0.5rem 0.25rem;
+    text-align: center;
+}
+
+.pricing-tier-cell-current {
+    border-bottom: 2px solid oklch(72% 0.28 295);
+}

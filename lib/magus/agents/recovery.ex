@@ -1,0 +1,174 @@
+defmodule Magus.Agents.Recovery do
+  @moduledoc """
+  Handles mid-turn recovery when an agent restores from hibernation
+  with an interrupted turn.
+
+  When an agent was mid-turn (status :awaiting_llm or :awaiting_tool) at
+  checkpoint time, recovery will:
+  1. Broadcast "thinking" state so the LiveView shows the spinner
+  2. Mark any stuck streaming messages as errored
+  3. Re-dispatch the last user message to retry the turn
+  """
+
+  require Logger
+  require Ash.Query
+
+  alias Magus.Agents.Signals
+
+  @doc """
+  Check if the agent needs recovery and trigger auto-retry if so.
+  Called from strategy init after the agent is fully initialized.
+
+  Returns the agent with `__recovery__` cleared from state to prevent
+  infinite recovery loops (if the recovered turn is checkpointed mid-flight,
+  the next restore must not trigger recovery again).
+
+  Runs async to avoid blocking agent initialization.
+  """
+  def maybe_recover(agent) do
+    recovery = get_in(agent.state || %{}, [:__recovery__])
+
+    if is_map(recovery) && recovery[:was_active] do
+      conversation_id = agent.state[:conversation_id]
+
+      Logger.info(
+        "Agent #{agent.id}: recovering interrupted turn for conversation #{conversation_id}"
+      )
+
+      # Broadcast thinking state so LiveView shows spinner immediately
+      Signals.state_change(conversation_id, :running)
+
+      active_message_id = recovery[:active_message_id]
+
+      # Run recovery async to not block init
+      Task.Supervisor.start_child(Magus.AgentLoopTaskSupervisor, fn ->
+        recover_interrupted_turn(conversation_id, active_message_id)
+      end)
+
+      # Clear recovery metadata so a subsequent checkpoint/restore cycle
+      # does not trigger recovery again
+      cleared_state = Map.delete(agent.state, :__recovery__)
+      %{agent | state: cleared_state}
+    else
+      agent
+    end
+  end
+
+  defp recover_interrupted_turn(conversation_id, active_message_id) do
+    # Wait for the agent process to be alive before proceeding
+    await_agent_ready(conversation_id)
+
+    # Mark any stuck streaming messages as error
+    cleanup_interrupted_messages(conversation_id)
+
+    # Find the interrupted message and re-dispatch it
+    case find_interrupted_message(conversation_id, active_message_id) do
+      {:ok, message} ->
+        Logger.info(
+          "Recovery: re-dispatching message #{message.id} for conversation #{conversation_id}"
+        )
+
+        Magus.Agents.Dispatcher.dispatch_user_message(message)
+
+      :error ->
+        Logger.warning("Recovery: no user message found for conversation #{conversation_id}")
+
+        Signals.state_change(conversation_id, :idle)
+    end
+  rescue
+    error ->
+      Logger.error("Recovery failed for conversation #{conversation_id}: #{inspect(error)}")
+
+      Signals.state_change(conversation_id, :idle)
+  end
+
+  defp await_agent_ready(conversation_id, attempts \\ 0)
+
+  defp await_agent_ready(_conversation_id, attempts) when attempts >= 10 do
+    Logger.warning("Recovery: agent not ready after #{attempts} attempts, proceeding anyway")
+    :ok
+  end
+
+  defp await_agent_ready(conversation_id, attempts) do
+    agent_id = "conv:#{conversation_id}"
+
+    case Jido.Agent.InstanceManager.lookup(:conversations, agent_id) do
+      {:ok, pid} when is_pid(pid) ->
+        if Process.alive?(pid), do: :ok, else: do_await_retry(conversation_id, attempts)
+
+      _ ->
+        do_await_retry(conversation_id, attempts)
+    end
+  rescue
+    _ -> do_await_retry(conversation_id, attempts)
+  end
+
+  defp do_await_retry(conversation_id, attempts) do
+    Process.sleep(50)
+    await_agent_ready(conversation_id, attempts + 1)
+  end
+
+  defp cleanup_interrupted_messages(conversation_id) do
+    streaming_messages =
+      Magus.Chat.Message
+      |> Ash.Query.filter(conversation_id == ^conversation_id and status == :streaming)
+      |> Ash.read!(authorize?: false)
+
+    if streaming_messages != [] do
+      %Ash.BulkResult{status: status, error_count: error_count} =
+        Ash.bulk_update(
+          streaming_messages,
+          :mark_error,
+          %{
+            error: %{
+              "reason" => "interrupted",
+              "detail" =>
+                "Streaming row left behind by an interrupted/hibernated turn; swept on recovery."
+            }
+          },
+          authorize?: false
+        )
+
+      count = length(streaming_messages)
+
+      if status == :success do
+        Logger.info("Recovery: marked #{count} streaming messages as error")
+      else
+        Logger.warning(
+          "Recovery: failed to mark #{error_count}/#{count} streaming messages as error"
+        )
+      end
+    end
+  end
+
+  # Try to find the specific interrupted message by ID first,
+  # fall back to the last user message in the conversation.
+  defp find_interrupted_message(conversation_id, active_message_id)
+       when is_binary(active_message_id) and active_message_id != "" do
+    case Ash.get(Magus.Chat.Message, active_message_id, authorize?: false) do
+      {:ok, message} ->
+        {:ok, message}
+
+      {:error, _} ->
+        Logger.warning(
+          "Recovery: active_message_id #{active_message_id} not found, falling back to last user message"
+        )
+
+        find_last_user_message(conversation_id)
+    end
+  end
+
+  defp find_interrupted_message(conversation_id, _), do: find_last_user_message(conversation_id)
+
+  defp find_last_user_message(conversation_id) do
+    case Magus.Chat.Message
+         |> Ash.Query.filter(conversation_id == ^conversation_id and role == :user)
+         |> Ash.Query.sort(inserted_at: :desc)
+         |> Ash.Query.limit(1)
+         |> Ash.read_one(authorize?: false) do
+      {:ok, nil} -> :error
+      {:ok, message} -> {:ok, message}
+      {:error, _} -> :error
+    end
+  end
+end

@@ -1,0 +1,88 @@
+/* ============================================
+   PDF Viewer Styles
+   Page layout, selection rectangle, Ask button
+   ============================================ */
+
+.pdf-viewer-pages {
+  min-height: 100%;
+}
+
+.pdf-page-wrapper {
+  box-shadow: 0 2px 8px oklch(0 0 0 / 0.15);
+  border-radius: 0.25rem;
+  overflow: hidden;
+  background: white;
+}
+
+/* Selection rectangle — double stroke for contrast on any background */
+.pdf-selection-rect {
+  border: 2px solid white;
+  outline: 2px solid var(--color-primary);
+  background: oklch(from var(--color-primary) l c h / 0.1);
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+/* Corner handles for visibility on any background */
+.pdf-selection-corner {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: white;
+  border: 2px solid var(--color-primary);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.pdf-selection-corner--tl {
+  top: -5px;
+  left: -5px;
+}
+
+.pdf-selection-corner--tr {
+  top: -5px;
+  right: -5px;
+}
+
+.pdf-selection-corner--bl {
+  bottom: -5px;
+  left: -5px;
+}
+
+.pdf-selection-corner--br {
+  bottom: -5px;
+  right: -5px;
+}
+
+/* Floating Ask button near the selection */
+.pdf-ask-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-primary-content);
+  background: var(--color-primary);
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px oklch(0 0 0 / 0.2);
+  transition:
+    background-color 0.15s ease,
+    transform 0.1s ease;
+  white-space: nowrap;
+}
+
+.pdf-ask-button:hover {
+  filter: brightness(1.1);
+  transform: scale(1.02);
+}
+
+.pdf-ask-button:active {
+  transform: scale(0.98);
+}
+
+.pdf-ask-button svg {
+  flex-shrink: 0;
+}
