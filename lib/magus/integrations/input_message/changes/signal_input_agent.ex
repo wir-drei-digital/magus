@@ -17,7 +17,7 @@ defmodule Magus.Integrations.InputMessage.Changes.SignalInputAgent do
       _changeset, {:ok, record} ->
         if not record.dispatched do
           # Dispatch asynchronously to not block the webhook response
-          Task.start(fn ->
+          Task.Supervisor.start_child(Magus.Integrations.WebhookTaskSupervisor, fn ->
             run_dispatch(record)
           end)
         end

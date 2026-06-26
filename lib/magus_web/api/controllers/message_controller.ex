@@ -109,7 +109,7 @@ defmodule MagusWeb.Api.MessageController do
   defp dispatch_message_async(input_message, conversation_id, parsed, user) do
     topic = "agents:#{conversation_id}"
 
-    Task.start(fn ->
+    Task.Supervisor.start_child(Magus.AgentLoopTaskSupervisor, fn ->
       with {:ok, _message} <-
              Chat.send_user_message(
                %{

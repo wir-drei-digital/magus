@@ -24,7 +24,7 @@ defmodule Magus.Chat.Conversation.Changes.ExtractTurnMemories do
   end
 
   defp run_extraction(conversation) do
-    Task.start(fn ->
+    Task.Supervisor.start_child(Magus.AgentLoopTaskSupervisor, fn ->
       case load_last_turn(conversation.id) do
         {:ok, user_message, agent_response} ->
           if String.length(user_message) > 50 and String.length(agent_response) > 100 do

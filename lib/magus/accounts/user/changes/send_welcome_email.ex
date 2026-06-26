@@ -25,7 +25,7 @@ defmodule Magus.Accounts.User.Changes.SendWelcomeEmail do
       now_onboarded? = user.confirmed_at != nil && user.accepted_terms == true
 
       if now_onboarded? && !was_onboarded? do
-        Task.start(fn ->
+        Task.Supervisor.start_child(Magus.AgentLoopTaskSupervisor, fn ->
           case Magus.Mail.send_welcome(user) do
             {:ok, _} ->
               Logger.debug("Sent welcome email to #{user.email}")
