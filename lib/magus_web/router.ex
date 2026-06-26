@@ -12,4 +12,13 @@ defmodule MagusWeb.Router do
 
   core_pipelines()
   core_routes()
+
+  # The root route is owned by the composing router, not `core_routes/0`, so
+  # each edition picks its own root. Open core hands `/` to the workbench;
+  # `magus_cloud` overrides it with a marketing landing.
+  scope "/", MagusWeb do
+    pipe_through :browser
+
+    get "/", RootController, :index
+  end
 end

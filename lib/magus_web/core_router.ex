@@ -367,9 +367,10 @@ defmodule MagusWeb.CoreRouter do
         # Vanity redirect for the magus CLI installer
         get "/install.sh", Content.InstallScriptController, :show
 
-        # Open-core root: hand off to the workbench (anonymous visitors are
-        # bounced to sign-in). The commercial edition serves a marketing landing.
-        get "/", RootController, :index
+        # NOTE: the root route `/` is intentionally NOT defined here. It is owned
+        # by the composing router (`MagusWeb.Router` serves the workbench;
+        # `magus_cloud`'s router serves a marketing landing) so editions can pick
+        # their own root without a duplicate-route conflict against this macro.
 
         auth_routes AuthController, Magus.Accounts.User, path: "/auth"
         sign_out_route AuthController
