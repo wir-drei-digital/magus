@@ -63,6 +63,10 @@ docker run --env-file .env -p 4000:4000 magus
 Or build a release directly with `MIX_ENV=prod mix release` and run
 `bin/magus start` (set `PHX_SERVER=true`).
 
+The release build runs `mix assets.deploy`, which builds the SvelteKit
+workbench (`frontend/`) into `priv/static/next/` and digests static assets.
+No separate frontend step is needed.
+
 ## Migrations
 
 Run migrations on every deploy, before the new app version starts serving:
