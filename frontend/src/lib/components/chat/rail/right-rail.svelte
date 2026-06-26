@@ -133,7 +133,10 @@
 			</div>
 
 			<div class="flex min-h-0 flex-1">
-				<nav class="flex w-12 shrink-0 flex-col items-center gap-1 border-r py-2" aria-label="Tool panels">
+				<nav
+					class="flex w-12 shrink-0 flex-col items-center gap-1 border-r py-2"
+					aria-label="Tool panels"
+				>
 					{#each panels.filter((panel) => panel.visible) as panel (panel.id)}
 						<button
 							type="button"
@@ -161,7 +164,10 @@
 					{:else if activePanel === 'brains'}
 						<BrainsPanel onCompanionRequest={requestCompanion} />
 					{:else if activePanel === 'drafts'}
-						<DraftsPanel conversationId={store.conversationId} onCompanionRequest={requestCompanion} />
+						<DraftsPanel
+							conversationId={store.conversationId}
+							onCompanionRequest={requestCompanion}
+						/>
 					{:else if activePanel === 'files'}
 						<FilesPanel conversationId={store.conversationId} />
 					{:else if activePanel === 'members'}

@@ -312,7 +312,9 @@
 				{/if}
 
 				<div class="mt-3 flex items-center justify-between">
-					<p class="font-mono text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+					<p
+						class="font-mono text-[10px] font-medium tracking-wider text-muted-foreground uppercase"
+					>
 						Invite links
 					</p>
 					<button

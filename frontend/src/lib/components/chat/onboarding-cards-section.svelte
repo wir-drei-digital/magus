@@ -43,7 +43,9 @@
 {#if cards.length > 0}
 	<div class="mb-6" data-testid="onboarding-cards">
 		{#if !firstTime}
-			<h2 class="mb-3 font-mono text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
+			<h2
+				class="mb-3 font-mono text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase"
+			>
 				Try it out
 			</h2>
 		{/if}

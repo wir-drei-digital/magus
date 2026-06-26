@@ -99,7 +99,10 @@
 		<span class="max-w-36 truncate">{modelLabel}</span>
 		<ChevronUp class="size-3" />
 	</DropdownMenu.Trigger>
-	<DropdownMenu.Content align="start" class="flex max-h-96 w-[min(24rem,calc(100vw-2rem))] flex-col gap-1 p-2">
+	<DropdownMenu.Content
+		align="start"
+		class="flex max-h-96 w-[min(24rem,calc(100vw-2rem))] flex-col gap-1 p-2"
+	>
 		<!-- svelte-ignore a11y_autofocus — search-first picker, classic parity -->
 		<input
 			type="text"
@@ -127,7 +130,9 @@
 				</span>
 			</DropdownMenu.Item>
 			{#each modelsByProvider as [provider, providerModels] (provider)}
-				<p class="px-2 pt-1 font-mono text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+				<p
+					class="px-2 pt-1 font-mono text-[10px] font-medium tracking-wider text-muted-foreground uppercase"
+				>
 					{provider}
 				</p>
 				{#each providerModels as model (model.id)}

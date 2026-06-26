@@ -348,13 +348,22 @@
 	{/if}
 
 	{#if sendError || uploadError}
-		<p class="pb-1 text-xs text-destructive" role="alert" id="landing-composer-error" data-testid="landing-composer-error">
+		<p
+			class="pb-1 text-xs text-destructive"
+			role="alert"
+			id="landing-composer-error"
+			data-testid="landing-composer-error"
+		>
 			{sendError ?? uploadError}
 		</p>
 	{/if}
 
 	{#if modalityMismatch}
-		<p class="pb-1 text-xs text-warning" role="alert" data-testid="landing-composer-modality-warning">
+		<p
+			class="pb-1 text-xs text-warning"
+			role="alert"
+			data-testid="landing-composer-modality-warning"
+		>
 			The selected model can't read images. Pick an image-capable model or remove the image.
 		</p>
 	{/if}

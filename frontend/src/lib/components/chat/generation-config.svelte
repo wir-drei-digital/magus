@@ -47,7 +47,8 @@
 
 	const selectClass =
 		'w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground';
-	const labelClass = 'font-mono text-[10px] font-medium tracking-wider text-muted-foreground uppercase';
+	const labelClass =
+		'font-mono text-[10px] font-medium tracking-wider text-muted-foreground uppercase';
 </script>
 
 {#snippet selectField(

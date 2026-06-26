@@ -58,7 +58,15 @@
 	} from '$lib/agents/agent-tools';
 	import ModelPicker from '$lib/components/chat/model-picker.svelte';
 	import ProfileImagePicker from '$lib/components/settings/profile-image-picker.svelte';
-	import { Section, Field, ToggleSwitch, Button, confirmAction, CONTROL_CLASS, TEXTAREA_CLASS } from '$lib/components/crud';
+	import {
+		Section,
+		Field,
+		ToggleSwitch,
+		Button,
+		confirmAction,
+		CONTROL_CLASS,
+		TEXTAREA_CLASS
+	} from '$lib/components/crud';
 	import { agentsNav } from '$lib/stores/agents-nav.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { workbench } from '$lib/stores/workbench.svelte';
@@ -807,7 +815,10 @@
 						<Field label="Description">
 							<input bind:value={gDescription} class={CONTROL_CLASS} />
 						</Field>
-						<Field label="Icon" hint="A single emoji, shown in lists and menus when no image is set.">
+						<Field
+							label="Icon"
+							hint="A single emoji, shown in lists and menus when no image is set."
+						>
 							<input
 								bind:value={gIcon}
 								maxlength="8"
@@ -841,7 +852,8 @@
 							<select
 								value={agent.chatMode ?? 'chat'}
 								class="{CONTROL_CLASS} w-48"
-								onchange={(event) => void patch({ chatMode: event.currentTarget.value as ChatMode })}
+								onchange={(event) =>
+									void patch({ chatMode: event.currentTarget.value as ChatMode })}
 							>
 								<option value="chat">Chat</option>
 								<option value="search">Search</option>
@@ -889,7 +901,10 @@
 					</div>
 				</Section>
 
-				<Section title="Tool categories" description="Turn off categories this agent shouldn't use.">
+				<Section
+					title="Tool categories"
+					description="Turn off categories this agent shouldn't use."
+				>
 					<div class="flex flex-col divide-y divide-border" data-testid="tool-categories">
 						{#each TOOL_CATEGORIES as category (category.key)}
 							{@render toggleRow(
@@ -1033,7 +1048,10 @@
 						</div>
 					</Section>
 
-					<Section title="Brain access" description="Brains this agent can read and edit autonomously.">
+					<Section
+						title="Brain access"
+						description="Brains this agent can read and edit autonomously."
+					>
 						{#if !knowledgeAccess || knowledgeAccess.brains.length === 0}
 							<p class="text-xs text-muted-foreground">No brains created yet.</p>
 						{:else}
@@ -1196,7 +1214,9 @@
 										</Button>
 									</div>
 									{#if integration.availableTools.length > 0}
-										<div class="mt-2 flex flex-col divide-y divide-border border-t border-input pt-2">
+										<div
+											class="mt-2 flex flex-col divide-y divide-border border-t border-input pt-2"
+										>
 											<span class="pb-1 text-[10px] tracking-wider text-muted-foreground uppercase">
 												Tools
 											</span>
@@ -1219,7 +1239,10 @@
 					{/if}
 				</Section>
 			{:else if section === 'privacy'}
-				<Section title="Privacy" description="What this agent may read and write beyond its own data.">
+				<Section
+					title="Privacy"
+					description="What this agent may read and write beyond its own data."
+				>
 					<div class="flex flex-col divide-y divide-border">
 						{@render toggleRow(
 							'Read global memories',
@@ -1258,22 +1281,30 @@
 					</div>
 				</Section>
 
-				<Section title="Heartbeat" description="How often and with what guidance the agent wakes up.">
+				<Section
+					title="Heartbeat"
+					description="How often and with what guidance the agent wakes up."
+				>
 					<div class="flex flex-col gap-4">
-						<Field
-							label="Interval (minutes)"
-							hint="How often the agent wakes to check for work."
-						>
-							<input type="number" min="5" bind:value={gHeartbeatInterval} class="{CONTROL_CLASS} w-32" />
+						<Field label="Interval (minutes)" hint="How often the agent wakes to check for work.">
+							<input
+								type="number"
+								min="5"
+								bind:value={gHeartbeatInterval}
+								class="{CONTROL_CLASS} w-32"
+							/>
 						</Field>
-						<Field
-							label="Instructions"
-							hint="What the agent should do each time it wakes up."
-						>
-							<textarea bind:value={gHeartbeatInstructions} rows="5" class={TEXTAREA_CLASS}></textarea>
+						<Field label="Instructions" hint="What the agent should do each time it wakes up.">
+							<textarea bind:value={gHeartbeatInstructions} rows="5" class={TEXTAREA_CLASS}
+							></textarea>
 						</Field>
 						<Field label="Max daily runs" hint="Caps how many times the agent may wake per day.">
-							<input type="number" min="1" bind:value={gMaxDailyRuns} class="{CONTROL_CLASS} w-32" />
+							<input
+								type="number"
+								min="1"
+								bind:value={gMaxDailyRuns}
+								class="{CONTROL_CLASS} w-32"
+							/>
 						</Field>
 						{@render saveBar(automationDirty, saveAutomation, resetAutomation)}
 						{#if agent.nextScheduledAt}

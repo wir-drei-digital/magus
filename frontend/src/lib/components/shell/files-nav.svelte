@@ -88,8 +88,7 @@
 										<span class="size-1.5 shrink-0 rounded-full bg-destructive" title="Sync error"
 										></span>
 									{:else if collection.syncStatus === 'syncing'}
-										<span class="size-1.5 shrink-0 rounded-full bg-warning" title="Syncing"
-										></span>
+										<span class="size-1.5 shrink-0 rounded-full bg-warning" title="Syncing"></span>
 									{/if}
 								</a>
 							{/snippet}

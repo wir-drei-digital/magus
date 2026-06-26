@@ -27,7 +27,14 @@
 	import { session } from '$lib/stores/session.svelte';
 	import { workbench } from '$lib/stores/workbench.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { Section, Field, Button, confirmAction, CONTROL_CLASS, TEXTAREA_CLASS } from '$lib/components/crud';
+	import {
+		Section,
+		Field,
+		Button,
+		confirmAction,
+		CONTROL_CLASS,
+		TEXTAREA_CLASS
+	} from '$lib/components/crud';
 
 	const promptId = $derived(page.params.promptId!);
 	const isNew = $derived(promptId === 'new');
@@ -223,7 +230,12 @@
 					}}
 				>
 					<Field label="Name" required>
-						<input bind:value={name} required class={CONTROL_CLASS} data-testid="prompt-name-input" />
+						<input
+							bind:value={name}
+							required
+							class={CONTROL_CLASS}
+							data-testid="prompt-name-input"
+						/>
 					</Field>
 
 					<Field label="Type">
@@ -299,14 +311,18 @@
 			<div class="flex shrink-0 items-center gap-1.5">
 				<button
 					type="button"
-					class="wb-pill-btn wb-pill-btn-square shrink-0 {prompt.isFavorited ? '!text-favorite' : ''}"
+					class="wb-pill-btn wb-pill-btn-square shrink-0 {prompt.isFavorited
+						? '!text-favorite'
+						: ''}"
 					aria-label={prompt.isFavorited ? 'Unfavorite' : 'Favorite'}
 					data-testid="prompt-favorite"
 					onclick={() => void toggleFavorite()}
 				>
 					<Star class="size-3.5 {prompt.isFavorited ? 'fill-favorite' : ''}" />
 				</button>
-				<Button size="sm" data-testid="prompt-use" onclick={() => void usePrompt()}>Use prompt</Button>
+				<Button size="sm" data-testid="prompt-use" onclick={() => void usePrompt()}
+					>Use prompt</Button
+				>
 				<button
 					type="button"
 					class="wb-pill-btn shrink-0"

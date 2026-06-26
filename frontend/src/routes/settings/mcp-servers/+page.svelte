@@ -333,10 +333,7 @@
 			<McpRegistryBrowse onImported={() => void load()} />
 		</SettingsSection>
 	{:else if loading}
-		<div
-			class="h-48 animate-pulse rounded-xl bg-muted/60"
-			data-testid="settings-mcp-loading"
-		></div>
+		<div class="h-48 animate-pulse rounded-xl bg-muted/60" data-testid="settings-mcp-loading"></div>
 	{:else}
 		<SettingsSection
 			title="MCP servers"

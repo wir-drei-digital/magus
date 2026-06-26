@@ -70,8 +70,7 @@
 		}
 	}
 
-	const FIELD =
-		CONTROL_CLASS;
+	const FIELD = CONTROL_CLASS;
 	const TZ_LOCK_DAYS = 30;
 
 	let settings = $state<UserSettings | null>(null);

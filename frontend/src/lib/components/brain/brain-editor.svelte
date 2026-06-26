@@ -188,82 +188,86 @@
 		if (!host) return;
 		const element = host;
 
-		editor = untrack(() => new Editor({
-			element,
-			content,
-			editorProps: {
-				attributes: {
-					// tiptap-phoenix's stylesheet targets .tiptap-editor-content.
-					class: 'tiptap-editor-content focus:outline-none'
-				},
-				handleDrop: (view, event, _slice, moved) => {
-					// Internal node drags (DragHandle reorder) and page-less hosts
-					// (draft companion) keep ProseMirror's default handling.
-					if (moved || !pageId) return false;
-					const files = filesFromTransfer(event.dataTransfer);
-					if (files.length === 0) return false;
-					event.preventDefault();
-					const coords = view.posAtCoords({ left: event.clientX, top: event.clientY });
-					void insertFilesInOrder(files, coords ? coords.pos : null);
-					return true;
-				},
-				handlePaste: (_view, event) => {
-					if (!pageId) return false;
-					const files = filesFromTransfer(event.clipboardData);
-					if (files.length === 0) return false;
-					event.preventDefault();
-					void insertFilesInOrder(files, null);
-					return true;
-				}
-			},
-			extensions: [
-				StarterKit,
-				Placeholder.configure({ placeholder: "Write, or type '/' for blocks…" }),
-				Image.configure({ inline: false, allowBase64: false }),
-				Link.configure({ openOnClick: false, autolink: true }),
-				Underline,
-				Typography,
-				Table.configure({ resizable: false }),
-				TableRow,
-				TableCell,
-				TableHeader,
-				Details,
-				DetailsSummary,
-				DetailsContent,
-				TaskList,
-				TaskItem.configure({ nested: true }),
-				createSlashCommand({ commands: defaultCommands }),
-				// Formatting bubble on selection (classic parity). The ask/refine
-				// extras forward the selection to the host via onBubbleAction.
-				createBubbleMenu({
-					extras: bubbleExtras(),
-					pushEvent: onBubbleAction
-						? (event: string, payload: Record<string, unknown>) => onBubbleAction(event, payload)
-						: null
-				}),
-				DragHandle,
-				// Getter (not a snapshot) so the wikilink list stays live as `pages`
-				// loads, without re-creating the editor. createPageLink is a vendored
-				// @ts-nocheck module whose JSDoc only advertises the array form, so the
-				// getter is cast through to satisfy the type-checker.
-				createPageLink(
-					(() =>
-						pages.map((page) => ({
-							id: page.id,
-							title: page.title ?? 'Untitled'
-						}))) as unknown as { id: string; title: string }[],
-					{ onPageRefClick }
-				),
-				SourceBlock,
-				FileBlock,
-				MessageBlock,
-				CalloutBlock,
-				ImageBlock,
-				PageRef,
-				Tag
-			],
-			onUpdate: () => onChange()
-		}));
+		editor = untrack(
+			() =>
+				new Editor({
+					element,
+					content,
+					editorProps: {
+						attributes: {
+							// tiptap-phoenix's stylesheet targets .tiptap-editor-content.
+							class: 'tiptap-editor-content focus:outline-none'
+						},
+						handleDrop: (view, event, _slice, moved) => {
+							// Internal node drags (DragHandle reorder) and page-less hosts
+							// (draft companion) keep ProseMirror's default handling.
+							if (moved || !pageId) return false;
+							const files = filesFromTransfer(event.dataTransfer);
+							if (files.length === 0) return false;
+							event.preventDefault();
+							const coords = view.posAtCoords({ left: event.clientX, top: event.clientY });
+							void insertFilesInOrder(files, coords ? coords.pos : null);
+							return true;
+						},
+						handlePaste: (_view, event) => {
+							if (!pageId) return false;
+							const files = filesFromTransfer(event.clipboardData);
+							if (files.length === 0) return false;
+							event.preventDefault();
+							void insertFilesInOrder(files, null);
+							return true;
+						}
+					},
+					extensions: [
+						StarterKit,
+						Placeholder.configure({ placeholder: "Write, or type '/' for blocks…" }),
+						Image.configure({ inline: false, allowBase64: false }),
+						Link.configure({ openOnClick: false, autolink: true }),
+						Underline,
+						Typography,
+						Table.configure({ resizable: false }),
+						TableRow,
+						TableCell,
+						TableHeader,
+						Details,
+						DetailsSummary,
+						DetailsContent,
+						TaskList,
+						TaskItem.configure({ nested: true }),
+						createSlashCommand({ commands: defaultCommands }),
+						// Formatting bubble on selection (classic parity). The ask/refine
+						// extras forward the selection to the host via onBubbleAction.
+						createBubbleMenu({
+							extras: bubbleExtras(),
+							pushEvent: onBubbleAction
+								? (event: string, payload: Record<string, unknown>) =>
+										onBubbleAction(event, payload)
+								: null
+						}),
+						DragHandle,
+						// Getter (not a snapshot) so the wikilink list stays live as `pages`
+						// loads, without re-creating the editor. createPageLink is a vendored
+						// @ts-nocheck module whose JSDoc only advertises the array form, so the
+						// getter is cast through to satisfy the type-checker.
+						createPageLink(
+							(() =>
+								pages.map((page) => ({
+									id: page.id,
+									title: page.title ?? 'Untitled'
+								}))) as unknown as { id: string; title: string }[],
+							{ onPageRefClick }
+						),
+						SourceBlock,
+						FileBlock,
+						MessageBlock,
+						CalloutBlock,
+						ImageBlock,
+						PageRef,
+						Tag
+					],
+					onUpdate: () => onChange()
+				})
+		);
 
 		return () => {
 			editor?.destroy();

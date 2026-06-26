@@ -124,10 +124,7 @@
 	{/snippet}
 
 	{#if conflictNotice}
-		<p
-			class="border-b bg-warning/10 px-4 py-1.5 text-xs text-warning"
-			data-testid="draft-conflict"
-		>
+		<p class="border-b bg-warning/10 px-4 py-1.5 text-xs text-warning" data-testid="draft-conflict">
 			{conflictNotice}
 		</p>
 	{/if}

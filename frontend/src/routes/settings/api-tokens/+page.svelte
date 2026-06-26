@@ -15,8 +15,7 @@
 	} from '$lib/ash/api';
 	import { relativeTime } from '$lib/time';
 
-	const FIELD =
-		CONTROL_CLASS;
+	const FIELD = CONTROL_CLASS;
 
 	let tokens = $state<ApiTokenEntry[]>([]);
 	let workspaces = $state<WorkspaceSummary[]>([]);

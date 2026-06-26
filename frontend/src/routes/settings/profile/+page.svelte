@@ -13,8 +13,7 @@
 	} from '$lib/ash/api';
 	import { session } from '$lib/stores/session.svelte';
 
-	const FIELD =
-		CONTROL_CLASS;
+	const FIELD = CONTROL_CLASS;
 
 	let settings = $state<UserSettings | null>(null);
 	let loading = $state(true);

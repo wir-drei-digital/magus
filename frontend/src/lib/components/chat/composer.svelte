@@ -349,7 +349,12 @@
 
 <div class="mx-auto w-full max-w-3xl">
 	{#if store.sendError || uploadError}
-		<p class="pb-1 text-xs text-destructive" role="alert" id="composer-error" data-testid="composer-error">
+		<p
+			class="pb-1 text-xs text-destructive"
+			role="alert"
+			id="composer-error"
+			data-testid="composer-error"
+		>
 			{store.sendError ?? uploadError}
 		</p>
 	{/if}

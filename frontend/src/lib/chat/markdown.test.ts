@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 // The renderers sanitize via DOMPurify, which needs a DOM window.
 import { describe, expect, it } from 'vitest';
-import { CITATION_CLASS, hasRichContent, referencedCitations, renderMarkdownLight } from './markdown';
+import {
+	CITATION_CLASS,
+	hasRichContent,
+	referencedCitations,
+	renderMarkdownLight
+} from './markdown';
 import { renderMarkdownFull } from './markdown-full';
 
 describe('renderMarkdownLight', () => {

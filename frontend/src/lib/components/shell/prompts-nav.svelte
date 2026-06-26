@@ -17,7 +17,12 @@
 	const allPrompts = $derived<PromptSummary[]>([...promptsNav.shared, ...promptsNav.personal]);
 
 	const scopes = $derived([
-		{ key: null as string | null, label: 'All prompts', icon: LayoutGrid, count: allPrompts.length },
+		{
+			key: null as string | null,
+			label: 'All prompts',
+			icon: LayoutGrid,
+			count: allPrompts.length
+		},
 		{ key: 'favorites', label: 'Favorites', icon: Star, count: promptsNav.favorites.length },
 		// Shared/Personal only mean something inside a workspace.
 		...(session.user?.currentWorkspaceId
@@ -68,7 +73,10 @@
 					{#each scopes as scope (scope.label)}
 						{@const active = inPrompts && !activeTag && (activeScope ?? null) === scope.key}
 						<Sidebar.MenuItem>
-							<Sidebar.MenuButton isActive={active} data-testid="prompts-scope-{scope.key ?? 'all'}">
+							<Sidebar.MenuButton
+								isActive={active}
+								data-testid="prompts-scope-{scope.key ?? 'all'}"
+							>
 								{#snippet child({ props })}
 									<a {...props} href={scopeHref(scope.key)}>
 										<scope.icon class="text-muted-foreground" />

@@ -17,6 +17,9 @@
 	<title>Magus — Agents</title>
 </svelte:head>
 
-<EmptyState title="No agent selected" description="Pick an agent from the left, or create a new one.">
+<EmptyState
+	title="No agent selected"
+	description="Pick an agent from the left, or create a new one."
+>
 	{#snippet icon()}<Bot />{/snippet}
 </EmptyState>

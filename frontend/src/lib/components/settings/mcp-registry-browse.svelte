@@ -345,9 +345,7 @@
 							<div
 								class="mt-2 flex flex-col items-start gap-2 rounded-md border bg-secondary/40 p-2.5"
 							>
-								<p class="text-xs text-muted-foreground">
-									Added. Authorize with OAuth to connect.
-								</p>
+								<p class="text-xs text-muted-foreground">Added. Authorize with OAuth to connect.</p>
 								<Button
 									type="button"
 									size="sm"

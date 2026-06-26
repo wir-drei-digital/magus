@@ -91,7 +91,10 @@
 {#if type === 'service'}
 	<!-- Sandbox service: compact card with a "View in Pane" action. -->
 	{#if view.status === 'error'}
-		<div class="ml-2 flex items-center gap-2 py-1 text-sm text-destructive/80" data-testid="tool-card">
+		<div
+			class="ml-2 flex items-center gap-2 py-1 text-sm text-destructive/80"
+			data-testid="tool-card"
+		>
 			<AlertCircle class="size-4 shrink-0" />
 			<span>Service failed</span>
 		</div>
@@ -120,7 +123,10 @@
 	{@const file = fileDownloadData(view.output)}
 	{@const FileIcon = fileIcon(file.mimeType)}
 	{#if view.status === 'error' || file.error}
-		<div class="ml-2 flex items-center gap-2 py-1 text-xs text-destructive/70" data-testid="tool-card">
+		<div
+			class="ml-2 flex items-center gap-2 py-1 text-xs text-destructive/70"
+			data-testid="tool-card"
+		>
 			<FileX class="size-3.5 shrink-0" />
 			<span class="truncate">{file.error ?? 'File not found'}</span>
 		</div>
