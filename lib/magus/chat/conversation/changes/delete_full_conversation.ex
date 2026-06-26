@@ -7,13 +7,16 @@ defmodule Magus.Chat.Conversation.Changes.DeleteFullConversation do
   that require application-level cleanup before deletion:
 
   - **Files**: Deletes from storage backend (S3/local) and decrements storage usage
-  - **Sandboxes**: Destroys remote sandbox sprites via provider API
+  - **Sandboxes**: Enqueues out-of-band destruction of remote sandbox sprites
+    (`Magus.Sandbox.Workers.DestroyRemoteSandbox`). The sprite ids are captured
+    here, before the DB cascade removes the rows, and the Oban jobs are inserted
+    in the deletion transaction so they persist only if the delete commits. This
+    keeps remote HTTP calls and retries out of the transaction (magus-2621).
   """
   use Ash.Resource.Change
   require Ash.Query
-  require Logger
 
-  alias Magus.Sandbox.Provider
+  alias Magus.Sandbox.Workers.DestroyRemoteSandbox
 
   @impl true
   def change(changeset, _opts, _context) do
@@ -42,53 +45,27 @@ defmodule Magus.Chat.Conversation.Changes.DeleteFullConversation do
     |> Ash.Query.filter(conversation_id == ^conversation_id)
     |> Ash.bulk_destroy!(:destroy, %{}, authorize?: false, strategy: :stream)
 
-    # Destroy remote sandbox sprites before DB cascade removes the records
-    destroy_remote_sandboxes(conversation_id)
+    enqueue_remote_sandbox_cleanup(conversation_id)
   end
 
-  defp destroy_remote_sandboxes(conversation_id) do
+  # Capture sprite ids now, before the DB cascade removes the sandbox rows, and
+  # enqueue their remote destruction. Oban.insert! participates in the deletion
+  # transaction, so the jobs persist only if the delete commits; Oban then runs
+  # them out of band with durable retries.
+  defp enqueue_remote_sandbox_cleanup(conversation_id) do
     Magus.Sandbox.Sandbox
     |> Ash.Query.filter(conversation_id == ^conversation_id)
     |> Ash.read!(authorize?: false)
     |> Enum.each(fn sandbox ->
       if sandbox.sprite_id do
-        client = Provider.client_for(sandbox)
-        destroy_with_retry(client, sandbox)
+        %{
+          "sandbox_id" => sandbox.id,
+          "provider" => to_string(sandbox.provider),
+          "sprite_id" => sandbox.sprite_id
+        }
+        |> DestroyRemoteSandbox.new()
+        |> Oban.insert!()
       end
     end)
-  end
-
-  defp destroy_with_retry(client, sandbox, attempt \\ 1) do
-    case apply(client, :destroy, [sandbox.sprite_id]) do
-      :ok ->
-        Logger.debug(
-          "Destroyed #{sandbox.provider} resource #{sandbox.sprite_id} for sandbox #{sandbox.id}"
-        )
-
-      {:error, :not_found} ->
-        Logger.debug(
-          "#{sandbox.provider} resource #{sandbox.sprite_id} already gone for sandbox #{sandbox.id}"
-        )
-
-      {:error, :not_configured} ->
-        Logger.debug(
-          "#{sandbox.provider} not configured, skipping destroy for sandbox #{sandbox.id}"
-        )
-
-      {:error, _reason} when attempt < 2 ->
-        Logger.warning(
-          "Retrying destroy for #{sandbox.provider} resource #{sandbox.sprite_id} (attempt #{attempt})"
-        )
-
-        Process.sleep(1_000)
-        destroy_with_retry(client, sandbox, attempt + 1)
-
-      {:error, reason} ->
-        Logger.error(
-          "ORPHANED: Failed to destroy #{sandbox.provider} resource #{sandbox.sprite_id} " <>
-            "for sandbox #{sandbox.id} after #{attempt} attempts: #{inspect(reason)}. " <>
-            "This service must be cleaned up manually or via orphan reconciliation."
-        )
-    end
   end
 end
