@@ -7,6 +7,8 @@ defmodule Magus.Files.Upload do
   the files sidebar.
   """
 
+  require Logger
+
   alias Magus.Files
   alias Magus.Files.{FileAnalyzer, Storage}
 
@@ -75,7 +77,16 @@ defmodule Magus.Files.Upload do
             |> maybe_add(:workspace_id, workspace_id)
             |> Map.merge(extra_attrs)
 
-          Files.create_file(attrs, actor: user)
+          case Files.create_file(attrs, actor: user) do
+            {:ok, file} ->
+              {:ok, file}
+
+            {:error, _reason} = error ->
+              # The DB record was rejected (quota, auth, validation) after the
+              # bytes were already written, so compensate to avoid an orphan.
+              compensate_orphaned_upload(storage_path)
+              error
+          end
         end
 
       {:error, reason} ->
@@ -177,4 +188,16 @@ defmodule Magus.Files.Upload do
 
   defp maybe_add(map, _key, nil), do: map
   defp maybe_add(map, key, value), do: Map.put(map, key, value)
+
+  defp compensate_orphaned_upload(storage_path) do
+    case Storage.delete(storage_path) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning(
+          "Upload compensation failed to delete orphaned bytes at #{storage_path}: #{inspect(reason)}"
+        )
+    end
+  end
 end
