@@ -8,6 +8,20 @@ on:
   pull_request:
 
 jobs:
+  # Recurring secret scan over the full history. gitleaks-action is free for
+  # public repositories. Complements the one-time pre-publish scan and fails CI
+  # if a credential is ever committed.
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   test:
     name: Run tests
     runs-on: ubuntu-latest

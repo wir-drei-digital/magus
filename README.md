@@ -70,6 +70,9 @@ the app together:
 docker compose -f docker-compose.selfhost.yml up
 ```
 
+For production deployment (release build, configuration, migrations, upgrades,
+TLS, and backups), see the [self-hosting guide](docs/self-hosting.md).
+
 ## Development
 
 ### Common Commands
