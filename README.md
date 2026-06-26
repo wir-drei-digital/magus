@@ -227,6 +227,16 @@ MIX_ENV=test mix test test/magus/eval/
 bin/test-e2e-live test/e2e_live/eval_benchmarks_test.exs
 ```
 
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup,
+conventions, and the DCO sign-off, and our [Code of Conduct](CODE_OF_CONDUCT.md).
+To report a security issue privately, see [SECURITY.md](SECURITY.md).
+
+Magus is open core: this repository is the Apache-2.0 core, and the commercial
+hosted edition (Magus Cloud) builds on top of it. Please keep contributions
+edition-neutral (no dependency on commercial billing).
+
 ## License
 
 Licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution.

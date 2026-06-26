@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest an idea or improvement for Magus
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the use case or pain point. "I'm always frustrated when ..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any alternative solutions or workarounds you have considered.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      description: Magus is open core; commercial billing/marketing lives in the separate cloud edition.
+      options:
+        - label: This is about the open-core product (not commercial billing/hosting).
+          required: true
