@@ -309,8 +309,9 @@ defmodule Magus.Agents.Context.Builder do
         %{role: :user, content: content} when is_list(content) ->
           # Content may be a list of parts (text, images, etc.)
           Enum.find_value(content, "", fn
+            # A ContentPart struct is also a map, so this clause matches both
+            # plain maps and %ReqLLM.Message.ContentPart{} parts.
             %{type: :text, text: text} -> text
-            %ReqLLM.Message.ContentPart{type: :text, text: text} -> text
             _ -> nil
           end)
 
