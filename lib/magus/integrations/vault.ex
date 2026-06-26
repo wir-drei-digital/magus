@@ -18,19 +18,24 @@ defmodule Magus.Integrations.Vault do
       Keyword.put(config, :ciphers,
         default: {
           Cloak.Ciphers.AES.GCM,
-          tag: "AES.GCM.V1", key: decode_env!("INTEGRATION_ENCRYPTION_KEY"), iv_length: 12
+          tag: "AES.GCM.V1", key: encryption_key!(), iv_length: 12
         }
       )
 
     {:ok, config}
   end
 
-  defp decode_env!(var) do
-    case System.get_env(var) do
+  # Dev/prod read INTEGRATION_ENCRYPTION_KEY from the environment. The test env
+  # sets a deterministic key via `config :magus, Magus.Integrations.Vault, key:`
+  # so the suite boots and encrypts with no secrets (fork PRs, fresh checkouts).
+  defp encryption_key! do
+    configured = Application.get_env(:magus, __MODULE__, [])[:key]
+
+    case configured || System.get_env("INTEGRATION_ENCRYPTION_KEY") do
       nil ->
         raise """
-        Environment variable #{var} is not set.
-        Generate one with: elixir -e ":crypto.strong_rand_bytes(32) |> Base.encode64() |> IO.puts()"
+        INTEGRATION_ENCRYPTION_KEY is not set.
+        Generate a base64 32-byte key: :crypto.strong_rand_bytes(32) |> Base.encode64()
         """
 
       value ->

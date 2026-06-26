@@ -5,6 +5,11 @@ config :magus, Oban, testing: :manual
 # Small init timeout so unreachable-server tests fail fast instead of waiting 10s.
 config :magus, Magus.MCP, allow_private_urls: true, init_timeout_ms: 200
 config :magus, token_signing_secret: "/kGClFEsHQGu7Qq6vHVbBD6EWKzeMkSs"
+
+# Deterministic encryption key so the integration credential Vault boots and
+# encrypts in test with no secrets (see Magus.Integrations.Vault). Test-only
+# fixed value; real keys come from INTEGRATION_ENCRYPTION_KEY in dev/prod.
+config :magus, Magus.Integrations.Vault, key: "4wfvLLk+ma4st61zxwIdqSsyYVsJ/6OOZcV+O3CEPEs="
 config :bcrypt_elixir, log_rounds: 1
 config :ash, policies: [show_policy_breakdowns?: true], disable_async?: true
 
