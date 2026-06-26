@@ -65,7 +65,7 @@ defmodule Magus.Files.File.Changes.StoreContent do
         |> Ash.Changeset.force_change_attribute(:id, file_id)
         |> Ash.Changeset.force_change_attribute(:file_path, relative_path)
         |> Ash.Changeset.force_change_attribute(:file_size, byte_size(binary_data))
-        |> Ash.Changeset.force_change_attribute(:storage_backend, "local")
+        |> Ash.Changeset.force_change_attribute(:storage_backend, Storage.backend_name())
         |> Ash.Changeset.force_change_attribute(:status, :ready)
 
       {:error, reason} ->

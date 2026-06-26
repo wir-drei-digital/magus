@@ -19,6 +19,15 @@ defmodule Magus.Files.Storage do
   end
 
   @doc """
+  Returns the configured storage backend as a string ("local" or "s3").
+
+  This is the value persisted to the `storage_backend` column so that deletes
+  route to the same backend that stored the bytes. Stamp records with this
+  rather than a hardcoded literal.
+  """
+  def backend_name, do: to_string(backend())
+
+  @doc """
   Stores file content at the given relative path.
   Returns {:ok, relative_path} or {:error, reason}
 

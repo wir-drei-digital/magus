@@ -290,7 +290,7 @@ defmodule Magus.Files.File do
 
       change relate_actor(:user)
       change set_attribute(:status, :pending)
-      change set_attribute(:storage_backend, "local")
+      change set_attribute(:storage_backend, &Magus.Files.Storage.backend_name/0)
 
       # Check storage limits before creating file
       validate Magus.Files.File.Validations.CheckStorageLimits
@@ -329,7 +329,7 @@ defmodule Magus.Files.File do
       ]
 
       change set_attribute(:status, :pending)
-      change set_attribute(:storage_backend, "local")
+      change set_attribute(:storage_backend, &Magus.Files.Storage.backend_name/0)
       change run_oban_trigger(:process_file)
       change Magus.Files.File.Changes.BroadcastWorkspaceEvent
     end
@@ -534,7 +534,7 @@ defmodule Magus.Files.File do
       change relate_actor(:user)
       change set_attribute(:source, :connector)
       change set_attribute(:status, :pending)
-      change set_attribute(:storage_backend, "local")
+      change set_attribute(:storage_backend, &Magus.Files.Storage.backend_name/0)
       change set_attribute(:last_synced_at, &DateTime.utc_now/0)
 
       # Check storage limits before syncing file
@@ -762,6 +762,8 @@ defmodule Magus.Files.File do
 
     attribute :storage_backend, :string do
       allow_nil? false
+      # Static DB fallback only; every create action stamps the configured
+      # backend via &Magus.Files.Storage.backend_name/0 (see actions above).
       default "local"
     end
 
