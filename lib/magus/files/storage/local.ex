@@ -19,12 +19,14 @@ defmodule Magus.Files.Storage.Local do
   the storage directory.
   """
   def full_path(relative_path) do
-    base = Path.join([File.cwd!(), @base_path])
+    base = Path.join([File.cwd!(), @base_path]) |> Path.expand()
     # Expand the path to resolve any ".." or "." components
     full = Path.join([base, relative_path]) |> Path.expand()
 
-    # Ensure the resolved path is still within the base directory
-    unless String.starts_with?(full, base) do
+    # Ensure the resolved path is within the base directory. A bare prefix check
+    # would also accept a sibling dir that shares the prefix (e.g. "<base>_evil"),
+    # so require an exact match or a path strictly under "<base>/".
+    unless full == base or String.starts_with?(full, base <> "/") do
       raise ArgumentError, "Invalid path: path traversal attempt detected"
     end
 
