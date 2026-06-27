@@ -307,7 +307,8 @@ config :magus,
     Magus.Brain,
     Magus.Workbench,
     Magus.SuperBrain,
-    Magus.MCP
+    Magus.MCP,
+    Magus.Skills
   ]
 
 # MCP client configuration. `init_timeout_ms` bounds how long a discovery
