@@ -230,7 +230,11 @@ defmodule Magus.Agents.Context.SuperBrainRagContextTest do
 
       out = SuperBrainRagContext.format(entities)
       # At most 2 relation lines (the budget cap).
-      assert length(for line <- String.split(out, "\n"), String.contains?(line, "relates_to:"), do: line) <= 2
+      assert length(
+               for line <- String.split(out, "\n"),
+                   String.contains?(line, "relates_to:"),
+                   do: line
+             ) == 2
     end
   end
 
