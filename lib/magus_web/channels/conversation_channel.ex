@@ -45,6 +45,8 @@ defmodule MagusWeb.ConversationChannel do
           Magus.Endpoint.subscribe(topic)
         end
 
+        send(self(), :after_join)
+
         {:ok,
          socket
          |> assign(:conversation_id, conversation.id)
@@ -228,6 +230,37 @@ defmodule MagusWeb.ConversationChannel do
         push(socket, event, %{})
     end
 
+    {:noreply, socket}
+  end
+
+  # Presence: track this viewer on the shared `presence:conversation:<id>` topic
+  # (the same one the workbench LiveViews use) and push the initial viewer list.
+  # Only collaborative conversations participate — a solo chat has no co-viewers.
+  # Phoenix.Presence auto-cleans on channel exit, so no untrack on leave.
+  def handle_info(:after_join, socket) do
+    if socket.assigns[:collaborative?] do
+      viewers =
+        Magus.Presence.track_channel(
+          :conversation,
+          socket.assigns.conversation_id,
+          socket.assigns.current_user
+        )
+
+      push(socket, "presence.state", %{viewers: viewers})
+    end
+
+    {:noreply, socket}
+  end
+
+  # Someone joined/left/toggled visibility: re-list and push the full viewer set.
+  # Viewer lists are small, so replacing state is simpler for the SPA than
+  # applying CRDT diffs.
+  def handle_info(
+        %Phoenix.Socket.Broadcast{topic: "presence:conversation:" <> _, event: "presence_diff"},
+        socket
+      ) do
+    viewers = Magus.Presence.list(:conversation, socket.assigns.conversation_id)
+    push(socket, "presence.state", %{viewers: viewers})
     {:noreply, socket}
   end
 

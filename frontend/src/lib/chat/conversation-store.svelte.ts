@@ -30,6 +30,7 @@ import {
 } from '$lib/chat/events';
 import { applyQueuedEvent, type QueuedMessage } from '$lib/chat/queued';
 import { readHistory, writeHistory } from '$lib/chat/history-cache';
+import { normalizeViewers, type PresenceViewer, type RawPresenceViewer } from '$lib/chat/presence';
 
 export type TypingUser = { userId: string; userName: string };
 
@@ -72,6 +73,9 @@ export class ConversationStore {
 	messages = $state<ChatMessage[]>([]);
 	liveTools = $state<LiveToolEvent[]>([]);
 	typing = $state<TypingUser[]>([]);
+	/** Live viewers of this conversation (multiplayer), from the `presence.state`
+	 *  channel push. Includes self + hidden; the UI filters those out. */
+	presence = $state<PresenceViewer[]>([]);
 	agentThinking = $state(false);
 	/**
 	 * true for the whole agent turn (thinking + tools + streaming); gates
@@ -767,6 +771,12 @@ export class ConversationStore {
 
 			const without = this.typing.filter((entry) => entry.userId !== userId);
 			this.typing = isTyping ? [...without, { userId, userName }] : without;
+		});
+
+		// Presence: the channel pushes the full deduped viewer list on join and on
+		// every change (collaborative conversations only). Replace state wholesale.
+		channel.on('presence.state', (payload: Record<string, unknown>) => {
+			this.presence = normalizeViewers(payload.viewers as RawPresenceViewer[] | undefined);
 		});
 
 		channel.on('access.revoked', () => {

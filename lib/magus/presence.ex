@@ -75,6 +75,24 @@ defmodule Magus.Presence do
   end
 
   @doc """
+  Channel/GenServer variant of `track/3`: tracks the **calling process** as
+  viewing the resource on the same presence topic the workbench LiveViews use,
+  subscribes it to that topic, and returns the current viewer list.
+
+  Use from a `Phoenix.Channel` (which carries a `Phoenix.Socket`, not a
+  `LiveView.Socket`) so SPA and LiveView viewers of one resource appear in a
+  single presence list. `Phoenix.Presence` auto-cleans on process exit, so the
+  caller needs no explicit `untrack`.
+  """
+  @spec track_channel(resource_type(), resource_id(), map()) :: [map()]
+  def track_channel(resource_type, resource_id, user) do
+    topic = topic(resource_type, resource_id)
+    Phoenix.PubSub.subscribe(Magus.PubSub, topic)
+    {:ok, _ref} = __MODULE__.Tracker.track(self(), topic, user.id, build_meta(user))
+    list(resource_type, resource_id)
+  end
+
+  @doc """
   Returns the deduped list of viewers for `{resource_type, resource_id}`.
 
   Each entry: `%{user_id, name, avatar_path, color, visible?}`. Hidden viewers

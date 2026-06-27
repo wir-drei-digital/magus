@@ -11,8 +11,10 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import RightRail from './rail/right-rail.svelte';
 	import ShareConversationDialog from './share-conversation-dialog.svelte';
+	import PresenceAvatars from './presence-avatars.svelte';
 	import { confirmAction } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { session } from '$lib/stores/session.svelte';
 
 	let {
 		store,
@@ -123,6 +125,8 @@
 	</div>
 
 	<div class="flex shrink-0 items-center gap-1.5">
+		<PresenceAvatars viewers={store.presence} selfUserId={session.user?.id} />
+
 		<button
 			type="button"
 			class="wb-pill-btn wb-pill-btn-square shrink-0 {conversation?.isFavorited

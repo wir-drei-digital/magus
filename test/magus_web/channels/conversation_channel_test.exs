@@ -214,4 +214,62 @@ defmodule MagusWeb.ConversationChannelTest do
       assert_push "message.create_event", _payload
     end
   end
+
+  describe "presence" do
+    test "tracks the joining viewer and pushes presence.state on a collaborative conversation" do
+      user = generate(user())
+      conversation = generate(conversation(actor: user))
+      {:ok, conversation} = Magus.Chat.enable_multiplayer(conversation, actor: user)
+
+      {:ok, _reply, _socket} =
+        subscribe_and_join(
+          connect_as(user),
+          ConversationChannel,
+          "conversation:#{conversation.id}"
+        )
+
+      user_id = user.id
+      assert_push "presence.state", %{viewers: viewers}
+      assert Enum.any?(viewers, &(&1.user_id == user_id))
+    end
+
+    test "does not track presence on a non-collaborative conversation" do
+      user = generate(user())
+      conversation = generate(conversation(actor: user))
+
+      {:ok, _reply, _socket} =
+        subscribe_and_join(
+          connect_as(user),
+          ConversationChannel,
+          "conversation:#{conversation.id}"
+        )
+
+      refute_push "presence.state", %{}
+    end
+
+    test "re-pushes the viewer list when presence changes on the shared topic" do
+      user = generate(user())
+      conversation = generate(conversation(actor: user))
+      {:ok, conversation} = Magus.Chat.enable_multiplayer(conversation, actor: user)
+
+      {:ok, _reply, _socket} =
+        subscribe_and_join(
+          connect_as(user),
+          ConversationChannel,
+          "conversation:#{conversation.id}"
+        )
+
+      assert_push "presence.state", %{viewers: _}
+
+      # A diff on the shared presence topic (what Phoenix.Presence emits on
+      # track/untrack) must make the channel re-list and re-push.
+      MagusWeb.Endpoint.broadcast(
+        "presence:conversation:#{conversation.id}",
+        "presence_diff",
+        %{}
+      )
+
+      assert_push "presence.state", %{viewers: _}
+    end
+  end
 end
