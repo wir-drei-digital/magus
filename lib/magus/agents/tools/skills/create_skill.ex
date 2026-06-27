@@ -65,8 +65,14 @@ defmodule Magus.Agents.Tools.Skills.CreateSkill do
   # Bundle paths are stored relative to scripts/ so SKILL.md can reference them.
   defp relative(path), do: "scripts/" <> Path.basename(path)
 
+  defp yaml_quote(value) do
+    escaped = value |> to_string() |> String.replace("\\", "\\\\") |> String.replace("\"", "\\\"")
+    "\"" <> escaped <> "\""
+  end
+
   defp build_zip(name, params, files) do
-    front = "---\nname: #{name}\ndescription: #{get_param(params, :description)}\n"
+    front =
+      "---\nname: #{yaml_quote(name)}\ndescription: #{yaml_quote(get_param(params, :description))}\n"
 
     allowed =
       case get_param(params, :requested_tools) do
