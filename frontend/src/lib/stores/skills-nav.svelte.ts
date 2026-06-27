@@ -1,7 +1,7 @@
 import { mySkills, workspaceSkills, type SkillSummary } from '$lib/ash/api';
 
 /**
- * Pure partition helper — exported so it is unit-testable without instantiating
+ * Pure partition helper, exported so it is unit-testable without instantiating
  * the store or mocking Svelte's $state.
  *
  * personal  = skills with no workspaceId (owned by the user personally).
@@ -28,7 +28,7 @@ export function partitionSkills(
 }
 
 /**
- * Skills nav lists (Personal / Workspace — mirrors PromptsNav sections).
+ * Skills nav lists (Personal / Workspace, mirrors PromptsNav sections).
  * Cached in a singleton so the detail view can refresh the nav after
  * create/rename/share without prop drilling.
  */

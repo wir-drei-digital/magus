@@ -40,7 +40,7 @@
 		{#if skill.hasExecutableBundle}
 			<span
 				class="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
-				title="Includes runnable code — executes in a sandbox"
+				title="Includes runnable code that executes in a sandbox"
 			>
 				<Box class="size-2.5" />
 				sandbox
