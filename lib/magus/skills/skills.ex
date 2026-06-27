@@ -21,6 +21,10 @@ defmodule Magus.Skills do
       define :update_skill, action: :update
       define :destroy_skill, action: :destroy
       define :list_skills, action: :read
+      define :my_skills, action: :my_skills
+      define :workspace_skills, action: :workspace_skills, args: [:workspace_id]
+      define :share_skill_to_team, action: :share_to_team
+      define :unshare_skill_from_team, action: :unshare_from_team
     end
   end
 end

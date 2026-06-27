@@ -13,6 +13,30 @@ defmodule Magus.Skills.Skill do
   actions do
     defaults [:read]
 
+    read :my_skills do
+      filter expr(user_id == ^actor(:id) and is_nil(workspace_id))
+    end
+
+    read :workspace_skills do
+      argument :workspace_id, :uuid, allow_nil?: false
+      filter expr(workspace_id == ^arg(:workspace_id))
+      prepare build(load: [:is_shared_to_workspace])
+    end
+
+    update :share_to_team do
+      accept []
+      require_atomic? false
+      validate present(:workspace_id), message: "skill must belong to a workspace"
+      change {Magus.Workspaces.Changes.GrantWorkspaceAccess, resource_type: :skill}
+    end
+
+    update :unshare_from_team do
+      accept []
+      require_atomic? false
+      validate present(:workspace_id), message: "skill must belong to a workspace"
+      change {Magus.Workspaces.Changes.RevokeWorkspaceAccess, resource_type: :skill}
+    end
+
     destroy :destroy do
       primary? true
       require_atomic? false
@@ -70,6 +94,26 @@ defmodule Magus.Skills.Skill do
     import Magus.Workspaces.Policies
 
     workspace_scoped_policies(resource_type: :skill)
+  end
+
+  pub_sub do
+    module MagusWeb.Endpoint
+    prefix "workspaces"
+
+    publish_all :create, [:workspace_id, "skills"] do
+      filter fn %{data: s} -> not is_nil(s.workspace_id) end
+      transform fn %{data: s} -> %{id: s.id, workspace_id: s.workspace_id, action: :created} end
+    end
+
+    publish_all :update, [:workspace_id, "skills"] do
+      filter fn %{data: s} -> not is_nil(s.workspace_id) end
+      transform fn %{data: s} -> %{id: s.id, workspace_id: s.workspace_id, action: :updated} end
+    end
+
+    publish_all :destroy, [:workspace_id, "skills"] do
+      filter fn %{data: s} -> not is_nil(s.workspace_id) end
+      transform fn %{data: s} -> %{id: s.id, workspace_id: s.workspace_id, action: :deleted} end
+    end
   end
 
   validations do
@@ -205,5 +249,11 @@ defmodule Magus.Skills.Skill do
       allow_nil? true
       public? true
     end
+  end
+
+  calculations do
+    import Magus.Workspaces.Calculations
+
+    is_shared_to_workspace(:skill)
   end
 end
