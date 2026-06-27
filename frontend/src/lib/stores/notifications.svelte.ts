@@ -31,7 +31,8 @@ class NotificationFeed {
 			targetConversationId: entry.targetConversationId,
 			navigateTo:
 				typeof entry.metadata?.navigate_to === 'string' ? entry.metadata.navigate_to : null,
-			insertedAt: entry.insertedAt
+			insertedAt: entry.insertedAt,
+			metadata: entry.metadata ?? null
 		}));
 		this.items = mergeInitial(this.items, loaded);
 	}
