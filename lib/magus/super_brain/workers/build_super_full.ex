@@ -594,10 +594,12 @@ defmodule Magus.SuperBrain.Workers.BuildSuperFull do
 
   # Canonical id formula delegates to `Magus.SuperBrain.CanonicalId.for/4`
   # so the BuildSuperFull and BuildSuperIncremental paths converge on the
-  # SAME canonical id for the same `(super_graph, type, normalized_subtype)`
-  # tuple. Name is intentionally NOT in the hash: a future name pick (e.g.
-  # "Daniel" -> "Daniel Smith") for the same cluster MUST resolve to the
-  # same canonical id so caches survive across rebuilds.
+  # SAME canonical id for the same `(super_graph, type, normalized_subtype,
+  # name_key)` tuple. The name IS folded into the hash (via
+  # `CanonicalId.name_key/1`): distinct names get distinct canonicals, while
+  # same-named instances across graphs fuse. Different-named aliases
+  # ("Daniel" vs "Daniel Smith") therefore stay separate until a future
+  # LLM-judge fusion pass.
   #
   # Note: the canonical id MUST be invariant under the staging vs live
   # graph name (so the swap does not invalidate retrieval caches). We

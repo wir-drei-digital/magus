@@ -80,7 +80,7 @@ Every entity is tagged with one of three tiers:
 
 ### Ontology
 
-12 seed entity types (`Magus.SuperBrain.Ontology.entity_types/0`, in code order): `:person`, `:organization`, `:project`, `:concept`, `:event`, `:location`, `:date`, `:document`, `:technology`, `:decision`, `:task`, `:fact`. 8 canonical predicates (`Magus.SuperBrain.Ontology.canonical_predicates/0`, in code order): `:relates_to` (fallback), `:mentions`, `:supports`, `:contradicts`, `:derived_from`, `:updates`, `:extends`, `:derives`. Free-form subtypes (e.g. `"coworker"`, `"side-project"`) are normalized via `Magus.SuperBrain.Ontology.SubtypeNormalizer` so `"colleague"` and `"coworker"` fuse but `"person (actual)"` and `"person (character)"` do not. The normalizer covers all 12 entity types with roughly 160 synonym entries (`lib/magus/super_brain/ontology/subtype_normalizer.ex`); unknown subtypes pass through lowercased and whitespace-collapsed so the LLM keeps its expressive room.
+17 seed entity types (`Magus.SuperBrain.Ontology.entity_types/0`, in code order): `:person`, `:organization`, `:project`, `:concept`, `:event`, `:location`, `:date`, `:document`, `:technology`, `:decision`, `:task`, `:fact`, `:role`, `:measurement`, `:goal`, `:resource`, `:identifier`. 18 canonical predicates (`Magus.SuperBrain.Ontology.canonical_predicates/0`, in code order): `:relates_to` (fallback), `:mentions`, `:supports`, `:contradicts`, `:derived_from`, `:updates`, `:extends`, `:derives`, `:precedes`, `:follows`, `:occurs_at`, `:is_a`, `:instance_of`, `:part_of`, `:located_in`, `:causes`, `:prevents`, `:enables`. Free-form subtypes (e.g. `"coworker"`, `"side-project"`) are normalized via `Magus.SuperBrain.Ontology.SubtypeNormalizer` so `"colleague"` and `"coworker"` fuse but `"person (actual)"` and `"person (character)"` do not. The normalizer covers all 17 entity types with roughly 160 synonym entries (`lib/magus/super_brain/ontology/subtype_normalizer.ex`); unknown subtypes pass through lowercased and whitespace-collapsed so the LLM keeps its expressive room.
 
 ### Canonical fusion
 
@@ -327,7 +327,7 @@ For FalkorDB deployment, backups, snapshot/restore, and disaster recovery, see `
 | File | Purpose |
 |------|---------|
 | `lib/magus/super_brain/accessible_graphs.ex` | Auth boundary: which graphs an actor can read |
-| `lib/magus/super_brain/ontology.ex` | 12 entity types, 8 predicates, trust tier multipliers |
+| `lib/magus/super_brain/ontology.ex` | 17 entity types, 18 predicates, trust tier multipliers |
 | `lib/magus/super_brain/ontology/subtype_normalizer.ex` | Hand-maintained subtype synonym map |
 | `lib/magus/super_brain/extraction.ex` | LLM extraction orchestrator (prompt → sanitize → return) |
 | `lib/magus/super_brain/extraction/prompt.ex` | Strict-JSON extraction prompt with ontology + subtype examples |
