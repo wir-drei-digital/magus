@@ -23,6 +23,7 @@ defmodule Magus.Chat.UserModelPreference do
 
   typescript do
     type_name "UserModelPreference"
+    field_names favorite?: "favorite", hidden?: "hidden"
   end
 
   actions do
