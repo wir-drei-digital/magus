@@ -108,14 +108,7 @@ defmodule Magus.Config.Health do
         sandbox_configured?(),
         "Set SANDBOX_PROVIDER + its API key (daytona or sprites)."
       ),
-      check(
-        :storage,
-        "Object storage (S3)",
-        :infra,
-        false,
-        env?("AWS_BUCKET"),
-        "Set AWS_BUCKET + credentials to persist uploaded files."
-      ),
+      storage_check(),
       check(
         :mail,
         "Email delivery",
@@ -207,6 +200,32 @@ defmodule Magus.Config.Health do
       status: classify(present?, required?),
       detail: detail
     }
+  end
+
+  # Storage is backend-aware (magus-i5k6): local disk is always "ok" (the
+  # zero-dependency self-host default), while the S3 backend needs AWS_BUCKET.
+  defp storage_check do
+    case Magus.Files.Storage.backend() do
+      :s3 ->
+        check(
+          :storage,
+          "File storage (object / S3)",
+          :infra,
+          false,
+          env?("AWS_BUCKET"),
+          "Set AWS_BUCKET + credentials to persist uploaded files."
+        )
+
+      _ ->
+        check(
+          :storage,
+          "File storage (local disk)",
+          :infra,
+          false,
+          true,
+          "Local disk at priv/static/uploads (single-node; mount a volume to persist). Set AWS_BUCKET or STORAGE_BACKEND=s3 for object storage."
+        )
+    end
   end
 
   defp env?(name), do: present?(System.get_env(name))

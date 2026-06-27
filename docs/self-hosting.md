@@ -44,7 +44,8 @@ mix magus.doctor
 - `PHX_HOST` — the public hostname; `PORT` — the listen port.
 
 **Optional** (unlock features when set): `FALKORDB_*` (Super Brain),
-object-storage `AWS_*` (file storage), a Swoosh mail adapter (email),
+object-storage `AWS_*` (S3/MinIO file storage; defaults to local disk, which
+needs a mounted volume and is single-node), a Swoosh mail adapter (email),
 `SANDBOX_PROVIDER` + credentials (code execution), and per-integration keys.
 See `.env.example` for the full list.
 

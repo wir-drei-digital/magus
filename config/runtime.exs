@@ -232,8 +232,21 @@ if config_env() == :prod do
     config :swoosh, local: true
   end
 
-  # S3-compatible storage configuration (e.g., Tigris, AWS S3, MinIO)
-  config :magus, :storage_backend, :s3
+  # File storage backend. Local disk is the zero-dependency default for
+  # self-host (single-node; mount a volume at priv/static/uploads to persist).
+  # Object storage (S3/MinIO/Tigris) is auto-selected when AWS_BUCKET is set, or
+  # force it with STORAGE_BACKEND=s3. See Magus.Files.Storage.resolve_backend/1.
+  storage_backend = Magus.Files.Storage.resolve_backend()
+
+  if storage_backend == :s3 and String.trim(System.get_env("AWS_BUCKET") || "") == "" do
+    raise """
+    STORAGE_BACKEND=s3 but AWS_BUCKET is not set. Set AWS_BUCKET (plus
+    AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY), or use STORAGE_BACKEND=local
+    for single-node local-disk storage.
+    """
+  end
+
+  config :magus, :storage_backend, storage_backend
   config :magus, :s3_bucket, System.get_env("AWS_BUCKET")
   config :magus, :s3_prefix, "files"
 

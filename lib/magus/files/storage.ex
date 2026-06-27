@@ -28,6 +28,31 @@ defmodule Magus.Files.Storage do
   def backend_name, do: to_string(backend())
 
   @doc """
+  Resolves the file-storage backend from the environment.
+
+  Used by `config/runtime.exs` at prod boot to pick a backend honestly:
+  explicit `STORAGE_BACKEND` (`"local"` or `"s3"`) always wins; otherwise `:s3`
+  is auto-selected when `AWS_BUCKET` is set (S3/MinIO/Tigris), else `:local`
+  disk. Blank values are treated as unset, so an empty var never silently
+  selects S3.
+
+  Local disk is the zero-dependency default for single-node self-host; mount a
+  persistent volume at `priv/static/uploads` to keep files across restarts. The
+  `get_env` reader defaults to `System.get_env/1` and is injected in tests.
+  """
+  @spec resolve_backend((String.t() -> String.t() | nil)) :: :local | :s3
+  def resolve_backend(get_env \\ &System.get_env/1) do
+    case get_env.("STORAGE_BACKEND") do
+      "local" -> :local
+      "s3" -> :s3
+      _ -> if blank?(get_env.("AWS_BUCKET")), do: :local, else: :s3
+    end
+  end
+
+  defp blank?(nil), do: true
+  defp blank?(value) when is_binary(value), do: String.trim(value) == ""
+
+  @doc """
   Stores file content at the given relative path.
   Returns {:ok, relative_path} or {:error, reason}
 

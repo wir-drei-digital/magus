@@ -26,6 +26,32 @@ defmodule Magus.Files.StorageTest do
     end
   end
 
+  describe "resolve_backend/1 (magus-i5k6)" do
+    # Pure env -> backend derivation used by config/runtime.exs at prod boot.
+    # An env getter is injected so these touch no global state.
+    test "explicit STORAGE_BACKEND=local wins even when AWS_BUCKET is set" do
+      assert Storage.resolve_backend(env(%{"STORAGE_BACKEND" => "local", "AWS_BUCKET" => "b"})) ==
+               :local
+    end
+
+    test "explicit STORAGE_BACKEND=s3 wins" do
+      assert Storage.resolve_backend(env(%{"STORAGE_BACKEND" => "s3"})) == :s3
+    end
+
+    test "auto-selects :s3 when AWS_BUCKET is set and no explicit backend" do
+      assert Storage.resolve_backend(env(%{"AWS_BUCKET" => "my-bucket"})) == :s3
+    end
+
+    test "auto-selects :local when nothing is configured" do
+      assert Storage.resolve_backend(env(%{})) == :local
+    end
+
+    test "blank values fall through to :local (no silent s3)" do
+      assert Storage.resolve_backend(env(%{"STORAGE_BACKEND" => "", "AWS_BUCKET" => ""})) ==
+               :local
+    end
+  end
+
   describe "create stamps the configured backend (magus-rnh5 regression)" do
     test "a file created under the :s3 backend records storage_backend \"s3\"" do
       # Before the fix this was hardcoded to "local", so prod (:s3) rows were
@@ -42,4 +68,8 @@ defmodule Magus.Files.StorageTest do
       assert file.storage_backend == "s3"
     end
   end
+
+  # Builds an env getter over a fixed map, matching System.get_env/1's contract
+  # (returns nil for absent keys).
+  defp env(map), do: fn key -> Map.get(map, key) end
 end

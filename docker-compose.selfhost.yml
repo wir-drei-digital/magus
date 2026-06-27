@@ -55,8 +55,13 @@ services:
         condition: service_healthy
     ports:
       - "4000:4000"
+    # Persist local-disk file storage (the default backend). Harmless to keep if
+    # you switch to S3/MinIO by setting AWS_BUCKET in .env.
+    volumes:
+      - magus_uploads:/app/priv/static/uploads
     restart: unless-stopped
 
 volumes:
   magus_pgdata:
   magus_falkordata:
+  magus_uploads:
