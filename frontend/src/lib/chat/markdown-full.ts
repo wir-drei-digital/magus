@@ -11,6 +11,7 @@ import markedFootnote from 'marked-footnote';
 import hljs from 'highlight.js';
 import katex from 'katex';
 import { escapeHtml, languageOf, sanitizeAndCite, type Citation } from './markdown';
+import { markedEmojiShortcodes } from './emoji-shortcodes';
 
 const MATH_FENCES = new Set(['math', 'latex', 'katex', 'tex']);
 
@@ -48,6 +49,7 @@ function richCode({ text, lang }: Tokens.Code): string {
 const mdFull = new Marked();
 mdFull.use(markedKatex({ throwOnError: false, output: 'htmlAndMathml' }));
 mdFull.use(markedFootnote());
+mdFull.use(markedEmojiShortcodes);
 mdFull.use({ renderer: { code: richCode } });
 
 /** Full render: highlight.js + KaTeX + footnotes + sanitize + citation badges. */

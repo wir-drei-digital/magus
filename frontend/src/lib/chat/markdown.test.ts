@@ -77,6 +77,31 @@ describe('renderMarkdownFull', () => {
 	});
 });
 
+describe('emoji shortcodes (MDEx shortcodes:true parity)', () => {
+	it('converts known :shortcodes: to unicode in the light render', () => {
+		const html = renderMarkdownLight('Ship it :tada: and :+1:');
+		expect(html).toContain('🎉');
+		expect(html).toContain('👍');
+		expect(html).not.toContain(':tada:');
+	});
+
+	it('leaves unknown shortcodes literal', () => {
+		const html = renderMarkdownLight('not real :definitelynotanemoji:');
+		expect(html).toContain(':definitelynotanemoji:');
+	});
+
+	it('does not convert shortcodes inside code', () => {
+		const html = renderMarkdownLight('type `:tada:` to celebrate');
+		expect(html).toContain(':tada:');
+		expect(html).not.toContain('🎉');
+	});
+
+	it('converts in the full pipeline too', () => {
+		const html = renderMarkdownFull('done :rocket:');
+		expect(html).toContain('🚀');
+	});
+});
+
 describe('hasRichContent', () => {
 	it('detects fenced code and $-math, ignores plain prose', () => {
 		expect(hasRichContent('```js\n1\n```')).toBe(true);

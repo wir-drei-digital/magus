@@ -22,6 +22,7 @@
 import { Marked, type Tokens } from 'marked';
 import markedFootnote from 'marked-footnote';
 import DOMPurify from 'dompurify';
+import { markedEmojiShortcodes } from './emoji-shortcodes';
 
 export type Citation = Record<string, unknown>;
 
@@ -57,6 +58,7 @@ function plainCode({ text, lang }: Tokens.Code): string {
 // until the full pass takes over on a settled message.
 const mdLight = new Marked();
 mdLight.use(markedFootnote());
+mdLight.use(markedEmojiShortcodes);
 mdLight.use({ renderer: { code: plainCode } });
 
 function citationField(citation: Citation, key: string): string | null {
