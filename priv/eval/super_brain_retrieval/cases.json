@@ -1,0 +1,66 @@
+[
+  {
+    "id": "local_lookup_daniel",
+    "category": "local_lookup",
+    "supported": true,
+    "subjects": ["deterministic", "live"],
+    "query": "who is Daniel",
+    "query_embedding": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "k": 5,
+    "expected": [{"name": "Daniel", "type": "person"}],
+    "fixture": {
+      "entities": [
+        {"key": "daniel", "name": "Daniel", "type": "person", "normalized_subtype": null,
+         "embedding": [1, 0, 0, 0, 0, 0, 0, 0], "trust_tier": "evidence", "confidence": 0.9},
+        {"key": "aurora", "name": "Project Aurora", "type": "project", "normalized_subtype": null,
+         "embedding": [0, 1, 0, 0, 0, 0, 0, 0], "trust_tier": "evidence", "confidence": 0.9}
+      ],
+      "edges": [{"from": "daniel", "to": "aurora", "predicate": "works_on", "confidence": 0.8}],
+      "sources": [{"entity": "daniel", "resource_type": "brain_page",
+                   "resource_id": "00000000-0000-4000-8000-000000000001"}]
+    }
+  },
+  {
+    "id": "contradiction_plan",
+    "category": "contradiction_detection",
+    "supported": true,
+    "subjects": ["deterministic", "live"],
+    "query": "what is the decision on shipping",
+    "query_embedding": [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "k": 5,
+    "expected": [{"name": "Ship Friday", "type": "decision"}],
+    "fixture": {
+      "entities": [
+        {"key": "ship", "name": "Ship Friday", "type": "decision", "normalized_subtype": null,
+         "embedding": [0, 0, 1, 0, 0, 0, 0, 0], "trust_tier": "evidence", "confidence": 0.9},
+        {"key": "risk", "name": "Release Risk", "type": "concept", "normalized_subtype": null,
+         "embedding": [0, 0, 0, 1, 0, 0, 0, 0], "trust_tier": "evidence", "confidence": 0.9}
+      ],
+      "edges": [
+        {"from": "ship", "to": "risk", "predicate": "supports", "confidence": 0.8},
+        {"from": "ship", "to": "risk", "predicate": "contradicts", "confidence": 0.7}
+      ],
+      "sources": [{"entity": "ship", "resource_type": "brain_page",
+                   "resource_id": "00000000-0000-4000-8000-000000000002"}]
+    }
+  },
+  {
+    "id": "attribution_elixir",
+    "category": "source_attribution",
+    "supported": true,
+    "subjects": ["deterministic", "live"],
+    "query": "what do I know about Elixir",
+    "query_embedding": [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+    "k": 5,
+    "expected": [{"name": "Elixir", "type": "concept"}],
+    "fixture": {
+      "entities": [
+        {"key": "elixir", "name": "Elixir", "type": "concept", "normalized_subtype": null,
+         "embedding": [0, 0, 0, 0, 1, 0, 0, 0], "trust_tier": "evidence", "confidence": 0.9}
+      ],
+      "edges": [],
+      "sources": [{"entity": "elixir", "resource_type": "brain_page",
+                   "resource_id": "00000000-0000-4000-8000-000000000003"}]
+    }
+  }
+]
