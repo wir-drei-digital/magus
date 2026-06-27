@@ -73,6 +73,36 @@ defmodule Magus.Skills.Skill do
       change relate_actor(:user)
     end
 
+    create :import do
+      description "Create a skill from an imported bundle (accepts bundle fields)."
+
+      accept [
+        :name,
+        :display_name,
+        :description,
+        :body,
+        :requested_tools,
+        :required_secrets,
+        :runtime_hints,
+        :metadata,
+        :version,
+        :license,
+        :compatibility,
+        :icon,
+        :color,
+        :source_format,
+        :source_url,
+        :workspace_id,
+        :bundle_path,
+        :bundle_backend,
+        :bundle_byte_size,
+        :file_manifest,
+        :has_executable_bundle
+      ]
+
+      change relate_actor(:user)
+    end
+
     update :update do
       primary? true
       require_atomic? false
