@@ -10,8 +10,8 @@ defmodule Magus.Agents.IntegrationTest do
   alias Magus.Agents.Plugins.PersistencePlugin
   alias Magus.Agents.Plugins.ToolEventPlugin
   alias Magus.Agents.Plugins.Support.Helpers
-  alias Magus.Agents.Plugins.Support.ModelResolver
   alias Magus.Agents.Persistence.PostgresStore
+  alias Magus.Models.{Resolution, Resolver}
   alias Magus.Agents.Persistence.Checkpoint, as: Persistence
 
   @moduledoc """
@@ -950,58 +950,60 @@ defmodule Magus.Agents.IntegrationTest do
   end
 
   # ==========================================================================
-  # ModelResolver Resolution
+  # Model Resolution
   # ==========================================================================
 
-  describe "ModelResolver model resolution" do
-    test "resolve_model uses selected_model_id when provided" do
+  describe "model resolution" do
+    test "resolves selected_model_id to that model as :explicit" do
       model = generate(model(key: "test/resolution-model"))
 
-      resolved = ModelResolver.resolve_model(%{}, :chat, model.id)
+      {:ok, res} =
+        Resolver.resolve(nil, %{model_keys: %{}, mode: :chat, selected_model_id: model.id})
 
-      assert resolved.key == "test/resolution-model"
+      assert res.model.key == "test/resolution-model"
+      assert res.selection_source == :explicit
+      refute Resolution.degraded?(res)
     end
 
-    test "resolve_model falls back to model_keys when no selected_model_id" do
+    test "falls back to model_keys when no selected_model_id" do
       model = generate(model(key: "test/keyed-model"))
 
-      resolved = ModelResolver.resolve_model(%{chat: model.key}, :chat, nil)
+      {:ok, res} = Resolver.resolve(nil, %{model_keys: %{chat: model.key}, mode: :chat})
 
-      assert resolved.key == "test/keyed-model"
+      assert res.model.key == "test/keyed-model"
     end
 
-    test "resolve_model returns fallback model when nothing matches" do
-      resolved = ModelResolver.resolve_model(%{}, :chat, nil)
+    test "returns fallback model when nothing matches" do
+      {:ok, res} = Resolver.resolve(nil, %{model_keys: %{}, mode: :chat})
 
-      # Should return the fallback model
-      assert resolved.name == "Default"
-      assert resolved.supports_tools? == true
+      assert res.model.name == "Default"
+      assert res.model.supports_tools? == true
     end
 
-    test "resolve_model uses image key for image_generation mode" do
+    test "uses image key for image_generation mode" do
       image_model = generate(model(key: "test/image-model"))
       chat_model = generate(model(key: "test/chat-model"))
 
       model_keys = %{chat: chat_model.key, image: image_model.key}
 
-      resolved = ModelResolver.resolve_model(model_keys, :image_generation, nil)
-      assert resolved.key == "test/image-model"
+      {:ok, res} = Resolver.resolve(nil, %{model_keys: model_keys, mode: :image_generation})
+      assert res.model.key == "test/image-model"
     end
 
-    test "resolve_model uses video key for video_generation mode" do
+    test "uses video key for video_generation mode" do
       video_model = generate(model(key: "test/video-model"))
       model_keys = %{video: video_model.key}
 
-      resolved = ModelResolver.resolve_model(model_keys, :video_generation, nil)
-      assert resolved.key == "test/video-model"
+      {:ok, res} = Resolver.resolve(nil, %{model_keys: model_keys, mode: :video_generation})
+      assert res.model.key == "test/video-model"
     end
 
-    test "resolve_model falls back to chat key for image mode when no image key" do
+    test "falls back to chat key for image mode when no image key" do
       chat_model = generate(model(key: "test/fallback-chat"))
       model_keys = %{chat: chat_model.key}
 
-      resolved = ModelResolver.resolve_model(model_keys, :image_generation, nil)
-      assert resolved.key == "test/fallback-chat"
+      {:ok, res} = Resolver.resolve(nil, %{model_keys: model_keys, mode: :image_generation})
+      assert res.model.key == "test/fallback-chat"
     end
   end
 
