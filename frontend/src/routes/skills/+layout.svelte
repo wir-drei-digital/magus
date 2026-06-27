@@ -10,9 +10,7 @@
 	// /skills <-> /skills/[id]: selecting a card narrows it into a master rail
 	// and the detail view opens beside it. Scroll position and filters survive,
 	// and deep links + the back button work.
-	// page.params will include skillId once the [skillId] route (Task 6) exists;
-	// cast to record so this layout compiles before that route is created.
-	const selectedId = $derived((page.params as Record<string, string | undefined>).skillId ?? null);
+	const selectedId = $derived(page.params.skillId ?? null);
 	const readerOpen = $derived(selectedId !== null);
 
 	// Deep links into a skill put the workbench in skills mode once; afterwards
