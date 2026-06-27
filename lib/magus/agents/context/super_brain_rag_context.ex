@@ -24,6 +24,8 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
   # Cap how many source references we list per entity so the block stays
   # compact on the per-message hot path; extras are summarized as "+N more".
   @max_refs_per_entity 5
+  # Cap relation lines per entity so the per-message block stays bounded.
+  @max_relation_lines 2
 
   @spec build(map()) :: String.t() | nil
   def build(%{query: query, user: %{} = user} = opts)
@@ -95,17 +97,58 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
 
     base = "- #{name} [#{type}#{subtype_str}]"
 
-    case entity_refs(e) do
-      [] ->
-        # Pre-rebuild super graphs (or non-loadable source types) have no
-        # page-level refs. Fall back to the graph-name "seen in" hint.
-        sources_str = e |> Map.get(:sources, []) |> Enum.map_join(", ", &short_source/1)
-        if sources_str == "", do: base, else: base <> " (seen in: #{sources_str})"
+    refs_part =
+      case entity_refs(e) do
+        [] ->
+          sources_str = e |> Map.get(:sources, []) |> Enum.map_join(", ", &short_source/1)
+          if sources_str == "", do: "", else: " (seen in: #{sources_str})"
 
-      refs ->
-        rendered = render_refs(refs, titles)
-        base <> "\n" <> Enum.map_join(rendered, "\n", &"    #{&1}")
+        refs ->
+          rendered = render_refs(refs, titles)
+          "\n" <> Enum.map_join(rendered, "\n", &"    #{&1}")
+      end
+
+    base <> refs_part <> relations_part(e)
+  end
+
+  # Render the contradiction/relation signal `Retrieval` already attaches as
+  # `:neighbors`. Contested edges are surfaced first (always), otherwise the
+  # highest-confidence relations, capped at `@max_relation_lines`.
+  defp relations_part(e) do
+    neighbors = Map.get(e, :neighbors, [])
+    contested = Enum.filter(neighbors, &(Map.get(&1, :contested) == true))
+
+    lines =
+      case contested do
+        [] ->
+          neighbors
+          |> Enum.sort_by(&(Map.get(&1, :confidence) || 0.0), :desc)
+          |> Enum.take(@max_relation_lines)
+          |> Enum.map(&relation_line/1)
+
+        list ->
+          list
+          |> Enum.take(@max_relation_lines)
+          |> Enum.map(&contested_line/1)
+      end
+
+    case lines do
+      [] -> ""
+      ls -> "\n" <> Enum.map_join(ls, "\n", &"    #{&1}")
     end
+  end
+
+  defp contested_line(n) do
+    breakdown =
+      n
+      |> Map.get(:predicate_breakdown, %{})
+      |> Enum.map_join(" / ", fn {pred, count} -> "#{pred} #{count}" end)
+
+    "contested: #{Map.get(n, :name) || "?"} (#{breakdown})"
+  end
+
+  defp relation_line(n) do
+    "#{Map.get(n, :predicate) || "relates_to"}: #{Map.get(n, :name) || "?"}"
   end
 
   # De-duplicated `[%{resource_type, resource_id}]` across all of an entity's

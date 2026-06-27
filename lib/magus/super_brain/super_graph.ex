@@ -38,7 +38,8 @@ defmodule Magus.SuperBrain.SuperGraph do
         :read_set_snapshot,
         :canonical_entity_count,
         :canonical_edge_count,
-        :last_build_duration_ms
+        :last_build_duration_ms,
+        :metrics
       ]
 
       require_atomic? false
@@ -118,6 +119,12 @@ defmodule Magus.SuperBrain.SuperGraph do
 
     attribute :canonical_edge_count, :integer do
       default 0
+      allow_nil? false
+      public? true
+    end
+
+    attribute :metrics, :map do
+      default %{}
       allow_nil? false
       public? true
     end
