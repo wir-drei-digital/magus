@@ -101,9 +101,9 @@
     "fixture": {
       "entities": [
         {"key": "daniel_g1", "name": "Daniel", "type": "person", "normalized_subtype": null,
-         "graph": "a", "trust_tier": "evidence", "confidence": 0.9},
+         "trust_tier": "evidence", "confidence": 0.9},
         {"key": "daniel_g2", "name": "Daniel", "type": "person", "normalized_subtype": null,
-         "graph": "b", "trust_tier": "evidence", "confidence": 0.9}
+         "trust_tier": "evidence", "confidence": 0.9}
       ],
       "edges": [],
       "sources": []

@@ -62,6 +62,9 @@ defmodule Magus.Eval.Subject.SuperBrainDeterministic do
       {:ok, list} when is_list(list) ->
         {:ok, %{answer: "", meta: %{retrieved: legacy_retrieved(list)}}}
 
+      {:ok, %{error: reason}} ->
+        {:ok, %{answer: "", meta: %{retrieved: [], error: reason}}}
+
       _ ->
         {:ok, %{answer: "", meta: %{retrieved: []}}}
     end
