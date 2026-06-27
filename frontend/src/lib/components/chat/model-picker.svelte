@@ -1,7 +1,10 @@
 <script lang="ts">
-	import { Check, ChevronUp, Sparkles } from '@lucide/svelte';
-	import type { ChatMode, ModelSummary } from '$lib/ash/api';
+	import { Check, ChevronUp, Sparkles, Star } from '@lucide/svelte';
+	import type { ChatMode, ModelPreference, ModelSummary } from '$lib/ash/api';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { cachedModelPreferences } from '$lib/chat/catalog';
+	import { toggleFavorite } from '$lib/chat/model-preferences';
+	import { groupModels, prefsById, FAVORITES_GROUP, type ModelFilters } from '$lib/chat/model-grouping';
 
 	// Shared classic-style model picker: searchable, grouped by provider, mode
 	// filtered. Used by both the active-conversation Composer and the new-chat
@@ -23,8 +26,34 @@
 	let modelMenuOpen = $state(false);
 	let modelQuery = $state('');
 	$effect(() => {
-		if (!modelMenuOpen) modelQuery = '';
+		if (!modelMenuOpen) {
+			modelQuery = '';
+			favoritesOnly = false;
+			showHidden = false;
+		}
 	});
+
+	let prefs = $state<ModelPreference[]>([]);
+	let favoritesOnly = $state(false);
+	let showHidden = $state(false);
+
+	async function loadPrefs() {
+		const result = await cachedModelPreferences();
+		if (result.success) prefs = result.data;
+	}
+
+	$effect(() => {
+		if (modelMenuOpen) void loadPrefs();
+	});
+
+	const prefMap = $derived(prefsById(prefs));
+
+	async function onToggleFavorite(event: MouseEvent, modelId: string, next: boolean) {
+		event.preventDefault();
+		event.stopPropagation();
+		const updated = await toggleFavorite(modelId, next);
+		if (updated) await loadPrefs();
+	}
 
 	// Only models able to produce the composer's current mode: image/video
 	// generation need that output modality; everything else needs text
@@ -39,21 +68,14 @@
 		return models.filter((model) => (model.outputModalities ?? ['text']).includes('text'));
 	});
 
-	const modelsByProvider = $derived.by(() => {
-		const query = modelQuery.toLowerCase();
-		const grouped = new Map<string, ModelSummary[]>();
-		for (const model of modeModels) {
-			if (
-				query !== '' &&
-				!model.name.toLowerCase().includes(query) &&
-				!(model.provider ?? '').toLowerCase().includes(query)
-			) {
-				continue;
-			}
-			const key = model.provider ?? 'Other';
-			grouped.set(key, [...(grouped.get(key) ?? []), model]);
-		}
-		return [...grouped.entries()];
+	const groups = $derived.by(() => {
+		const filters: ModelFilters = {
+			search: modelQuery,
+			favoritesOnly,
+			showHidden,
+			capability: 'any'
+		};
+		return groupModels(modeModels, prefMap, filters);
 	});
 
 	function formatContextWindow(tokens: number): string {
@@ -129,13 +151,45 @@
 					Automatically selects the model for you
 				</span>
 			</DropdownMenu.Item>
-			{#each modelsByProvider as [provider, providerModels] (provider)}
-				<p
-					class="px-2 pt-1 font-mono text-[10px] font-medium tracking-wider text-muted-foreground uppercase"
+			<div class="flex items-center gap-2 px-1 pb-1">
+				<button
+					type="button"
+					onclick={(e) => {
+						e.stopPropagation();
+						favoritesOnly = !favoritesOnly;
+					}}
+					data-testid="picker-filter-favorites"
+					aria-pressed={favoritesOnly}
+					class="rounded px-1.5 py-0.5 text-[10px] {favoritesOnly
+						? 'bg-primary/15 text-primary'
+						: 'text-muted-foreground hover:bg-accent/60'}"
 				>
-					{provider}
+					Favorites
+				</button>
+				<button
+					type="button"
+					onclick={(e) => {
+						e.stopPropagation();
+						showHidden = !showHidden;
+					}}
+					data-testid="picker-filter-hidden"
+					aria-pressed={showHidden}
+					class="rounded px-1.5 py-0.5 text-[10px] {showHidden
+						? 'bg-primary/15 text-primary'
+						: 'text-muted-foreground hover:bg-accent/60'}"
+				>
+					Show hidden
+				</button>
+			</div>
+			{#each groups as group (group.label)}
+				<p
+					class="flex items-center gap-1 px-2 pt-1 font-mono text-[10px] font-medium tracking-wider text-muted-foreground uppercase"
+				>
+					{#if group.label === FAVORITES_GROUP}<Star class="size-3 text-primary" />{/if}
+					{group.label}
 				</p>
-				{#each providerModels as model (model.id)}
+				{#each group.models as model (model.id)}
+					{@const isFavorite = prefMap.get(model.id)?.favorite ?? false}
 					<DropdownMenu.Item
 						onSelect={() => onPick(model.id)}
 						data-testid="model-option"
@@ -144,6 +198,20 @@
 							: ''}"
 					>
 						<span class="flex w-full items-center gap-1.5">
+							<button
+								type="button"
+								onclick={(e) => onToggleFavorite(e, model.id, !isFavorite)}
+								data-testid="model-favorite-toggle"
+								aria-label={isFavorite ? 'Unfavorite' : 'Favorite'}
+								aria-pressed={isFavorite}
+								class="shrink-0 rounded p-0.5 hover:bg-accent/60"
+							>
+								<Star
+									class="size-3.5 {isFavorite
+										? 'fill-primary text-primary'
+										: 'text-muted-foreground'}"
+								/>
+							</button>
 							<span class="truncate text-xs font-medium">{model.name}</span>
 							<span class="ml-auto flex shrink-0 items-center gap-1.5">
 								{#if requestCostLabel(model.requestCostCents)}
@@ -195,8 +263,10 @@
 					</DropdownMenu.Item>
 				{/each}
 			{/each}
-			{#if modelsByProvider.length === 0}
-				<p class="px-2 py-3 text-center text-xs text-muted-foreground">No matches.</p>
+			{#if groups.length === 0}
+				<p class="px-2 py-3 text-center text-xs text-muted-foreground" data-testid="picker-empty">
+					{showHidden ? 'No matches.' : 'No models. Adjust filters or unhide in Settings.'}
+				</p>
 			{/if}
 		</div>
 	</DropdownMenu.Content>

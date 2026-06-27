@@ -2,7 +2,9 @@ import {
 	listActiveModels,
 	mergedSlashCommands,
 	myAgents,
+	myModelPreferences,
 	type AgentSummary,
+	type ModelPreference,
 	type ModelSummary,
 	type RpcResult,
 	type SlashCommandEntry
@@ -25,6 +27,7 @@ function fresh<T>(entry: Entry<T> | null): entry is Entry<T> {
 
 let agentsEntry: Entry<AgentSummary[]> | null = null;
 let modelsEntry: Entry<ModelSummary[]> | null = null;
+let modelPrefsEntry: Entry<ModelPreference[]> | null = null;
 const slashEntries = new Map<string, Entry<SlashCommandEntry[]>>();
 
 export function cachedMyAgents(): Promise<RpcResult<AgentSummary[]>> {
@@ -51,6 +54,24 @@ export function cachedActiveModels(): Promise<RpcResult<ModelSummary[]>> {
 	};
 	modelsEntry = entry;
 	return entry.promise;
+}
+
+export function cachedModelPreferences(): Promise<RpcResult<ModelPreference[]>> {
+	if (fresh(modelPrefsEntry)) return modelPrefsEntry.promise;
+	const entry: Entry<ModelPreference[]> = {
+		at: Date.now(),
+		promise: myModelPreferences().then((result) => {
+			if (!result.success && modelPrefsEntry === entry) modelPrefsEntry = null;
+			return result;
+		})
+	};
+	modelPrefsEntry = entry;
+	return entry.promise;
+}
+
+/** Call after a favorite/hide/order change so the picker refreshes immediately. */
+export function invalidateModelPreferences(): void {
+	modelPrefsEntry = null;
 }
 
 export function cachedSlashCommands(

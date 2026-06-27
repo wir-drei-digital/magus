@@ -96,6 +96,13 @@ defmodule Magus.Chat do
       rpc_action :remove_conversation_favorite, :unfavorite_by_conversation
     end
 
+    resource Magus.Chat.UserModelPreference do
+      rpc_action :my_model_preferences, :my_model_preferences
+      rpc_action :set_model_favorite, :set_favorite
+      rpc_action :set_model_hidden, :set_hidden
+      rpc_action :set_model_position, :set_position
+    end
+
     # File-browser folder tree (migration iteration 5). promote_to_mixed is
     # intentionally NOT exposed — it auto-triggers via PromoteKindForContent
     # when content moves into an opposite-kind folder.
@@ -368,6 +375,14 @@ defmodule Magus.Chat do
         action: :by_conversation,
         args: [:conversation_id],
         get?: true
+    end
+
+    resource Magus.Chat.UserModelPreference do
+      define :my_model_preferences, action: :my_model_preferences
+      define :set_model_favorite, action: :set_favorite
+      define :set_model_hidden, action: :set_hidden
+      define :set_model_position, action: :set_position
+      define :destroy_model_preference, action: :destroy
     end
 
     resource Magus.Chat.PaneState do

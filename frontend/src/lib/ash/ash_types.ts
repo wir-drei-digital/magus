@@ -948,6 +948,31 @@ export type UserFolderStateAttributesOnlySchema = {
 };
 
 
+// UserModelPreference Schema
+export type UserModelPreferenceResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "favorite" | "hidden" | "position" | "modelId";
+  id: UUIDv7;
+  favorite: boolean;
+  hidden: boolean;
+  position: number | null;
+  modelId: UUID;
+  model: { __type: "Relationship"; __resource: ModelResourceSchema; };
+};
+
+
+
+export type UserModelPreferenceAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "favorite" | "hidden" | "position" | "modelId";
+  id: UUIDv7;
+  favorite: boolean;
+  hidden: boolean;
+  position: number | null;
+  modelId: UUID;
+};
+
+
 // Draft Schema
 export type DraftResourceSchema = {
   __type: "Resource";
@@ -3972,6 +3997,48 @@ export type UserFolderStateFilterInput = {
   folder?: FolderFilterInput;
 
 };
+export type UserModelPreferenceFilterInput = {
+  and?: Array<UserModelPreferenceFilterInput>;
+  or?: Array<UserModelPreferenceFilterInput>;
+  not?: Array<UserModelPreferenceFilterInput>;
+
+  id?: {
+    eq?: UUIDv7;
+    notEq?: UUIDv7;
+    in?: Array<UUIDv7>;
+  };
+
+  favorite?: {
+    eq?: boolean;
+    notEq?: boolean;
+  };
+
+  hidden?: {
+    eq?: boolean;
+    notEq?: boolean;
+  };
+
+  position?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  modelId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+
+  model?: ModelFilterInput;
+
+};
 export type DraftFilterInput = {
   and?: Array<DraftFilterInput>;
   or?: Array<DraftFilterInput>;
@@ -5787,6 +5854,9 @@ export type ModelFilterField = (typeof modelFilterFields)[number];
 export const userFolderStateFilterFields = ["id", "isExpanded", "userId", "folderId", "user", "folder"] as const;
 export type UserFolderStateFilterField = (typeof userFolderStateFilterFields)[number];
 
+export const userModelPreferenceFilterFields = ["id", "favorite", "hidden", "position", "modelId", "model"] as const;
+export type UserModelPreferenceFilterField = (typeof userModelPreferenceFilterFields)[number];
+
 export const draftFilterFields = ["id", "title", "content", "status", "version", "metadata", "updatedAt", "conversationId", "conversation"] as const;
 export type DraftFilterField = (typeof draftFilterFields)[number];
 
@@ -5916,6 +5986,9 @@ export type ModelSortField = (typeof modelSortFields)[number];
 
 export const userFolderStateSortFields = ["id", "isExpanded", "userId", "folderId"] as const;
 export type UserFolderStateSortField = (typeof userFolderStateSortFields)[number];
+
+export const userModelPreferenceSortFields = ["id", "favorite", "hidden", "position", "modelId"] as const;
+export type UserModelPreferenceSortField = (typeof userModelPreferenceSortFields)[number];
 
 export const draftSortFields = ["id", "title", "content", "status", "version", "metadata", "updatedAt", "conversationId"] as const;
 export type DraftSortField = (typeof draftSortFields)[number];

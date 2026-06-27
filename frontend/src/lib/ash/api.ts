@@ -1575,6 +1575,54 @@ export function listVideoGenerationModels(): Promise<RpcResult<ModelSummary[]>> 
 	return run((opts) => rpc.listVideoGenerationModels({ fields: MODEL_SUMMARY_FIELDS, ...opts }));
 }
 
+export type ModelPreference = {
+	id: string;
+	modelId: string;
+	favorite: boolean;
+	hidden: boolean;
+	position: number | null;
+};
+
+const MODEL_PREFERENCE_FIELDS: rpc.MyModelPreferencesFields = [
+	'id',
+	'modelId',
+	'favorite',
+	'hidden',
+	'position'
+];
+
+/** The actor's model curation rows (favorite / hidden / position). */
+export function myModelPreferences(): Promise<RpcResult<ModelPreference[]>> {
+	return run((opts) => rpc.myModelPreferences({ fields: MODEL_PREFERENCE_FIELDS, ...opts }));
+}
+
+export function setModelFavorite(
+	modelId: string,
+	favorite: boolean
+): Promise<RpcResult<ModelPreference>> {
+	return run((opts) =>
+		rpc.setModelFavorite({ input: { modelId, favorite }, fields: MODEL_PREFERENCE_FIELDS, ...opts })
+	);
+}
+
+export function setModelHidden(
+	modelId: string,
+	hidden: boolean
+): Promise<RpcResult<ModelPreference>> {
+	return run((opts) =>
+		rpc.setModelHidden({ input: { modelId, hidden }, fields: MODEL_PREFERENCE_FIELDS, ...opts })
+	);
+}
+
+export function setModelPosition(
+	modelId: string,
+	position: number
+): Promise<RpcResult<ModelPreference>> {
+	return run((opts) =>
+		rpc.setModelPosition({ input: { modelId, position }, fields: MODEL_PREFERENCE_FIELDS, ...opts })
+	);
+}
+
 export type AgentSummary = {
 	id: string;
 	name: string;
