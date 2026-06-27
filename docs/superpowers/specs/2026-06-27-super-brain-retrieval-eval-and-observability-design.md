@@ -1,7 +1,7 @@
 # Super Brain: Retrieval Eval + Observability (Phase 1)
 
 Date: 2026-06-27
-Status: Approved (design)
+Status: Approved (design, revised after review)
 Scope: First slice of the "super graph" upgrade roadmap. Stands up the
 guardrails and free wins that make every later phase (claim/evidence
 storage, identity resolution, query-planned retrieval) safe to attempt.
@@ -70,7 +70,8 @@ xfail cases so they become measurable when implemented.
   recall and writes a diffable JSONL row to
   `eval/results/super_brain_retrieval.jsonl`.
 - A normal `mix test` run executes the deterministic eval and fails on any
-  regression in the supported case set.
+  regression in the supported case set, WITHOUT writing to
+  `eval/results/*.jsonl` (it runs with `dry_run: true`).
 - The live eval runs the real `BuildSuperFull` over a deterministic L1
   fixture with real embeddings behind `:e2e_live`.
 - The agent `<super_brain>` block surfaces contradiction signal for
@@ -83,10 +84,28 @@ xfail cases so they become measurable when implemented.
 The `Magus.Eval` framework is QA-shaped: a `Benchmark` produces cases
 (`{id, question, gold, ingest_items, meta}`); a `Subject` implements
 `reset/ingest/query`; the `Runner` loops cases through the subject and a
-`Scoreboard` appends one JSONL row per run. Approach A (retrieval-only over
-a seeded graph fixture) maps onto this by treating the seeded graph as the
-"ingest" and the ranked retrieval result as the "answer," with deterministic
-scoring against an expected entity set carried in `meta`.
+`Scoreboard` appends one JSONL row per run. Crucially, `Runner.run_case/3`
+(`runner.ex:48`) threads `ctx` through `reset -> ingest -> query` and passes
+only `c.ingest_items` to `ingest` and only `c.question` to `query`; the case
+`meta` is merged into the result `meta` and reaches `score/2`, but is NOT
+handed to the subject.
+
+Approach A (retrieval-only over a seeded graph fixture) maps onto this
+contract WITHOUT changing `Runner` or the `Subject` behaviour:
+
+- The graph fixture (entities, edges, sources, and the authored
+  `query_embedding`) is carried as a single `ingest_items` element of the
+  form `%{role: :fixture, text: Jason.encode!(fixture)}`. This widens the
+  `role` field from `:user | :assistant` to also allow `:fixture`; the
+  generic `Runner` passes it through opaquely, and the `Subject` behaviour
+  already types `role` as `atom`.
+- `ingest/2` decodes that fixture, materializes the graph, and stashes the
+  authored `query_embedding` onto the returned `ctx`.
+- `query/2` reads `ctx.query_embedding` (deterministic) or embeds
+  `c.question` for real (live), then calls `Retrieval.search`, returning the
+  ranked canonicals in its result `meta`.
+- The expected entity set, `category`, `k`, and `supported` flag live in the
+  case `meta` so `score/2` can read them from the merged result `meta`.
 
 ### New modules
 
@@ -97,9 +116,12 @@ scoring against an expected entity set carried in `meta`.
   - `name/0` returns `"super_brain_retrieval"`.
   - `load_dataset/1` reads
     `priv/eval/super_brain_retrieval/cases.json`.
-  - `cases/2` maps each JSON case to
+  - `cases/2` splits each JSON case into
     `%{id, question: query, gold: primary_expected_name,
-    ingest_items: [], meta: %{fixture, expected, category, k, supported}}`.
+    ingest_items: [%{role: :fixture, text: Jason.encode!(fixture)}],
+    meta: %{expected, category, k, supported}}`, and filters the dataset by
+    `opts[:subject_kind]` so live-only cases (see Categories) are excluded
+    from deterministic runs.
   - `score/2` delegates to `Magus.Eval.SuperBrain.Metrics`; returns
     `%{aggregate, per_case, per_category, known_gaps}`.
   - `emit_hypotheses/2` writes one JSON line per case with the retrieved
@@ -109,9 +131,20 @@ scoring against an expected entity set carried in `meta`.
   with per-category and known-gap breakdowns. No I/O, unit-tested in
   isolation.
 - `Magus.Eval.SuperBrain.Fixture` parses a case's graph spec
-  (`entities`, `edges`, `sources`, `expected`) from the decoded JSON into a
-  normalized struct that both subjects consume. This is the single shared
-  contract between the deterministic and live subjects.
+  (`entities`, `edges`, `sources`, `expected`, `query_embedding`) from the
+  decoded JSON into a normalized struct that both subjects consume. This is
+  the single shared contract between the deterministic and live subjects.
+- `Magus.SuperBrain.EdgeAggregation` (new, lib) holds the pure
+  RELATES_TO aggregation currently inlined as the private
+  `BuildSuperFull.aggregate_relates_to/3` (`build_super_full.ex:762`):
+  given a list of L1-style edge observations, group by `(from, to)` and
+  return one aggregate per pair with `predicate` (most common),
+  `predicate_breakdown` (frequencies), `contested` (via
+  `Ontology.contradicting_predicates/0`), `confidence`, `trust_tier`,
+  `source_graphs`, and `appearance_count`. `BuildSuperFull` is refactored to
+  compute via this module and then perform its FalkorDB upserts; the
+  deterministic subject and unit tests reuse it. This removes the
+  duplicate `contested?/1` logic the spec would otherwise have to mirror.
 
 **Eval subjects (test/support, alongside `Subject.Live`):**
 
@@ -120,42 +153,63 @@ scoring against an expected entity set carried in `meta`.
   - `reset/1` ensures a clean eval user (from `ctx`) and drops that user's
     `super:user:<id>` graph plus any prior `SuperGraph` row, so each case
     starts empty.
-  - `ingest/2` reads the fixture from the case meta and seeds the L2 super
-    graph directly: `CanonicalEntity` nodes with hand-authored low-dim
-    embeddings (dim 8); one `RELATES_TO` edge per `(from, to)` pair derived
-    from the fixture's L1-style edge observations using the same aggregation
-    as `BuildSuperFull.aggregate_relates_to` (most-common `predicate`,
-    `predicate_breakdown` frequencies, and `contested` via
-    `Ontology.contradicting_predicates/0`), so the deterministic edge matches
-    what the builder would emit; `SourcePointer` nodes; and `APPEARS_IN`
-    edges. It creates the
+  - `ingest/2` decodes the fixture from the single `:fixture` item and seeds
+    the L2 super graph directly: `CanonicalEntity` nodes with hand-authored
+    low-dim embeddings (dim 8); one `RELATES_TO` edge per `(from, to)` pair
+    computed by `Magus.SuperBrain.EdgeAggregation.aggregate/1` over the
+    fixture's L1-style edge observations (so the deterministic edge, including
+    `contested` and `predicate_breakdown`, matches what the builder emits);
+    `SourcePointer` nodes; and `APPEARS_IN` edges. It creates the
     `CanonicalEntity.embedding` vector index at dim 8 on the fresh graph,
-    then upserts a `SuperGraph` row marked `:ok` with
+    upserts a `SuperGraph` row marked `:ok` with
     `read_set_snapshot = AccessibleGraphs.for_actor(user) |> reject(super)
-    |> sort` so `Retrieval`'s drift check passes and the super-graph happy
-    path is taken.
-  - `query/2` calls `Retrieval.search(user, query:, query_embedding:,
-    limit:)` with the case's authored query vector and returns
-    `%{answer: top_name, meta: %{retrieved: [%{id, name, type, score,
-    rank, sources, neighbors}]}}`.
+    |> sort` so `Retrieval`'s drift check passes, and stashes the authored
+    `query_embedding` onto `ctx`.
+  - `query/2` calls `Retrieval.search(user, query: c.question,
+    query_embedding: ctx.query_embedding, limit:)` and returns
+    `%{answer: top_name, meta: %{retrieved: [%{id, name, type, score, rank,
+    sources, neighbors}]}}`.
+  - Because it seeds an already-fused L2, the deterministic subject tests
+    retrieval over a canonical, NOT the fusion step itself (so
+    `same_name_fusion` is a live-only case; see Categories).
 - `Magus.Eval.Subject.SuperBrainLive` implements `Magus.Eval.Subject`,
   tagged for `:e2e_live` use.
   - `reset/1` creates a real personal brain via `Magus.Generators` (so
     `AccessibleGraphs.for_actor` discovers `brain:<id>`) and drops any
     stale L1/L2 graphs for the user.
   - `ingest/2` seeds the L1 `brain:<id>` graph directly with `Entity`
-    nodes (embeddings produced by the real `Magus.Files.EmbeddingModel`
-    over entity names), `RELATES_TO` edges, and `Episode -[:HAS_ENTITY]->`
-    provenance, then runs `Magus.SuperBrain.Workers.BuildSuperFull.perform`
-    for the accessor to materialize L2.
-  - `query/2` embeds the query text with the real embedder and calls
+    nodes, `RELATES_TO` edges, and `Episode -[:HAS_ENTITY]->` provenance,
+    then runs `Magus.SuperBrain.Workers.BuildSuperFull.perform` for the
+    accessor to materialize L2. Entity embeddings are produced by the real
+    embedder (see Embeddings below).
+  - `query/2` embeds `c.question` with the real embedder and calls
     `Retrieval.search`.
 
 The live subject deliberately seeds L1 entities directly and skips LLM
 extraction: entity content stays deterministic, so the gold expected sets
-remain valid, while embeddings, clustering, contested aggregation,
-importance scoring, the staged build + swap, and retrieval are all real.
-Extraction quality (raw text to entities) is approach B and out of scope.
+remain valid, while clustering/fusion, contested aggregation, importance
+scoring, the staged build + swap, and retrieval are all real. Extraction
+quality (raw text to entities) is approach B and out of scope.
+
+### Embeddings (deterministic vs live)
+
+The deterministic subject uses only authored vectors and never calls an
+embedder.
+
+The live subject needs REAL embeddings, but in the test env (which
+`:e2e_live` runs under) `config/test.exs:87,90` point
+`:super_brain_embedder` and `:super_brain_extraction_embedder` at
+`EmbedderMock` / `BatchEmbedderMock`. To get real recall, the live subject
+embeds both entity names and the query via `Magus.Files.EmbeddingModel`
+(the real OpenRouter path production retrieval uses for query embeddings),
+which is independent of those two config keys and therefore unaffected by the
+mocks. This requires `OPENROUTER_API_KEY`, already mandated by `:e2e_live`.
+Entity and query embeddings thus share one model/space, and
+`EmbeddingModel`'s dim equals `EmbeddingConfig.dim()` (both resolve the
+`:embeddings` role), so the L1 index dim, the averaged canonical embedding,
+and the query vector all agree. `BuildSuperFull` itself calls no embedder
+(it averages existing L1 embeddings), so the mocked extraction embedder is
+never on this path.
 
 ### Data: cases.json
 
@@ -166,6 +220,7 @@ A JSON array. Each case:
   "id": "local_lookup_daniel",
   "category": "local_lookup",
   "supported": true,
+  "subjects": ["deterministic", "live"],
   "query": "who is Daniel",
   "query_embedding": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
   "k": 5,
@@ -184,15 +239,18 @@ A JSON array. Each case:
     ],
     "sources": [
       {"entity": "daniel", "resource_type": "brain_page",
-       "resource_id": "page-1"}
+       "resource_id": "00000000-0000-4000-8000-000000000001"}
     ]
   }
 }
 ```
 
 Notes:
-- `query_embedding` is authored for the deterministic subject. The live
-  subject ignores it and embeds `query` for real.
+- `subjects` selects which subject(s) a case applies to (default both).
+  Fusion cases are `["live"]` only.
+- `query_embedding` is authored for the deterministic subject (carried into
+  `ctx` by `ingest`). The live subject ignores it and embeds `query` for
+  real.
 - Entity `embedding` is authored for the deterministic subject and ignored
   by the live subject (which embeds `name`).
 - `expected` matches on normalized `(name, type)` against retrieved
@@ -200,20 +258,29 @@ Notes:
 - `fixture.edges` are L1-style observations (one per observed relation);
   multiple entries for the same `(from, to)` pair represent repeated or
   conflicting observations. Both subjects derive the single L2 `RELATES_TO`
-  identically: the deterministic subject applies the builder's aggregation
-  in code, the live subject seeds the L1 edges and runs the real builder. A
-  `contested` case supplies opposing predicates (for example `supports` and
-  `contradicts`) for one pair so `contested: true` results either way.
+  identically via `EdgeAggregation.aggregate/1`: the deterministic subject
+  applies it in code, the live subject seeds the L1 edges and lets the real
+  builder apply it. A `contested` case supplies opposing predicates (for
+  example `supports` and `contradicts`) for one pair.
+- `resource_id` values MUST be valid UUIDs. `SuperBrainRagContext` title
+  resolution filters Postgres by UUID columns
+  (`super_brain_rag_context.ex:170`), so non-UUID ids would be silently
+  dropped if a ref ever flows into `format/1`. The live subject points
+  `brain_page` refs at a real created page id so end-to-end attribution
+  resolves.
 
 ### Categories and the xfail roadmap
 
 Supported now (must pass, recall@k == 1.0 by fixture construction):
-- `local_lookup` — vector recall of a single entity.
-- `same_name_fusion` — one canonical fused from same `(type, subtype,
-  name)` across two source graphs.
-- `contradiction_detection` — the hit carries a `contested` neighbor with
-  the expected `predicate_breakdown`.
-- `source_attribution` — the hit carries the expected source ref.
+- `local_lookup` (both subjects) — vector recall of a single entity.
+- `contradiction_detection` (both) — the hit carries a `contested` neighbor
+  with the expected `predicate_breakdown`.
+- `source_attribution` (both) — the hit carries the expected source ref.
+- `same_name_fusion` (live only) — two L1 graphs each hold a same-named
+  entity; after the real `BuildSuperFull`, retrieval returns ONE fused
+  canonical. The deterministic subject cannot test this because it seeds an
+  already-fused L2; genuine fusion is build-time and is also covered by the
+  existing `BuildSuperFull` tests.
 
 Known-gap xfail (`supported: false`, expected to fail until the named
 phase; flipping to passing is a signal to promote the case):
@@ -236,38 +303,51 @@ phase; flipping to passing is a signal to promote the case):
 ### Runner / mix task integration
 
 - `Magus.Eval.Runner` and `Magus.Eval.Scoreboard` are reused unchanged.
-  Scoreboard writes `eval/results/super_brain_retrieval.jsonl`, git-sha
-  tagged and diffable.
-- `Mix.Tasks.Magus.Eval` gains a `--subject deterministic|live` option
-  mapping to the two subject modules, defaulting to `deterministic` for
-  this benchmark. `"super_brain_retrieval"` is added to the task's
-  benchmark map.
+  When not in `dry_run`, Scoreboard writes
+  `eval/results/super_brain_retrieval.jsonl`, git-sha tagged and diffable.
+- The EXISTING test-support task
+  `test/support/mix/tasks/magus.eval.ex` is extended IN PLACE (it stays in
+  `test/support/` because it depends on test-only generators and live
+  helpers; it is NOT moved to `lib/`). It gains a
+  `--subject deterministic|live` option mapping to the two subject modules,
+  passes a matching `subject_kind` into `run_opts` (so `cases/2` filters),
+  and registers `"super_brain_retrieval"` in its benchmark map.
 - The deterministic path requires Postgres + FalkorDB but no LLM/embedding
   API key: `Harness.setup` only builds DB fixtures and swaps an (unused)
   LLM client, and the deterministic subject calls neither the embedder nor
-  the agent. The `mix test` regression guard bypasses `Harness` entirely,
-  building its `ctx` user via `Magus.Generators`.
+  the agent.
 
 ### Where it runs
 
 - `test/magus/super_brain/eval/super_brain_retrieval_test.exs`: drives the
-  deterministic subject through `Runner.run` over the full case set in a
-  normal `mix test` run (and therefore `mix precommit`). Asserts the
-  supported aggregate is 1.0 and that every `supported: false` case still
-  fails (a newly-passing gap fails this assertion, forcing a conscious
-  promotion).
+  deterministic subject through `Runner.run` with `subject_kind:
+  :deterministic` and `dry_run: true` (so it does NOT append to
+  `eval/results/*.jsonl`), asserting on the returned `scored` map: the
+  supported aggregate is 1.0 and every `supported: false` case still fails
+  (a newly-passing gap fails this assertion, forcing a conscious promotion).
+  Runs in a normal `mix test` (and therefore `mix precommit`).
 - `test/e2e_live/super_brain_retrieval_eval_test.exs`: drives the live
   subject, tagged `:e2e_live`.
 
 ## Observability
 
 - `Magus.SuperBrain.GraphMetrics` (lib): pure functions computing
-  `isolated_entity_rate`, `relates_to_fallback_rate` (fraction of edges
-  whose `predicate` is the generic `relates_to`), `alias_candidate_count`
-  (count of `(type, normalized_subtype)` buckets holding more than one
-  distinct `name_key`, the phase-3 opportunity signal), `contested_edge_count`,
-  and `edges_per_entity`. Inputs are FalkorDB query results; no I/O in the
-  module itself so it is unit-testable.
+  - `isolated_entity_rate` — fraction of `CanonicalEntity` nodes with no
+    `RELATES_TO` edge (APPEARS_IN is excluded, since every canonical has at
+    least one APPEARS_IN, so "no edges at all" would be meaningless).
+  - `relates_to_fallback_rate` — fraction of edges whose `predicate` is the
+    generic `relates_to`.
+  - `ambiguous_bucket_count` — count of `(type, normalized_subtype)` buckets
+    holding more than one distinct `name_key`. This is a coarse upper bound
+    on identity-resolution opportunity and WILL be noisy (unrelated
+    same-typed entities inflate it); phase 3 refines it with lexical /
+    embedding similarity thresholds. Named `ambiguous_bucket_count`, not
+    `alias_candidate_count`, to avoid implying confirmed aliases.
+  - `contested_edge_count` — number of edges with `contested == true`.
+  - `edges_per_entity` — `RELATES_TO` edge count divided by canonical count.
+
+  Inputs are FalkorDB query results; no I/O in the module itself so it is
+  unit-testable.
 - `BuildSuperFull` computes these against the staging graph before the swap
   and persists them.
 - `SuperGraph` gains a `metrics :map` attribute (default `%{}`), written via
@@ -293,7 +373,8 @@ phase; flipping to passing is a signal to promote the case):
   block bounded; overflow collapses to the existing `+N more` style.
 
 This is a pure formatting change covered by the existing
-`super_brain_rag_context` test (extended with a contested fixture).
+`super_brain_rag_context` test (extended with a contested fixture whose
+refs use valid UUIDs).
 
 ## Drift / docs
 
@@ -306,12 +387,17 @@ This is a pure formatting change covered by the existing
 
 ## Testing strategy
 
+- `Magus.SuperBrain.EdgeAggregation` — pure unit tests for grouping,
+  most-common predicate, `predicate_breakdown`, and `contested`; the
+  `BuildSuperFull` refactor is covered by existing builder tests (no
+  behaviour change).
 - `Magus.Eval.SuperBrain.Metrics` — pure unit tests for `hit@k`,
   `recall@k`, `mrr`, aggregation, and the known-gap split.
 - `Magus.Eval.SuperBrain.Fixture` — parse/normalize unit tests.
 - `Magus.SuperBrain.GraphMetrics` — pure unit tests over synthetic
   query-result inputs.
-- Deterministic eval regression test (above) in normal `mix test`.
+- Deterministic eval regression test (above) in normal `mix test`, with
+  `dry_run: true`.
 - Live eval test behind `:e2e_live`.
 - Extended `super_brain_rag_context` test asserting the contested line
   renders and the budget cap holds.
@@ -326,6 +412,10 @@ This is a pure formatting change covered by the existing
   computes the snapshot via the same `AccessibleGraphs.for_actor` call
   Retrieval uses, and creates the index before seeding (mirrors
   `retrieval_test.exs`).
+- **`role: :fixture` widens the eval_case shape.** It is a benign widening
+  the generic `Runner` passes through opaquely; the `Subject` behaviour
+  already types `role` as `atom`. Mitigation: documented here and in the
+  benchmark moduledoc; no core code changes.
 - **Live build flake** (FalkorDB `GRAPH.COPY` fork failures, embedder
   latency). Mitigation: it is `:e2e_live`-only and reuses the worker's
   existing retry/threshold handling.
@@ -337,10 +427,15 @@ This is a pure formatting change covered by the existing
 
 1. Drift/doc fixes (zero-risk warmup).
 2. Context render + extended context test.
-3. `GraphMetrics` + `SuperGraph.metrics` column + `BuildSuperFull` wiring +
-   retrieval telemetry metadata.
-4. Eval core: `Metrics`, `Fixture`, `Benchmark`, `cases.json` (supported
-   cases first, then xfail gaps).
-5. `SuperBrainDeterministic` subject + deterministic regression test + mix
-   task registration.
-6. `SuperBrainLive` subject + `:e2e_live` test.
+3. Extract `Magus.SuperBrain.EdgeAggregation` (pure) from
+   `BuildSuperFull.aggregate_relates_to`; builder delegates; unit tests.
+   (Prereq for the deterministic subject and a small standalone refactor.)
+4. `GraphMetrics` + `SuperGraph.metrics` column (`ash.codegen`) +
+   `BuildSuperFull` wiring + retrieval telemetry metadata.
+5. Eval core: `Metrics`, `Fixture`, `Benchmark`, `cases.json` (supported
+   deterministic cases first, then live-only fusion, then xfail gaps).
+6. `SuperBrainDeterministic` subject + deterministic regression test
+   (`dry_run: true`) + extend the test-support `magus.eval` task
+   (`--subject`, `subject_kind`, register benchmark).
+7. `SuperBrainLive` subject + `:e2e_live` test (real `EmbeddingModel`
+   embeddings).
