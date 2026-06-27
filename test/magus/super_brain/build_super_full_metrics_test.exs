@@ -54,7 +54,7 @@ defmodule Magus.SuperBrain.BuildSuperFullMetricsTest do
       |> Ash.read_one!(authorize?: false)
 
     assert is_map(row.metrics)
-    assert Map.has_key?(row.metrics, "isolated_entity_rate")
-    assert Map.has_key?(row.metrics, "edges_per_entity")
+    assert row.metrics["edges_per_entity"] == 0.5
+    assert row.metrics["isolated_entity_rate"] == 0.0
   end
 end

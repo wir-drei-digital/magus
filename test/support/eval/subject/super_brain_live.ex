@@ -88,6 +88,9 @@ defmodule Magus.Eval.Subject.SuperBrainLive do
       {:ok, %{entities: entities}} ->
         {:ok, %{answer: "", meta: %{retrieved: shape(entities)}}}
 
+      {:ok, %{error: reason}} ->
+        {:ok, %{answer: "", meta: %{retrieved: [], error: reason}}}
+
       _ ->
         {:ok, %{answer: "", meta: %{retrieved: []}}}
     end

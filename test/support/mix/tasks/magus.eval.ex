@@ -61,6 +61,9 @@ defmodule Mix.Tasks.Magus.Eval do
 
     {subject_mod, subject_kind} =
       case opts[:subject] do
+        "live" when benchmark == Magus.Eval.Benchmarks.SuperBrainRetrieval ->
+          {Magus.Eval.Subject.SuperBrainLive, :live}
+
         "live" ->
           {Magus.Eval.Subject.Live, :live}
 
