@@ -2,12 +2,17 @@ defmodule Magus.Skills.Skill do
   use Ash.Resource,
     domain: Magus.Skills,
     data_layer: AshPostgres.DataLayer,
+    extensions: [AshTypescript.Resource],
     authorizers: [Ash.Policy.Authorizer],
     notifiers: [Ash.Notifier.PubSub]
 
   postgres do
     table "skills"
     repo Magus.Repo
+  end
+
+  typescript do
+    type_name "Skill"
   end
 
   actions do

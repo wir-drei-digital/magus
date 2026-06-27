@@ -6,12 +6,28 @@ defmodule Magus.Skills do
   a later plan). This plan establishes the resource, sharing, and RPC surface.
   """
 
-  use Ash.Domain, otp_app: :magus
+  use Ash.Domain, otp_app: :magus, extensions: [AshTypescript.Rpc]
 
   @doc "Whether the user-managed skills feature is enabled for this instance."
   def enabled? do
     Application.get_env(:magus, __MODULE__, [])
     |> Keyword.get(:enabled, true)
+  end
+
+  typescript_rpc do
+    resource Magus.Skills.Skill do
+      rpc_action :my_skills, :my_skills
+      rpc_action :workspace_skills, :workspace_skills
+      rpc_action :create_skill, :create
+      rpc_action :update_skill, :update
+      rpc_action :destroy_skill, :destroy
+      rpc_action :share_skill_to_team, :share_to_team
+      rpc_action :unshare_skill_from_team, :unshare_from_team
+
+      rpc_action :get_skill, :read do
+        get_by [:id]
+      end
+    end
   end
 
   resources do
