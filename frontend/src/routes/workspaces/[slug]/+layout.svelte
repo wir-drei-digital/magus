@@ -120,9 +120,12 @@
 			<a href="{base}/chat" class="text-sm text-primary hover:underline">Back to chat</a>
 		</div>
 	{:else}
-		<div class="flex min-h-0 flex-1">
-			<nav class="w-48 shrink-0 border-r p-2" data-testid="workspace-nav">
-				<ul class="flex flex-col gap-0.5">
+		<div class="flex min-h-0 flex-1 flex-col md:flex-row">
+			<nav
+				class="shrink-0 border-b p-2 md:w-48 md:border-r md:border-b-0"
+				data-testid="workspace-nav"
+			>
+				<ul class="flex flex-row gap-0.5 overflow-x-auto md:flex-col">
 					{#each tabs as tab (tab.id)}
 						<li>
 							<a
