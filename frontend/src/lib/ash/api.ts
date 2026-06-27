@@ -579,15 +579,10 @@ export function setTabSessionMode(
 	sessionId: string,
 	mode: TabSession['mode']
 ): Promise<RpcResult<TabSession>> {
-	// Cast: TabSession['mode'] includes 'skills' (added ahead of the backend
-	// migration); the generated RPC input type will catch up once the backend
-	// enum is extended. The cast is safe — the server accepts unknown enum values
-	// gracefully and the mode is validated server-side anyway.
-	const rpcMode = mode as rpc.SetTabSessionModeInput['mode'];
 	return run((opts) =>
 		rpc.setTabSessionMode({
 			identity: sessionId,
-			input: { mode: rpcMode },
+			input: { mode },
 			fields: TAB_SESSION_FIELDS,
 			...opts
 		})
