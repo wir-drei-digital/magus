@@ -151,7 +151,9 @@ defmodule Magus.Agents.Tools.Skills.LoadSkill do
            Map.merge(base, %{
              status: "pending",
              hint:
-               "This skill bundles code that runs in the sandbox. STOP and wait for the user to approve. After they approve, call load_skill again with the same ref to install and use it."
+               "This skill bundles code that runs in the sandbox. STOP and ask the user to approve it by replying exactly: " <>
+                 Magus.Skills.Approval.approve_phrase(skill.id) <>
+                 ". After they approve, call load_skill again with the same ref to install and use it."
            })}
         end
 
