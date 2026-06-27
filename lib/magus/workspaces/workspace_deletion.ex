@@ -208,6 +208,7 @@ defmodule Magus.Workspaces.WorkspaceDeletion do
     destroy_via_action(Magus.Chat.Conversation, :delete_full_conversation, workspace_id)
     destroy_scoped(Magus.Files.File, workspace_id)
     destroy_scoped(Magus.Library.Prompt, workspace_id)
+    destroy_scoped(Magus.Skills.Skill, workspace_id)
     destroy_scoped(Magus.Knowledge.KnowledgeSource, workspace_id)
 
     # MCP servers cascade-delete via `mcp_servers.workspace_id ON DELETE :delete_all`
