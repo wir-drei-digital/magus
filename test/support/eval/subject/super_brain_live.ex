@@ -20,10 +20,19 @@ defmodule Magus.Eval.Subject.SuperBrainLive do
 
   @impl true
   def reset(ctx) do
-    brain = Magus.Generators.generate(Magus.Generators.brain(user_id: ctx.user.id))
     super_graph = "super:user:#{ctx.user.id}"
-    Magus.Graph.drop("brain:#{brain.id}")
+
+    # Drop all brain L1 graphs the user can currently see, then the super
+    # graph. This prevents prior cases' L1 graphs from leaking their entities
+    # into later cases' L2 via BuildSuperFull, which pulls from ALL accessible
+    # brain graphs.
+    Magus.SuperBrain.AccessibleGraphs.for_actor(ctx.user, workspace_context: nil)
+    |> Enum.filter(&String.starts_with?(&1, "brain:"))
+    |> Enum.each(&Magus.Graph.drop/1)
+
     Magus.Graph.drop(super_graph)
+
+    brain = Magus.Generators.generate(Magus.Generators.brain(user_id: ctx.user.id))
     {:ok, ctx |> Map.put(:brain, brain) |> Map.put(:super_graph, super_graph)}
   end
 
@@ -63,6 +72,9 @@ defmodule Magus.Eval.Subject.SuperBrainLive do
 
     {:ok, ctx}
   end
+
+  # Fallback: empty list or unexpected message shape -- no-op rather than crash.
+  def ingest(ctx, _), do: {:ok, ctx}
 
   @impl true
   def query(ctx, question) do
