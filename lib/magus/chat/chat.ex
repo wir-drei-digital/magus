@@ -370,6 +370,14 @@ defmodule Magus.Chat do
         get?: true
     end
 
+    resource Magus.Chat.UserModelPreference do
+      define :my_model_preferences, action: :my_model_preferences
+      define :set_model_favorite, action: :set_favorite
+      define :set_model_hidden, action: :set_hidden
+      define :set_model_position, action: :set_position
+      define :destroy_model_preference, action: :destroy
+    end
+
     resource Magus.Chat.PaneState do
       define :get_pane_state,
         action: :by_conversation_and_user,
