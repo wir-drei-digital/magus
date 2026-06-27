@@ -94,11 +94,15 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
 
   @impl true
   def run(params, _context) do
-    user_id = params[:user_id] || params["user_id"]
-    conversation_id = params[:conversation_id] || params["conversation_id"]
-    user_message = params[:user_message] || params["user_message"] || ""
-    agent_response = params[:agent_response] || params["agent_response"] || ""
-    model = params[:model] || params["model"] || Config.extraction_model()
+    # Normalize once at the boundary so the rest of the function reads a single
+    # key shape instead of checking atom-or-string per field (magus-t1dx). This
+    # also fixes allow_global_memories below, which previously only read the atom.
+    params = normalize_keys(params)
+    user_id = params["user_id"]
+    conversation_id = params["conversation_id"]
+    user_message = params["user_message"] || ""
+    agent_response = params["agent_response"] || ""
+    model = params["model"] || Config.extraction_model()
 
     Logger.debug(
       "ExtractTurnMemories: user_id=#{inspect(user_id)}, conv_id=#{inspect(conversation_id)}, " <>
@@ -121,7 +125,7 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
         {:ok, %{extractions_applied: 0, extractions_skipped: 0}}
 
       true ->
-        allow_global = Map.get(params, :allow_global_memories, true)
+        allow_global = Map.get(params, "allow_global_memories", true)
 
         case extract_and_apply(
                user_id,
@@ -143,6 +147,10 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
       Logger.warning("ExtractTurnMemories: Unexpected exception: #{Exception.message(e)}")
       Logger.debug("Stacktrace: #{Exception.format_stacktrace(__STACKTRACE__)}")
       {:error, "unexpected error: #{Exception.message(e)}"}
+  end
+
+  defp normalize_keys(params) do
+    Map.new(params, fn {key, value} -> {to_string(key), value} end)
   end
 
   defp extract_and_apply(
