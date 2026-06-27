@@ -12,15 +12,18 @@ defmodule MagusWeb.Rpc.SkillsController do
   def create(conn, %{"file" => %Plug.Upload{} = upload} = params) do
     user = conn.assigns.current_user
 
-    with {:ok, bytes} <- File.read(upload.path),
-         {:ok, skill} <-
-           Magus.Skills.Import.import_bundle(bytes,
-             actor: user,
-             workspace_id: cast_uuid(params["workspace_id"])
-           ) do
-      json(conn, %{success: true, data: %{id: skill.id, name: skill.name}})
-    else
-      {:error, reason} -> json(conn, error_envelope(reason))
+    case File.read(upload.path) do
+      {:ok, bytes} ->
+        case Magus.Skills.Import.import_bundle(bytes,
+               actor: user,
+               workspace_id: cast_uuid(params["workspace_id"])
+             ) do
+          {:ok, skill} -> json(conn, %{success: true, data: %{id: skill.id, name: skill.name}})
+          {:error, reason} -> json(conn, error_envelope(reason))
+        end
+
+      {:error, _posix} ->
+        json(conn, error_envelope("Could not read the uploaded file"))
     end
   end
 
@@ -48,6 +51,9 @@ defmodule MagusWeb.Rpc.SkillsController do
 
         %Ash.Error.Invalid{errors: [first | _]} when is_exception(first) ->
           Exception.message(first)
+
+        %Ash.Error.Invalid{} ->
+          "Import failed"
 
         other ->
           Logger.warning("RPC skill import failed: #{inspect(other)}")
