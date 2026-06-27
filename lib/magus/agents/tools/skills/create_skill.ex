@@ -25,7 +25,7 @@ defmodule Magus.Agents.Tools.Skills.CreateSkill do
 
   @impl true
   def run(params, context) do
-    with {:ok, ctx} <- validate_context(context, [:user_id, :conversation_id]) do
+    with {:ok, ctx} <- validate_context(context, [:user_id, :conversation_id, :user]) do
       user = get_context_value(context, :user)
       name = get_param(params, :name)
       include = get_param(params, :include_paths) || []

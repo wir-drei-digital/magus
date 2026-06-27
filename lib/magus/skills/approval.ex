@@ -28,7 +28,11 @@ defmodule Magus.Skills.Approval do
         title: "Skill approval needed",
         body: question,
         target_conversation_id: conversation_id,
-        metadata: %{skill_id: skill.id, options: ["Approve", "Reject"]}
+        metadata: %{
+          skill_id: skill.id,
+          approve_phrase: approve_phrase(skill.id),
+          options: ["Approve", "Reject"]
+        }
       },
       authorize?: false
     )
