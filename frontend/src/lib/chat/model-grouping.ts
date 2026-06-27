@@ -62,8 +62,8 @@ export function groupModels(
 		const key = m.provider ?? 'Other';
 		byProvider.set(key, [...(byProvider.get(key) ?? []), m]);
 	}
-	for (const [label, groupModels] of byProvider) {
-		groups.push({ label, models: groupModels.sort(byOrderThenName) });
+	for (const [label, providerModels] of byProvider) {
+		groups.push({ label, models: providerModels.sort(byOrderThenName) });
 	}
 
 	return groups;
