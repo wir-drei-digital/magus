@@ -3,42 +3,19 @@ defmodule Magus.Models.CatalogTest do
 
   alias Magus.Models.Catalog
 
-  describe "all/0" do
-    test "filters out seed?: false entries" do
-      entries = Catalog.all()
-      refute Enum.any?(entries, &(Map.get(&1, :seed?, true) == false))
-    end
-
-    test "every entry has a key" do
-      for entry <- Catalog.all() do
-        assert is_binary(entry[:key]), "missing key: #{inspect(entry)}"
-      end
-    end
-
-    test "all_with_internal/0 includes seed?: false entries" do
-      assert length(Catalog.all_with_internal()) > length(Catalog.all())
+  describe "OSS empty-start (magus-mxj5.6)" do
+    test "the open-core catalog ships empty" do
+      assert Catalog.all() == []
+      assert Catalog.all_with_internal() == []
     end
   end
 
+  # The curated data moved to MagusCloud.Models.Catalog; the transformers stay
+  # in core because the data-migration helpers (Backfill / InternalizeExtras)
+  # use them. They operate on caller-supplied entries, so they are exercised
+  # here with inline fixtures rather than the (now empty) catalog list.
   describe "to_db_attrs/1" do
-    test "produces only fields the Magus.Chat.Model :create action accepts" do
-      accept_keys =
-        Magus.Chat.Model
-        |> Ash.Resource.Info.action(:create)
-        |> Map.fetch!(:accept)
-        |> MapSet.new()
-
-      for entry <- Catalog.all() do
-        attrs = Catalog.to_db_attrs(entry)
-        unknown = MapSet.difference(MapSet.new(Map.keys(attrs)), accept_keys)
-
-        assert MapSet.size(unknown) == 0,
-               "to_db_attrs/1 returned keys not in :create accept list for " <>
-                 "#{entry[:key]}: #{inspect(MapSet.to_list(unknown))}"
-      end
-    end
-
-    test "drops llmdb_* and seed? fields" do
+    test "drops llmdb_* and seed? fields and any unknown keys" do
       entry = %{
         name: "Test",
         key: "test:foo",
@@ -60,22 +37,28 @@ defmodule Magus.Models.CatalogTest do
       assert attrs.key == "test:foo"
     end
 
-    test "to_db_attrs includes derived llm_metadata" do
-      entry = %{
-        name: "X",
-        key: "openrouter:x/y",
-        provider: "X Corp",
-        llmdb_output_limit: 1234
-      }
-
-      attrs = Magus.Models.Catalog.to_db_attrs(entry)
+    test "folds llmdb_* overrides into derived llm_metadata" do
+      entry = %{name: "X", key: "openrouter:x/y", provider: "X Corp", llmdb_output_limit: 1234}
+      attrs = Catalog.to_db_attrs(entry)
       assert attrs.llm_metadata == %{"output_limit" => 1234}
       assert attrs.name == "X"
+    end
+
+    test "returns only keys the Magus.Chat.Model :create action accepts" do
+      accept_keys =
+        Magus.Chat.Model
+        |> Ash.Resource.Info.action(:create)
+        |> Map.fetch!(:accept)
+        |> MapSet.new()
+
+      attrs = Catalog.to_db_attrs(%{name: "Z", key: "openrouter:z", provider: "Z"})
+      unknown = MapSet.difference(MapSet.new(Map.keys(attrs)), accept_keys)
+      assert MapSet.size(unknown) == 0, "unexpected keys: #{inspect(MapSet.to_list(unknown))}"
     end
   end
 
   describe "to_llm_metadata/1" do
-    test "Catalog.to_llm_metadata extracts llmdb overrides from a catalog entry" do
+    test "extracts llmdb overrides into a string-keyed map" do
       entry = %{
         key: "openrouter:x/y",
         llmdb_output_limit: 32_000,
@@ -84,7 +67,7 @@ defmodule Magus.Models.CatalogTest do
         llmdb_skip_tools?: true
       }
 
-      assert Magus.Models.Catalog.to_llm_metadata(entry) == %{
+      assert Catalog.to_llm_metadata(entry) == %{
                "output_limit" => 32_000,
                "cache_read" => 0.5,
                "cache_write" => 6.25,
@@ -93,15 +76,11 @@ defmodule Magus.Models.CatalogTest do
     end
   end
 
-  describe "to_db_attrs/1 api_provider" do
-    test "Apertus 70B db attrs preserve api_provider: :publicai" do
-      apertus =
-        Catalog.all()
-        |> Enum.find(&(&1.key == "publicai:swiss-ai/apertus-70b-instruct"))
-
-      attrs = Catalog.to_db_attrs(apertus)
-      assert attrs.api_provider == :publicai
-      assert attrs.provider == "Swiss AI"
+  describe "llmdb_provider_meta/1" do
+    test "returns provider metadata for a known slug" do
+      meta = Catalog.llmdb_provider_meta("openrouter")
+      assert meta.req_llm_id == "openrouter"
+      assert meta.base_url == "https://openrouter.ai/api/v1"
     end
   end
 end

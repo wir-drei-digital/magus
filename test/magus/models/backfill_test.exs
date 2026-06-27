@@ -8,7 +8,6 @@ defmodule Magus.Models.BackfillTest do
       Magus.Chat.Model
       |> Ash.Changeset.for_create(:create, %{
         name: "Catalog Model",
-        # real key from the catalog so llm_metadata backfill matches
         key: "openrouter:anthropic/claude-sonnet-4.6",
         provider: "Anthropic",
         api_provider: :openrouter,
@@ -40,11 +39,6 @@ defmodule Magus.Models.BackfillTest do
 
     assert sonnet.model_provider_id == openrouter.id
     assert grok.model_provider_id == xai.id
-
-    # llm_metadata pulled from the catalog entry for the matching key
-    assert sonnet.llm_metadata["output_limit"] == 128_000
-    # not in catalog -> stays empty
-    assert grok.llm_metadata == %{}
   end
 
   test "run is idempotent" do
