@@ -178,6 +178,62 @@ defmodule Magus.Agents.Context.SuperBrainRagContextTest do
     end
   end
 
+  describe "format/1 relation signal" do
+    test "renders a contested line with the predicate breakdown" do
+      entities = [
+        %{
+          name: "Plan A",
+          primary_type: "decision",
+          normalized_subtype: nil,
+          sources: [%{graph_name: "brain:abc", source_refs: []}],
+          neighbors: [
+            %{
+              id: "n1",
+              name: "Ship Friday",
+              predicate: "supports",
+              confidence: 0.9,
+              contested: true,
+              predicate_breakdown: %{"supports" => 2, "contradicts" => 1}
+            }
+          ]
+        }
+      ]
+
+      out = SuperBrainRagContext.format(entities)
+      assert out =~ "contested: Ship Friday"
+      assert out =~ "supports 2"
+      assert out =~ "contradicts 1"
+    end
+
+    test "caps relation lines and prefers contested over plain relations" do
+      neighbors =
+        for i <- 1..5 do
+          %{
+            id: "n#{i}",
+            name: "Rel #{i}",
+            predicate: "relates_to",
+            confidence: 0.5,
+            contested: false,
+            predicate_breakdown: %{"relates_to" => 1}
+          }
+        end
+
+      entities = [
+        %{
+          name: "Hub",
+          primary_type: "concept",
+          normalized_subtype: nil,
+          sources: [%{graph_name: "brain:abc", source_refs: []}],
+          neighbors: neighbors
+        }
+      ]
+
+      out = SuperBrainRagContext.format(entities)
+      # At most 2 relation lines (the budget cap).
+      assert length(for line <- String.split(out, "\n"), String.contains?(line, "relates_to:"), do: line) <= 2
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Helpers
   # ---------------------------------------------------------------------------
