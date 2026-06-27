@@ -12,13 +12,20 @@ export type PresenceViewer = {
 	visible: boolean;
 };
 
-/** Raw viewer as pushed by the channel (snake_case, from Elixir). */
+/**
+ * Raw viewer as pushed by the channel (snake_case, from Elixir).
+ *
+ * `Magus.Presence` stores the visibility flag as the atom `:visible?`, which
+ * JSON-encodes with the trailing `?` — so the wire key is `visible?`, not
+ * `visible`. Accept both: `visible?` is what the backend actually sends.
+ */
 export type RawPresenceViewer = {
 	user_id?: string;
 	name?: string | null;
 	avatar_path?: string | null;
 	color?: string | null;
 	visible?: boolean;
+	'visible?'?: boolean;
 };
 
 export function normalizeViewers(raw: RawPresenceViewer[] | undefined | null): PresenceViewer[] {
@@ -30,7 +37,7 @@ export function normalizeViewers(raw: RawPresenceViewer[] | undefined | null): P
 			name: v.name ?? '',
 			avatarPath: v.avatar_path ?? null,
 			color: v.color ?? '#888888',
-			visible: v.visible ?? true
+			visible: v['visible?'] ?? v.visible ?? true
 		}));
 }
 

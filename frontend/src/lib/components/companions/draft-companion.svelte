@@ -3,6 +3,9 @@
 	import { getDraft, renameDraft, updateDraftContent, type DraftDetail } from '$lib/ash/api';
 	import { relativeTime } from '$lib/time';
 	import BrainEditor from '$lib/components/brain/brain-editor.svelte';
+	import PresenceAvatars from '$lib/components/chat/presence-avatars.svelte';
+	import { ResourcePresence } from '$lib/chat/resource-presence.svelte';
+	import { session } from '$lib/stores/session.svelte';
 	import CompanionFrame from './companion-frame.svelte';
 
 	let {
@@ -15,6 +18,13 @@
 		revision?: number;
 		onClose: () => void;
 	} = $props();
+
+	// Live co-viewers on this draft's shared presence topic (SPA + classic).
+	const presence = new ResourcePresence();
+	$effect(() => {
+		void presence.start('draft', draftId);
+		return () => presence.stop();
+	});
 
 	let draft = $state<DraftDetail | null>(null);
 	let loadError = $state<string | null>(null);
@@ -121,6 +131,10 @@
 >
 	{#snippet icon()}
 		<FileText class="size-4 shrink-0 text-muted-foreground" />
+	{/snippet}
+
+	{#snippet headerActions()}
+		<PresenceAvatars viewers={presence.viewers} selfUserId={session.user?.id} max={3} />
 	{/snippet}
 
 	{#if conflictNotice}

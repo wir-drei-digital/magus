@@ -9,6 +9,7 @@
 		icon = null,
 		onClose,
 		onRename,
+		headerActions = null,
 		children,
 		footer = null
 	}: {
@@ -20,6 +21,8 @@
 		onClose: () => void;
 		/** When set, the title becomes click-to-rename. */
 		onRename?: (title: string) => void;
+		/** Right-aligned header content (e.g. presence avatars), before the pill. */
+		headerActions?: Snippet | null;
 		children: Snippet;
 		footer?: Snippet | null;
 	} = $props();
@@ -91,6 +94,9 @@
 					<p class="truncate text-xs text-muted-foreground">{meta}</p>
 				{/if}
 			</div>
+		{/if}
+		{#if headerActions}
+			<div class="shrink-0">{@render headerActions()}</div>
 		{/if}
 		{#if pill}
 			<span

@@ -30,6 +30,8 @@
 	import { relativeTime } from '$lib/time';
 	import BrainBottomBar from '$lib/components/brain/brain-bottom-bar.svelte';
 	import VersionDiffOverlay from '$lib/components/brain/version-diff-overlay.svelte';
+	import PresenceAvatars from '$lib/components/chat/presence-avatars.svelte';
+	import { ResourcePresence } from '$lib/chat/resource-presence.svelte';
 	// Lazy: keeps the chat view stack out of the brain route chunk.
 	const loadConversationCompanion = () =>
 		import('$lib/components/companions/conversation-companion.svelte');
@@ -41,6 +43,15 @@
 	import { workbench } from '$lib/stores/workbench.svelte';
 
 	const pageId = $derived(page.params.pageId!);
+
+	// Live co-viewers on this page's shared presence topic (classic brain page
+	// view tracks the same `presence:page:<id>` topic, so SPA + classic + the
+	// side-pane companion all appear together).
+	const presence = new ResourcePresence();
+	$effect(() => {
+		void presence.start('page', pageId);
+		return () => presence.stop();
+	});
 
 	// Title/icon from the nav tree while the page detail loads — the header
 	// renders immediately with the right text instead of appearing later.
@@ -413,6 +424,7 @@
 							Updated {relativeTime(pageData.updatedAt)}
 						{/if}
 					</span>
+					<PresenceAvatars viewers={presence.viewers} selfUserId={session.user?.id} max={3} />
 					<div class="flex shrink-0 items-center gap-1.5">
 						<button
 							type="button"

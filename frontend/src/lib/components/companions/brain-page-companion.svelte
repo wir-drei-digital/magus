@@ -13,6 +13,9 @@
 	import { extractOutline, stripFrontmatter, type OutlineEntry } from '$lib/brain/outline';
 	import { relativeTime } from '$lib/time';
 	import Markdown from '$lib/components/chat/markdown.svelte';
+	import PresenceAvatars from '$lib/components/chat/presence-avatars.svelte';
+	import { ResourcePresence } from '$lib/chat/resource-presence.svelte';
+	import { session } from '$lib/stores/session.svelte';
 	import CompanionFrame from './companion-frame.svelte';
 
 	let {
@@ -31,6 +34,13 @@
 
 	const TABS = ['outline', 'sources', 'related', 'activity'] as const;
 	type Tab = (typeof TABS)[number];
+
+	// Live co-viewers on this page's shared presence topic (SPA + classic).
+	const presence = new ResourcePresence();
+	$effect(() => {
+		void presence.start('page', pageId);
+		return () => presence.stop();
+	});
 
 	let page = $state<BrainPageDetail | null>(null);
 	let sources = $state<PageSourceEntry[]>([]);
@@ -144,6 +154,10 @@
 		{:else}
 			<NotebookPen class="size-4 shrink-0 text-muted-foreground" />
 		{/if}
+	{/snippet}
+
+	{#snippet headerActions()}
+		<PresenceAvatars viewers={presence.viewers} selfUserId={session.user?.id} max={3} />
 	{/snippet}
 
 	<div class="wb-scroll min-h-0 flex-1 overflow-y-auto px-5 py-4" bind:this={body}>

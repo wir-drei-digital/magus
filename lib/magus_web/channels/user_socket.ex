@@ -18,6 +18,8 @@ defmodule MagusWeb.UserSocket do
   channel "workspace:*", MagusWeb.WorkspaceChannel
   channel "agent:*", MagusWeb.AgentChannel
   channel "brain_updates:*", MagusWeb.BrainChannel
+  channel "viewers:*", MagusWeb.PresenceChannel
+  channel "conversation_presence:*", MagusWeb.ConversationPresenceChannel
 
   @impl true
   def connect(%{"token" => token}, socket, _connect_info) do

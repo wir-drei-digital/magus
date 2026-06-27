@@ -22,6 +22,14 @@ describe('normalizeViewers', () => {
 		expect(normalizeViewers([{ name: 'no id' }])).toEqual([]);
 		expect(normalizeViewers(undefined)).toEqual([]);
 	});
+
+	it('honors the Elixir `visible?` key so alt-tabbed viewers can be hidden', () => {
+		// Magus.Presence serializes the meta flag as the atom `:visible?`, which
+		// JSON-encodes with the trailing `?`. Reading `visible` (no `?`) would
+		// always default to true and never hide anyone.
+		expect(normalizeViewers([{ user_id: 'u1', 'visible?': false }])[0].visible).toBe(false);
+		expect(normalizeViewers([{ user_id: 'u2', 'visible?': true }])[0].visible).toBe(true);
+	});
 });
 
 describe('visibleOthers', () => {

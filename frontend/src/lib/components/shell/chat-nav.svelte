@@ -27,6 +27,9 @@
 	import { chatNav, type FolderNode } from '$lib/stores/chat-nav.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { workbench } from '$lib/stores/workbench.svelte';
+	import { conversationPresence } from '$lib/chat/conversation-presence.svelte';
+	import { collaborativeConversationIds } from '$lib/chat/conversation-presence';
+	import PresenceAvatars from '$lib/components/chat/presence-avatars.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 
 	let { query = '' }: { query?: string } = $props();
@@ -44,6 +47,21 @@
 
 	$effect(() => {
 		void chatNav.load(workspaceId);
+	});
+
+	// Nav-row presence: join the per-user feed for the session, then tell it
+	// which collaborative conversations are on screen. Two effects so a changing
+	// conversation list (new messages reorder rows) only re-pushes the watch set
+	// — it never tears down and rejoins the feed.
+	$effect(() => {
+		const userId = session.user?.id;
+		if (!userId) return;
+		void conversationPresence.start(userId);
+		return () => conversationPresence.stop();
+	});
+
+	$effect(() => {
+		conversationPresence.watch(collaborativeConversationIds(workbench.conversations));
 	});
 
 	const filtered = $derived(
@@ -216,6 +234,12 @@
 		>
 			<MessageSquare class="text-muted-foreground" />
 			<span class="min-w-0 flex-1 truncate">{conversation.title ?? 'Untitled conversation'}</span>
+			<!-- Co-viewers on shared rows (empty + self-hiding for solo chats). -->
+			<PresenceAvatars
+				viewers={conversationPresence.viewers(conversation.id)}
+				selfUserId={session.user?.id}
+				max={2}
+			/>
 			<span class="shrink-0 text-[10px] text-muted-foreground group-hover/row:opacity-0">
 				{compactTime(navTimestamp(conversation))}
 			</span>
