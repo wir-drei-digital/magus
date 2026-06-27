@@ -51,7 +51,7 @@
 
 ## Phase A: Port the foundation + coordination
 
-### Task A1: Brain.Page `kind` + brain-access-filter paths (the plan-page foundation)
+### Task 1: [A1] Brain.Page `kind` + brain-access-filter paths (the plan-page foundation)
 
 **Files:**
 - Modify: `lib/magus/brain/page.ex` (add `kind` attribute + promote/demote action)
@@ -70,7 +70,7 @@
 - [ ] **Step 6: Run the test -> PASS** + `MIX_ENV=test mix compile --warnings-as-errors`.
 - [ ] **Step 7: Commit** `lib/magus/brain/page.ex lib/magus/brain/checks/brain_access_filter.ex priv/repo/migrations priv/resource_snapshots test/magus/brain/page_kind_test.exs` — `feat(brain): page :plan kind + brain-access paths for plan tasks`.
 
-### Task A2: Port the Plan domain (resources + changes + checks + errors)
+### Task 2: [A2] Port the Plan domain (resources + changes + checks + errors)
 
 **Files:**
 - Replace/Create: all of `lib/magus/plan/**` from the cloud src (24 files; see the file-disposition map)
@@ -86,7 +86,7 @@
 - [ ] **Step 4: `MIX_ENV=test mix compile --warnings-as-errors`** -> clean (no migration yet, so DB-touching tests will fail; that is fine here - this task only makes the domain COMPILE).
 - [ ] **Step 5: Commit** `lib/magus/plan` — `feat(plan): port brain plans/tasks/coordination domain from cloud branch`.
 
-### Task A3: Regenerate schema migration + ash_typescript codegen
+### Task 3: [A3] Regenerate schema migration + ash_typescript codegen
 
 **Files:**
 - Generated: migration(s) for the new `plan_tasks` columns + `plan_task_dependencies` + `plan_task_events` tables; snapshots; `frontend/src/lib/ash/ash_rpc.ts` + `ash_types.ts`
@@ -101,7 +101,7 @@
 - [ ] **Step 4: Smoke.** `MIX_ENV=test mix compile --warnings-as-errors`; a quick `iex`-free read smoke is optional. `cd frontend && npm run check` (the generated TS must typecheck; the hand-written consumers come in A7, so check may report missing consumers - that is fine, focus on the generated files being valid).
 - [ ] **Step 5: Commit** `priv/repo/migrations priv/resource_snapshots frontend/src/lib/ash/ash_rpc.ts frontend/src/lib/ash/ash_types.ts` — `chore(plan): migration + ash_typescript codegen for ported plan domain`.
 
-### Task A4: Port + green the Plan domain tests
+### Task 4: [A4] Port + green the Plan domain tests
 
 **Files:**
 - Create: `test/magus/plan/**` from cloud src (replace OSS's smaller original plan tests)
@@ -115,7 +115,7 @@
 - [ ] **Step 3: Green + compile.** All plan tests pass; `MIX_ENV=test mix compile --warnings-as-errors` clean.
 - [ ] **Step 4: Commit** `test/magus/plan test/support` — `test(plan): port plan domain tests`.
 
-### Task A5: Port config (lease, queue, cap)
+### Task 5: [A5] Port config (lease, queue, cap)
 
 **Files:**
 - Modify: `config/config.exs`
@@ -128,7 +128,7 @@
 - [ ] **Step 3: Compile.** `MIX_ENV=test mix compile --warnings-as-errors`. Run the reaper-trigger test from A4 again (it needs the queue): `MIX_ENV=test mix test test/magus/plan/task_reaper_trigger_test.exs`.
 - [ ] **Step 4: Commit** `config/config.exs` — `feat(plan): lease TTL + reaper queue + task cap config`.
 
-### Task A6: Port the API (controllers + router + channel)
+### Task 6: [A6] Port the API (controllers + router + channel)
 
 **Files:**
 - Create: `lib/magus_web/api/v2/tasks_controller.ex`, `lib/magus_web/api/v2/overview_controller.ex`, `lib/magus_web/channels/task_channel.ex`
@@ -147,7 +147,7 @@
 - [ ] **Step 6: Green + compile** `--warnings-as-errors`.
 - [ ] **Step 7: Commit** the controllers + channel + router + socket + tests + any helper — `feat(api): port /api/v2 plan-task surface + task channel`.
 
-### Task A7: Port the frontend (board + overview + client)
+### Task 7: [A7] Port the frontend (board + overview + client)
 
 **Files:**
 - Create: `frontend/src/lib/components/plan/**`, `frontend/src/routes/brain/overview/**`, `frontend/src/lib/realtime/task-updates.ts`
@@ -167,7 +167,7 @@
 
 ## Phase B: Project-state layer (new)
 
-### Task B1: Page `:spec` kind + spec↔plan link
+### Task 8: [B1] Page `:spec` kind + spec↔plan link
 
 **Files:**
 - Modify: `lib/magus/brain/page.ex` (extend `kind` enum; add `spec_page_id`)
@@ -185,7 +185,7 @@
 - [ ] **Step 5: Run -> PASS** + compile `--warnings-as-errors`.
 - [ ] **Step 6: Commit** `lib/magus/brain/page.ex priv/repo/migrations priv/resource_snapshots test/magus/brain/page_spec_link_test.exs` — `feat(brain): :spec page kind + spec->plan link`.
 
-### Task B2: Delivery lifecycle on plan pages
+### Task 9: [B2] Delivery lifecycle on plan pages
 
 **Files:**
 - Modify: `lib/magus/brain/page.ex` (add `delivered_at`, `delivery_ref`, `lifecycle` calc, `:stranded_plans` read, `mark_delivered`/`undeliver` actions)
@@ -241,7 +241,7 @@
 - [ ] **Step 6: Run -> PASS** + compile `--warnings-as-errors`.
 - [ ] **Step 7: Commit** the page changes + calc + migration + snapshot + test — `feat(brain): plan delivery lifecycle + stranded-plan detector`.
 
-### Task B3: Lifecycle + stranded + spec-link API
+### Task 10: [B3] Lifecycle + stranded + spec-link API
 
 **Files:**
 - Modify: `lib/magus_web/api/v2/tasks_controller.ex` OR a new `lib/magus_web/api/v2/plans_controller.ex` (plan lifecycle endpoints); router
@@ -257,7 +257,7 @@
 - [ ] **Step 4: Run -> PASS** + compile. `mix ash_typescript.codegen` if any rpc/public attr changed; commit generated TS if so.
 - [ ] **Step 5: Commit** — `feat(api): plan delivery + stranded-plan endpoints`.
 
-### Task B4: Frontend - lifecycle badges, stranded section, unified tree
+### Task 11: [B4] Frontend - lifecycle badges, stranded section, unified tree
 
 **Files:**
 - Create: `frontend/src/lib/components/plan/lifecycle-badge.svelte`, `frontend/src/lib/components/plan/plan-tree.svelte`
@@ -278,7 +278,7 @@
 
 ## Phase C: Verification
 
-### Task C1: Full verification at HEAD
+### Task 12: [C1] Full verification at HEAD
 
 - [ ] **Step 1: Full backend suite.** `MIX_ENV=test mix test` (env-prefixed). Record results. The requirement: `test/magus/plan/`, `test/magus/brain/`, `test/magus_web/api/v2/` all green; any other failure must be confirmed PRE-EXISTING on OSS magus main (compare against a `git stash` + main run if unsure) and NOT caused by this branch.
 - [ ] **Step 2: Compile + frontend.** `MIX_ENV=test mix compile --warnings-as-errors`; `cd frontend && npm run check && npm run build && npx vitest run`; `npx playwright test plan-board brain-overview` (if specs present).
