@@ -8,6 +8,7 @@
 	} from '$lib/ash/api';
 	import SettingsSection from '$lib/components/crud/section.svelte';
 	import { confirmAction } from '$lib/stores/confirm.svelte';
+	import { providerLabel } from '$lib/integrations/provider-label';
 
 	let sources = $state<KnowledgeSourceEntry[]>([]);
 	let loading = $state(true);
@@ -38,12 +39,6 @@
 		else error = result.errors[0]?.message ?? 'Could not disconnect source';
 	}
 
-	function providerLabel(key: string): string {
-		return key
-			.split('_')
-			.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-			.join(' ');
-	}
 
 	function statusClass(status: string): string {
 		if (status === 'active') return 'bg-success/15 text-success';

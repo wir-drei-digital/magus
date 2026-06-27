@@ -8,6 +8,7 @@
 		type UserIntegrationEntry
 	} from '$lib/ash/api';
 	import { session } from '$lib/stores/session.svelte';
+	import { providerLabel } from '$lib/integrations/provider-label';
 	import { Button } from '$lib/components/ui/button';
 	import SettingsSection from '$lib/components/crud/section.svelte';
 
@@ -66,10 +67,6 @@
 			...config,
 			allowed_chat_ids: (config.allowed_chat_ids ?? []).filter((id) => id !== chatId)
 		});
-	}
-
-	function providerLabel(key: string): string {
-		return key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
 	}
 </script>
 
