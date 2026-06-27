@@ -240,17 +240,16 @@ test('runnable badge: bundled skill card shows sandbox chip; prompt-only does no
 	const cards = page.getByTestId('skill-card');
 	await expect(cards).toHaveCount(2);
 
-	// Find the card for bash-runner (bundled) — it's first in the mock list and
-	// sorted A-Z, "Bash Runner" before "Code Review".
-	const firstCard = cards.nth(0);
-	const secondCard = cards.nth(1);
+	// Select each card by its display name rather than relying on sort order.
+	const bundledCard = cards.filter({ hasText: 'Bash Runner' });
+	const promptOnlyCard = cards.filter({ hasText: 'Code Review' });
 
 	// Bundled card shows the "sandbox" chip (exact text on the badge span, not
 	// the description which contains "sandbox" as a substring).
-	await expect(firstCard.getByText('sandbox', { exact: true })).toBeVisible();
+	await expect(bundledCard.getByText('sandbox', { exact: true })).toBeVisible();
 
 	// Prompt-only card does NOT show the "sandbox" chip.
-	await expect(secondCard.getByText('sandbox', { exact: true })).toHaveCount(0);
+	await expect(promptOnlyCard.getByText('sandbox', { exact: true })).toHaveCount(0);
 });
 
 test('import: opening dialog, setting a file, and submitting navigates to the new skill', async ({
@@ -349,12 +348,7 @@ test('create: filling the new-skill form and submitting navigates to the created
 	await page.locator('input[placeholder="What this skill does"]').fill('A brand-new skill');
 
 	// Fill the body textarea.
-	await page
-		.locator('textarea[placeholder*="What this skill does"]')
-		.fill('## My New Skill\n\nDoes great things.')
-		.catch(() => {
-			// The textarea placeholder text may differ; try the generic textarea.
-		});
+	await page.getByTestId('skill-body-input').fill('## My New Skill\n\nDoes great things.');
 
 	// Click save.
 	await page.getByTestId('skill-save').click();
