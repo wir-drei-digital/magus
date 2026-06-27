@@ -75,7 +75,18 @@ defmodule Magus.Integrations.Providers.LogSource do
       (integration.config || %{})
       |> Map.put("webhook_secret", secret)
 
-    {:ok, %{config: config}}
+    # Persist the config here: the SetupIntegration reactor discards this hook's
+    # return value, so (like the api/telegram providers) the provider must save
+    # it, otherwise the webhook secret is lost and inbound webhooks can never
+    # authenticate.
+    with {:ok, _} <-
+           Magus.Integrations.update_integration_config(
+             integration,
+             %{config: config},
+             authorize?: false
+           ) do
+      {:ok, %{config: config}}
+    end
   end
 
   @doc """

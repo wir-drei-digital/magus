@@ -69,5 +69,22 @@ defmodule Magus.Agents.AgentIntegrationConnectTest do
                  user
                )
     end
+
+    test "log_source connect persists the generated webhook secret to config", %{
+      user: user,
+      agent: agent
+    } do
+      assert {:ok, %{status: "active"}} =
+               run_action(
+                 :connect_agent_integration,
+                 %{agent_id: agent.id, provider_key: "log_source"},
+                 user
+               )
+
+      # The on_credentials_saved hook must persist the secret itself (the reactor
+      # discards its return value); otherwise inbound webhooks can't authenticate.
+      assert [integration] = Magus.Integrations.list_agent_integrations!(agent.id, actor: user)
+      assert is_binary(integration.config["webhook_secret"])
+    end
   end
 end
