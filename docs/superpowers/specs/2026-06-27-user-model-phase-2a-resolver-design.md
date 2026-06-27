@@ -31,13 +31,13 @@ Resolution today spans six modules. Relevant `file:line`:
 
 | Site | Purpose | Pre-resolves chat `:auto`? | Modes |
 |---|---|---|---|
-| `preflight.ex:65` | `build_react_signal/3` (main turn) | **Yes**, via `maybe_auto_route` (749) -> `AutoRouteResolver` | chat |
+| `preflight.ex:65` | `build_react_signal/3` (main turn) | **Yes** (dispatcher; Preflight `maybe_auto_route` at 749 is a fallback) | chat |
 | `preflight.ex:159` | `build_resume_signal` (agent.resume) | No (raw `state[:model_keys]`) | chat |
 | `preflight.ex:229` | `assemble_context/2` (read-only debug, `mix agent.preflight`) | No (`ModelKeyResolver.resolve`) | chat |
 | `preflight.ex:265` | `validate_and_resolve_model/4` (helper) | No (raw arg) | chat |
 | `media_bypass.ex:33` | media generation bypass | No (raw `data/state[:model_keys]`) | image, video |
 
-Only the main path pre-resolves chat `:auto` before calling `resolve_model`. The four other sites pass raw keys, so `:auto` can still be present and is resolved *inside* `ModelResolver` (chat -> role default; media -> `ModelMatcher`). The existing Preflight gate order in `build_react_signal` is **resolve -> usage -> region -> routing**, which 2a preserves.
+For the main turn, the **dispatcher** auto-routes chat `:auto` (`Dispatcher.auto_route` -> `AutoRouteResolver`) and threads both the resolved keys and a `routing_reason` into the `message.user` signal (`Dispatcher.build_signal_data`); `Preflight.maybe_auto_route` (749) is a secondary fallback that only fires if a still-`:auto` chat key reaches Preflight. So at `preflight.ex:65` the chat key is already concrete, and a present `routing_reason` (or a raw chat key still `:auto`) is the provenance signal that it was auto-routed. The four other sites pass raw keys, so `:auto` can still be present and is resolved *inside* `ModelResolver` (chat -> role default; media -> `ModelMatcher`). The existing Preflight gate order in `build_react_signal` is **resolve -> usage -> region -> routing**, which 2a preserves.
 
 ## Design decisions (locked)
 
