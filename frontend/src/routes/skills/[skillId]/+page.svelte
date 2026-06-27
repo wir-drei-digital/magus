@@ -45,7 +45,11 @@
 
 	const NAME_RE = /^[a-z0-9-]{1,64}$/;
 
-	const canSave = $derived(name.trim() !== '' && NAME_RE.test(name.trim()));
+	const canSave = $derived(
+		name.trim() !== '' &&
+		NAME_RE.test(name.trim()) &&
+		description.trim() !== ''
+	);
 
 	$effect(() => {
 		const id = skillId;
@@ -162,7 +166,7 @@
 	}
 
 	async function remove() {
-		if (!skill && !isNew) return;
+		if (!skill) return;
 		const skillName = skill?.name ?? name;
 		const ok = await confirmAction({
 			title: `Delete ${skillName}?`,
@@ -170,8 +174,7 @@
 			confirmLabel: 'Delete'
 		});
 		if (!ok) return;
-		const id = isNew ? '' : skillId;
-		const result = await destroySkill(id);
+		const result = await destroySkill(skillId);
 		if (result.success) {
 			skillsNav.refresh();
 			await goto(`${base}/skills`);
