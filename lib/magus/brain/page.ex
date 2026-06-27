@@ -119,7 +119,7 @@ defmodule Magus.Brain.Page do
 
     create :create do
       primary? true
-      accept [:title, :icon, :parent_page_id]
+      accept [:title, :icon, :parent_page_id, :kind]
       argument :brain_id, :uuid, allow_nil?: false
       change set_attribute(:brain_id, arg(:brain_id))
       change set_attribute(:contributor_type, :user)
@@ -136,7 +136,7 @@ defmodule Magus.Brain.Page do
     end
 
     create :create_as_external_agent do
-      accept [:title, :icon, :parent_page_id]
+      accept [:title, :icon, :parent_page_id, :kind]
       argument :brain_id, :uuid, allow_nil?: false
       argument :external_agent_id, :uuid, allow_nil?: false
 
@@ -203,6 +203,13 @@ defmodule Magus.Brain.Page do
 
     update :reposition do
       accept [:position, :depth]
+    end
+
+    update :set_kind do
+      description "Promote/demote a page between :page and :plan."
+      accept [:kind]
+      require_atomic? false
+      change {Magus.Brain.Changes.BroadcastBrainEvent, resource_type: :page}
     end
 
     update :move_to_parent do
@@ -471,7 +478,8 @@ defmodule Magus.Brain.Page do
              :destroy,
              :move_to_parent,
              :soft_delete,
-             :restore
+             :restore,
+             :set_kind
            ]) do
       authorize_if {Magus.Brain.Checks.BrainAccessFilter, path: :direct, min_role: :editor}
     end
@@ -491,6 +499,14 @@ defmodule Magus.Brain.Page do
     attribute :slug, :string, allow_nil?: false
     attribute :position, :float, allow_nil?: false
     attribute :icon, :string, public?: true
+
+    attribute :kind, :atom do
+      description "A :plan page renders a structured task board; :page is a normal markdown page."
+      allow_nil? false
+      default :page
+      public? true
+      constraints one_of: [:page, :plan]
+    end
 
     attribute :contributor_type, :atom,
       constraints: [one_of: [:user, :custom_agent, :external_agent]]

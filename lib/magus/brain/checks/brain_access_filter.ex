@@ -25,6 +25,14 @@ defmodule Magus.Brain.Checks.BrainAccessFilter do
     * `path: :via_source_page` — resource has a `source_page_id` attribute
       pointing to a `Magus.Brain.Page`, e.g. `Magus.Brain.PageLink` where
       the "source" is the linking page, not a `Magus.Brain.Source` row.
+    * `path: :via_brain_page` - resource has a `brain_page` relationship to a
+      `Magus.Brain.Page` (which carries its own `brain_id`), e.g.
+      `Magus.Plan.Task` attached to a plan page.
+    * `path: :via_task_brain_page` - resource reaches the brain through a
+      `task` relationship whose `brain_page` carries the `brain_id`, e.g.
+      `Magus.Plan.TaskDependency`. Unlike a simple check, this filter-style
+      path also authorizes the resource when it is loaded as a relationship
+      aggregate (e.g. the `dependencies` count on `Magus.Plan.Task`).
 
   Supports `min_role` option (default `:viewer`) with role hierarchy:
   `viewer < editor < owner`.
@@ -97,6 +105,12 @@ defmodule Magus.Brain.Checks.BrainAccessFilter do
 
       :via_source_page ->
         Ash.Expr.expr(exists(source_page, brain_id in ^brain_ids))
+
+      :via_brain_page ->
+        Ash.Expr.expr(exists(brain_page, brain_id in ^brain_ids))
+
+      :via_task_brain_page ->
+        Ash.Expr.expr(exists(task.brain_page, brain_id in ^brain_ids))
     end
   end
 
