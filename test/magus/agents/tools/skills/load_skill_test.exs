@@ -42,7 +42,7 @@ defmodule Magus.Agents.Tools.Skills.LoadSkillTest do
 
       assert result.error =~ "not found"
       assert is_list(result.available_skills)
-      assert "poetry_writing" in result.available_skills
+      assert "builtin:poetry_writing" in result.available_skills
     end
 
     test "can load multiple different skills" do
