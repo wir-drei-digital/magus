@@ -67,13 +67,28 @@ defmodule Magus.Agents.Tools.Skills.LoadSkill do
         tools = skill.requested_tools || []
         persist_user_skill(context, skill.body, tools)
 
-        result = %{
+        base = %{
           skill: skill.name,
           description: skill.description || "",
           content: skill.body || ""
         }
 
-        {:ok, maybe_attach_new_tools(result, tools)}
+        cond do
+          not skill.has_executable_bundle ->
+            {:ok, maybe_attach_new_tools(base, tools)}
+
+          not Magus.Sandbox.Provider.configured?() ->
+            {:ok,
+             Map.merge(base, %{
+               unavailable: true,
+               content:
+                 base.content <>
+                   "\n\n(This skill requires code execution, which is unavailable on this instance.)"
+             })}
+
+          true ->
+            handle_bundled_skill(context, skill, base, tools)
+        end
 
       :not_found ->
         available =
@@ -103,6 +118,40 @@ defmodule Magus.Agents.Tools.Skills.LoadSkill do
     case Registry.get_skill(name) do
       {:ok, skill} -> {:builtin, skill}
       _ -> :not_found
+    end
+  end
+
+  defp handle_bundled_skill(context, skill, base, tools) do
+    conversation_id = get_context_value(context, :conversation_id)
+    user_id = get_context_value(context, :user_id)
+    {:ok, conversation} = Magus.Chat.get_conversation(conversation_id, authorize?: false)
+
+    if Magus.Skills.Approval.approved?(conversation, skill.id) do
+      case Magus.Skills.Materializer.materialize(conversation_id, skill, user_id) do
+        {:ok, dir} ->
+          enriched =
+            base
+            |> Map.put(:materialized, dir)
+            |> Map.put(
+              :content,
+              base.content <>
+                "\n\nThis skill is installed at #{dir}. If it needs secrets, `source /workspace/.env` first."
+            )
+
+          {:ok, maybe_attach_new_tools(enriched, tools)}
+
+        {:error, reason} ->
+          {:ok, Map.put(base, :error, "Could not install skill: #{inspect(reason)}")}
+      end
+    else
+      Magus.Skills.Approval.request(conversation_id, skill, user_id)
+
+      {:ok,
+       Map.merge(base, %{
+         status: "pending",
+         hint:
+           "This skill bundles code that runs in the sandbox. STOP and wait for the user to approve. After they approve, call load_skill again with the same ref to install and use it."
+       })}
     end
   end
 
