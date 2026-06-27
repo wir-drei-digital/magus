@@ -118,7 +118,7 @@
 				type="button"
 				class="relative flex size-10 items-center justify-center rounded-lg transition-colors {workbench.mode ===
 				mode.key
-					? 'text-primary'
+					? 'text-foreground'
 					: 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'}"
 				title={mode.label}
 				data-testid="mode-{mode.key}"
