@@ -36,6 +36,8 @@ defmodule Magus.Agents do
       rpc_action :agent_integrations, :agent_integrations
       rpc_action :disconnect_agent_integration, :disconnect_agent_integration
       rpc_action :set_agent_integration_tool, :set_agent_integration_tool
+      rpc_action :available_integration_providers, :available_integration_providers
+      rpc_action :connect_agent_integration, :connect_agent_integration
 
       rpc_action :get_custom_agent, :read do
         get_by [:id]

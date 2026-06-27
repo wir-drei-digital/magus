@@ -3032,6 +3032,92 @@ export async function setAgentIntegrationTool(
 	};
 }
 
+/** A dynamic credential field a provider asks for (from its auth_fields). */
+export type IntegrationAuthField = {
+	name: string;
+	label: string;
+	type: string;
+	help: string | null;
+};
+
+/** A provider the connect wizard can set up. */
+export type IntegrationProviderMeta = {
+	key: string;
+	name: string;
+	description: string;
+	/** 'none' | 'api_key' | 'oauth2' | 'webhook_only' | 'imap' */
+	authType: string;
+	sourceType: string;
+	requiresAdmin: boolean;
+	authFields: IntegrationAuthField[];
+};
+
+export type ConnectedIntegration = {
+	id: string;
+	providerKey: string;
+	status: string;
+	authType: string;
+	/** One-time API key (api provider only); never re-fetchable afterwards. */
+	apiKey: string | null;
+};
+
+/** Providers the agent can connect (excludes knowledge sources + admin-only when not admin). */
+export async function availableIntegrationProviders(
+	agentId: string
+): Promise<RpcResult<IntegrationProviderMeta[]>> {
+	const result = await run<Array<Record<string, unknown>> | null>((opts) =>
+		rpc.availableIntegrationProviders({ input: { agentId }, ...opts })
+	);
+	if (!result.success) return result;
+	return {
+		success: true,
+		data: (result.data ?? []).map((row) => ({
+			key: String(row.key ?? ''),
+			name: String(row.name ?? ''),
+			description: String(row.description ?? ''),
+			authType: String(row.auth_type ?? 'none'),
+			sourceType: String(row.source_type ?? ''),
+			requiresAdmin: row.requires_admin === true,
+			authFields: (
+				(Array.isArray(row.auth_fields) ? row.auth_fields : []) as Record<string, unknown>[]
+			).map((field) => ({
+				name: String(field.name ?? ''),
+				label: String(field.label ?? ''),
+				type: String(field.type ?? 'text'),
+				help: field.help == null ? null : String(field.help)
+			}))
+		}))
+	};
+}
+
+/**
+ * Connect a new integration for an agent. For OAuth providers this creates the
+ * integration (the caller then redirects to /oauth/<key>/authorize); for the
+ * api provider the returned `apiKey` is the one-time plaintext to show once.
+ */
+export async function connectAgentIntegration(input: {
+	agentId: string;
+	providerKey: string;
+	credentials?: Record<string, unknown>;
+	config?: Record<string, unknown>;
+}): Promise<RpcResult<ConnectedIntegration>> {
+	const result = await run<Record<string, unknown> | null>((opts) =>
+		rpc.connectAgentIntegration({ input, ...opts })
+	);
+	if (!result.success) return result;
+	const row = result.data ?? {};
+	return {
+		success: true,
+		data: {
+			id: String(row.id ?? ''),
+			providerKey: String(row.provider_key ?? ''),
+			status: String(row.status ?? ''),
+			authType: String(row.auth_type ?? 'none'),
+			apiKey: typeof row.api_key === 'string' ? row.api_key : null
+		}
+	};
+}
+
 export function createCustomAgent(input: {
 	name: string;
 	description?: string;

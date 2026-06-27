@@ -1234,6 +1234,85 @@ export async function agentMemories(
 }
 
 
+export type AvailableIntegrationProvidersInput = {
+  agentId: UUID;
+};
+
+export type InferAvailableIntegrationProvidersResult = Array<Record<string, any>>;
+
+export type AvailableIntegrationProvidersResult = | { success: true; data: InferAvailableIntegrationProvidersResult; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on CustomAgent
+ *
+ * @ashActionType :action
+ */
+export async function availableIntegrationProviders(
+  config: {
+  tenant?: string;
+  input: AvailableIntegrationProvidersInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<AvailableIntegrationProvidersResult> {
+  const payload = {
+    action: "available_integration_providers",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeActionRpcRequest<AvailableIntegrationProvidersResult>(
+    payload,
+    config
+  );
+}
+
+
+export type ConnectAgentIntegrationInput = {
+  agentId: UUID;
+  providerKey: string;
+  credentials?: Record<string, any> | null;
+  config?: Record<string, any> | null;
+};
+
+export type InferConnectAgentIntegrationResult = Record<string, any>;
+
+export type ConnectAgentIntegrationResult = | { success: true; data: InferConnectAgentIntegrationResult; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on CustomAgent
+ *
+ * @ashActionType :action
+ */
+export async function connectAgentIntegration(
+  config: {
+  tenant?: string;
+  input: ConnectAgentIntegrationInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ConnectAgentIntegrationResult> {
+  const payload = {
+    action: "connect_agent_integration",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeActionRpcRequest<ConnectAgentIntegrationResult>(
+    payload,
+    config
+  );
+}
+
+
 export type CreateCustomAgentInput = {
   name: string;
   description?: string | null;

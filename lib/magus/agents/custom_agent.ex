@@ -588,6 +588,38 @@ defmodule Magus.Agents.CustomAgent do
       end
     end
 
+    action :available_integration_providers, {:array, :map} do
+      description "Connectable integration providers for the agent connect wizard."
+      argument :agent_id, :uuid, allow_nil?: false
+
+      run fn input, context ->
+        with {:ok, _agent} <-
+               Magus.Agents.get_custom_agent(input.arguments.agent_id, actor: context.actor) do
+          {:ok, connectable_providers(context.actor)}
+        end
+      end
+    end
+
+    action :connect_agent_integration, :map do
+      description "Connect a new integration for an agent (runs the SetupIntegration reactor)."
+      argument :agent_id, :uuid, allow_nil?: false
+      argument :provider_key, :string, allow_nil?: false
+      argument :credentials, :map, allow_nil?: true, default: %{}
+      argument :config, :map, allow_nil?: true, default: %{}
+
+      run fn input, context ->
+        with :ok <- assert_agent_editable(input.arguments.agent_id, context.actor) do
+          connect_agent_integration(
+            input.arguments.agent_id,
+            input.arguments.provider_key,
+            input.arguments[:credentials] || %{},
+            input.arguments[:config] || %{},
+            context.actor
+          )
+        end
+      end
+    end
+
     action :trigger_run, :map do
       description """
       Manual wake-up ("Run now") for the SvelteKit workbench. Mirrors the
@@ -673,7 +705,9 @@ defmodule Magus.Agents.CustomAgent do
              :remove_agent_attachment,
              :agent_integrations,
              :disconnect_agent_integration,
-             :set_agent_integration_tool
+             :set_agent_integration_tool,
+             :available_integration_providers,
+             :connect_agent_integration
            ]) do
       authorize_if actor_present()
     end
@@ -1041,6 +1075,95 @@ defmodule Magus.Agents.CustomAgent do
       _ -> {:error, "not authorized to edit this agent"}
     end
   end
+
+  @connectable_provider_keys ~w(telegram google_calendar rss_source api log_source simple_webhook)
+
+  # Providers the SPA connect wizard can set up: every registered provider that
+  # isn't a knowledge source (those have their own wizard) or the AI-guided
+  # custom_api, with admin-only providers hidden from non-admins.
+  defp connectable_providers(actor) do
+    admin? = Map.get(actor || %{}, :is_admin, false) == true
+
+    Magus.Integrations.list_available_providers()
+    |> Enum.reject(&(&1.source_type == :knowledge or &1.key == :custom_api))
+    |> Enum.reject(&(&1.requires_admin? and not admin?))
+    |> Enum.map(&provider_meta_map/1)
+  end
+
+  defp provider_meta_map(meta) do
+    %{
+      key: to_string(meta.key),
+      name: meta.name,
+      description: meta.description,
+      auth_type: to_string(meta.auth_type),
+      source_type: to_string(meta.source_type),
+      requires_admin: meta.requires_admin?,
+      auth_fields:
+        Enum.map(meta.auth_fields || [], fn field ->
+          %{
+            name: to_string(field[:name]),
+            label: field[:label],
+            type: to_string(field[:type] || :text),
+            help: field[:help]
+          }
+        end)
+    }
+  end
+
+  defp connect_agent_integration(agent_id, provider_key, credentials, config, actor)
+       when is_binary(provider_key) do
+    if provider_key in @connectable_provider_keys do
+      provider_atom = String.to_existing_atom(provider_key)
+
+      case Reactor.run(
+             Magus.Integrations.Reactors.SetupIntegration,
+             %{
+               user_id: actor.id,
+               custom_agent_id: agent_id,
+               provider_key: provider_atom,
+               credentials: credentials,
+               config: config
+             },
+             async?: false
+           ) do
+        {:ok, integration} -> {:ok, connected_integration_map(integration, provider_atom)}
+        {:error, reason} -> {:error, friendly_integration_error(reason)}
+      end
+    else
+      {:error, "Unknown integration provider"}
+    end
+  end
+
+  defp connected_integration_map(integration, provider_atom) do
+    base = %{
+      id: integration.id,
+      provider_key: to_string(integration.provider_key),
+      status: to_string(integration.status),
+      auth_type: to_string(provider_auth_type(provider_atom))
+    }
+
+    # The API provider mints a one-time key during setup; surface it once so the
+    # SPA can show it (afterwards it is only stored hashed + encrypted).
+    if provider_atom == :api do
+      case Magus.Integrations.load_credentials(integration.id) do
+        {:ok, %{"api_key" => key}} when is_binary(key) -> Map.put(base, :api_key, key)
+        _ -> base
+      end
+    else
+      base
+    end
+  end
+
+  defp provider_auth_type(provider_atom) do
+    case Magus.Integrations.get_provider_module(provider_atom) do
+      nil -> :none
+      module -> module.auth_type()
+    end
+  end
+
+  defp friendly_integration_error(reason) when is_binary(reason), do: reason
+  defp friendly_integration_error(%{message: message}) when is_binary(message), do: message
+  defp friendly_integration_error(reason), do: "Could not connect: #{inspect(reason)}"
 
   defp integration_map(integration, provider_meta) do
     meta =

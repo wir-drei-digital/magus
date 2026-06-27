@@ -54,6 +54,7 @@
 		alwaysIncludeTokens,
 		budgetTier
 	} from '$lib/agents/attachment-budget';
+	import AgentIntegrationWizard from '$lib/components/agents/agent-integration-wizard.svelte';
 	import { cachedActiveModels, invalidateAgentCatalog } from '$lib/chat/catalog';
 	import {
 		categoryEnabled,
@@ -365,6 +366,7 @@
 	// Integrations section (manage-only): list / disconnect / tool toggle.
 	let integrations = $state<AgentIntegration[]>([]);
 	let integrationsLoaded = $state(false);
+	let integrationWizardOpen = $state(false);
 
 	function loadIntegrations(id: string) {
 		integrationsLoaded = false;
@@ -425,11 +427,15 @@
 		if (workbench.mode !== 'agents') void workbench.setMode('agents');
 	});
 
+	let previousAgentId: string | null = null;
 	$effect(() => {
 		const id = agentId;
 		agent = null;
 		loadError = null;
-		section = 'general';
+		// Honor the ?section= deep link on first load; only reset to the default
+		// section when actually switching to a different agent.
+		if (previousAgentId !== null && previousAgentId !== id) section = 'general';
+		previousAgentId = id;
 		runMessage = null;
 		saveStatus = null;
 		// Creation lives in the shared "New agent" dialog; this route only edits.
@@ -1225,8 +1231,19 @@
 			{:else if section === 'integrations'}
 				<Section
 					title="Integrations"
-					description="Manage this agent's connected integrations. New connections are added in the classic UI for now."
+					description="Connect channels, calendars, and data sources for this agent."
 				>
+					{#snippet actions()}
+						<Button
+							size="sm"
+							variant="outline"
+							onclick={() => (integrationWizardOpen = true)}
+							data-testid="agent-integration-connect"
+						>
+							+ Connect new
+						</Button>
+					{/snippet}
+
 					{#if !integrationsLoaded}
 						<div class="h-16 animate-pulse rounded-lg bg-muted/60"></div>
 					{:else if integrations.length === 0}
@@ -1278,6 +1295,13 @@
 							{/each}
 						</div>
 					{/if}
+
+					<AgentIntegrationWizard
+						bind:open={integrationWizardOpen}
+						{agentId}
+						connectedKeys={integrations.map((i) => i.providerKey)}
+						onConnected={() => loadIntegrations(agentId)}
+					/>
 				</Section>
 			{:else if section === 'privacy'}
 				<Section
