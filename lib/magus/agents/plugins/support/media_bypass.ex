@@ -7,7 +7,8 @@ defmodule Magus.Agents.Plugins.Support.MediaBypass do
 
   alias Magus.Agents.Context.ConversationState, as: State
   alias Magus.Agents.Support.MediaGenerator
-  alias Magus.Agents.Plugins.Support.{Helpers, ModelResolver, Preflight}
+  alias Magus.Agents.Plugins.Support.{Helpers, Preflight}
+  alias Magus.Models.Resolver
   alias Magus.Agents.Signals
   alias Magus.Chat
 
@@ -30,7 +31,14 @@ defmodule Magus.Agents.Plugins.Support.MediaBypass do
 
     selected_model_id = data[:selected_model_id] || data["selected_model_id"]
 
-    model = ModelResolver.resolve_model(model_keys, mode, selected_model_id)
+    {:ok, resolution} =
+      Resolver.resolve(nil, %{
+        model_keys: model_keys,
+        mode: mode,
+        selected_model_id: selected_model_id
+      })
+
+    model = resolution.model
     user = Preflight.load_user_for_limits(state[:user_id])
     message_id = data[:message_id] || data["message_id"]
 
