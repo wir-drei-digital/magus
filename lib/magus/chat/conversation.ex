@@ -594,6 +594,17 @@ defmodule Magus.Chat.Conversation do
       change set_attribute(:system_prompt_id, nil)
     end
 
+    update :record_skill_approval do
+      require_atomic? false
+      argument :skill_id, :uuid, allow_nil?: false
+
+      change fn changeset, _context ->
+        id = Ash.Changeset.get_argument(changeset, :skill_id)
+        existing = Ash.Changeset.get_attribute(changeset, :approved_skill_ids) || []
+        Ash.Changeset.change_attribute(changeset, :approved_skill_ids, Enum.uniq([id | existing]))
+      end
+    end
+
     action :build_message_history, {:array, :struct} do
       argument :conversation_id, :uuid, allow_nil?: false
       argument :current_message_id, :uuid
@@ -779,6 +790,13 @@ defmodule Magus.Chat.Conversation do
       public? true
       allow_nil? true
       description "Tool names discovered via tool_search and loaded into this conversation"
+    end
+
+    attribute :approved_skill_ids, {:array, :uuid} do
+      allow_nil? true
+      default []
+      public? true
+      description "Skill ids the user has approved to run bundled code in this conversation"
     end
 
     attribute :sampling_settings, :map do
