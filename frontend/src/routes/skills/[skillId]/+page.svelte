@@ -3,28 +3,195 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
 	import { ArrowLeft, Box, FileCode, Package, Wrench } from '@lucide/svelte';
-	import { getSkill, skillDownloadUrl, type SkillDetail } from '$lib/ash/api';
+	import {
+		createSkill,
+		destroySkill,
+		getSkill,
+		shareSkillToTeam,
+		skillDownloadUrl,
+		unshareSkillFromTeam,
+		updateSkill,
+		type SkillDetail
+	} from '$lib/ash/api';
 	import Markdown from '$lib/components/chat/markdown.svelte';
+	import { skillsNav } from '$lib/stores/skills-nav.svelte';
+	import { session } from '$lib/stores/session.svelte';
+	import {
+		Section,
+		Field,
+		Button,
+		confirmAction,
+		CONTROL_CLASS,
+		TEXTAREA_CLASS
+	} from '$lib/components/crud';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 
 	const skillId = $derived(page.params.skillId!);
+	const isNew = $derived(skillId === 'new');
 
 	let skill = $state<SkillDetail | null>(null);
 	let loadError = $state<string | null>(null);
+	let editing = $state(false);
+	let saving = $state(false);
+	let saveError = $state<string | null>(null);
+
+	// Form fields
+	let name = $state('');
+	let displayName = $state('');
+	let description = $state('');
+	let body = $state('');
+	let requestedToolsRaw = $state('');
+	let nameError = $state<string | null>(null);
+
+	const NAME_RE = /^[a-z0-9-]{1,64}$/;
+
+	const canSave = $derived(name.trim() !== '' && NAME_RE.test(name.trim()));
 
 	$effect(() => {
 		const id = skillId;
 		skill = null;
 		loadError = null;
+		saveError = null;
 
+		if (id === 'new') {
+			// Create mode: start with a blank form in editing state.
+			editing = true;
+			name = '';
+			displayName = '';
+			description = '';
+			body = '';
+			requestedToolsRaw = '';
+			nameError = null;
+			return;
+		}
+
+		editing = false;
 		void getSkill(id).then((result) => {
 			if (id !== skillId) return;
 			if (result.success) {
 				skill = result.data;
+				syncForm(result.data);
 			} else {
 				loadError = result.errors[0]?.message ?? 'Skill could not be loaded';
 			}
 		});
 	});
+
+	function syncForm(data: SkillDetail) {
+		name = data.name;
+		displayName = data.displayName ?? '';
+		description = data.description;
+		body = data.body ?? '';
+		requestedToolsRaw = (data.requestedTools ?? []).join(', ');
+		nameError = null;
+	}
+
+	function validateName(): boolean {
+		const trimmed = name.trim();
+		if (trimmed === '') {
+			nameError = 'Name is required.';
+			return false;
+		}
+		if (!NAME_RE.test(trimmed)) {
+			nameError = 'Name must be 1-64 lowercase letters, digits, or hyphens (a-z, 0-9, -).';
+			return false;
+		}
+		nameError = null;
+		return true;
+	}
+
+	function parseTools(raw: string): string[] {
+		return raw
+			.split(/[,\s]+/)
+			.map((t) => t.trim())
+			.filter((t) => t.length > 0);
+	}
+
+	async function save() {
+		if (saving) return;
+		if (!validateName()) return;
+		saving = true;
+		saveError = null;
+
+		const trimmedName = name.trim();
+		const tools = parseTools(requestedToolsRaw);
+
+		if (isNew) {
+			const result = await createSkill({
+				name: trimmedName,
+				displayName: displayName.trim() || undefined,
+				description: description.trim(),
+				body: body.trim() || undefined,
+				requestedTools: tools.length > 0 ? tools : undefined,
+				workspaceId: session.user?.currentWorkspaceId ?? null
+			});
+			saving = false;
+			if (result.success) {
+				skillsNav.refresh();
+				await goto(`${base}/skills/${result.data.id}`);
+			} else {
+				saveError = result.errors[0]?.message ?? 'Skill could not be created';
+			}
+		} else {
+			const result = await updateSkill(skillId, {
+				name: trimmedName,
+				displayName: displayName.trim() || null,
+				description: description.trim(),
+				body: body.trim() || null,
+				requestedTools: tools.length > 0 ? tools : null
+			});
+			saving = false;
+			if (result.success) {
+				skill = result.data;
+				editing = false;
+				skillsNav.refresh();
+			} else {
+				saveError = result.errors[0]?.message ?? 'Skill could not be saved';
+			}
+		}
+	}
+
+	function cancelEdit() {
+		if (isNew) {
+			void goto(`${base}/skills`);
+			return;
+		}
+		if (skill) syncForm(skill);
+		editing = false;
+		saveError = null;
+	}
+
+	async function remove() {
+		if (!skill && !isNew) return;
+		const skillName = skill?.name ?? name;
+		const ok = await confirmAction({
+			title: `Delete ${skillName}?`,
+			description: 'This skill will be permanently removed.',
+			confirmLabel: 'Delete'
+		});
+		if (!ok) return;
+		const id = isNew ? '' : skillId;
+		const result = await destroySkill(id);
+		if (result.success) {
+			skillsNav.refresh();
+			await goto(`${base}/skills`);
+		} else {
+			saveError = result.errors[0]?.message ?? 'Skill could not be deleted';
+		}
+	}
+
+	async function toggleShare() {
+		if (!skill) return;
+		const result = skill.isSharedToWorkspace
+			? await unshareSkillFromTeam(skill.id)
+			: await shareSkillToTeam(skill.id);
+		if (result.success) {
+			skill = result.data;
+			skillsNav.refresh();
+		} else {
+			saveError = result.errors[0]?.message ?? 'Sharing failed';
+		}
+	}
 
 	/** Format a file size in bytes into a human-readable string. */
 	function formatSize(bytes: unknown): string {
@@ -57,18 +224,109 @@
 </script>
 
 <svelte:head>
-	<title>Magus — {skill?.displayName ?? skill?.name ?? 'Skill'}</title>
+	<title>Magus — {isNew ? 'New skill' : (skill?.displayName ?? skill?.name ?? 'Skill')}</title>
 </svelte:head>
 
 <div class="flex h-full min-h-0 flex-col" data-testid="skill-detail">
-	{#if loadError}
+	{#if !isNew && loadError}
 		<p class="p-6 text-sm text-destructive">{loadError}</p>
-	{:else if !skill}
+	{:else if !isNew && !skill && !editing}
 		<div class="space-y-3 p-6">
 			<div class="h-5 w-1/3 animate-pulse rounded bg-muted"></div>
 			<div class="h-40 animate-pulse rounded-xl bg-muted"></div>
 		</div>
-	{:else}
+	{:else if editing || isNew}
+		<!-- Create / Edit form -->
+		{#if saveError}
+			<p class="border-b bg-destructive/10 px-6 py-1.5 text-xs text-destructive">{saveError}</p>
+		{/if}
+		<div class="wb-scroll mx-auto w-full max-w-2xl min-h-0 flex-1 overflow-y-auto p-6">
+			<Section
+				title={isNew ? 'New skill' : 'Edit skill'}
+				description={isNew
+					? 'Define a new skill with its name, instructions, and optional tool requirements.'
+					: 'Update this skill and save your changes.'}
+			>
+				<form
+					class="flex flex-col gap-4"
+					onsubmit={(event) => {
+						event.preventDefault();
+						void save();
+					}}
+				>
+					<Field
+						label="Name"
+						required
+						hint="Lowercase letters, digits, and hyphens only (a-z, 0-9, -)"
+						error={nameError}
+					>
+						<input
+							bind:value={name}
+							required
+							placeholder="my-skill"
+							class={CONTROL_CLASS}
+							data-testid="skill-name-input"
+							oninput={() => {
+								if (nameError) validateName();
+							}}
+						/>
+					</Field>
+
+					<Field label="Display name" hint="Human-readable name shown in the UI">
+						<input
+							bind:value={displayName}
+							placeholder="My Skill"
+							class={CONTROL_CLASS}
+						/>
+					</Field>
+
+					<Field label="Description" required>
+						<input
+							bind:value={description}
+							required
+							placeholder="What this skill does"
+							class={CONTROL_CLASS}
+						/>
+					</Field>
+
+					<Field label="Instructions (body)" hint="Full skill instructions, supports Markdown">
+						<textarea
+							bind:value={body}
+							rows="10"
+							placeholder="## What this skill does&#10;&#10;Describe the skill..."
+							class="{TEXTAREA_CLASS} font-mono"
+						></textarea>
+					</Field>
+
+					<Field
+						label="Required tools"
+						hint="Comma or space-separated tool names (e.g. bash, web_search)"
+					>
+						<input
+							bind:value={requestedToolsRaw}
+							placeholder="bash, web_search"
+							class={CONTROL_CLASS}
+						/>
+					</Field>
+
+					<div class="flex items-center gap-2 pt-1">
+						<Button
+							type="submit"
+							disabled={saving || !canSave}
+							data-testid="skill-save"
+						>
+							{saving ? 'Saving…' : isNew ? 'Create skill' : 'Save'}
+						</Button>
+						<Button type="button" variant="ghost" onclick={cancelEdit}>Cancel</Button>
+					</div>
+				</form>
+			</Section>
+		</div>
+	{:else if skill}
+		<!-- Read view -->
+		{#if saveError}
+			<p class="border-b bg-destructive/10 px-6 py-1.5 text-xs text-destructive">{saveError}</p>
+		{/if}
 		<header class="flex shrink-0 items-center gap-2.5 border-b py-3 pr-6 pl-14 md:pl-4">
 			<button
 				type="button"
@@ -97,6 +355,42 @@
 				{#if skill.description}
 					<p class="truncate text-xs text-muted-foreground">{skill.description}</p>
 				{/if}
+			</div>
+			<div class="flex shrink-0 items-center gap-1.5">
+				<button
+					type="button"
+					class="wb-pill-btn shrink-0"
+					data-testid="skill-edit"
+					onclick={() => (editing = true)}
+				>
+					Edit
+				</button>
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger
+						class="wb-pill-btn wb-pill-btn-square shrink-0"
+						aria-label="Skill actions"
+					>
+						⋯
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content align="end">
+						{#if session.user?.currentWorkspaceId}
+							<DropdownMenu.Item
+								data-testid="skill-share"
+								onSelect={() => void toggleShare()}
+							>
+								{skill.isSharedToWorkspace ? 'Unshare from workspace' : 'Share to workspace'}
+							</DropdownMenu.Item>
+							<DropdownMenu.Separator />
+						{/if}
+						<DropdownMenu.Item
+							variant="destructive"
+							data-testid="skill-delete"
+							onSelect={() => void remove()}
+						>
+							Delete
+						</DropdownMenu.Item>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
 			</div>
 		</header>
 
