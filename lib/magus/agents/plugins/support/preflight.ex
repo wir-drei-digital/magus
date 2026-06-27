@@ -9,7 +9,7 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
   alias Magus.Agents.Routing.AutoRouteResolver
   alias Magus.Agents.Tools.ToolBuilder
   alias Magus.Agents.Plugins.Support.{ErrorMessages, Helpers}
-  alias Magus.Agents.Plugins.Support.ModelResolver
+  alias Magus.Models.Resolver
   alias Magus.Agents.Signals
   alias Magus.Agents.SlashCommands
 
@@ -61,13 +61,29 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
         route_metadata
       )
 
-    model =
-      ModelResolver.resolve_model(
-        model_keys,
-        mode,
-        selected_model_id,
-        preloaded_model_candidates(conversation)
-      )
+    # The dispatcher resolves chat :auto upstream and threads the routing
+    # reason into the signal (see Magus.Agents.Dispatcher.build_signal_data:
+    # routing_reason). A present routing_reason, or a raw chat key still :auto
+    # (Preflight's own secondary maybe_auto_route path), means the chat key was
+    # auto-routed rather than explicitly picked.
+    routing_reason = data[:routing_reason] || data["routing_reason"]
+
+    auto_routed = %{
+      chat: routing_reason not in [nil, ""] or raw_model_keys[:chat] == :auto,
+      image: raw_model_keys[:image] == :auto,
+      video: raw_model_keys[:video] == :auto
+    }
+
+    {:ok, resolution} =
+      Resolver.resolve(nil, %{
+        model_keys: model_keys,
+        mode: mode,
+        selected_model_id: selected_model_id,
+        preloaded: preloaded_model_candidates(conversation),
+        auto_routed: auto_routed
+      })
+
+    model = resolution.model
 
     # Enforce the spend gate against the member who sent the triggering message,
     # not the conversation owner (magus-k3at); owner fallback for autonomous turns.
@@ -155,13 +171,15 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
     raw_model_keys = Helpers.normalize_model_keys(state[:model_keys])
     mode = state[:mode] || :chat
 
-    model =
-      ModelResolver.resolve_model(
-        raw_model_keys,
-        mode,
-        nil,
-        preloaded_model_candidates(conversation)
-      )
+    {:ok, resolution} =
+      Resolver.resolve(nil, %{
+        model_keys: raw_model_keys,
+        mode: mode,
+        selected_model_id: nil,
+        preloaded: preloaded_model_candidates(conversation)
+      })
+
+    model = resolution.model
 
     # CRITICAL: pass a synthetic message_id in data so build_request_context
     # does not drop initial_messages. The id is a fresh UUID that exists in
@@ -225,13 +243,15 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
       mode = opts[:mode] || conversation.chat_mode || :chat
       text = opts[:text] || ""
 
-      model =
-        ModelResolver.resolve_model(
-          model_keys,
-          mode,
-          nil,
-          preloaded_model_candidates(conversation)
-        )
+      {:ok, resolution} =
+        Resolver.resolve(nil, %{
+          model_keys: model_keys,
+          mode: mode,
+          selected_model_id: nil,
+          preloaded: preloaded_model_candidates(conversation)
+        })
+
+      model = resolution.model
 
       # Synthetic message_id (in nobody's DB) so build_request_context keeps
       # initial_messages: the history query's exclude filter matches nothing,
@@ -262,7 +282,14 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
 
   @doc "Resolve model and check usage limits. Returns `{:ok, model}` or `{:error, error}`."
   def validate_and_resolve_model(model_keys, mode, selected_model_id, user_id) do
-    model = ModelResolver.resolve_model(model_keys, mode, selected_model_id)
+    {:ok, resolution} =
+      Resolver.resolve(nil, %{
+        model_keys: model_keys,
+        mode: mode,
+        selected_model_id: selected_model_id
+      })
+
+    model = resolution.model
     user = load_user_for_limits(user_id)
 
     case check_usage_limit(user, mode, model, nil) do
