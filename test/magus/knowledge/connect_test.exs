@@ -1,0 +1,103 @@
+defmodule Magus.Knowledge.ConnectTest do
+  use Magus.ResourceCase, async: true
+
+  alias Magus.Knowledge
+  alias Magus.Knowledge.Connect
+  alias Magus.Knowledge.KnowledgeSource
+
+  # Nextcloud's connect/1 is purely structural (no HTTP), so it exercises the
+  # connect -> create -> activate path without touching the network.
+  @nextcloud %{
+    "base_url" => "https://cloud.example.com",
+    "username" => "alice",
+    "password" => "app-token"
+  }
+
+  describe "connect_and_create/3" do
+    test "validates credentials and creates an active source" do
+      user = generate(user())
+
+      assert {:ok, source} = Connect.connect_and_create("nextcloud", @nextcloud, actor: user)
+      assert source.provider == :nextcloud
+      assert source.status == :active
+      assert source.name == "Nextcloud"
+      assert source.user_id == user.id
+    end
+
+    test "uses a supplied name" do
+      user = generate(user())
+
+      assert {:ok, source} =
+               Connect.connect_and_create("nextcloud", @nextcloud,
+                 actor: user,
+                 name: "Team Cloud"
+               )
+
+      assert source.name == "Team Cloud"
+    end
+
+    test "rejects an unknown provider" do
+      user = generate(user())
+
+      assert {:error, "Unknown provider"} =
+               Connect.connect_and_create("dropbox", %{}, actor: user)
+    end
+
+    test "surfaces a connector failure without creating a source" do
+      user = generate(user())
+
+      assert {:error, _message} =
+               Connect.connect_and_create(
+                 "nextcloud",
+                 %{"base_url" => "", "username" => "", "password" => ""},
+                 actor: user
+               )
+
+      assert {:ok, []} = Knowledge.list_sources_for_user(actor: user)
+    end
+  end
+
+  describe "connect_source action (SPA RPC surface)" do
+    test "returns a source summary map" do
+      user = generate(user())
+
+      assert {:ok, summary} =
+               KnowledgeSource
+               |> Ash.ActionInput.for_action(
+                 :connect_source,
+                 %{provider: "nextcloud", auth_config: @nextcloud},
+                 actor: user
+               )
+               |> Ash.run_action()
+
+      assert summary.provider == "nextcloud"
+      assert summary.status == "active"
+      assert is_binary(summary.id)
+    end
+  end
+
+  describe "create_source_collections action" do
+    test "creates a collection per selected folder (deduped by external_id)" do
+      user = generate(user())
+      {:ok, source} = Connect.connect_and_create("nextcloud", @nextcloud, actor: user)
+
+      folders = [
+        %{"id" => "/dav/folderA", "name" => "Folder A", "path" => "/Folder A"},
+        %{"id" => "/dav/folderB", "name" => "Folder B", "path" => "/Folder B"}
+      ]
+
+      assert {:ok, %{created: 2}} =
+               KnowledgeSource
+               |> Ash.ActionInput.for_action(
+                 :create_source_collections,
+                 %{source_id: source.id, folders: folders},
+                 actor: user
+               )
+               |> Ash.run_action()
+
+      assert {:ok, collections} = Knowledge.list_collections_for_source(source.id, actor: user)
+      assert length(collections) == 2
+      assert "/dav/folderA" in Enum.map(collections, & &1.external_id)
+    end
+  end
+end

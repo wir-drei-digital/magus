@@ -205,6 +205,7 @@ defmodule MagusWeb.CoreRouter do
         post "/run", RpcController, :run
         post "/validate", RpcController, :validate
         get "/socket-token", RpcController, :socket_token
+        post "/knowledge/oauth-finalize", RpcController, :knowledge_oauth_finalize
         post "/upload", UploadController, :create
         post "/profile-image/upload", ImageController, :upload
         post "/profile-image/generate", ImageController, :generate

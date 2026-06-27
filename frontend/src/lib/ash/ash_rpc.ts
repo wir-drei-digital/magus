@@ -7630,6 +7630,86 @@ export async function workspaceKnowledgeCollections<Fields extends WorkspaceKnow
 }
 
 
+export type ConnectKnowledgeSourceInput = {
+  provider: string;
+  authConfig: Record<string, any>;
+  name?: string | null;
+  workspaceId?: UUID | null;
+};
+
+export type InferConnectKnowledgeSourceResult = Record<string, any>;
+
+export type ConnectKnowledgeSourceResult = | { success: true; data: InferConnectKnowledgeSourceResult; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on KnowledgeSource
+ *
+ * @ashActionType :action
+ */
+export async function connectKnowledgeSource(
+  config: {
+  tenant?: string;
+  input: ConnectKnowledgeSourceInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ConnectKnowledgeSourceResult> {
+  const payload = {
+    action: "connect_knowledge_source",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeActionRpcRequest<ConnectKnowledgeSourceResult>(
+    payload,
+    config
+  );
+}
+
+
+export type CreateKnowledgeCollectionsInput = {
+  sourceId: UUID;
+  folders: Array<Record<string, any>>;
+};
+
+export type InferCreateKnowledgeCollectionsResult = Record<string, any>;
+
+export type CreateKnowledgeCollectionsResult = | { success: true; data: InferCreateKnowledgeCollectionsResult; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on KnowledgeSource
+ *
+ * @ashActionType :action
+ */
+export async function createKnowledgeCollections(
+  config: {
+  tenant?: string;
+  input: CreateKnowledgeCollectionsInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<CreateKnowledgeCollectionsResult> {
+  const payload = {
+    action: "create_knowledge_collections",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeActionRpcRequest<CreateKnowledgeCollectionsResult>(
+    payload,
+    config
+  );
+}
+
+
 export type DisconnectKnowledgeSourceResult = | { success: true; data: {}; }
 | { success: false; errors: AshRpcError[]; }
 
@@ -7656,6 +7736,45 @@ export async function disconnectKnowledgeSource(
   };
 
   return executeActionRpcRequest<DisconnectKnowledgeSourceResult>(
+    payload,
+    config
+  );
+}
+
+
+export type KnowledgeSourceFoldersInput = {
+  sourceId: UUID;
+  parentId?: string | null;
+};
+
+export type InferKnowledgeSourceFoldersResult = Array<Record<string, any>>;
+
+export type KnowledgeSourceFoldersResult = | { success: true; data: InferKnowledgeSourceFoldersResult; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on KnowledgeSource
+ *
+ * @ashActionType :action
+ */
+export async function knowledgeSourceFolders(
+  config: {
+  tenant?: string;
+  input: KnowledgeSourceFoldersInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<KnowledgeSourceFoldersResult> {
+  const payload = {
+    action: "knowledge_source_folders",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeActionRpcRequest<KnowledgeSourceFoldersResult>(
     payload,
     config
   );

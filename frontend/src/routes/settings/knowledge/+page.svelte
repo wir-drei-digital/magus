@@ -3,10 +3,13 @@
 	import { Trash2 } from '@lucide/svelte';
 	import {
 		disconnectKnowledgeSource,
+		finalizeKnowledgeOauth,
 		knowledgeSources,
 		type KnowledgeSourceEntry
 	} from '$lib/ash/api';
 	import SettingsSection from '$lib/components/crud/section.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import KnowledgeConnectWizard from '$lib/components/knowledge/knowledge-connect-wizard.svelte';
 	import { confirmAction } from '$lib/stores/confirm.svelte';
 	import { providerLabel } from '$lib/integrations/provider-label';
 
@@ -15,7 +18,41 @@
 	let error = $state<string | null>(null);
 	let busyId = $state<string | null>(null);
 
-	onMount(() => void load());
+	let wizardOpen = $state(false);
+	let resumeSource = $state<KnowledgeSourceEntry | null>(null);
+
+	onMount(() => {
+		void load();
+		void maybeResumeOauth();
+	});
+
+	// After an OAuth redirect, the callback stashed the tokens in the session and
+	// sent us back with ?wizard_provider=<key>. Finalize server-side (creating the
+	// source without the tokens touching the browser), then resume the wizard at
+	// the folder picker. Clear the param so a refresh does not re-finalize.
+	async function maybeResumeOauth() {
+		const params = new URLSearchParams(window.location.search);
+		const provider = params.get('wizard_provider');
+		if (!provider) return;
+
+		const url = new URL(window.location.href);
+		url.searchParams.delete('wizard_provider');
+		window.history.replaceState({}, '', url);
+
+		const result = await finalizeKnowledgeOauth(provider);
+		if (result.ok) {
+			await load();
+			resumeSource = result.source;
+			wizardOpen = true;
+		} else {
+			error = result.error;
+		}
+	}
+
+	function openWizard() {
+		resumeSource = null;
+		wizardOpen = true;
+	}
 
 	async function load() {
 		const result = await knowledgeSources();
@@ -100,10 +137,18 @@
 				</ul>
 			{/if}
 
-			<p class="mt-4 text-xs text-muted-foreground">
-				Connecting a new source (Notion, Google Drive, and others) runs an authorization wizard that
-				is not yet available in the new UI.
-			</p>
+			<div class="mt-4">
+				<Button
+					size="sm"
+					variant="outline"
+					onclick={openWizard}
+					data-testid="knowledge-connect-open"
+				>
+					+ Connect a source
+				</Button>
+			</div>
 		</SettingsSection>
 	</div>
 {/if}
+
+<KnowledgeConnectWizard bind:open={wizardOpen} {resumeSource} onConnected={load} />

@@ -12,6 +12,9 @@ defmodule Magus.Knowledge do
     resource Magus.Knowledge.KnowledgeSource do
       rpc_action :list_knowledge_sources, :for_user
       rpc_action :disconnect_knowledge_source, :destroy
+      rpc_action :connect_knowledge_source, :connect_source
+      rpc_action :knowledge_source_folders, :source_folders
+      rpc_action :create_knowledge_collections, :create_source_collections
     end
   end
 

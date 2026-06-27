@@ -1965,6 +1965,68 @@ export function disconnectKnowledgeSource(id: string): Promise<RpcResult<Record<
 	return run((opts) => rpc.disconnectKnowledgeSource({ identity: id, ...opts }));
 }
 
+/** A browsable folder in a connected source (lazy children via parentId). */
+export type KnowledgeFolderNode = { id: string; name: string; path: string };
+
+/**
+ * Validate API-key/URL credentials via the provider connector, then create +
+ * activate a source. OAuth providers do NOT use this — their tokens are
+ * finalized server-side via {@link finalizeKnowledgeOauth}.
+ */
+export function connectKnowledgeSource(input: {
+	provider: string;
+	authConfig: Record<string, unknown>;
+	name?: string | null;
+	workspaceId?: string | null;
+}): Promise<RpcResult<KnowledgeSourceEntry>> {
+	return run((opts) =>
+		rpc.connectKnowledgeSource({ input, ...opts })
+	) as Promise<RpcResult<KnowledgeSourceEntry>>;
+}
+
+/** Browse a connected source's folders (null parent = root; lazy on expand). */
+export function knowledgeSourceFolders(
+	sourceId: string,
+	parentId: string | null = null
+): Promise<RpcResult<KnowledgeFolderNode[]>> {
+	return run((opts) =>
+		rpc.knowledgeSourceFolders({ input: { sourceId, parentId }, ...opts })
+	) as Promise<RpcResult<KnowledgeFolderNode[]>>;
+}
+
+/** Create + sync a collection for each selected folder. */
+export function createKnowledgeCollections(
+	sourceId: string,
+	folders: KnowledgeFolderNode[]
+): Promise<RpcResult<{ created: number }>> {
+	return run((opts) =>
+		rpc.createKnowledgeCollections({ input: { sourceId, folders }, ...opts })
+	) as Promise<RpcResult<{ created: number }>>;
+}
+
+/**
+ * Finalize an OAuth connect after the provider redirect lands back on the SPA.
+ * The callback stashed the tokens in the session; this creates the source
+ * server-side so the tokens never touch the browser. Returns the new source.
+ */
+export async function finalizeKnowledgeOauth(
+	provider: string
+): Promise<{ ok: true; source: KnowledgeSourceEntry } | { ok: false; error: string }> {
+	try {
+		const response = await fetch('/rpc/knowledge/oauth-finalize', {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ provider })
+		});
+		const body = (await response.json()) as { source?: KnowledgeSourceEntry; error?: string };
+		if (response.ok && body.source) return { ok: true, source: body.source };
+		return { ok: false, error: body.error ?? 'Could not finalize the connection.' };
+	} catch (error) {
+		return { ok: false, error: error instanceof Error ? error.message : 'Network error' };
+	}
+}
+
 /** Ascending by inserted_at (the `:since` action sorts server-side). */
 export function messagesSince(
 	conversationId: string,
