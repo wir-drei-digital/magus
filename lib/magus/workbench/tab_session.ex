@@ -126,7 +126,7 @@ defmodule Magus.Workbench.TabSession do
     uuid_primary_key :id
 
     attribute :mode, :atom do
-      constraints one_of: [:chat, :brain, :agents, :prompts, :files]
+      constraints one_of: [:chat, :brain, :agents, :prompts, :files, :skills]
       default :chat
       allow_nil? false
       public? true
