@@ -272,22 +272,31 @@ Notes:
 ### Categories and the xfail roadmap
 
 Supported now (must pass, recall@k == 1.0 by fixture construction):
-- `local_lookup` (both subjects) — vector recall of a single entity.
-- `contradiction_detection` (both) — the hit carries a `contested` neighbor
+- `local_lookup` (both subjects): vector recall of a single entity.
+- `contradiction_detection` (both): the hit carries a `contested` neighbor
   with the expected `predicate_breakdown`.
-- `source_attribution` (both) — the hit carries the expected source ref.
-- `same_name_fusion` (live only) — two L1 graphs each hold a same-named
+- `source_attribution` (both): the hit carries the expected source ref.
+- `same_name_fusion` (live only): two L1 graphs each hold a same-named
   entity; after the real `BuildSuperFull`, retrieval returns ONE fused
   canonical. The deterministic subject cannot test this because it seeds an
   already-fused L2; genuine fusion is build-time and is also covered by the
   existing `BuildSuperFull` tests.
 
-Known-gap xfail (`supported: false`, expected to fail until the named
-phase; flipping to passing is a signal to promote the case):
-- `alias_resolution` (different surface names, for example "Daniel" vs
-  "Daniel Smith") — phase 3 identity resolution.
-- `multi_hop` (2+ hop reasoning) — phase 5/6 traversal.
-- `temporal` (validity windows / current-vs-historic) — phase 6.
+Known-gap xfail (`supported: false`, expected to fail until the named phase;
+a case flipping to passing is the signal to promote it):
+- `multi_hop` (deterministic): an entity reachable only by 2-hop traversal
+  (A to B to C) with a query vector near A and `k: 1`, so C is absent from
+  today's vector-plus-1-hop result and present only after phase 5/6 adds
+  traversal. This is the one gap the recall@k metric can grade honestly today
+  and flip cleanly when fixed.
+
+Deferred (NOT encoded this phase): `alias_resolution` and `temporal` cannot
+be honestly graded by recall@k. Alias resolution is graph fusion (one
+canonical vs two), which the L2-direct deterministic subject decides by what
+it seeds and which a name-based recall metric cannot detect as fixed.
+Temporal needs validity-window scoring that does not exist yet. Both become
+xfail cases only when phases 3 and 6 add the structural and temporal scoring
+primitives needed to grade them.
 
 ### Scoring
 
@@ -332,19 +341,19 @@ phase; flipping to passing is a signal to promote the case):
 ## Observability
 
 - `Magus.SuperBrain.GraphMetrics` (lib): pure functions computing
-  - `isolated_entity_rate` — fraction of `CanonicalEntity` nodes with no
+  - `isolated_entity_rate`: fraction of `CanonicalEntity` nodes with no
     `RELATES_TO` edge (APPEARS_IN is excluded, since every canonical has at
     least one APPEARS_IN, so "no edges at all" would be meaningless).
-  - `relates_to_fallback_rate` — fraction of edges whose `predicate` is the
+  - `relates_to_fallback_rate`: fraction of edges whose `predicate` is the
     generic `relates_to`.
-  - `ambiguous_bucket_count` — count of `(type, normalized_subtype)` buckets
+  - `ambiguous_bucket_count`: count of `(type, normalized_subtype)` buckets
     holding more than one distinct `name_key`. This is a coarse upper bound
     on identity-resolution opportunity and WILL be noisy (unrelated
     same-typed entities inflate it); phase 3 refines it with lexical /
     embedding similarity thresholds. Named `ambiguous_bucket_count`, not
     `alias_candidate_count`, to avoid implying confirmed aliases.
-  - `contested_edge_count` — number of edges with `contested == true`.
-  - `edges_per_entity` — `RELATES_TO` edge count divided by canonical count.
+  - `contested_edge_count`: number of edges with `contested == true`.
+  - `edges_per_entity`: `RELATES_TO` edge count divided by canonical count.
 
   Inputs are FalkorDB query results; no I/O in the module itself so it is
   unit-testable.
@@ -387,14 +396,14 @@ refs use valid UUIDs).
 
 ## Testing strategy
 
-- `Magus.SuperBrain.EdgeAggregation` — pure unit tests for grouping,
+- `Magus.SuperBrain.EdgeAggregation`: pure unit tests for grouping,
   most-common predicate, `predicate_breakdown`, and `contested`; the
   `BuildSuperFull` refactor is covered by existing builder tests (no
   behaviour change).
-- `Magus.Eval.SuperBrain.Metrics` — pure unit tests for `hit@k`,
+- `Magus.Eval.SuperBrain.Metrics`: pure unit tests for `hit@k`,
   `recall@k`, `mrr`, aggregation, and the known-gap split.
-- `Magus.Eval.SuperBrain.Fixture` — parse/normalize unit tests.
-- `Magus.SuperBrain.GraphMetrics` — pure unit tests over synthetic
+- `Magus.Eval.SuperBrain.Fixture`: parse/normalize unit tests.
+- `Magus.SuperBrain.GraphMetrics`: pure unit tests over synthetic
   query-result inputs.
 - Deterministic eval regression test (above) in normal `mix test`, with
   `dry_run: true`.
