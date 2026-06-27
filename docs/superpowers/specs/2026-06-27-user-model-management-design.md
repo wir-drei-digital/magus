@@ -75,8 +75,13 @@ Backend:
 - Sharing infra: `Magus.Workspaces.ResourceAccess` grants + `workspace_scoped_policies`
   macro, reused by Folder/Prompt/CustomAgent/Brain/KnowledgeCollection. `:model` is not in
   the resource-types list yet.
-- Limits/billing: `Magus.Subscriptions.LimitEnforcer` and `Magus.Usage.PolicyEnforcer`
-  gate generation against subscription credits, mode access, and model tier.
+- Limits/billing: `Magus.Usage.PolicyEnforcer` (`check_usage/3`, `check_mode_access`,
+  `check_workspace_model`) plus `Magus.Usage.Calculator` gate generation against a CHF-cent
+  monthly spend cap (`period_usage_cents` vs `effective_cap_cents`, `monthly_spend_cap_cents`),
+  mode access, and a workspace model allowlist. There is no runtime credit system;
+  subscriptions carry a Stripe-backed `billable?` flag. CLAUDE.md's `daily_credits` /
+  `cost_multiplier` wording is stale, and no `Magus.Subscriptions.LimitEnforcer` module
+  exists.
 
 Frontend (the SPA, where all new user-facing UI lands):
 
@@ -106,12 +111,16 @@ user-owned. A user's API key is encrypted on their own `Provider` row, exactly a
 keys are today. There is no per-user override of an admin row: BYOK is achieved by owning a
 provider and the models under it.
 
-**Identity / uniqueness.**
+**Identity / uniqueness.** The runtime identity of any model is its `id` (UUID); `key` is a
+catalog/provider-facing identifier, not a runtime lookup key (see the Model reference
+contract in pillar B). Uniqueness:
 
-- Admin models keep a globally-unique `key` (partial unique index on `key` where
-  `owner_user_id IS NULL`).
-- User models are unique per owner (partial unique index on `(owner_user_id, key)` where
-  `owner_user_id IS NOT NULL`).
+- Admin/global models keep a globally-unique `key` (partial unique index on `key` where
+  `owner_user_id IS NULL`). The catalog and ReqLLM model strings rely on this.
+- User models keep `(owner_user_id, key)` unique (partial index where
+  `owner_user_id IS NOT NULL`) only to dedup a user's own list. Their `key` is NOT required
+  to be globally unique and may collide with an admin `key`; that is safe only because
+  runtime never resolves a user model by bare `key`.
 - Same split for `Provider.slug`: globally unique for admin, unique per owner for user
   providers.
 
@@ -135,6 +144,37 @@ edit, `owner` can reshare. Revoking a grant removes access without deleting the 
 existing classic share button (`lib/magus_web/workbench/workspace_share_button.ex`) is a
 reference only; the SPA needs its own share affordance backed by the same
 `Magus.Workspaces` grant actions exposed over RPC.
+
+**Access model.** The generic `workspace_scoped_policies` macro defaults ownership to
+`user_id == actor(:id)`, but our ownership field is `owner_user_id` and admin/global rows
+have a nil owner. Models therefore need explicit policy wiring and an actor-scoped read, not
+the bare macro:
+
+- Wire `workspace_scoped_policies(resource_type: :model, owner_expr: expr(owner_user_id == ^actor(:id)))`,
+  plus an `extra_read` branch granting any authenticated user read of global rows
+  (`owner_user_id` is nil and `active?` and not `internal?`).
+- Add an actor-scoped read (for example `list_for_actor`) returning the union of global +
+  owned + workspace-shared models. The existing key-only `list_active` stays for catalog and
+  admin use; the user-facing picker uses the actor-scoped read.
+
+Model access matrix (read / use / edit):
+
+| Category | Condition | Read | Use | Edit |
+| --- | --- | --- | --- | --- |
+| admin/global | owner nil, active, not internal | all users | all users | admin |
+| admin internal | `internal?` true | system only | system only | admin |
+| user private | owner == actor | owner | owner | owner |
+| workspace-shared | ResourceAccess grant | grantees | grantees (owner's key) | per role |
+| disabled/deleted | `active?` false or removed | n/a | no (explicit selection hard-stops) | owner/admin |
+| hidden | `UserModelPreference.hidden?` for actor | yes (so unhideable) | yes | owner |
+
+**Provider read policy.** `Provider` currently authorizes all reads (`authorize_if always()`)
+and exposes `slug` / `req_llm_id` / `base_url` / `enabled?` as public. Once providers are
+user-owned, that endpoint metadata is private user data. Before Phase 2 exposes providers
+over RPC: restrict reads to admin/global providers (owner nil) and the owner for user
+providers, expose only non-sensitive fields, and keep `api_key` sensitive and never
+serialized. Grantees of a shared model never read the owner's provider directly; the
+server-side resolver loads it.
 
 **Curation (Phase 1).** One resource `Magus.Chat.UserModelPreference`:
 `(user_id, model_id, favorite?, hidden?, position)`, unique `(user_id, model_id)`. A row
@@ -161,15 +201,38 @@ It returns a resolution struct or a typed error:
 ```
 {:ok, %Magus.Models.Resolution{
    model:                    %Magus.Chat.Model{},
-   source:                   :user | :workspace_shared | :admin | :product_default,
+   selection_source:         :explicit | :conversation | :agent | :user_default | :router_slot | :product_default,
+   access_source:            :owned | :workspace_shared | :admin_global | :product_default,
    provider:                 %Magus.Models.Provider{} | nil,
-   credential_owner_user_id: uuid | nil,   # nil = admin/env key
+   credential_owner_user_id: uuid | nil,   # nil = admin/env key (Magus pays the provider)
    cost_source:              :provider_reported | :admin_pricing | :user_pricing | :zero | :unknown,
-   billable_by_magus:        boolean,
-   req_opts:                 keyword       # api_key, base_url, routing
+   billable_by_magus:        boolean,       # derived: credential_owner_user_id == nil
+   req_opts:                 keyword         # api_key, base_url, routing
  }}
 | {:error, %Magus.Models.Resolution.Error{reason: atom, model_ref: term, message: String.t}}
 ```
+
+The four axes are orthogonal: `selection_source` records which layer supplied the model
+(for remediation messaging and the explicit-vs-inherited decision), `access_source` records
+by what right the actor may use it, `credential_owner_user_id` records whose key pays the
+provider, and `billable_by_magus` is derived from it. A user can explicitly select an admin
+model (`selection :conversation`, `access :admin_global`, credential owner nil, billable
+true) or run a shared model on another user's key (`access :workspace_shared`, credential
+owner the sharer, billable false). A single `source` field could not express both.
+
+**Model reference contract.** Runtime selection and signals reference a model by `id` (UUID)
+or an opaque `ModelRef`, never by bare `key`. This is a prerequisite for ownership: today
+`ModelResolver.fetch_model_by_key` does `filter(key == ^key) |> Ash.read_one(authorize?: false)`
+and `RequestOptions.resolve/1` does `get_model_by_key_with_provider(key)`, both of which
+break once a user `key` can collide with an admin `key` (`read_one` errors on duplicates,
+and the `authorize?: false` lookup ignores ownership). Phase 2 migrates these explicit-
+selection paths and the `ai.react.query` `:model` field to carry `model_id`. The resolver
+then dispatches on the loaded model: admin/global models build the ReqLLM model from `key`
+(catalog path); user-owned models build it from the owned provider (protocol `req_llm_id` +
+`base_url` + the model's provider-local id). `key` stays the provider-facing identifier and
+the catalog/ReqLLM string for admin rows; it is never a cross-owner lookup key. The
+conversation/message/user/agent FKs are already `id`-based, so the migration is the two
+key-based lookups above plus any signal that passes a bare key string.
 
 **Precedence.**
 
@@ -199,32 +262,48 @@ turn's error. No per-turn health probes.
 
 ### C. Billing, limits, and the open-core split
 
-Two separate layers, deliberately decoupled:
+Two separate layers, deliberately decoupled. The split must be concrete in code, because
+today `Magus.Usage.PolicyEnforcer` runs them behind one preflight call: `check_mode_access`
+(feature gate), `check_workspace_model` (allowlist), and `check_usage/3` (CHF-cent spend
+cap).
 
-**Usage caps and abuse limits: universal.** Rate limits, agent run caps, parallel-run caps,
-and quotas apply in both cloud and self-hosted, independent of billing. A self-hosted admin
-can cap users with no billing involved at all. These always apply, including to BYOK and
-shared-key requests: BYOK waives money, not guardrails, otherwise a user could proxy
-unlimited agent runs through the platform on their own key.
+**Universal gates (cloud and self-hosted, always apply).** Mode access, the workspace model
+allowlist, and abuse/run quotas (rate limits, agent run caps, parallel-run caps) apply to
+every request regardless of who pays, including BYOK and shared-key. BYOK waives money, not
+guardrails, otherwise a user could proxy unlimited agent runs through the platform on their
+own key. A self-hosted admin configures these caps with no billing involved.
 
-**Billing: cloud only.** Cloud is a base fee plus pay-as-you-go on metered usage. The
-`billable_by_magus` flag gates whether a request meters for PAYG. BYOK and shared-key
-requests are `billable_by_magus: false`: the user pays only the base fee, and their provider
-bills them directly. (Open item: confirm whether the existing credit/`cost_multiplier`
-mechanism is the PAYG meter or is being superseded; see Open Items. The attribution fields
-and the BYOK-is-not-metered rule hold either way.)
+**Spend gate (cloud only, billable requests only).** `check_usage/3` compares
+`period_usage_cents + estimate <= effective_cap_cents` against the subscription's monthly
+CHF-cent spend cap. There is no credit system. This gate, and the addition to
+`period_usage_cents`, apply only when the request is `billable_by_magus`. BYOK and
+shared-key requests (`billable_by_magus: false`) skip the spend gate and do not accrue
+`period_usage_cents`: the user pays only the base fee and their provider bills them
+directly.
+
+Two distinct `billable` axes, do not conflate: the subscription-level `billable?`
+(Stripe-backed vs free-trial, already in `Magus.Usage.Calculator`) is unchanged; the new
+request-level `billable_by_magus` (on the resolution and the usage row) decides whether a
+single request meters.
 
 **Cloud gating.** Adding providers (BYOK or custom models) requires a paid base-fee plan.
-Free users cannot add providers in cloud. This gate is a check on the provider/model create
-actions that is a no-op in self-hosted deployments (where self-hosters bring keys natively)
-and plan-gated in cloud.
+Free users cannot add providers in cloud. The gate is a check on the provider/model create
+actions, plan-gated in cloud and a no-op in self-hosted (where self-hosters bring keys
+natively).
 
 **Attribution.** Extend `Magus.Usage.MessageUsage` with: `billable_by_magus` (bool),
 `requesting_user_id` (uuid), `credential_owner_user_id` (uuid, nil for admin/env keys),
-`cost_source` (the enum above), and `external_cost_chf` (nullable decimal). The resolver
-computes `billable_by_magus`, `credential_owner_user_id`, and `cost_source`; the usage
-plugin writes the row. The SPA shows BYOK and shared-key usage as external provider cost
-("External CHF 0.04, your key"), never folded into Magus spend.
+`cost_source` (`:provider_reported | :admin_pricing | :user_pricing | :zero | :unknown`),
+and `external_cost_chf` (nullable decimal). The resolver computes `billable_by_magus`,
+`credential_owner_user_id`, and `cost_source`; the usage plugin writes the row. The SPA
+shows BYOK and shared-key usage as external provider cost ("External CHF 0.04, your key"),
+never folded into Magus spend.
+
+**Key-owner usage visibility.** Because external cost lands on the credential owner, a key
+owner can see usage and estimated external cost attributed to their key, including requests
+made by workspace grantees. This is a usage read scoped by `credential_owner_user_id`
+(aggregate cost, not the grantee's message content). Grantees see their own usage as
+external, not billed.
 
 ## Phase roadmap
 
@@ -274,13 +353,37 @@ picker grouping and filtering surface that every later phase plugs into.
   then the existing provider groups. Filters available now: favorites only, hide/show
   hidden, capability (search, reasoning, tools), modality (text/image/video). Filters that
   depend on later phases (My models, Workspace models, Has my key, cost-known/free/unknown)
-  are designed into the filter model now but only populated as those phases land.
-- Favorite toggle (star) on each picker row and in the settings list, calling the new RPC
-  actions; update the `catalog.ts` cache or refetch.
+  are designed into the filter model now but only populated as those phases land. A
+  favorited model appears in the Favorites group only, not duplicated in its provider group.
+  Keep the picker compact: put filters behind a small control (popover or segmented), not
+  always-on chrome.
+- Favorite/hide toggles (star icon in rows) on the picker and the settings list, calling the
+  new RPC actions. On any preference mutation, explicitly invalidate the `catalog.ts` model
+  cache (reset the cached entry and refetch) rather than waiting out the 5-minute TTL, so the
+  picker reflects the change immediately.
 - New settings route `frontend/src/routes/settings/models/+page.svelte` plus a nav entry in
-  `settings-nav.svelte` ("Models"). Phase 1 content: list all models with
-  favorite/hide/reorder controls. This route is where later phases add "My models",
+  `settings-nav.svelte` ("Models"). Phase 1 content: list all models as a dense management
+  list (rows, not a card grid) with favorite/hide/reorder controls. This route is where later
+  phases add "My models",
   "API keys", "Workspace sharing", and "Auto router" subsections.
+
+**Acceptance criteria.**
+
+- `position` is a single global manual ordering of the user's visible models (fractional or
+  integer rank; null sorts last, then by name). No per-filter ordering (YAGNI). The Favorites
+  group renders favorited models in that same order.
+- `favorite?` and `hidden?` are independent. In the picker, hidden wins: a hidden model is
+  excluded even if favorited. The settings Models list shows every model with both toggles,
+  so a hidden+favorite model can be unhidden.
+- `set_favorite` / `set_hidden` / `set_position` validate that the target model is readable
+  by the actor (active, non-internal, or owned/shared) and reject otherwise; they upsert on
+  `(user_id, model_id)` and never create a row for an unreadable or internal model.
+- Empty states: no favorites yet means the Favorites group is omitted, not an empty header;
+  all models hidden shows an explicit "all models hidden" affordance linking to settings.
+- Tests cover: favoriting moves a model into the Favorites group and removes it from its
+  provider group; hiding excludes it from the picker but keeps it in settings; a
+  hidden+favorite model resolves to hidden in the picker; the actions reject an unreadable or
+  internal model; a mutation invalidates the cache and refetches.
 
 **Out of scope for Phase 1:** any provider/key/custom-model work, the resolver refactor,
 billing attribution, sharing, and router slots. Those are Phases 2 to 5.
@@ -306,13 +409,17 @@ billing attribution, sharing, and router slots. Those are Phases 2 to 5.
 
 ## Open items to confirm
 
-- **PAYG vs credits.** Confirm whether the existing credit/`cost_multiplier` system is the
-  cloud PAYG meter or is being replaced by direct CHF metering. Resolve when Phase 2 touches
-  billing. Does not affect the attribution-field design.
-- **Modes as features vs cost** for paid plans: confirm that a paid base-fee plan unlocks
-  all modes (image/video/reasoning) so BYOK does not need to bypass mode gates. Assumed yes.
+- **Billing meter (resolved).** Verified in code: there is no runtime credit system.
+  `Magus.Usage.PolicyEnforcer` enforces a CHF-cent monthly spend cap (`period_usage_cents`
+  vs `effective_cap_cents`) via `Magus.Usage.Calculator`. The spec is written in those terms;
+  CLAUDE.md's `daily_credits` / `cost_multiplier` wording is stale.
+- **Modes as features (grounded).** `check_mode_access` is a plan feature gate that always
+  applies, so BYOK does not bypass mode access; image/video stay gated by plan. Confirm a
+  paid base-fee plan is intended to unlock all modes.
 - **Clone affordance** ("clone a catalog model into mine"): confirm it is wanted in Phase 2
   and that clones are explicit snapshots that do not auto-track admin catalog updates.
+- **Key-owner usage visibility** (Phase 3): confirm key owners should see aggregate external
+  usage that workspace grantees generate on their key.
 
 ## Appendix: key file references
 
@@ -331,8 +438,8 @@ Backend:
 - `lib/magus/agents/agent_secret/encrypted_string.ex`, `lib/magus/integrations/vault.ex`
   (encryption)
 - `lib/magus/workspaces/{resource_access,policies}.ex` (sharing)
-- `lib/magus/usage/message_usage.ex` (attribution), `lib/magus/subscriptions/limit_enforcer.ex`,
-  `lib/magus/usage/policy_enforcer.ex` (limits/billing)
+- `lib/magus/usage/message_usage.ex` (attribution), `lib/magus/usage/policy_enforcer.ex`,
+  `lib/magus/usage/calculator.ex` (universal gates + CHF-cent spend cap)
 - `lib/magus/chat/chat.ex`, `lib/magus/accounts/user.ex` (rpc_action declarations, user defaults)
 - `lib/magus_web/core_router.ex`, `lib/magus_web/rpc/rpc_controller.ex` (RPC + actor)
 
