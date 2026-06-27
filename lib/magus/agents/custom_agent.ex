@@ -1179,7 +1179,11 @@ defmodule Magus.Agents.CustomAgent do
       source_type: to_string(Map.get(meta, :source_type, :other)),
       status: to_string(integration.status),
       enabled_tools: Enum.map(integration.enabled_tools || [], &to_string/1),
-      available_tools: available_tools_for(integration.provider_key)
+      available_tools: available_tools_for(integration.provider_key),
+      # Per-provider config for the management cards (feed urls, webhook secret,
+      # thresholds, key prefix). The actor owns the integration; the API key is
+      # NOT here (it lives in the encrypted credential).
+      config: integration.config || %{}
     }
   end
 

@@ -55,6 +55,7 @@
 		budgetTier
 	} from '$lib/agents/attachment-budget';
 	import AgentIntegrationWizard from '$lib/components/agents/agent-integration-wizard.svelte';
+	import AgentIntegrationConfig from '$lib/components/agents/agent-integration-config.svelte';
 	import { cachedActiveModels, invalidateAgentCatalog } from '$lib/chat/catalog';
 	import {
 		categoryEnabled,
@@ -1291,6 +1292,11 @@
 											{/each}
 										</div>
 									{/if}
+
+									<AgentIntegrationConfig
+										{integration}
+										onSaved={() => loadIntegrations(agentId)}
+									/>
 								</div>
 							{/each}
 						</div>

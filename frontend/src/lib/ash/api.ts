@@ -2980,6 +2980,8 @@ export type AgentIntegration = {
 	status: string;
 	enabledTools: string[];
 	availableTools: IntegrationTool[];
+	/** Per-provider config (feed urls, webhook secret, thresholds, key prefix). */
+	config: IntegrationConfig;
 };
 
 export async function agentIntegrations(agentId: string): Promise<RpcResult<AgentIntegration[]>> {
@@ -2998,7 +3000,9 @@ export async function agentIntegrations(agentId: string): Promise<RpcResult<Agen
 			enabledTools: Array.isArray(row.enabled_tools) ? row.enabled_tools.map(String) : [],
 			availableTools: (
 				(Array.isArray(row.available_tools) ? row.available_tools : []) as Record<string, unknown>[]
-			).map((tool) => ({ key: String(tool.key ?? ''), name: String(tool.name ?? tool.key ?? '') }))
+			).map((tool) => ({ key: String(tool.key ?? ''), name: String(tool.name ?? tool.key ?? '') })),
+			config:
+				row.config && typeof row.config === 'object' ? (row.config as IntegrationConfig) : {}
 		}))
 	};
 }
