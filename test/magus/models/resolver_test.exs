@@ -73,7 +73,7 @@ defmodule Magus.Models.ResolverTest do
     end
   end
 
-  describe ":auto and media (parity with legacy ModelResolver)" do
+  describe ":auto and media resolution" do
     test "resolves :auto image to the image model via routing slot, as :auto" do
       image_model = generate(model(output_modalities: ["image"]))
       routing_slot(model_id: image_model.id, specialty: :image, tier: :standard)
@@ -174,7 +174,10 @@ defmodule Magus.Models.ResolverTest do
         |> Ash.create!()
 
       {:ok, res} =
-        Resolver.resolve(nil, %{model_keys: %{chat: model.key, image: nil, video: nil}, mode: :chat})
+        Resolver.resolve(nil, %{
+          model_keys: %{chat: model.key, image: nil, video: nil},
+          mode: :chat
+        })
 
       assert res.provider_id == provider.id
       assert is_binary(res.provider_id)
