@@ -32,7 +32,8 @@ defmodule MagusWeb.OnboardingLive.RegisterLiveTest do
       refute html =~ "Selected plan:"
     end
 
-    test "renders registration form with starter plan when specified", %{conn: conn} do
+    test "renders registration form with starter plan in the billing edition", %{conn: conn} do
+      enable_billing_edition()
       {:ok, _view, html} = live(conn, ~p"/register?plan=starter")
 
       assert html =~ "Create your account"
@@ -41,7 +42,8 @@ defmodule MagusWeb.OnboardingLive.RegisterLiveTest do
       assert html =~ "Continue to Payment"
     end
 
-    test "renders registration form with pro plan when specified", %{conn: conn} do
+    test "renders registration form with pro plan in the billing edition", %{conn: conn} do
+      enable_billing_edition()
       {:ok, _view, html} = live(conn, ~p"/register?plan=pro")
 
       assert html =~ "Create your account"
@@ -55,6 +57,17 @@ defmodule MagusWeb.OnboardingLive.RegisterLiveTest do
       assert html =~ "Create your account"
       # Should not show plan badge for free plan
       refute html =~ "Selected plan:"
+    end
+
+    test "normalizes a paid plan param to free in OSS (no billing edition) (magus-rim5)",
+         %{conn: conn} do
+      # Without the commercial billing edition there is no checkout flow, so a
+      # paid plan param must be normalized to free rather than selected and
+      # later routed to the cloud-only /onboarding/checkout.
+      {:ok, _view, html} = live(conn, ~p"/register?plan=pro")
+
+      refute html =~ "Selected plan:"
+      assert html =~ ~s(name="user[selected_plan_key]" value="free")
     end
 
     test "redirects authenticated user", %{conn: conn} do
@@ -169,7 +182,8 @@ defmodule MagusWeb.OnboardingLive.RegisterLiveTest do
   end
 
   describe "hidden plan field" do
-    test "includes selected plan in hidden field", %{conn: conn} do
+    test "includes selected paid plan in hidden field (billing edition)", %{conn: conn} do
+      enable_billing_edition()
       {:ok, _view, html} = live(conn, ~p"/register?plan=starter")
 
       assert html =~ ~s(name="user[selected_plan_key]" value="starter")
@@ -180,5 +194,19 @@ defmodule MagusWeb.OnboardingLive.RegisterLiveTest do
 
       assert html =~ ~s(name="user[selected_plan_key]" value="free")
     end
+  end
+
+  # Paid plans are only selectable in the commercial billing edition
+  # (Magus.Usage.billing_edition?/0). Toggle it on, with cleanup, for the tests
+  # that exercise the paid-plan path; OSS (the default) normalizes them to free.
+  defp enable_billing_edition do
+    prev = Application.get_env(:magus, :billing_edition?)
+    Application.put_env(:magus, :billing_edition?, true)
+
+    on_exit(fn ->
+      if is_nil(prev),
+        do: Application.delete_env(:magus, :billing_edition?),
+        else: Application.put_env(:magus, :billing_edition?, prev)
+    end)
   end
 end

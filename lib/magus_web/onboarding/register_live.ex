@@ -276,9 +276,18 @@ defmodule MagusWeb.OnboardingLive.RegisterLive do
     end
   end
 
-  # Validates the plan parameter, defaulting to "free" if invalid
-  defp validate_plan(plan) when plan in @valid_plans, do: plan
-  defp validate_plan(_), do: "free"
+  # Validates the plan parameter, defaulting to "free" if invalid.
+  #
+  # Paid plans require the commercial billing edition (Magus.Usage.billing_edition?/0).
+  # OSS self-host has no checkout flow, so any paid plan param normalizes to
+  # "free" instead of routing to the cloud-only /onboarding/checkout (magus-rim5).
+  defp validate_plan(plan) do
+    if plan in valid_plans(), do: plan, else: "free"
+  end
+
+  defp valid_plans do
+    if Magus.Usage.billing_edition?(), do: @valid_plans, else: ["free"]
+  end
 
   defp sign_in_params(plan, lang, invite_token) do
     %{}

@@ -27,7 +27,10 @@ defmodule MagusWeb.AuthController do
       invite_token != nil ->
         redirect(conn, to: ~p"/workspaces/invite/#{invite_token}")
 
-      user.selected_plan_key not in [nil, "free"] ->
+      # Checkout exists only in the commercial billing edition (the route is
+      # carved to magus_cloud). In OSS, billing_edition? is false so a paid
+      # selected_plan_key never routes to the dead /onboarding/checkout (magus-rim5).
+      Magus.Usage.billing_edition?() and user.selected_plan_key not in [nil, "free"] ->
         redirect(conn, to: "/onboarding/checkout?plan=#{user.selected_plan_key}")
 
       true ->
