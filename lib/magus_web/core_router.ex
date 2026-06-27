@@ -207,6 +207,7 @@ defmodule MagusWeb.CoreRouter do
         get "/socket-token", RpcController, :socket_token
         post "/knowledge/oauth-finalize", RpcController, :knowledge_oauth_finalize
         post "/upload", UploadController, :create
+        post "/skills/import", SkillsController, :create
         post "/profile-image/upload", ImageController, :upload
         post "/profile-image/generate", ImageController, :generate
         post "/profile-image/remove", ImageController, :remove
