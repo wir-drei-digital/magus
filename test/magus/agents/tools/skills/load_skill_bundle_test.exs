@@ -31,8 +31,10 @@ defmodule Magus.Agents.Tools.Skills.LoadSkillBundleTest do
     else
       # No sandbox: the unavailable branch fires before the approval check.
       assert result[:unavailable] == true or result.content =~ "unavailable"
-      assert result.content =~ "B"
     end
+
+    # Body must be preserved in all cases
+    assert result.content =~ "B"
   end
 
   test "loading an approved bundled skill (no sandbox) reports execution unavailable" do
@@ -63,5 +65,8 @@ defmodule Magus.Agents.Tools.Skills.LoadSkillBundleTest do
     else
       assert result[:unavailable] == true or result.content =~ "unavailable"
     end
+
+    # Body must be preserved in all cases
+    assert result.content =~ "B"
   end
 end

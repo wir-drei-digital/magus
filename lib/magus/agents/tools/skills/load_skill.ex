@@ -124,34 +124,39 @@ defmodule Magus.Agents.Tools.Skills.LoadSkill do
   defp handle_bundled_skill(context, skill, base, tools) do
     conversation_id = get_context_value(context, :conversation_id)
     user_id = get_context_value(context, :user_id)
-    {:ok, conversation} = Magus.Chat.get_conversation(conversation_id, authorize?: false)
 
-    if Magus.Skills.Approval.approved?(conversation, skill.id) do
-      case Magus.Skills.Materializer.materialize(conversation_id, skill, user_id) do
-        {:ok, dir} ->
-          enriched =
-            base
-            |> Map.put(:materialized, dir)
-            |> Map.put(
-              :content,
-              base.content <>
-                "\n\nThis skill is installed at #{dir}. If it needs secrets, `source /workspace/.env` first."
-            )
+    case Magus.Chat.get_conversation(conversation_id, authorize?: false) do
+      {:ok, conversation} ->
+        if Magus.Skills.Approval.approved?(conversation, skill.id) do
+          case Magus.Skills.Materializer.materialize(conversation_id, skill, user_id) do
+            {:ok, dir} ->
+              enriched =
+                base
+                |> Map.put(:materialized, dir)
+                |> Map.put(
+                  :content,
+                  base.content <>
+                    "\n\nThis skill is installed at #{dir}. If it needs secrets, `source /workspace/.env` first."
+                )
 
-          {:ok, maybe_attach_new_tools(enriched, tools)}
+              {:ok, maybe_attach_new_tools(enriched, tools)}
 
-        {:error, reason} ->
-          {:ok, Map.put(base, :error, "Could not install skill: #{inspect(reason)}")}
-      end
-    else
-      Magus.Skills.Approval.request(conversation_id, skill, user_id)
+            {:error, reason} ->
+              {:ok, Map.put(base, :error, "Could not install skill: #{inspect(reason)}")}
+          end
+        else
+          Magus.Skills.Approval.request(conversation_id, skill, user_id)
 
-      {:ok,
-       Map.merge(base, %{
-         status: "pending",
-         hint:
-           "This skill bundles code that runs in the sandbox. STOP and wait for the user to approve. After they approve, call load_skill again with the same ref to install and use it."
-       })}
+          {:ok,
+           Map.merge(base, %{
+             status: "pending",
+             hint:
+               "This skill bundles code that runs in the sandbox. STOP and wait for the user to approve. After they approve, call load_skill again with the same ref to install and use it."
+           })}
+        end
+
+      _ ->
+        {:ok, Map.put(base, :error, "Could not load conversation to check skill approval.")}
     end
   end
 
