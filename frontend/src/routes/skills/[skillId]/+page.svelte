@@ -298,6 +298,7 @@
 							rows="10"
 							placeholder="## What this skill does&#10;&#10;Describe the skill..."
 							class="{TEXTAREA_CLASS} font-mono"
+							data-testid="skill-body-input"
 						></textarea>
 					</Field>
 
