@@ -18,6 +18,7 @@
 - **Never** `mix ash.reset`. Use `mix ash.codegen` + `mix ash.migrate`.
 - **No em dashes** (U+2014) in any code/comment/doc. Use `:` or `-`.
 - **CI parity:** before each commit run `MIX_ENV=test mix compile --warnings-as-errors`; for frontend run `npm run check` (in `frontend/`).
+- **Frontend is SPA-only.** All UI work lives in `frontend/` (the SvelteKit SPA). NEVER add or modify the classic LiveView workbench (`lib/magus_web/live/**`, `lib/magus_web/workbench/**`, `.heex` templates) for this feature. The board, overview, and tree views are SPA-only. The backend port is shared infrastructure (not "frontend"); the classic conversation task pane keeps working through the ported `Plan.Task` resource but is NOT extended or touched. If a cloud-source file under the port footprint turns out to be a classic-LiveView file, EXCLUDE it from the port and note it.
 - **Codegen + migrations are regenerated HERE.** After any resource change: `mix ash.codegen <name>` + `mix ash.migrate`; after any rpc/public-attribute change: `mix ash_typescript.codegen`. Commit the generated migration, snapshot, `ash_rpc.ts`, `ash_types.ts`.
 - **Plan-task scoping is law** (the leak fix, already in the cloud source): `RenewLease` and `is_stale` act ONLY on tasks with a `brain_page_id`. Conversation tasks are never leased or reaped. Do not regress this.
 - **Lease TTL** `900`s; **reaper cron** `*/2 * * * *`; **task cap** `200`; **reaper queue** `plan_task_cleanup`.
@@ -46,6 +47,8 @@
 - `frontend/src/routes/brain/page/[pageId]/+page.svelte` -> mount the plan board when `pageData.kind === 'plan'`.
 
 **REGENERATE HERE** (never copy from cloud): `priv/repo/migrations/**`, `priv/resource_snapshots/**`, `frontend/src/lib/ash/ash_rpc.ts`, `frontend/src/lib/ash/ash_types.ts`.
+
+**EXCLUDE (do NOT port; SPA-only directive):** the cloud branch also modified classic-LiveView files `lib/magus_web/workbench/resources/task_handlers.ex` and `lib/magus_web/workbench/resources/conversation_view.ex` (the classic conversation task pane). DO NOT port these. OSS magus already has its own versions written against the original `Plan.Task`; they stay untouched. The ported (generalized) `Task` MUST remain backward-compatible so these keep compiling and their existing tests pass (`test/magus_web/workbench/chat/new_chat_open_tasks_test.exs`, `test/magus_web/workbench/resources/conversation_view_tasks_test.exs`). If the port breaks them, fix it by preserving the original conversation-task code interfaces/actions on `Task` (backend), NEVER by editing the classic LiveView. Likewise any other cloud `lib/magus_web/live/**` or `lib/magus_web/workbench/**` change is excluded.
 
 ---
 
