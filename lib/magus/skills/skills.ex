@@ -33,6 +33,7 @@ defmodule Magus.Skills do
   resources do
     resource Magus.Skills.Skill do
       define :create_skill, action: :create
+      define :import_skill, action: :import
       define :get_skill, action: :read, get_by: [:id]
       define :update_skill, action: :update
       define :destroy_skill, action: :destroy
