@@ -53,6 +53,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
   alias Magus.Agents.Tools.Library.{ListPrompts, CreatePrompt}
   alias Magus.Agents.Tools.Models.ListModels
   alias Magus.Agents.Tools.Skills.LoadSkill
+  alias Magus.Agents.Tools.Skills.CreateSkill
 
   alias Magus.Agents.Tools.Tasks.{
     SpawnTask,
@@ -142,6 +143,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
     "search_files" => Rag,
     "roll_dice" => DiceRoll,
     "load_skill" => LoadSkill,
+    "create_skill" => CreateSkill,
     "run_code" => RunCode,
     "install_packages" => InstallPackages,
     "send_email" => SendEmail,
@@ -215,6 +217,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
     WriteDraft => :files,
     ReadDraft => :files,
     LoadSkill => :skills,
+    CreateSkill => :skills,
     SpawnTask => :tasks,
     SpawnSubAgent => :tasks,
     AwaitSubAgents => :tasks,
@@ -297,6 +300,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
       ToolSearch,
       LoadTool,
       LoadSkill,
+      CreateSkill,
       WebSearch,
       WebFetch,
       Rag,
