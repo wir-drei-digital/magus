@@ -36,6 +36,7 @@ class SkillsNav {
 	personal = $state<SkillSummary[]>([]);
 	workspace = $state<SkillSummary[]>([]);
 	loading = $state(true);
+	importOpen = $state(false);
 
 	#workspaceId: string | null = null;
 	#loadKey: string | null = null;
