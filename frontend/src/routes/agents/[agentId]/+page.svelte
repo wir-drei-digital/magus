@@ -1072,7 +1072,16 @@
 
 					<Section title="Collections" description="Knowledge collections this agent can search.">
 						{#if !knowledgeAccess || knowledgeAccess.sources.length === 0}
-							<p class="text-xs text-muted-foreground">No knowledge sources connected.</p>
+							<p class="text-xs text-muted-foreground">
+								No knowledge sources connected.
+								<a
+									href="{base}/settings/knowledge"
+									class="text-foreground underline-offset-2 hover:underline"
+									data-testid="agent-connect-knowledge-link"
+								>
+									Connect a source
+								</a>
+							</p>
 						{:else}
 							<div class="flex flex-col gap-3" data-testid="agent-collections">
 								{#each knowledgeAccess.sources as source (source.name)}
