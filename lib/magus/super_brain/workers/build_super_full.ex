@@ -107,6 +107,7 @@ defmodule Magus.SuperBrain.Workers.BuildSuperFull do
   alias Magus.SuperBrain.EdgeAggregation
   alias Magus.SuperBrain.EmbeddingConfig
   alias Magus.SuperBrain.FalkorValues
+  alias Magus.SuperBrain.GraphMetrics
   alias Magus.SuperBrain.GraphWeight
   alias Magus.SuperBrain.Migration
   alias Magus.SuperBrain.SourceRefs
@@ -219,10 +220,12 @@ defmodule Magus.SuperBrain.Workers.BuildSuperFull do
         {:ok, %{canonicals: canonical_count, edges: edge_count, writes: write_stats}} ->
           adjusted = maybe_override_write_stats(write_stats)
 
+          metrics = compute_graph_metrics(staging_name)
+
           with :ok <- check_write_errors(staging_name, adjusted),
                :ok <- swap_into_live(staging_name, live_name),
                {:ok, _} <-
-                 mark_built(super_row, read_set, canonical_count, edge_count, started_at) do
+                 mark_built(super_row, read_set, canonical_count, edge_count, started_at, metrics) do
             :ok
           else
             {:error, reason} ->
@@ -1036,7 +1039,7 @@ defmodule Magus.SuperBrain.Workers.BuildSuperFull do
   # Status transitions
   # ---------------------------------------------------------------------------
 
-  defp mark_built(super_row, read_set, canonical_count, edge_count, started_at) do
+  defp mark_built(super_row, read_set, canonical_count, edge_count, started_at, metrics) do
     snapshot =
       Enum.map(read_set, fn graph_name ->
         %{
@@ -1053,11 +1056,81 @@ defmodule Magus.SuperBrain.Workers.BuildSuperFull do
         read_set_snapshot: snapshot,
         canonical_entity_count: canonical_count,
         canonical_edge_count: edge_count,
-        last_build_duration_ms: duration_ms
+        last_build_duration_ms: duration_ms,
+        metrics: metrics
       },
       action: :mark_built,
       authorize?: false
     )
+  end
+
+  # Gather graph-shape metrics from the staging graph. Numeric scalars come
+  # back as strings in FalkorDB's verbose mode, so coerce via FalkorValues.
+  defp compute_graph_metrics(super_graph) do
+    counts =
+      case Magus.Graph.query(
+             super_graph,
+             """
+             MATCH (c:CanonicalEntity)
+             OPTIONAL MATCH (c)-[r:RELATES_TO]->()
+             WITH count(DISTINCT c) AS canonicals,
+                  count(r) AS edges,
+                  sum(CASE WHEN r.predicate = 'relates_to' THEN 1 ELSE 0 END) AS fallback,
+                  sum(CASE WHEN r.contested = true THEN 1 ELSE 0 END) AS contested
+             RETURN canonicals, edges, fallback, contested
+             """,
+             %{}
+           ) do
+        {:ok, %{rows: [[canon, edges, fallback, contested]]}} ->
+          %{
+            canonical_count: trunc(FalkorValues.parse_number(canon, 0.0)),
+            relates_to_count: trunc(FalkorValues.parse_number(edges, 0.0)),
+            relates_to_fallback_count: trunc(FalkorValues.parse_number(fallback, 0.0)),
+            contested_count: trunc(FalkorValues.parse_number(contested, 0.0))
+          }
+
+        _ ->
+          %{
+            canonical_count: 0,
+            relates_to_count: 0,
+            relates_to_fallback_count: 0,
+            contested_count: 0
+          }
+      end
+
+    isolated =
+      case Magus.Graph.query(
+             super_graph,
+             """
+             MATCH (c:CanonicalEntity)
+             WHERE NOT (c)-[:RELATES_TO]-()
+             RETURN count(c)
+             """,
+             %{}
+           ) do
+        {:ok, %{rows: [[n]]}} -> trunc(FalkorValues.parse_number(n, 0.0))
+        _ -> 0
+      end
+
+    buckets =
+      case Magus.Graph.query(
+             super_graph,
+             """
+             MATCH (c:CanonicalEntity)
+             RETURN c.primary_type, c.normalized_subtype, count(DISTINCT c.name)
+             """,
+             %{}
+           ) do
+        {:ok, %{rows: rows}} ->
+          Enum.map(rows, fn [_t, _st, names] ->
+            %{distinct_name_count: trunc(FalkorValues.parse_number(names, 0.0))}
+          end)
+
+        _ ->
+          []
+      end
+
+    GraphMetrics.compute(Map.merge(counts, %{isolated_count: isolated, buckets: buckets}))
   end
 
   defp mark_failed_safe(accessor, reason) do
