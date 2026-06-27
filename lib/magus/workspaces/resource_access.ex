@@ -25,7 +25,8 @@ defmodule Magus.Workspaces.ResourceAccess do
     :custom_agent,
     :brain,
     :knowledge_collection,
-    :mcp_server
+    :mcp_server,
+    :skill
   ]
   @grantee_types [:user, :workspace, :custom_agent]
   @roles [:viewer, :editor, :owner]
