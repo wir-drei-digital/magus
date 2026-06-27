@@ -104,11 +104,11 @@ defmodule Magus.SuperBrain.Workers.BuildSuperFull do
   alias Magus.SuperBrain.AccessibleGraphs
   alias Magus.SuperBrain.AccessorLock
   alias Magus.SuperBrain.CanonicalId
+  alias Magus.SuperBrain.EdgeAggregation
   alias Magus.SuperBrain.EmbeddingConfig
   alias Magus.SuperBrain.FalkorValues
   alias Magus.SuperBrain.GraphWeight
   alias Magus.SuperBrain.Migration
-  alias Magus.SuperBrain.Ontology
   alias Magus.SuperBrain.SourceRefs
   alias Magus.SuperBrain.SuperGraph
 
@@ -116,12 +116,6 @@ defmodule Magus.SuperBrain.Workers.BuildSuperFull do
   require Logger
 
   @extractor_version "build_super_worker@2026-05-25"
-
-  # Trust tier precedence used for picking the canonical's tier (max
-  # across cluster members). The importance score does NOT bake in the
-  # tier multiplier; that is applied once at query time by
-  # `Magus.SuperBrain.Retrieval`.
-  @tier_order %{"instruction" => 3, "evidence" => 2, "noise" => 1}
 
   # Maximum fraction of FalkorDB write attempts allowed to error before
   # the build refuses to swap staging into live. The threshold is
@@ -649,7 +643,7 @@ defmodule Magus.SuperBrain.Workers.BuildSuperFull do
     normalized_subtype = Map.get(head, :normalized_subtype)
 
     avg_embedding = average_embeddings(Enum.map(cluster, & &1.embedding))
-    max_tier = max_trust_tier(cluster)
+    max_tier = EdgeAggregation.max_trust_tier(Enum.map(cluster, & &1.trust_tier))
     last_evidence_at = DateTime.utc_now() |> DateTime.to_iso8601()
 
     source_count =
@@ -699,16 +693,6 @@ defmodule Magus.SuperBrain.Workers.BuildSuperFull do
           sum / n
         end)
       end
-    end
-  end
-
-  defp max_trust_tier(cluster) do
-    cluster
-    |> Enum.map(& &1.trust_tier)
-    |> Enum.reject(&is_nil/1)
-    |> case do
-      [] -> "evidence"
-      tiers -> Enum.max_by(tiers, fn t -> Map.get(@tier_order, t, 0) end)
     end
   end
 
@@ -804,77 +788,48 @@ defmodule Magus.SuperBrain.Workers.BuildSuperFull do
       # confuses downstream rankers.
       |> Enum.reject(fn e -> e.from_canonical == e.to_canonical end)
 
-    edge_groups = Enum.group_by(edges, fn e -> {e.from_canonical, e.to_canonical} end)
+    aggregates =
+      edges
+      |> Enum.map(fn e ->
+        %{
+          from: e.from_canonical,
+          to: e.to_canonical,
+          predicate: e.predicate,
+          confidence: e.confidence,
+          trust_tier: e.trust_tier,
+          source_graph: e.source_graph
+        }
+      end)
+      |> EdgeAggregation.aggregate()
 
     writes =
-      Enum.reduce(edge_groups, empty_writes(), fn {{from, to}, group}, w_acc ->
-        predicates = group |> Enum.map(& &1.predicate) |> Enum.reject(&is_nil/1)
-        predicate = FalkorValues.most_common(Enum.map(group, & &1.predicate))
-        max_conf = group |> Enum.map(& &1.confidence) |> Enum.max(fn -> 0.0 end)
-
-        max_tier =
-          group
-          |> Enum.map(& &1.trust_tier)
-          |> Enum.reject(&is_nil/1)
-          |> case do
-            [] -> "evidence"
-            tiers -> Enum.max_by(tiers, fn t -> Map.get(@tier_order, t, 0) end)
-          end
-
-        source_graphs = group |> Enum.map(& &1.source_graph) |> Enum.uniq()
-
-        breakdown_map = Enum.frequencies(predicates)
-        predicate_breakdown = Jason.encode!(breakdown_map)
-        contested = contested?(breakdown_map)
-
-        # `appearance_count` is the number of Layer 1 RELATES_TO instances
-        # backing this canonical edge. The incremental path bumps it on
-        # ON MATCH SET; the nightly full rebuild MUST emit it too so the
-        # property does not flip to null on every nightly run.
-        appearance_count = length(group)
-
+      Enum.reduce(aggregates, empty_writes(), fn agg, w_acc ->
         edge_result =
           Magus.Graph.upsert_edge(
             super_graph,
             %{
               from_label: "CanonicalEntity",
-              from_id: from,
+              from_id: agg.from,
               to_label: "CanonicalEntity",
-              to_id: to
+              to_id: agg.to
             },
             "RELATES_TO",
             %{
-              predicate: predicate,
-              confidence: max_conf,
-              trust_tier: max_tier,
-              source_graphs: source_graphs,
+              predicate: agg.predicate,
+              confidence: agg.confidence,
+              trust_tier: agg.trust_tier,
+              source_graphs: agg.source_graphs,
               extractor: @extractor_version,
-              contested: contested,
-              predicate_breakdown: predicate_breakdown,
-              appearance_count: appearance_count
+              contested: agg.contested,
+              predicate_breakdown: Jason.encode!(agg.predicate_breakdown),
+              appearance_count: agg.appearance_count
             }
           )
 
         tally(w_acc, edge_result)
       end)
 
-    %{edge_count: map_size(edge_groups), writes: writes}
-  end
-
-  # True when the set of predicates seen for a single canonical pair
-  # includes both halves of any entry in
-  # `Ontology.contradicting_predicates/0`. The frequency map is keyed on
-  # whatever shape `parse_number/...` returned; predicates stay as
-  # binaries here because that is what FalkorDB hands back for the
-  # `r.predicate` property.
-  defp contested?(breakdown_map) when is_map(breakdown_map) do
-    contradicting = Ontology.contradicting_predicates()
-    keys = Map.keys(breakdown_map)
-
-    Enum.any?(keys, fn pred ->
-      opposite = Map.get(contradicting, pred)
-      opposite != nil and opposite in keys
-    end)
+    %{edge_count: length(aggregates), writes: writes}
   end
 
   # ---------------------------------------------------------------------------
