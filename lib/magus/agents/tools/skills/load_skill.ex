@@ -54,31 +54,90 @@ defmodule Magus.Agents.Tools.Skills.LoadSkill do
 
   @impl true
   def run(params, context) do
-    skill_name = get_param(params, :skill_name)
+    ref = get_param(params, :skill_name)
 
-    case Registry.get_skill(skill_name) do
-      {:ok, skill} ->
+    case resolve(ref, context) do
+      {:builtin, skill} ->
         persist_skill(context, skill)
+
+        result = %{skill: skill.name, description: skill.description, content: skill.content}
+        {:ok, maybe_attach_new_tools(result, skill.tools)}
+
+      {:user, skill} ->
+        tools = skill.requested_tools || []
+        persist_user_skill(context, skill.body, tools)
 
         result = %{
           skill: skill.name,
-          description: skill.description,
-          content: skill.content
+          description: skill.description || "",
+          content: skill.body || ""
         }
 
-        {:ok, maybe_attach_new_tools(result, skill.tools)}
+        {:ok, maybe_attach_new_tools(result, tools)}
 
-      {:error, :not_found} ->
-        available_skills =
-          Registry.list_skills()
-          |> Enum.map(& &1.name)
-          |> Enum.sort()
+      :not_found ->
+        available =
+          Registry.list_skills() |> Enum.map(&("builtin:" <> &1.name)) |> Enum.sort()
 
-        {:ok,
-         %{
-           error: "Skill '#{skill_name}' not found",
-           available_skills: available_skills
-         }}
+        {:ok, %{error: "Skill '#{ref}' not found", available_skills: available}}
+    end
+  end
+
+  # Resolve a load_skill ref to its source.
+  # "user:<id>" -> DB skill (access-checked as the context user)
+  # "builtin:<name>" or a bare name -> registry skill
+  defp resolve("user:" <> id, context) do
+    actor = get_context_value(context, :user)
+
+    case actor && Magus.Skills.get_skill(id, actor: actor) do
+      {:ok, skill} -> {:user, skill}
+      _ -> :not_found
+    end
+  end
+
+  defp resolve("builtin:" <> name, _context), do: registry_lookup(name)
+  defp resolve(name, _context) when is_binary(name), do: registry_lookup(name)
+  defp resolve(_, _), do: :not_found
+
+  defp registry_lookup(name) do
+    case Registry.get_skill(name) do
+      {:ok, skill} -> {:builtin, skill}
+      _ -> :not_found
+    end
+  end
+
+  # Persist a user skill's body + requested tool names onto the conversation,
+  # mirroring persist_skill/2 but sourced from a Magus.Skills.Skill.
+  defp persist_user_skill(context, body, tools) do
+    conversation_id = get_context_value(context, :conversation_id)
+    body = body || ""
+
+    if conversation_id != nil and body != "" do
+      case Magus.Chat.get_conversation(conversation_id, authorize?: false) do
+        {:ok, conversation} ->
+          existing_context = conversation.skill_context || ""
+          existing_tools = conversation.skill_tools || []
+
+          # Skip if this exact body is already present (idempotent re-load).
+          unless String.contains?(existing_context, body) do
+            merged_context =
+              if existing_context == "", do: body, else: existing_context <> "\n\n---\n\n" <> body
+
+            merged_tools = Enum.uniq(existing_tools ++ tools)
+
+            case Magus.Chat.set_conversation_skill(
+                   conversation,
+                   %{skill_context: merged_context, skill_tools: merged_tools},
+                   authorize?: false
+                 ) do
+              {:ok, _} -> :ok
+              {:error, reason} -> Logger.warning("persist_user_skill failed: #{inspect(reason)}")
+            end
+          end
+
+        _ ->
+          :ok
+      end
     end
   end
 
