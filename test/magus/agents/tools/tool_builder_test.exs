@@ -1,3 +1,19 @@
+defmodule ToolBuilderSearchStub do
+  @moduledoc false
+  # Stand-in search provider whose `configured?/0` is true, so the capability
+  # gate keeps WebSearch in the tool list.
+  def configured?, do: true
+  def search(_query, _opts), do: {:ok, []}
+end
+
+defmodule ToolBuilderSearchUnconfiguredStub do
+  @moduledoc false
+  # Stand-in search provider that is never configured, so the capability gate
+  # drops WebSearch regardless of any ambient EXA_API_KEY.
+  def configured?, do: false
+  def search(_query, _opts), do: {:error, :not_configured}
+end
+
 defmodule Magus.Agents.Tools.ToolBuilderTest do
   @moduledoc """
   Tests for the ToolBuilder module.
@@ -11,7 +27,8 @@ defmodule Magus.Agents.Tools.ToolBuilderTest do
   - ReqLLM tool conversion
   - Agent category filtering
   """
-  use Magus.ResourceCase, async: true
+  # async: false because some tests toggle the global :search_provider config.
+  use Magus.ResourceCase, async: false
 
   alias Magus.Agents.Tools.ToolBuilder
   alias Magus.Agents.Tools.Web.{WebSearch, WebFetch}
@@ -42,17 +59,38 @@ defmodule Magus.Agents.Tools.ToolBuilderTest do
       assert {[], %{}} = ToolBuilder.build_tools(:chat, %{}, false, nil)
     end
 
-    test "adds web_search for :search mode" do
+    test "includes web_search as a base tool when a search provider is configured" do
+      prev = Application.get_env(:magus, :search_provider)
+      Application.put_env(:magus, :search_provider, ToolBuilderSearchStub)
+
+      on_exit(fn ->
+        if prev,
+          do: Application.put_env(:magus, :search_provider, prev),
+          else: Application.delete_env(:magus, :search_provider)
+      end)
+
       user = generate(user())
       {:ok, conversation} = Chat.create_conversation(%{}, actor: user)
       conversation = Ash.load!(conversation, [:user], authorize?: false)
 
-      {tools, _tool_contexts} = ToolBuilder.build_tools(:search, conversation, true, nil)
+      {tools, _tool_contexts} = ToolBuilder.build_tools(:chat, conversation, true, nil)
 
       assert WebSearch in tools
     end
 
-    test "does not include web_search in :chat mode without skill_tools" do
+    test "excludes web_search when no search provider is configured" do
+      # WebSearch is a base tool, but the capability gate drops it when no search
+      # provider is configured. Pin an unconfigured provider so this does not
+      # depend on whether EXA_API_KEY happens to be set in the environment.
+      prev = Application.get_env(:magus, :search_provider)
+      Application.put_env(:magus, :search_provider, ToolBuilderSearchUnconfiguredStub)
+
+      on_exit(fn ->
+        if prev,
+          do: Application.put_env(:magus, :search_provider, prev),
+          else: Application.delete_env(:magus, :search_provider)
+      end)
+
       user = generate(user())
       {:ok, conversation} = Chat.create_conversation(%{}, actor: user)
       conversation = Ash.load!(conversation, [:user], authorize?: false)
@@ -94,14 +132,14 @@ defmodule Magus.Agents.Tools.ToolBuilderTest do
       user = generate(user())
 
       {:ok, conversation} =
-        Chat.create_conversation(%{skill_tools: ["web_search"]}, actor: user)
+        Chat.create_conversation(%{skill_tools: ["roll_dice"]}, actor: user)
 
       conversation = Ash.load!(conversation, [:user], authorize?: false)
 
       {tools, tool_contexts} = ToolBuilder.build_tools(:chat, conversation, true, nil)
 
-      assert WebSearch in tools
-      assert Map.has_key?(tool_contexts, WebSearch)
+      assert DiceRoll in tools
+      assert Map.has_key?(tool_contexts, DiceRoll)
     end
 
     test "gracefully handles nil skill_tools" do
@@ -175,7 +213,7 @@ defmodule Magus.Agents.Tools.ToolBuilderTest do
 
       {:ok, conversation} =
         Chat.create_conversation(
-          %{skill_tools: ["nonexistent_tool", "web_search"]},
+          %{skill_tools: ["nonexistent_tool", "roll_dice"]},
           actor: user
         )
 
@@ -183,7 +221,7 @@ defmodule Magus.Agents.Tools.ToolBuilderTest do
 
       {tools, _tool_contexts} = ToolBuilder.build_tools(:chat, conversation, true, nil)
 
-      assert WebSearch in tools
+      assert DiceRoll in tools
     end
   end
 

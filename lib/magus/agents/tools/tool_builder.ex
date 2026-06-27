@@ -297,6 +297,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
       ToolSearch,
       LoadTool,
       LoadSkill,
+      WebSearch,
       WebFetch,
       Rag,
       SpawnTask,
@@ -360,9 +361,6 @@ defmodule Magus.Agents.Tools.ToolBuilder do
         true ->
           main_tools
       end
-
-    # Tier 2: Mode-specific (no skill needed)
-    tools = if mode == :search, do: Enum.uniq(tools ++ [WebSearch]), else: tools
 
     # Mode tier: image/video generation tools stay loaded inside their mode.
     tools =
