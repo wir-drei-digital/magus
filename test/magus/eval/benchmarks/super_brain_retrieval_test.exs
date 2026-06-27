@@ -19,6 +19,8 @@ defmodule Magus.Eval.Benchmarks.SuperBrainRetrievalTest do
   test "subject_kind filters live-only cases out of deterministic runs" do
     {:ok, dataset} = SuperBrainRetrieval.load_dataset([])
     det = SuperBrainRetrieval.cases(dataset, subject_kind: :deterministic)
+    # All 3 current cases include "deterministic" in subjects, so none should be filtered out
+    assert length(det) == 3
     refute Enum.any?(det, fn c -> c.meta.category == "same_name_fusion" end)
   end
 
