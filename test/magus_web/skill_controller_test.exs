@@ -44,4 +44,13 @@ defmodule MagusWeb.Workbench.SkillControllerTest do
     conn = conn |> log_in_user(stranger) |> get(~p"/skills/#{skill.id}/download")
     assert conn.status == 404
   end
+
+  test "unauthenticated request returns 404", %{conn: conn} do
+    owner = generate(user())
+    bytes = zip([{"SKILL.md", "---\nname: anon-skill\ndescription: d\n---\nb"}])
+    {:ok, skill} = Magus.Skills.Import.import_bundle(bytes, actor: owner)
+
+    conn = get(conn, ~p"/skills/#{skill.id}/download")
+    assert conn.status == 404
+  end
 end
