@@ -1503,6 +1503,56 @@ export type TaskAttributesOnlySchema = {
 };
 
 
+// Skill Schema
+export type SkillResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "name" | "displayName" | "description" | "body" | "requestedTools" | "requiredSecrets" | "version" | "license" | "compatibility" | "icon" | "color" | "sourceFormat" | "sourceUrl" | "hasExecutableBundle" | "fileManifest" | "workspaceId" | "isSharedToWorkspace";
+  id: UUID;
+  name: string;
+  displayName: string | null;
+  description: string;
+  body: string | null;
+  requestedTools: Array<string> | null;
+  requiredSecrets: Array<Record<string, any>> | null;
+  version: string | null;
+  license: string | null;
+  compatibility: string | null;
+  icon: string | null;
+  color: string | null;
+  sourceFormat: "agents_md" | "goose" | "other" | "skill_md";
+  sourceUrl: string | null;
+  hasExecutableBundle: boolean;
+  fileManifest: Array<Record<string, any>> | null;
+  workspaceId: UUID | null;
+  isSharedToWorkspace: boolean | null;
+  workspace: { __type: "Relationship"; __resource: WorkspaceResourceSchema | null; };
+};
+
+
+
+export type SkillAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "name" | "displayName" | "description" | "body" | "requestedTools" | "requiredSecrets" | "version" | "license" | "compatibility" | "icon" | "color" | "sourceFormat" | "sourceUrl" | "hasExecutableBundle" | "fileManifest" | "workspaceId";
+  id: UUID;
+  name: string;
+  displayName: string | null;
+  description: string;
+  body: string | null;
+  requestedTools: Array<string> | null;
+  requiredSecrets: Array<Record<string, any>> | null;
+  version: string | null;
+  license: string | null;
+  compatibility: string | null;
+  icon: string | null;
+  color: string | null;
+  sourceFormat: "agents_md" | "goose" | "other" | "skill_md";
+  sourceUrl: string | null;
+  hasExecutableBundle: boolean;
+  fileManifest: Array<Record<string, any>> | null;
+  workspaceId: UUID | null;
+};
+
+
 // UserSubscription Schema
 export type UserSubscriptionResourceSchema = {
   __type: "Resource";
@@ -5319,6 +5369,134 @@ export type TaskFilterInput = {
   assignedToUser?: UserFilterInput;
 
 };
+export type SkillFilterInput = {
+  and?: Array<SkillFilterInput>;
+  or?: Array<SkillFilterInput>;
+  not?: Array<SkillFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  name?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  displayName?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  description?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  body?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  requestedTools?: {
+    eq?: Array<string>;
+    notEq?: Array<string>;
+    in?: Array<Array<string>>;
+    isNil?: boolean;
+  };
+
+  requiredSecrets?: {
+    eq?: Array<Record<string, any>>;
+    notEq?: Array<Record<string, any>>;
+    in?: Array<Array<Record<string, any>>>;
+    isNil?: boolean;
+  };
+
+  version?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  license?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  compatibility?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  icon?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  color?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  sourceFormat?: {
+    eq?: "agents_md" | "goose" | "other" | "skill_md";
+    notEq?: "agents_md" | "goose" | "other" | "skill_md";
+    in?: Array<"agents_md" | "goose" | "other" | "skill_md">;
+  };
+
+  sourceUrl?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  hasExecutableBundle?: {
+    eq?: boolean;
+    notEq?: boolean;
+  };
+
+  fileManifest?: {
+    eq?: Array<Record<string, any>>;
+    notEq?: Array<Record<string, any>>;
+    in?: Array<Array<Record<string, any>>>;
+    isNil?: boolean;
+  };
+
+  workspaceId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+  isSharedToWorkspace?: {
+    eq?: boolean;
+    notEq?: boolean;
+    isNil?: boolean;
+  };
+
+
+  workspace?: WorkspaceFilterInput;
+
+};
 export type UserSubscriptionFilterInput = {
   and?: Array<UserSubscriptionFilterInput>;
   or?: Array<UserSubscriptionFilterInput>;
@@ -5899,6 +6077,9 @@ export type NotificationFilterField = (typeof notificationFilterFields)[number];
 export const taskFilterFields = ["id", "title", "description", "status", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "dismissedAt", "recurrence", "conversationId", "parentId", "assignedToUserId", "conversation", "parent", "subtasks", "assignedToUser"] as const;
 export type TaskFilterField = (typeof taskFilterFields)[number];
 
+export const skillFilterFields = ["id", "name", "displayName", "description", "body", "requestedTools", "requiredSecrets", "version", "license", "compatibility", "icon", "color", "sourceFormat", "sourceUrl", "hasExecutableBundle", "fileManifest", "workspaceId", "isSharedToWorkspace", "workspace"] as const;
+export type SkillFilterField = (typeof skillFilterFields)[number];
+
 export const userSubscriptionFilterFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "extraSeats", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
 export type UserSubscriptionFilterField = (typeof userSubscriptionFilterFields)[number];
 
@@ -6031,6 +6212,9 @@ export type NotificationSortField = (typeof notificationSortFields)[number];
 
 export const taskSortFields = ["id", "title", "description", "status", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "dismissedAt", "recurrence", "conversationId", "parentId", "assignedToUserId"] as const;
 export type TaskSortField = (typeof taskSortFields)[number];
+
+export const skillSortFields = ["id", "name", "displayName", "description", "body", "requestedTools", "requiredSecrets", "version", "license", "compatibility", "icon", "color", "sourceFormat", "sourceUrl", "hasExecutableBundle", "fileManifest", "workspaceId", "isSharedToWorkspace"] as const;
+export type SkillSortField = (typeof skillSortFields)[number];
 
 export const userSubscriptionSortFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "extraSeats", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
 export type UserSubscriptionSortField = (typeof userSubscriptionSortFields)[number];
