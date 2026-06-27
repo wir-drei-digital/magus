@@ -11,9 +11,9 @@
     "fixture": {
       "entities": [
         {"key": "daniel", "name": "Daniel", "type": "person", "normalized_subtype": null,
-         "embedding": [1, 0, 0, 0, 0, 0, 0, 0], "trust_tier": "evidence", "confidence": 0.9},
+         "embedding": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "trust_tier": "evidence", "confidence": 0.9},
         {"key": "aurora", "name": "Project Aurora", "type": "project", "normalized_subtype": null,
-         "embedding": [0, 1, 0, 0, 0, 0, 0, 0], "trust_tier": "evidence", "confidence": 0.9}
+         "embedding": [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "trust_tier": "evidence", "confidence": 0.9}
       ],
       "edges": [{"from": "daniel", "to": "aurora", "predicate": "works_on", "confidence": 0.8}],
       "sources": [{"entity": "daniel", "resource_type": "brain_page",
@@ -32,9 +32,9 @@
     "fixture": {
       "entities": [
         {"key": "ship", "name": "Ship Friday", "type": "decision", "normalized_subtype": null,
-         "embedding": [0, 0, 1, 0, 0, 0, 0, 0], "trust_tier": "evidence", "confidence": 0.9},
+         "embedding": [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0], "trust_tier": "evidence", "confidence": 0.9},
         {"key": "risk", "name": "Release Risk", "type": "concept", "normalized_subtype": null,
-         "embedding": [0, 0, 0, 1, 0, 0, 0, 0], "trust_tier": "evidence", "confidence": 0.9}
+         "embedding": [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0], "trust_tier": "evidence", "confidence": 0.9}
       ],
       "edges": [
         {"from": "ship", "to": "risk", "predicate": "supports", "confidence": 0.8},
@@ -56,7 +56,7 @@
     "fixture": {
       "entities": [
         {"key": "elixir", "name": "Elixir", "type": "concept", "normalized_subtype": null,
-         "embedding": [0, 0, 0, 0, 1, 0, 0, 0], "trust_tier": "evidence", "confidence": 0.9}
+         "embedding": [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0], "trust_tier": "evidence", "confidence": 0.9}
       ],
       "edges": [],
       "sources": [{"entity": "elixir", "resource_type": "brain_page",
