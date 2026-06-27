@@ -7,7 +7,7 @@ defmodule MagusWeb.Workbench.SkillController do
   use MagusWeb, :controller
 
   def download(conn, %{"id" => id}) do
-    user = conn.assigns.current_user
+    user = conn.assigns[:current_user]
 
     with {:ok, skill} <- Magus.Skills.get_skill(id, actor: user),
          path when is_binary(path) <- skill.bundle_path,
