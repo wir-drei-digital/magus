@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
-	import { Plus, Search, BookMarked } from '@lucide/svelte';
+	import { Download, Plus, Search, BookMarked } from '@lucide/svelte';
 	import type { SkillSummary } from '$lib/ash/api';
 	import { skillsNav } from '$lib/stores/skills-nav.svelte';
 	import { session } from '$lib/stores/session.svelte';
@@ -143,9 +143,19 @@
 					description="Skills extend what the AI can do: install one from a URL or create your own."
 				>
 					{#snippet icon()}<BookMarked />{/snippet}
-					<Button size="sm" href="{base}/skills/new">
-						<Plus class="size-3.5" /> New skill
-					</Button>
+					<div class="flex items-center gap-2">
+						<Button size="sm" href="{base}/skills/new">
+							<Plus class="size-3.5" /> New skill
+						</Button>
+						<Button
+							size="sm"
+							variant="outline"
+							data-testid="import-skill-empty"
+							onclick={() => (skillsNav.importOpen = true)}
+						>
+							<Download class="size-3.5" /> Import skill
+						</Button>
+					</div>
 				</EmptyState>
 			{:else}
 				<div class="mb-3 flex items-baseline gap-2">

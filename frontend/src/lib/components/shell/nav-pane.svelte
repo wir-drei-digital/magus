@@ -17,6 +17,8 @@
 	import SkillsNav from './skills-nav.svelte';
 	import SettingsNav from './settings-nav.svelte';
 	import WorkspaceSwitcher from './workspace-switcher.svelte';
+	import SkillImportDialog from './skill-import-dialog.svelte';
+	import { skillsNav } from '$lib/stores/skills-nav.svelte';
 
 	// Settings reuses the main nav pane for its section list (no second sidebar).
 	const inSettings = $derived(page.url.pathname.startsWith(`${base}/settings`));
@@ -44,8 +46,6 @@
 	function newConversation() {
 		void goto(`${base}/chat`);
 	}
-
-	let skillImportOpen = $state(false);
 
 	let uploading = $state(false);
 	let uploadError = $state<string | null>(null);
@@ -101,7 +101,7 @@
 							<Sidebar.MenuButton
 								data-testid="import-skill"
 								onclick={() => {
-									skillImportOpen = true;
+									skillsNav.importOpen = true;
 								}}
 							>
 								<Download class="text-muted-foreground" />
@@ -228,3 +228,4 @@
 	</Sidebar.Root>
 </Sidebar.Provider>
 <NewResourceDialog kind={createKind} bind:open={createOpen} />
+<SkillImportDialog />
