@@ -24,6 +24,7 @@ A second capability closes the loop: an agent authoring tool (`create_skill`) th
 - Public cross-user marketplace (publish, browse, copy, moderate). Deferred to a later phase.
 - Fully editable in-browser file tree. v1 uses the hybrid model (editable SKILL.md plus an attached artifact archive). The schema keeps a per-file manifest so the editor is an additive Phase 3.
 - Static source scanning or trust tiers. v1 relies on sandbox isolation plus a first-run execution approval.
+- Dedicated per-skill secret storage. v1 reuses the existing `AgentSecret` `:sandbox_env` injection; a per-user, per-skill `SkillSecret` with per-key scoping is Phase 2.
 - Per-skill custom container images.
 
 ## Key decisions (from brainstorming)
@@ -31,7 +32,7 @@ A second capability closes the loop: an agent authoring tool (`create_skill`) th
 1. **Superset model.** The internal representation is a superset that native authoring and external formats normalize into. Native authoring and Anthropic import are both v1.
 2. **Hybrid storage, file tree latent.** SKILL.md (frontmatter plus body) is stored as structured, in-app-editable fields. The rest of the bundle is an archive in File-storage. A `file_manifest` keeps the per-file representation latent so a future file-tree editor is additive.
 3. **Workspace-scoped resource plus import.** A skill is a resource like any other, with personal and workspace access via the existing grant model. Import is via zip upload (v1) and git/URL (Phase 2). No marketplace in v1.
-4. **Sandbox plus first-run approval.** The sandbox is the security boundary, the same isolation Magus already trusts for agent-authored code. The first time a bundled skill executes in a conversation, a human approval is required. Secrets are opt-in per manifest, never auto-injected.
+4. **Sandbox plus first-run approval.** The sandbox is the security boundary, the same isolation Magus already trusts for agent-authored code. The first time a bundled skill executes in a conversation, a human approval is required. Secret values are never bundled with a skill: in v1 the sandbox env is populated by the existing `AgentSecret` `:sandbox_env` mechanism, and a skill's optional `required_secrets` is a declarative UX hint.
 5. **Sandbox-materialized bundles, reuse existing tools.** Execution rides the existing sandbox and tools rather than compiling typed tools or running an MCP server per skill.
 
 ## Standards alignment (2026-06-27 web research)
@@ -62,7 +63,7 @@ Reused subsystems:
 - Tools: existing sandbox tools (`ExecCommand`, `RunCode`, `InstallPackages`, `StartService`, file tools) and the existing `@skill_tool_mapping` in `Magus.Agents.Tools.ToolBuilder`.
 - Approval: `RequestApproval` tool plus `InboxEventPlugin` approval matching.
 - Storage: `Magus.Files.Storage` (local/S3 backend, stamped at write).
-- Secrets: `Magus.Agents.AgentSecret` pattern (Cloak `EncryptedString`, `:sandbox_env` scope).
+- Secrets: `Magus.Agents.AgentSecret` (`:sandbox_env` env-var injection), reused directly in v1.
 - Sharing: `Magus.Workspaces.Policies.workspace_scoped_policies/1`, `ResourceAccess`, `share_to_team`/`unshare_from_team`.
 - SPA: SvelteKit mode strip plus AshTypescript RPC over `/rpc/run`, multipart upload over `/rpc/upload`.
 
@@ -85,9 +86,9 @@ New domain `Magus.Skills` with a `Skill` resource. The existing `Magus.Agents.Sk
 
 Nullable attributes follow the schema rule from CLAUDE.md (use `{:or, [type, nil]}`, not a bare type with `default: nil`). AshPaperTrail versions (like Brain pages) are a Phase 2 add for import-v1-vs-edited-v2 history.
 
-### `Magus.Skills.SkillSecret`
+### Secrets (v1 reuses `AgentSecret`)
 
-Mirrors `Magus.Agents.AgentSecret` exactly: Cloak `EncryptedString` value, key regex `^[A-Za-z_][A-Za-z0-9_]*$`, `:sandbox_env` scope, owner-only policy. Belongs to a skill (and owner). Only the keys a skill declares inject as env at execution. Imported skills ship declarations only, never values.
+Secrets are sandbox environment variables, the same model Anthropic skills use (the `SKILL.md` standard has no secrets field). Magus already injects them via `Magus.Agents.AgentSecret` with scope `:sandbox_env`. v1 reuses that directly, so a skill running under a custom agent gets that agent's env secrets. A skill's `required_secrets` (carried under `metadata`) is an optional declarative hint only: it drives the UI prompt and the agent's "missing key" message; it stores no value, and an imported skill that omits it still runs. A dedicated per-user, per-skill `SkillSecret` (inject only declared keys; cover skills used outside a custom agent) is deferred to Phase 2.
 
 ### Conversation tracking
 
@@ -109,7 +110,7 @@ Only name and description are exposed at this layer; the body stays out until lo
 2. **Load.** Agent calls `load_skill(name)`. The dispatcher branches:
    - Built-in: unchanged (body to `skill_context`, tools to `skill_tools`).
    - User skill: persist `body` to `skill_context`, resolve `requested_tools` to `skill_tools` (existing path, including mid-turn `__new_tools__` registration in the ReAct runner). If `has_executable_bundle`, proceed to materialize.
-3. **Materialize.** Ensure the conversation sandbox exists (orchestrator auto-creates), then unpack the archive into `/workspace/.skills/<name>/`, idempotent via a marker so suspend/resume and re-loads do not re-unpack. Declared secrets inject as `:sandbox_env`. Optional `runtime_hints.packages` install via the existing `install_packages`.
+3. **Materialize.** Ensure the conversation sandbox exists (orchestrator auto-creates), then unpack the archive into `/workspace/.skills/<name>/`, idempotent via a marker so suspend/resume and re-loads do not re-unpack. Secret values come from the existing `AgentSecret` `:sandbox_env` injection (v1); the skill's `required_secrets` is a declarative hint, not a value store. Optional `runtime_hints.packages` install via the existing `install_packages`.
 4. **Approve (first-run gate).** The first time a bundled skill is activated in a conversation, before its code can run, the agent raises an approval through `RequestApproval`, matched by `InboxEventPlugin`. The prompt names the skill and surfaces declared secrets and packages. The decision is remembered per conversation. A self-authored skill is flagged "authored by you" to reduce friction. Per-user "always trust this skill" is Phase 2. Built-in and prompt-only skills skip the gate.
 5. **Execute.** The agent runs the bundled CLIs via existing `exec_command` / `run_code` / `start_service`. The SKILL.md body tells it how (for example `python .skills/<name>/foo.py`). Files persist in `/workspace` for the conversation. No new execution tool is introduced.
 
@@ -147,7 +148,7 @@ The adapter boundary keeps new formats additive: each is one normalizer into the
 
 - **Boundary:** the sandbox is the same isolation Magus already trusts for agent-authored code (egress restricted to package registries, one sandbox per conversation, auto-suspend, destroyed on delete). Running a skill's CLIs is the same execution class, now with provenance attached.
 - **First-run approval:** see runtime flow step 4. Reuses `RequestApproval` plus `InboxEventPlugin`.
-- **Secrets:** opt-in, declared per skill, stored encrypted as `SkillSecret`, only declared keys injected as `:sandbox_env`. Missing required secrets at load do not block load; the agent is told which keys are unset.
+- **Secrets:** sandbox env vars, never bundled with the skill. v1 reuses the existing `AgentSecret` `:sandbox_env` injection for values; a skill's optional `required_secrets` is a declarative UX hint (under `metadata`). Missing keys do not block load; the agent is told which are unset. Per-skill `SkillSecret` with per-key scoping is Phase 2.
 
 ## Sharing and access control
 
@@ -180,8 +181,8 @@ A new `skills` mode next to `prompts`, reusing the library patterns:
 
 ## Phasing
 
-- **Phase 1 (core runtime plus manual UI):** `Skill` resource plus `Magus.Skills` domain plus policies plus `SkillSecret`; discovery merge (built-in plus user); `load_skill` dispatch; sandbox materialization; first-run approval; capability gating plus kill-switch; RPC actions; SPA `skills` mode (list/detail/share); import (zip plus Anthropic adapter) and native authoring with artifact upload.
-- **Phase 2 (payoff plus ergonomics):** the `create_skill` agent authoring tool; git/URL import; `SKILL.md` export/round-trip; AGENTS.md import (prompt-only); per-user "trust this skill"; `runtime_hints` package preinstall; AshPaperTrail versions. The `create_skill` tool may be pulled into late Phase 1 once the resource and storage exist (decide during planning).
+- **Phase 1 (core runtime plus manual UI):** `Skill` resource plus `Magus.Skills` domain plus policies; secrets via the existing `AgentSecret` `:sandbox_env` reuse (no new resource); discovery merge (built-in plus user); `load_skill` dispatch; sandbox materialization; first-run approval; capability gating plus kill-switch; RPC actions; SPA `skills` mode (list/detail/share); import (zip plus Anthropic adapter) and native authoring with artifact upload.
+- **Phase 2 (payoff plus ergonomics):** the `create_skill` agent authoring tool; git/URL import; `SKILL.md` export/round-trip; AGENTS.md import (prompt-only); dedicated `SkillSecret` (per-user, per-skill, per-key scoping, secrets outside a custom agent); per-user "trust this skill"; `runtime_hints` package preinstall; AshPaperTrail versions. The `create_skill` tool may be pulled into late Phase 1 once the resource and storage exist (decide during planning).
 - **Phase 3 (deferred):** fully editable in-browser file tree; Goose recipe adapter; public marketplace (publish, copy, discovery, like the public Prompt library).
 
 ## Testing
@@ -194,13 +195,13 @@ A new `skills` mode next to `prompts`, reusing the library patterns:
 
 - Exact home of the approved/materialized skill set per conversation (array field vs join row).
 - Cache impact of per-conversation skills-section composition (keep built-in skills in the stable prefix; measure the user-skill delta).
-- `SkillSecret` ownership shape (per skill plus user now; per-agent override later).
+- `SkillSecret` scoping when it lands in Phase 2: per-user vs agent-scoped override vs workspace-shared team values.
 
 ## Affected and new modules (indicative)
 
 New:
 
-- `lib/magus/skills/skills.ex` (domain), `lib/magus/skills/skill.ex`, `lib/magus/skills/skill_secret.ex`.
+- `lib/magus/skills/skills.ex` (domain), `lib/magus/skills/skill.ex` (`lib/magus/skills/skill_secret.ex` is Phase 2).
 - `lib/magus/skills/import/` (safe unpack, `SKILL.md` parse and normalizer; AGENTS.md and Goose adapters in later phases).
 - `lib/magus/skills/materializer.ex` (archive to sandbox, idempotent marker).
 - `lib/magus/agents/tools/skills/create_skill.ex` (authoring tool, Phase 2 or late Phase 1).
