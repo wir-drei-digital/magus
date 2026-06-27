@@ -6,7 +6,8 @@ const MODE_SEGMENTS: Array<[Mode, string]> = [
 	['brain', '/brain'],
 	['files', '/files'],
 	['prompts', '/prompts'],
-	['agents', '/agents']
+	['agents', '/agents'],
+	['skills', '/skills']
 ];
 
 /**

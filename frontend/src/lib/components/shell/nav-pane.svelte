@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
-	import { History, Plus, Search, Trash2, Upload } from '@lucide/svelte';
+	import { Download, History, Plus, Search, Trash2, Upload } from '@lucide/svelte';
 	import { uploadFile } from '$lib/ash/api';
 	import { session } from '$lib/stores/session.svelte';
 	import { workbench } from '$lib/stores/workbench.svelte';
@@ -14,6 +14,7 @@
 	import FilesNav from './files-nav.svelte';
 	import NewResourceDialog, { type NewResourceKind } from './new-resource-dialog.svelte';
 	import PromptsNav from './prompts-nav.svelte';
+	import SkillsNav from './skills-nav.svelte';
 	import SettingsNav from './settings-nav.svelte';
 	import WorkspaceSwitcher from './workspace-switcher.svelte';
 
@@ -43,6 +44,8 @@
 	function newConversation() {
 		void goto(`${base}/chat`);
 	}
+
+	let skillImportOpen = $state(false);
 
 	let uploading = $state(false);
 	let uploadError = $state<string | null>(null);
@@ -82,59 +85,87 @@
 			     shows the settings section list instead. -->
 			{#if !inSettings}
 				<Sidebar.Menu>
-					<Sidebar.MenuItem>
-						{#if workbench.mode === 'chat'}
-							<Sidebar.MenuButton onclick={() => newConversation()} data-testid="new-conversation">
-								<Plus class="text-muted-foreground" />
-								<span>New chat</span>
-							</Sidebar.MenuButton>
-						{:else if workbench.mode === 'brain'}
-							<Sidebar.MenuButton onclick={() => openCreate('brain')} data-testid="new-brain">
-								<Plus class="text-muted-foreground" />
-								<span>New brain</span>
-							</Sidebar.MenuButton>
-						{:else if workbench.mode === 'files'}
+					{#if workbench.mode === 'skills'}
+						<Sidebar.MenuItem>
 							<Sidebar.MenuButton
-								class={uploading ? 'pointer-events-none opacity-50' : ''}
-								onclick={() => fileInput?.click()}
-								data-testid="files-upload"
-							>
-								{#if uploading}
-									<span
-										class="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
-									></span>
-									<span>Uploading…</span>
-								{:else}
-									<Upload class="text-muted-foreground" />
-									<span>Upload files</span>
-								{/if}
-							</Sidebar.MenuButton>
-							{#if uploadError}
-								<p class="px-2 pt-1 text-xs text-destructive">{uploadError}</p>
-							{/if}
-							<input
-								bind:this={fileInput}
-								type="file"
-								multiple
-								class="hidden"
-								onchange={(event) => {
-									const files = event.currentTarget.files;
-									if (files && files.length > 0) void uploadFiles(files);
-									event.currentTarget.value = '';
+								data-testid="new-skill"
+								onclick={() => {
+									void goto(`${base}/skills/new`);
 								}}
-							/>
-						{:else if workbench.mode === 'prompts'}
-							<Sidebar.MenuButton onclick={() => openCreate('prompt')} data-testid="new-prompt">
+							>
 								<Plus class="text-muted-foreground" />
-								<span>New prompt</span>
+								<span>New skill</span>
 							</Sidebar.MenuButton>
-						{:else if workbench.mode === 'agents'}
-							<Sidebar.MenuButton onclick={() => openCreate('agent')} data-testid="new-agent">
-								<Plus class="text-muted-foreground" />
-								<span>New agent</span>
+						</Sidebar.MenuItem>
+						<Sidebar.MenuItem>
+							<Sidebar.MenuButton
+								data-testid="import-skill"
+								onclick={() => {
+									skillImportOpen = true;
+								}}
+							>
+								<Download class="text-muted-foreground" />
+								<span>Import skill</span>
 							</Sidebar.MenuButton>
-						{/if}
-					</Sidebar.MenuItem>
+						</Sidebar.MenuItem>
+					{:else}
+						<Sidebar.MenuItem>
+							{#if workbench.mode === 'chat'}
+								<Sidebar.MenuButton
+									onclick={() => newConversation()}
+									data-testid="new-conversation"
+								>
+									<Plus class="text-muted-foreground" />
+									<span>New chat</span>
+								</Sidebar.MenuButton>
+							{:else if workbench.mode === 'brain'}
+								<Sidebar.MenuButton onclick={() => openCreate('brain')} data-testid="new-brain">
+									<Plus class="text-muted-foreground" />
+									<span>New brain</span>
+								</Sidebar.MenuButton>
+							{:else if workbench.mode === 'files'}
+								<Sidebar.MenuButton
+									class={uploading ? 'pointer-events-none opacity-50' : ''}
+									onclick={() => fileInput?.click()}
+									data-testid="files-upload"
+								>
+									{#if uploading}
+										<span
+											class="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
+										></span>
+										<span>Uploading…</span>
+									{:else}
+										<Upload class="text-muted-foreground" />
+										<span>Upload files</span>
+									{/if}
+								</Sidebar.MenuButton>
+								{#if uploadError}
+									<p class="px-2 pt-1 text-xs text-destructive">{uploadError}</p>
+								{/if}
+								<input
+									bind:this={fileInput}
+									type="file"
+									multiple
+									class="hidden"
+									onchange={(event) => {
+										const files = event.currentTarget.files;
+										if (files && files.length > 0) void uploadFiles(files);
+										event.currentTarget.value = '';
+									}}
+								/>
+							{:else if workbench.mode === 'prompts'}
+								<Sidebar.MenuButton onclick={() => openCreate('prompt')} data-testid="new-prompt">
+									<Plus class="text-muted-foreground" />
+									<span>New prompt</span>
+								</Sidebar.MenuButton>
+							{:else if workbench.mode === 'agents'}
+								<Sidebar.MenuButton onclick={() => openCreate('agent')} data-testid="new-agent">
+									<Plus class="text-muted-foreground" />
+									<span>New agent</span>
+								</Sidebar.MenuButton>
+							{/if}
+						</Sidebar.MenuItem>
+					{/if}
 				</Sidebar.Menu>
 			{/if}
 		</Sidebar.Header>
@@ -152,6 +183,8 @@
 				<PromptsNav />
 			{:else if workbench.mode === 'agents'}
 				<AgentsNav />
+			{:else if workbench.mode === 'skills'}
+				<SkillsNav />
 			{/if}
 		</Sidebar.Content>
 
