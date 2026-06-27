@@ -25,14 +25,21 @@ defmodule Mix.Tasks.Magus.Eval do
   @benchmarks %{
     "coverage_smoke" => Magus.Eval.Benchmarks.CoverageSmoke,
     "longmemeval" => Magus.Eval.Benchmarks.LongMemEval,
-    "gaia" => Magus.Eval.Benchmarks.GAIA
+    "gaia" => Magus.Eval.Benchmarks.GAIA,
+    "super_brain_retrieval" => Magus.Eval.Benchmarks.SuperBrainRetrieval
   }
 
   @impl Mix.Task
   def run(argv) do
     {opts, args, _} =
       OptionParser.parse(argv,
-        strict: [limit: :integer, dry_run: :boolean, judge: :string, out: :string]
+        strict: [
+          limit: :integer,
+          dry_run: :boolean,
+          judge: :string,
+          out: :string,
+          subject: :string
+        ]
       )
 
     benchmark =
@@ -52,10 +59,26 @@ defmodule Mix.Tasks.Magus.Eval do
 
     {:ok, ctx} = Magus.Eval.Harness.setup([])
 
+    {subject_mod, subject_kind} =
+      case opts[:subject] do
+        "live" ->
+          {Magus.Eval.Subject.Live, :live}
+
+        "deterministic" ->
+          {Magus.Eval.Subject.SuperBrainDeterministic, :deterministic}
+
+        _ when benchmark == Magus.Eval.Benchmarks.SuperBrainRetrieval ->
+          {Magus.Eval.Subject.SuperBrainDeterministic, :deterministic}
+
+        _ ->
+          {Magus.Eval.Subject.Live, nil}
+      end
+
     run_opts =
       [
         ctx: ctx,
-        subject: Magus.Eval.Subject.Live,
+        subject: subject_mod,
+        subject_kind: subject_kind,
         limit: opts[:limit],
         dry_run: opts[:dry_run] || false,
         judge: opts[:judge],
