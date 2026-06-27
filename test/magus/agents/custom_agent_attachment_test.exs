@@ -222,4 +222,66 @@ defmodule Magus.Agents.CustomAgentAttachmentTest do
       assert Enum.map(atts, & &1.file_id) == [file2.id, file.id]
     end
   end
+
+  describe "agent_attachments action (token budget + status)" do
+    test "exposes file_status and token_count summed from the file's chunks", %{
+      user: user,
+      agent: agent,
+      doc_file: file
+    } do
+      # Chunks are written only by the processing pipeline (the create policy
+      # forbids actor writes), so seed them with authorize?: false.
+      for {content, tokens, pos} <- [{"alpha", 120, 0}, {"beta", 230, 1}] do
+        Ash.create!(
+          Magus.Files.Chunk,
+          %{file_id: file.id, content: content, position: pos, token_count: tokens},
+          action: :create,
+          authorize?: false
+        )
+      end
+
+      {:ok, _att} =
+        Magus.Agents.create_attachment(
+          %{custom_agent_id: agent.id, file_id: file.id, mode: :always},
+          actor: user
+        )
+
+      {:ok, [row]} =
+        Ash.ActionInput.for_action(
+          Magus.Agents.CustomAgent,
+          :agent_attachments,
+          %{agent_id: agent.id},
+          actor: user
+        )
+        |> Ash.run_action()
+
+      assert row.file_id == file.id
+      assert row.token_count == 350
+      assert row.file_status == "pending"
+    end
+
+    test "token_count is 0 when the file has no chunks", %{
+      user: user,
+      agent: agent,
+      doc_file: file
+    } do
+      {:ok, _att} =
+        Magus.Agents.create_attachment(
+          %{custom_agent_id: agent.id, file_id: file.id, mode: :search},
+          actor: user
+        )
+
+      {:ok, [row]} =
+        Ash.ActionInput.for_action(
+          Magus.Agents.CustomAgent,
+          :agent_attachments,
+          %{agent_id: agent.id},
+          actor: user
+        )
+        |> Ash.run_action()
+
+      assert row.token_count == 0
+      assert row.file_status == "pending"
+    end
+  end
 end

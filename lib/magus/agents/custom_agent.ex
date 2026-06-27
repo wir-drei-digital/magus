@@ -434,7 +434,7 @@ defmodule Magus.Agents.CustomAgent do
              {:ok, attachments} <-
                Magus.Agents.list_agent_attachments(input.arguments.agent_id,
                  actor: context.actor,
-                 load: [:file]
+                 load: [file: [:chunks]]
                ) do
           {:ok, Enum.map(attachments, &attachment_map/1)}
         end
@@ -1020,9 +1020,18 @@ defmodule Magus.Agents.CustomAgent do
       file_id: attachment.file_id,
       file_name: file && file.name,
       file_type: file && to_string(file.type),
-      file_size: file && file.file_size
+      file_size: file && file.file_size,
+      file_status: file && to_string(file.status),
+      token_count: attachment_token_count(file)
     }
   end
+
+  # Sum of token_count across the file's chunks (loaded via `[file: [:chunks]]`).
+  # The editor sums these across :always-mode attachments for the budget bar.
+  defp attachment_token_count(%{chunks: chunks}) when is_list(chunks),
+    do: Enum.reduce(chunks, 0, fn chunk, acc -> acc + (chunk.token_count || 0) end)
+
+  defp attachment_token_count(_file), do: 0
 
   # The attachment join resource has no policies of its own, so gate mutations
   # on the actor's update access to the owning agent.

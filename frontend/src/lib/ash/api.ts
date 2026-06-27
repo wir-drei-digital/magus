@@ -2830,6 +2830,10 @@ export type AgentAttachment = {
 	fileName: string;
 	fileType: string;
 	fileSize: number | null;
+	/** Sum of the file's chunk token_counts; budgeted across `always` mode. */
+	tokenCount: number;
+	/** File processing status; the mode select is gated until `ready`. */
+	status: 'pending' | 'processing' | 'ready' | 'error';
 };
 
 /** Max attachments per agent — keep in sync with Magus.Agents.AttachmentLimits. */
@@ -2849,7 +2853,16 @@ export async function agentAttachments(agentId: string): Promise<RpcResult<Agent
 			fileId: String(row.file_id ?? ''),
 			fileName: String(row.file_name ?? 'file'),
 			fileType: String(row.file_type ?? 'file'),
-			fileSize: typeof row.file_size === 'number' ? row.file_size : null
+			fileSize: typeof row.file_size === 'number' ? row.file_size : null,
+			tokenCount: typeof row.token_count === 'number' ? row.token_count : 0,
+			// Default to `ready` (enabled) when the field is absent, so a backend
+			// that predates this field does not wrongly gate the mode select.
+			status:
+				row.file_status === 'pending' ||
+				row.file_status === 'processing' ||
+				row.file_status === 'error'
+					? row.file_status
+					: 'ready'
 		}))
 	};
 }

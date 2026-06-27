@@ -49,6 +49,11 @@
 	import { getSocket } from '$lib/realtime/socket';
 	import { relativeTime } from '$lib/time';
 	import { formatFileSize } from '$lib/files/format';
+	import {
+		MAX_ALWAYS_INCLUDE_TOKENS,
+		alwaysIncludeTokens,
+		budgetTier
+	} from '$lib/agents/attachment-budget';
 	import { cachedActiveModels, invalidateAgentCatalog } from '$lib/chat/catalog';
 	import {
 		categoryEnabled,
@@ -313,6 +318,10 @@
 	const pickableFiles = $derived(
 		libraryFiles.filter((file) => ATTACHABLE_TYPES.has(file.type) && !attachedFileIds.has(file.id))
 	);
+	// Always-include files are injected into every prompt, so their combined
+	// token_count is budgeted against AttachmentLimits.max_always_include_tokens.
+	const alwaysTokens = $derived(alwaysIncludeTokens(attachments));
+	const tokenTier = $derived(budgetTier(alwaysTokens));
 
 	function loadAttachments(id: string) {
 		void agentAttachments(id).then((result) => {
@@ -1125,15 +1134,25 @@
 								<div class="flex items-center gap-3 py-2 text-sm">
 									<span class="min-w-0 flex-1">
 										<span class="block truncate font-medium">{attachment.fileName}</span>
-										{#if attachment.fileSize}
+										{#if attachment.fileSize || attachment.status !== 'ready'}
 											<span class="block text-xs text-muted-foreground">
-												{formatFileSize(attachment.fileSize)}
+												{#if attachment.fileSize}{formatFileSize(attachment.fileSize)}{/if}
+												{#if attachment.status !== 'ready'}<span
+														class={attachment.status === 'error'
+															? 'text-destructive'
+															: 'text-warning'}
+														data-testid="attachment-file-status">· {attachment.status}</span
+													>{/if}
 											</span>
 										{/if}
 									</span>
 									<select
 										value={attachment.mode}
-										class="rounded-md border border-input bg-secondary px-2 py-1 text-xs outline-none focus:border-primary/60"
+										disabled={attachment.status !== 'ready'}
+										title={attachment.status !== 'ready'
+											? 'Available once the file finishes processing'
+											: undefined}
+										class="rounded-md border border-input bg-secondary px-2 py-1 text-xs outline-none focus:border-primary/60 disabled:cursor-not-allowed disabled:opacity-50"
 										onchange={(event) =>
 											void setAttachmentMode(
 												attachment.id,
@@ -1155,6 +1174,19 @@
 								</div>
 							{/each}
 						</div>
+						{#if attachments.some((a) => a.mode === 'always')}
+							<p
+								class="mt-3 text-xs {tokenTier === 'over'
+									? 'font-semibold text-destructive'
+									: tokenTier === 'warn'
+										? 'font-semibold text-warning'
+										: 'text-muted-foreground'}"
+								data-testid="attachment-token-budget"
+							>
+								Always-include tokens: {alwaysTokens.toLocaleString()} / {MAX_ALWAYS_INCLUDE_TOKENS.toLocaleString()}
+								{#if tokenTier === 'over'} — over budget, trim always-include files{/if}
+							</p>
+						{/if}
 					{:else}
 						<p class="text-xs text-muted-foreground">No files attached yet.</p>
 					{/if}
