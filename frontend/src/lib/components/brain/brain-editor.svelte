@@ -34,7 +34,7 @@
 	import { createPageLink } from '$lib/brain/page-link';
 	import { addBrainFileToMap } from '$lib/brain/file-map';
 	import { brainNodeForFile, filesFromTransfer } from '$lib/brain/editor-uploads';
-	import { getFile, uploadFile, type PageTreeNode } from '$lib/ash/api';
+	import { getFile, uploadFile, type FileEntry, type PageTreeNode } from '$lib/ash/api';
 
 	let {
 		content,
@@ -130,6 +130,20 @@
 
 	export function focus(): void {
 		editor?.commands.focus();
+	}
+
+	/**
+	 * Insert an already-uploaded file as a brain block at the caret — the "browse
+	 * existing files" picker path (drop/paste goes through uploadAndInsert). The
+	 * picker's list entries are full FileEntry records, so we register the summary
+	 * in the page map directly (no getFile round-trip) and insert the image/file
+	 * block, which autosaves to a `magus://` reference like any upload.
+	 */
+	export function insertExistingFile(file: FileEntry): void {
+		if (!editor || !pageId) return;
+		addBrainFileToMap(pageId, file);
+		const node = brainNodeForFile(file.id, file.mimeType);
+		editor.chain().focus().insertContent(node).run();
 	}
 
 	// Drop/paste upload: store the file (workspace- or personally-scoped to match

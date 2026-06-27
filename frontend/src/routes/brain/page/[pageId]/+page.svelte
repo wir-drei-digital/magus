@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
-	import { MessageSquare, NotebookPen, Trash2 } from '@lucide/svelte';
+	import { MessageSquare, NotebookPen, Paperclip, Trash2 } from '@lucide/svelte';
 	import {
 		brainPages,
 		getBrainPageForEdit,
@@ -35,6 +35,7 @@
 		import('$lib/components/companions/conversation-companion.svelte');
 	import * as Resizable from '$lib/components/ui/resizable';
 	import BrainEditor from '$lib/components/brain/brain-editor.svelte';
+	import BrainFilePickerDialog from '$lib/components/brain/brain-file-picker-dialog.svelte';
 	import { brainNav } from '$lib/stores/brain-nav.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { workbench } from '$lib/stores/workbench.svelte';
@@ -57,6 +58,7 @@
 	let loadError = $state<string | null>(null);
 
 	let editorRef = $state<BrainEditor | null>(null);
+	let filePickerOpen = $state(false);
 	let lockVersion = $state(0);
 	let dirty = $state(false);
 	let saveState = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -414,6 +416,15 @@
 					<div class="flex shrink-0 items-center gap-1.5">
 						<button
 							type="button"
+							class="wb-pill-btn shrink-0"
+							data-testid="brain-add-file"
+							onclick={() => (filePickerOpen = true)}
+						>
+							<Paperclip class="size-3.5" />
+							<span>Add file</span>
+						</button>
+						<button
+							type="button"
 							class="wb-pill-btn shrink-0 {chatConversationId ? 'wb-pill-btn-active' : ''}"
 							data-testid="brain-open-chat"
 							disabled={openingChat}
@@ -487,6 +498,12 @@
 					revision={editorRevision}
 					getDoc={() => editorRef?.getJSON() ?? pageData?.prosemirror ?? null}
 					onViewVersion={(versionId) => void viewVersion(versionId)}
+				/>
+
+				<BrainFilePickerDialog
+					bind:open={filePickerOpen}
+					workspaceId={pageData.brain.workspaceId}
+					onPick={(file) => editorRef?.insertExistingFile(file)}
 				/>
 			{/if}
 		</div>
