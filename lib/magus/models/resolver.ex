@@ -4,8 +4,8 @@ defmodule Magus.Models.Resolver do
   key, or an inherited default) into a `Magus.Models.Resolution`.
 
   Total: always returns `{:ok, %Resolution{}}`, producing the same model the
-  legacy `Magus.Agents.Plugins.Support.ModelResolver` did. A broken explicit
-  selection degrades to the inherited model (unchanged behavior) and is
+  legacy resolver did. A broken explicit selection degrades to the inherited
+  model (unchanged behavior) and is
   reported via `requested_selection` plus a
   `[:magus, :models, :resolution, :degraded]` telemetry event. Whether to
   hard-stop on a degradation is a caller policy, off in this phase.
@@ -75,7 +75,7 @@ defmodule Magus.Models.Resolver do
     end
   end
 
-  # Mirrors ModelResolver.resolve_auto_media: media specialty match (no
+  # Media :auto resolution: media specialty match (no
   # preloaded lookup) -> :auto; otherwise the role default for the mode's key
   # type (with preloaded lookup) -> :role_default.
   defp resolve_auto(mode, preloaded) do
@@ -117,7 +117,7 @@ defmodule Magus.Models.Resolver do
     resolution
   end
 
-  # --- key/mode helpers (ported verbatim from ModelResolver) ---
+  # --- key/mode helpers ---
 
   defp model_key_for_mode(%{} = keys, :image_generation), do: keys[:image] || keys[:chat]
   defp model_key_for_mode(%{} = keys, :video_generation), do: keys[:video] || keys[:chat]
