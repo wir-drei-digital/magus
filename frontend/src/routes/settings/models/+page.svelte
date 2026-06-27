@@ -55,8 +55,9 @@
 		busy = false;
 	}
 
-	// Move within the favorites list by swapping integer positions, then renumber
-	// the whole favorites list 0..n-1 so order is stable.
+	// Move within the favorites list by splice-removing the item and reinserting it
+	// at the target index, then renumber the whole favorites list 0..n-1 so order
+	// is stable.
 	async function move(index: number, delta: number) {
 		if (busy) return;
 		const next = index + delta;

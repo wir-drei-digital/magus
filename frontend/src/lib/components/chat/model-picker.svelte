@@ -26,7 +26,11 @@
 	let modelMenuOpen = $state(false);
 	let modelQuery = $state('');
 	$effect(() => {
-		if (!modelMenuOpen) modelQuery = '';
+		if (!modelMenuOpen) {
+			modelQuery = '';
+			favoritesOnly = false;
+			showHidden = false;
+		}
 	});
 
 	let prefs = $state<ModelPreference[]>([]);
