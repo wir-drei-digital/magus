@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { base } from '$app/paths';
 	import {
+		Boxes,
 		CreditCard,
 		Database,
 		FolderSync,
@@ -18,6 +19,7 @@
 	const sections = [
 		{ id: 'profile', label: 'Profile', icon: User },
 		{ id: 'preferences', label: 'Preferences', icon: SlidersHorizontal },
+		{ id: 'models', label: 'Models', icon: Boxes },
 		{ id: 'subscription', label: 'Subscription', icon: CreditCard },
 		{ id: 'integrations', label: 'Integrations', icon: Plug },
 		{ id: 'knowledge', label: 'Knowledge', icon: FolderSync },
