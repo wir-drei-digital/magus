@@ -56,8 +56,10 @@ defmodule Magus.Skills.Materializer do
           "export #{k}='#{String.replace(v, "'", "'\\''")}'"
         end)
 
-      Orchestrator.write_file(conversation_id, "/workspace/.env", content, user_id: user_id)
-      :ok
+      case Orchestrator.write_file(conversation_id, "/workspace/.env", content, user_id: user_id) do
+        {:ok, _} -> :ok
+        other -> normalize(other)
+      end
     else
       _ -> :ok
     end
