@@ -4,6 +4,52 @@ defmodule Magus.Skills.DiscoveryTest do
   alias Magus.Skills
   alias Magus.Skills.Discovery
 
+  test "runnable is false for a user skill with has_executable_bundle when sandbox is not configured" do
+    # In the test env, Magus.Sandbox.Provider.configured?() returns false
+    # because the :test provider's configured?/0 returns false.
+    owner = generate(user())
+
+    {:ok, skill} =
+      Skills.import_skill(
+        %{
+          name: "my-bundle-skill",
+          description: "a bundled skill",
+          has_executable_bundle: true
+        },
+        actor: owner
+      )
+
+    views = Discovery.list_for_actor(owner)
+    view = Enum.find(views, &(&1.ref == "user:" <> skill.id))
+
+    assert view, "expected to find the skill in the discovery list"
+    assert view.has_executable_bundle == true
+
+    assert view.runnable == false,
+           "bundled skill should be non-runnable when sandbox is not configured"
+  end
+
+  test "runnable is true for a user skill without an executable bundle" do
+    owner = generate(user())
+
+    {:ok, skill} =
+      Skills.create_skill(%{name: "plain-skill", description: "no bundle"}, actor: owner)
+
+    views = Discovery.list_for_actor(owner)
+    view = Enum.find(views, &(&1.ref == "user:" <> skill.id))
+
+    assert view, "expected to find the skill in the discovery list"
+    assert view.has_executable_bundle == false
+    assert view.runnable == true, "non-bundle skill should always be runnable"
+  end
+
+  test "runnable is true for all built-in skills" do
+    views = Discovery.list_for_actor(nil)
+
+    assert Enum.all?(views, &(&1.runnable == true)),
+           "all built-in skills should be runnable"
+  end
+
   test "includes built-in skills with builtin: refs even for a nil actor" do
     views = Discovery.list_for_actor(nil)
     assert Enum.all?(views, &(&1.source == :builtin))

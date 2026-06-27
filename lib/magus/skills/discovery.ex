@@ -14,7 +14,8 @@ defmodule Magus.Skills.Discovery do
           name: String.t(),
           description: String.t(),
           source: :builtin | :user,
-          has_executable_bundle: boolean()
+          has_executable_bundle: boolean(),
+          runnable: boolean()
         }
 
   @doc """
@@ -35,7 +36,8 @@ defmodule Magus.Skills.Discovery do
         name: s.name,
         description: s.description || "",
         source: :builtin,
-        has_executable_bundle: false
+        has_executable_bundle: false,
+        runnable: true
       }
     end)
   end
@@ -51,7 +53,8 @@ defmodule Magus.Skills.Discovery do
             name: s.name,
             description: s.description || "",
             source: :user,
-            has_executable_bundle: s.has_executable_bundle
+            has_executable_bundle: s.has_executable_bundle,
+            runnable: not s.has_executable_bundle or Magus.Sandbox.Provider.configured?()
           }
         end)
 
