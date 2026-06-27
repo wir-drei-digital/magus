@@ -89,4 +89,10 @@ defmodule Magus.Workspaces.ResourceAccessTest do
       assert {:error, _} = Ash.get(ResourceAccess, grant.id, actor: user)
     end
   end
+
+  describe "resource types" do
+    test ":skill is an accepted resource_type" do
+      assert :skill in Magus.Workspaces.ResourceAccess.resource_types()
+    end
+  end
 end
