@@ -236,6 +236,7 @@ defmodule MagusWeb.CoreRouter do
         pipe_through [:file_serving]
 
         get "/files/:id/download", FileController, :download
+        get "/skills/:id/download", Workbench.SkillController, :download
       end
 
       # Legacy routes — redirect to workbench equivalents with URL query params
