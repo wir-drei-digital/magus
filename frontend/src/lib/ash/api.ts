@@ -898,6 +898,9 @@ export type ChatMode = 'chat' | 'search' | 'reasoning' | 'image_generation' | 'v
 
 export type ConversationSummary = {
 	id: string;
+	/** Conversation creator / owner (implicitly :owner). Used to gate owner-only
+	 *  controls like the context-window donut actions (server still enforces). */
+	userId: string;
 	title: string | null;
 	chatMode: ChatMode;
 	updatedAt: string;
@@ -921,6 +924,7 @@ export type ConversationSummary = {
 
 const CONVERSATION_FIELDS: rpc.GetConversationFields = [
 	'id',
+	'userId',
 	'title',
 	'chatMode',
 	'updatedAt',

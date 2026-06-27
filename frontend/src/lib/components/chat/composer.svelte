@@ -36,6 +36,7 @@
 	import { cachedActiveModels, cachedMyAgents, cachedSlashCommands } from '$lib/chat/catalog';
 	import { imageModalityMismatch } from '$lib/chat/composer-guards';
 	import type { ConversationStore } from '$lib/chat/conversation-store.svelte';
+	import { isConversationOwner } from '$lib/chat/ownership';
 	import { clearDraft, loadDraft, saveDraft } from '$lib/chat/drafts';
 	import {
 		detectMention,
@@ -44,6 +45,7 @@
 		type MentionContext
 	} from '$lib/chat/mentions';
 	import { workbench } from '$lib/stores/workbench.svelte';
+	import { session } from '$lib/stores/session.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import GenerationConfig from './generation-config.svelte';
 	import ModelPicker from './model-picker.svelte';
@@ -91,6 +93,9 @@
 
 	const conversation = $derived(workbench.conversation(store.conversationId));
 	const chatMode = $derived(conversation?.chatMode ?? 'chat');
+	// Owner-only context-window controls (Clear/Compact/strategy); non-owner members
+	// get a read-only donut, mirroring the classic is_owner gate. Server enforces.
+	const isOwner = $derived(isConversationOwner(conversation, session.user?.id));
 
 	// Plus-menu slash commands: globals merged with the active agent's own.
 	let slashCommands = $state<SlashCommandEntry[]>([]);
@@ -566,6 +571,7 @@
 
 				<ContextIndicator
 					{store}
+					{isOwner}
 					selectedContextWindow={selectedModel?.contextWindow ?? null}
 					isAuto={selectedModelForMode === null}
 				/>

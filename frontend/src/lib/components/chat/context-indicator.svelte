@@ -8,10 +8,14 @@
 
 	let {
 		store,
+		isOwner = false,
 		selectedContextWindow = null,
 		isAuto = true
 	}: {
 		store: ConversationStore;
+		/** Only the conversation owner gets the Clear/Compact/strategy controls;
+		 *  non-owner members see a read-only donut (server enforces the actions). */
+		isOwner?: boolean;
 		selectedContextWindow?: number | null;
 		isAuto?: boolean;
 	} = $props();
@@ -207,70 +211,72 @@
 			<!-- One row: strategy toggle (config) on the left, icon actions on the
 			     right. The effective strategy is highlighted — the app default when
 			     there's no per-conversation override. -->
-			<div class="mt-3 flex items-center gap-2 border-t border-border pt-3">
-				<div class="flex overflow-hidden rounded-md border border-border">
+			{#if isOwner}
+				<div class="mt-3 flex items-center gap-2 border-t border-border pt-3">
+					<div class="flex overflow-hidden rounded-md border border-border">
+						<button
+							type="button"
+							data-testid="context-strategy-rolling"
+							onclick={() => pickStrategy('rolling')}
+							title={strategyIsDefault && effectiveStrategy === 'rolling'
+								? 'Active by default'
+								: undefined}
+							class="px-2.5 py-1 text-xs transition-colors {effectiveStrategy === 'rolling'
+								? 'bg-primary text-primary-foreground'
+								: 'hover:bg-accent'}"
+						>
+							Rolling
+						</button>
+						<button
+							type="button"
+							data-testid="context-strategy-compact"
+							onclick={() => pickStrategy('compact')}
+							title={strategyIsDefault && effectiveStrategy === 'compact'
+								? 'Active by default'
+								: undefined}
+							class="border-l border-border px-2.5 py-1 text-xs transition-colors {effectiveStrategy ===
+							'compact'
+								? 'bg-primary text-primary-foreground'
+								: 'hover:bg-accent'}"
+						>
+							Auto compact
+						</button>
+					</div>
+
+					<div class="flex-1"></div>
+
 					<button
 						type="button"
-						data-testid="context-strategy-rolling"
-						onclick={() => pickStrategy('rolling')}
-						title={strategyIsDefault && effectiveStrategy === 'rolling'
-							? 'Active by default'
-							: undefined}
-						class="px-2.5 py-1 text-xs transition-colors {effectiveStrategy === 'rolling'
-							? 'bg-primary text-primary-foreground'
-							: 'hover:bg-accent'}"
+						data-testid="context-compact"
+						data-compaction-status={compactionStatus}
+						onclick={compact}
+						disabled={compacting}
+						title={compactTitle}
+						aria-label={compactFailed ? 'Retry compaction' : 'Compact now'}
+						class="flex size-7 shrink-0 items-center justify-center rounded-md border border-border transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
 					>
-						Rolling
+						{#if compacting}
+							<span
+								class="size-3 animate-spin rounded-full border-2 border-current border-t-transparent"
+							></span>
+						{:else}
+							<Combine class="size-3.5" />
+						{/if}
 					</button>
+
 					<button
 						type="button"
-						data-testid="context-strategy-compact"
-						onclick={() => pickStrategy('compact')}
-						title={strategyIsDefault && effectiveStrategy === 'compact'
-							? 'Active by default'
-							: undefined}
-						class="border-l border-border px-2.5 py-1 text-xs transition-colors {effectiveStrategy ===
-						'compact'
-							? 'bg-primary text-primary-foreground'
-							: 'hover:bg-accent'}"
+						data-testid="context-clear"
+						onclick={clear}
+						disabled={compacting}
+						title="Clear"
+						aria-label="Clear context"
+						class="flex size-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
 					>
-						Auto compact
+						<Eraser class="size-3.5" />
 					</button>
 				</div>
-
-				<div class="flex-1"></div>
-
-				<button
-					type="button"
-					data-testid="context-compact"
-					data-compaction-status={compactionStatus}
-					onclick={compact}
-					disabled={compacting}
-					title={compactTitle}
-					aria-label={compactFailed ? 'Retry compaction' : 'Compact now'}
-					class="flex size-7 shrink-0 items-center justify-center rounded-md border border-border transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
-				>
-					{#if compacting}
-						<span
-							class="size-3 animate-spin rounded-full border-2 border-current border-t-transparent"
-						></span>
-					{:else}
-						<Combine class="size-3.5" />
-					{/if}
-				</button>
-
-				<button
-					type="button"
-					data-testid="context-clear"
-					onclick={clear}
-					disabled={compacting}
-					title="Clear"
-					aria-label="Clear context"
-					class="flex size-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-				>
-					<Eraser class="size-3.5" />
-				</button>
-			</div>
+			{/if}
 
 			<a
 				href="/docs/conversations/context-window"

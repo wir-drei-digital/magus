@@ -5,6 +5,7 @@ import type { ConversationSummary } from '$lib/ash/api';
 function conversation(overrides: Partial<ConversationSummary>): ConversationSummary {
 	return {
 		id: crypto.randomUUID(),
+		userId: 'user-1',
 		title: 'Chat',
 		chatMode: 'chat',
 		updatedAt: '2026-06-12T08:00:00Z',
