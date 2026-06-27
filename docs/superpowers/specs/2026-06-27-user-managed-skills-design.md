@@ -32,7 +32,7 @@ A second capability closes the loop: an agent authoring tool (`create_skill`) th
 1. **Superset model.** The internal representation is a superset that native authoring and external formats normalize into. Native authoring and Anthropic import are both v1.
 2. **Hybrid storage, file tree latent.** SKILL.md (frontmatter plus body) is stored as structured, in-app-editable fields. The rest of the bundle is an archive in File-storage. A `file_manifest` keeps the per-file representation latent so a future file-tree editor is additive.
 3. **Workspace-scoped resource plus import.** A skill is a resource like any other, with personal and workspace access via the existing grant model. Import is via zip upload (v1) and git/URL (Phase 2). No marketplace in v1.
-4. **Sandbox plus first-run approval.** The sandbox is the security boundary, the same isolation Magus already trusts for agent-authored code. The first time a bundled skill executes in a conversation, a human approval is required. Secret values are never bundled with a skill: in v1 the sandbox env is populated by the existing `AgentSecret` `:sandbox_env` mechanism, and a skill's optional `required_secrets` is a declarative UX hint.
+4. **Sandbox plus first-run approval.** The sandbox is the security boundary, the same isolation Magus already trusts for agent-authored code. The first time a bundled skill is activated in a conversation, a human approval is required **before any of its bytes are written to the shared `/workspace`**. Secret values are never bundled with a skill: in v1 the sandbox env is populated by the existing `AgentSecret` `:sandbox_env` mechanism (a `/workspace/.env` that scripts source), and a skill's optional `required_secrets` is a declarative UX hint.
 5. **Sandbox-materialized bundles, reuse existing tools.** Execution rides the existing sandbox and tools rather than compiling typed tools or running an MCP server per skill.
 
 ## Standards alignment (2026-06-27 web research)
@@ -40,7 +40,7 @@ A second capability closes the loop: an agent authoring tool (`create_skill`) th
 A cited, adversarially verified web-research pass confirmed the design direction and sharpened the adapter list. Recency caveat: this space moves fast and much of the governance/adoption detail is post the assistant's knowledge cutoff, so re-verify field-level details against the live spec (agentskills.io) before implementation. The structural facts below match the format's original launch and are treated as stable.
 
 - **`SKILL.md` (Anthropic Agent Skills) is the convergent cross-vendor format** for portable skill bundles: a directory with a `SKILL.md` (YAML frontmatter + Markdown body) plus optional `scripts/`, `references/`, `assets/`, executed via progressive disclosure and bash-run bundled scripts. It is structurally identical to our internal model and is adopted across many harnesses (Claude Code, OpenAI Codex, Gemini CLI, Cursor, GitHub Copilot, opencode/sst, Goose, and others).
-- **Decision: our native format IS `SKILL.md`, extended as a strict superset.** Required frontmatter: `name`, `description`. Optional standard fields: `license`, `compatibility`, `metadata`, `allowed-tools` (experimental). Our `requested_tools` serializes as `allowed-tools`; our extras (`required_secrets`, `runtime_hints`, `version`) live under the arbitrary `metadata` map (exactly where the standard itself places `version`). Result: every Magus skill is a valid Agent Skill, and every Agent Skill imports losslessly.
+- **Decision: our native format IS `SKILL.md`, extended as a careful superset.** Required frontmatter: `name`, `description`. Optional standard fields: `license`, `compatibility`, `metadata`, `allowed-tools` (experimental). Serialization rules (re-verify against the live spec before coding, since `metadata` value-typing and the `allowed-tools` delimiter are the load-bearing details): `allowed-tools` is a **string in the file (space-separated), not an array**, and maps to/from our `requested_tools` list; `metadata` **values are strings**, so Magus-only extensions (`required_secrets`, `runtime_hints`, internal `version`) are JSON-encoded into a single namespaced `metadata["x-magus"]` string, which keeps the file spec-valid and is ignored by other tools. Result: the standard fields round-trip exactly, a Magus skill stays a valid Agent Skill, and any Agent Skill imports (our extensions simply absent). We do not claim nested structures under `metadata`.
 - **Codex needs no separate adapter:** OpenAI Codex consumes the same Agent Skills standard, so importing a Codex skill is just parsing `SKILL.md`. The previously planned `:codex` adapter is dropped.
 - **MCP is an adjacent layer, not a bundle format:** it is the typed-tool transport a skill may call into, already integrated at the Magus tool layer. No MCP skill adapter.
 - **AGENTS.md is prompt-only guidance** (no scripts, no bundle). An AGENTS.md import maps to a prompt-only skill (populates `body`, never `scripts/`).
@@ -73,14 +73,14 @@ New domain `Magus.Skills` with a `Skill` resource. The existing `Magus.Agents.Sk
 
 ### `Magus.Skills.Skill`
 
-- Identity/display: `name` (the `SKILL.md` name: lowercase, numbers, hyphens, max 64 chars, no reserved words, unique per owner scope), `display_name`, `description` (drives discovery, max 1024 chars), `license`, `compatibility`, `icon`, `color`. `version` is not top-level; it lives under `metadata` per the standard.
+- Identity/display: `name` (the `SKILL.md` name: lowercase, numbers, hyphens, max 64 chars, no reserved words; the DB identity is unique per owner scope, but cross-source name collisions are resolved at discovery, see Naming and collisions), `display_name`, `description` (drives discovery, max 1024 chars), `license`, `compatibility`, `icon`, `color`. `version` is not a standard top-level field; it rides inside the `x-magus` metadata string.
 - Instructions: `body` (the SKILL.md markdown body, progressive-disclosure layer 2).
-- Capability declarations (serialized as a strict `SKILL.md` superset):
-  - `requested_tools` (`{:array, :string}`): existing Magus tools the skill wants, resolved through `@skill_tool_mapping`. Serializes to/from the standard `allowed-tools` frontmatter field (experimental in the spec); unknown names retained but inert.
-  - `metadata` (`:map`): the standard arbitrary key-value map. Carries `version` plus the Magus-specific extras below under a namespaced key, so a Magus skill stays a valid Agent Skill and any Agent Skill imports losslessly.
-  - `required_secrets` (`{:array, :map}`): `[%{key, description}]`, opt-in, never auto-injected. Serialized under `metadata`.
-  - `runtime_hints` (`:map`): optional `%{packages: [...], image: ...}`. Serialized under `metadata`.
-- Bundle: `bundle_file_id` (FK to `Magus.Files.File`, nullable, nil means prompt-only), `file_manifest` (`{:array, :map}` of `%{path, size, sha256, executable?}`), `has_executable_bundle` (boolean, gates the approval path). The bundle preserves the standard `SKILL.md` layout (`scripts/`, `references/`, `assets/`), so imported relative paths resolve unchanged after materialization.
+- Capability declarations (serialized as a careful `SKILL.md` superset):
+  - `requested_tools` (`{:array, :string}`): existing Magus tools the skill wants, resolved through `@skill_tool_mapping`. Serializes to/from the standard `allowed-tools` field, which is a **space-separated string** in the file (not an array); unknown names retained but inert.
+  - `metadata` (`:map`): the standard map, whose **values are strings**. Magus extensions do not nest under it directly; instead `required_secrets`, `runtime_hints`, and the internal `version` are JSON-encoded into a single `metadata["x-magus"]` string, keeping the file spec-valid and ignored by other tools.
+  - `required_secrets` (`{:array, :map}`): `[%{key, description}]`, declarative hint only (see Secrets), serialized inside the `x-magus` metadata string.
+  - `runtime_hints` (`:map`): optional `%{packages: [...], image: ...}`, serialized inside the `x-magus` metadata string.
+- Bundle: stored so the inert archive is NOT indexed. `Files.File.create` fires `:process_file` (chunking/embedding), wrong here, so the bundle uses either a dedicated non-indexing `Files.File` create action (keeps storage limits and tracking, skips `:process_file`) or a direct `Magus.Files.Storage` write (decided in the plan). The `Skill` records the bundle reference (nil means prompt-only) and a `file_manifest` (`{:array, :map}` of `%{path, size, sha256, executable?}`); `has_executable_bundle` (boolean) gates the approval path. The bundle preserves the standard `SKILL.md` layout (`scripts/`, `references/`, `assets/`), so imported relative paths resolve unchanged after materialization.
 - Provenance: `source_format` (`:skill_md` native/Anthropic/Codex, `:agents_md`, `:goose`, `:other`), `source_url` (nullable).
 - Scoping: `user_id` (owner), `workspace_id` (nullable), `deleted_at` (soft delete).
 
@@ -104,22 +104,28 @@ The "## Available Skills" system-prompt section is composed per-conversation fro
 
 Only name and description are exposed at this layer; the body stays out until load. This is the one notable change from today's global, cached section. Built-in skills remain in the stable (cached) prefix. The user-skill list is per-conversation but stable across turns unless the skill set changes, so cache impact is bounded. The exact stable-prefix split is measured in the plan.
 
+### Naming and collisions
+
+`load_skill` takes a stable `skill_ref`, not a bare name: an opaque id for user skills and `builtin:<name>` for built-ins, so the LLM never loads ambiguously. The DB keeps `name` unique per owner scope, but a built-in, a personal skill, and a workspace or granted skill can still share a display name. Discovery resolves this deterministically: each surfaced skill gets a unique `skill_ref`, and on display-name collision a fixed precedence applies (agent-pinned > personal > workspace/granted > built-in), with shadowed entries surfaced explicitly so the agent and user can tell them apart.
+
 ## Runtime flow
 
-1. **Discovery.** Agent sees the skill (name plus description) in the merged list.
-2. **Load.** Agent calls `load_skill(name)`. The dispatcher branches:
+Discovery, then load, then approve, then materialize, then execute. Approval precedes any write to the sandbox.
+
+1. **Discovery.** Agent sees the skill (name plus description plus a stable `skill_ref`) in the merged list.
+2. **Load.** Agent calls `load_skill(skill_ref)`. The dispatcher resolves the ref (built-in vs user skill, no name ambiguity) and branches:
    - Built-in: unchanged (body to `skill_context`, tools to `skill_tools`).
-   - User skill: persist `body` to `skill_context`, resolve `requested_tools` to `skill_tools` (existing path, including mid-turn `__new_tools__` registration in the ReAct runner). If `has_executable_bundle`, proceed to materialize.
-3. **Materialize.** Ensure the conversation sandbox exists (orchestrator auto-creates), then unpack the archive into `/workspace/.skills/<name>/`, idempotent via a marker so suspend/resume and re-loads do not re-unpack. Secret values come from the existing `AgentSecret` `:sandbox_env` injection (v1); the skill's `required_secrets` is a declarative hint, not a value store. Optional `runtime_hints.packages` install via the existing `install_packages`.
-4. **Approve (first-run gate).** The first time a bundled skill is activated in a conversation, before its code can run, the agent raises an approval through `RequestApproval`, matched by `InboxEventPlugin`. The prompt names the skill and surfaces declared secrets and packages. The decision is remembered per conversation. A self-authored skill is flagged "authored by you" to reduce friction. Per-user "always trust this skill" is Phase 2. Built-in and prompt-only skills skip the gate.
-5. **Execute.** The agent runs the bundled CLIs via existing `exec_command` / `run_code` / `start_service`. The SKILL.md body tells it how (for example `python .skills/<name>/foo.py`). Files persist in `/workspace` for the conversation. No new execution tool is introduced.
+   - User skill: persist `body` to `skill_context`, resolve `requested_tools` to `skill_tools` (existing path, including mid-turn `__new_tools__` registration in the ReAct runner). If `has_executable_bundle`, go to approval **before** anything is written to the sandbox.
+3. **Approve (first-run gate), before any bytes touch the sandbox.** Because `/workspace` is shared and `exec_command` may already be enabled by another loaded skill, no skill file is written until approved. The first time a bundled skill is activated in a conversation, the agent raises an approval through `RequestApproval` (matched by `InboxEventPlugin`), naming the skill and surfacing declared secrets and packages. Remembered per conversation. A self-authored skill is flagged "authored by you" to reduce friction; per-user "always trust this skill" is Phase 2. Built-in and prompt-only skills skip the gate.
+4. **Materialize (only after approval).** Ensure the sandbox exists, unpack the archive in-app (safe, path-guarded), then write each file into `/workspace/.skills/<name>/` via `Orchestrator.write_file` (the sandbox exposes per-file writes, not an unpack primitive; these use the provider file API, not `exec`). Idempotent via a marker so suspend/resume and re-loads do not re-write. Optional `runtime_hints.packages` install via `install_packages`.
+5. **Execute.** The agent runs the bundled CLIs via existing `exec_command` / `run_code` / `start_service`, per the SKILL.md body (for example `python .skills/<name>/foo.py`). Secret delivery: for an agent-bound conversation `ExecCommand` writes the agent's secrets to `/workspace/.env` as `export` lines, which are not auto-sourced, so the skill run convention must `source /workspace/.env` (covering `run_code` is a Phase-1 task). Files persist in `/workspace` for the conversation. No new execution tool is introduced.
 
 ## Agent authoring tool: `create_skill`
 
 A new authoring tool (not an execution tool, so it does not break the no-new-execution-tools property).
 
 - **Params:** `name`, `description`, `body` (the SKILL.md the agent writes), `include_paths` (sandbox files/dirs to bundle; empty means a prompt-only skill), and optional `requested_tools`, `required_secrets`, `runtime_hints`, `workspace_id`. Nullable params use `{:or, [type, nil]}`.
-- **Run:** validate context (`user_id`, `conversation_id`), read `include_paths` from the conversation sandbox (existing orchestrator read/download), safe-pack into an archive, store via File-storage, compute `file_manifest`, create a `Skill` row owned by the acting user (workspace-shared if requested). Returns the new skill id and name; it is discoverable on the next turn.
+- **Run:** validate context (`user_id`, `conversation_id`), read `include_paths` from the conversation sandbox (existing orchestrator read/download), safe-pack into an archive, store it without indexing (non-indexing `Files.File` create or a direct `Magus.Files.Storage` write, NOT `Files.File.create`), compute `file_manifest`, create a `Skill` row owned by the acting user (workspace-shared if requested). Returns the new skill id and name; it is discoverable on the next turn.
 - **Trust:** creating is low-risk (it persists files from the user's own sandbox, scoped to the user), so no approval to author. The first-run execution gate still applies when the skill is later loaded.
 - **The loop:** "Build me a CLI that does X" leads to the agent writing and testing it in the sandbox, then calling `create_skill`. A later conversation loads that skill and runs the CLI instead of rebuilding it. Skills become durable memory for agent-built tooling.
 
@@ -131,9 +137,9 @@ Pipeline (a dedicated multipart `/rpc/skills/import` controller, since it unpack
 
 1. Multipart upload of the zip.
 2. **Safe unpack**, reusing the boundary-safe path-traversal guard from `Magus.Files.Storage.Local` (commit `mw8p`): reject absolute paths, `..` escapes, and symlinks; enforce max file count, max total size, max single-file size.
-3. Locate `SKILL.md` (repo root or a single top-level dir), parse YAML frontmatter plus body with the same parser the Registry uses.
+3. Locate `SKILL.md` (repo root or a single top-level dir), and parse YAML frontmatter plus body with a parser that preserves ALL standard fields (`name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools`). The Registry's `parse_skill_file`/`validate_frontmatter` is lossy (keeps only `name`/`description`/`tags`/`tools`/`enabled`) and must be extended or replaced.
 4. **Normalize via adapter** (detect format, map into the superset).
-5. Persist: the `Skill` row plus the remaining bundle files as an archive in File-storage (`bundle_file_id`) plus a computed `file_manifest`.
+5. Persist: the `Skill` row, the bundle archive stored without indexing (a dedicated non-indexing `Files.File` create or a direct `Magus.Files.Storage` write, NOT the standard `Files.File.create` `:process_file` path), plus a computed `file_manifest`.
 
 Formats (our native format is `SKILL.md` itself, so most "import" is just parsing):
 
@@ -147,8 +153,8 @@ The adapter boundary keeps new formats additive: each is one normalizer into the
 ## Security model
 
 - **Boundary:** the sandbox is the same isolation Magus already trusts for agent-authored code (egress restricted to package registries, one sandbox per conversation, auto-suspend, destroyed on delete). Running a skill's CLIs is the same execution class, now with provenance attached.
-- **First-run approval:** see runtime flow step 4. Reuses `RequestApproval` plus `InboxEventPlugin`.
-- **Secrets:** sandbox env vars, never bundled with the skill. v1 reuses the existing `AgentSecret` `:sandbox_env` injection for values; a skill's optional `required_secrets` is a declarative UX hint (under `metadata`). Missing keys do not block load; the agent is told which are unset. Per-skill `SkillSecret` with per-key scoping is Phase 2.
+- **First-run approval (before any sandbox write):** see runtime flow step 3. Reuses `RequestApproval` plus `InboxEventPlugin`.
+- **Secrets:** sandbox env vars, never bundled with the skill. v1 reuses the existing `AgentSecret` `:sandbox_env` injection: for an agent-bound conversation `ExecCommand` writes the agent's secrets to `/workspace/.env` as `export` lines, which are not auto-sourced (CommandRunner/RunCode run the raw command), so the skill run convention must `source /workspace/.env`; making this reliable and covering `run_code` is a Phase-1 task. A skill's optional `required_secrets` is a declarative hint (inside the `x-magus` metadata), with no value store in v1. Missing keys do not block load; the agent is told which are unset. Per-skill `SkillSecret` with per-key scoping is Phase 2.
 
 ## Sharing and access control
 
@@ -165,17 +171,17 @@ This is identical to agents, prompts, and brains. Personal is the default (nil w
 
 A new `skills` mode next to `prompts`, reusing the library patterns:
 
-- **Nav:** add a `skills` entry to the mode strip (`frontend/src/lib/components/shell/mode-strip.svelte`) and `/skills` to `MODE_HOME`. The `WorkbenchMode` union and the backend `TabSession.mode` enum both gain `skills`.
+- **Nav and mode plumbing (broader than the strip):** add a `skills` entry to the mode strip (`frontend/src/lib/components/shell/mode-strip.svelte`) and `/skills` to `MODE_HOME`; update route-to-mode inference; extend the `WorkbenchMode` TS union; add `:skills` to the backend `TabSession.mode` `one_of` (`lib/magus/workbench/tab_session.ex`) and regenerate the Ash snapshot via `mix ash.codegen` (DB migration only if a constraint exists); regenerate the TS client; update route tests.
 - **Routes** mirroring prompts: `/skills` master/detail layout, a `skill-gallery` list with scope/tag/search filters, a `skills-nav` sidebar, and `/skills/[skillId]` detail.
-- **Detail/editor** for native authoring: name, description, body (markdown/code editor), declared `requested_tools`, declared `required_secrets` (key plus description; values entered separately and stored encrypted), and an artifacts panel listing `file_manifest` entries with upload/replace/remove. Share-to-workspace is the same dropdown toggle prompts use.
+- **Detail/editor** for native authoring: name, description, body (markdown/code editor), declared `requested_tools`, and declared `required_secrets` shown as **read-only hints** (key plus description: what the skill needs and where to set it, i.e. as an `AgentSecret` on the agent that runs it), with no per-skill value entry in v1, plus an artifacts panel listing `file_manifest` entries with upload/replace/remove. Share-to-workspace is the same dropdown toggle prompts use.
 - **Two creation entry points:** "New skill" (native authoring, optional artifact zip) and "Import skill" (Anthropic zip).
-- **Backend exposure:** declare RPC actions on the `Skills` domain (`my_skills`, `workspace_skills`, `get_skill`, `create`, `update`, `destroy`, `share_to_team`, `unshare_from_team`, add/remove secret) and run `mix ash_typescript.codegen`. Bundle/artifact upload and zip import go through the dedicated multipart import/upload controller.
+- **Backend exposure:** declare RPC actions on the `Skills` domain (`my_skills`, `workspace_skills`, `get_skill`, `create`, `update`, `destroy`, `share_to_team`, `unshare_from_team`) and run `mix ash_typescript.codegen`. No per-skill secret RPC in v1. Bundle/artifact upload and zip import go through the dedicated multipart import/upload controller.
 
 ## Error handling and capability gating
 
 - **No sandbox provider:** bundled skills still list but are marked "requires code execution (unavailable here)"; loading one returns a clear message. Prompt-only user skills work regardless. Mirrors the existing `Sandbox.Provider.configured?/0` gating in `tool_builder.ex`.
 - **Import failures** are specific and typed (missing `SKILL.md`, invalid frontmatter, unsafe path, oversize, too many files) so the SPA can show them.
-- **Materialization failure** (sandbox died mid-conversation): surfaced to the agent, retried on next load, idempotent marker prevents partial double-unpack.
+- **Materialization failure** (sandbox died mid-conversation): surfaced to the agent, retried on next load, idempotent marker prevents partial double-write.
 - **Unknown `requested_tools`:** ignored with a warning, exactly as `resolve_skill_tools/1` does today.
 - **Kill-switch:** a `Magus.Skills.enabled?` flag (like `SuperBrain.enabled?`) lets an instance disable the whole feature.
 
@@ -203,14 +209,14 @@ New:
 
 - `lib/magus/skills/skills.ex` (domain), `lib/magus/skills/skill.ex` (`lib/magus/skills/skill_secret.ex` is Phase 2).
 - `lib/magus/skills/import/` (safe unpack, `SKILL.md` parse and normalizer; AGENTS.md and Goose adapters in later phases).
-- `lib/magus/skills/materializer.ex` (archive to sandbox, idempotent marker).
+- `lib/magus/skills/materializer.ex` (in-app unpack, per-file write via `Orchestrator.write_file`, idempotent marker).
 - `lib/magus/agents/tools/skills/create_skill.ex` (authoring tool, Phase 2 or late Phase 1).
 - `lib/magus_web/rpc/skills_controller.ex` (multipart import/upload).
 - `frontend/src/routes/skills/...`, `frontend/src/lib/components/shell/skills-nav.svelte`, `frontend/src/lib/stores/skills-nav.svelte.ts`, `frontend/src/lib/ash/api.ts` additions.
 
 Changed:
 
-- `lib/magus/agents/skills/registry.ex` (discovery/merge layer over built-in plus user skills).
+- `lib/magus/agents/skills/registry.ex` (discovery/merge layer over built-in plus user skills; its lossy frontmatter parser extended or replaced for the full `SKILL.md` field set).
 - `lib/magus/agents/tools/skills/load_skill.ex` (dispatch built-in vs user, trigger materialize and approval).
 - `lib/magus/agents/tools/tool_builder.ex` (per-actor user-skill resolution, capability gating already present for sandbox tools).
 - `lib/magus/agents/context/system_prompts.ex` (per-conversation skills section composition).
@@ -218,4 +224,5 @@ Changed:
 - `lib/magus/agents/custom_agent.ex` (`pre_loaded_skills` resolves user-skill ids).
 - `lib/magus/chat/conversation.ex` (approved/materialized skill tracking).
 - Domain RPC config for AshTypescript plus `mix ash_typescript.codegen`.
-- `TabSession.mode` enum gains `skills`.
+- `lib/magus/workbench/tab_session.ex` `mode` `one_of` gains `:skills` (plus Ash snapshot regen via `mix ash.codegen`, route-to-mode inference, and route tests).
+
