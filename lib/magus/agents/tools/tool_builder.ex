@@ -338,6 +338,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
       ToolSearch,
       LoadTool,
       LoadSkill,
+      CreateSkill,
       WebSearch,
       WebFetch,
       Rag,
