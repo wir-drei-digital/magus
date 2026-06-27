@@ -11,7 +11,13 @@ defmodule Magus.Plan.Task.Changes.SpawnRecurrence do
   @impl true
   def change(changeset, _, _) do
     Ash.Changeset.after_action(changeset, fn changeset, task ->
-      with true <- Ash.Changeset.changing_attribute?(changeset, :status),
+      # Plan tasks (no conversation_id) do not spawn recurrences. `create_task`
+      # targets the conversation `:create` action, which requires a non-nil
+      # conversation_id; spawning here would error inside the completing task's
+      # after_action and could roll back a legitimate completion. Recurrence for
+      # plan tasks is a later-plan concern.
+      with false <- is_nil(task.conversation_id),
+           true <- Ash.Changeset.changing_attribute?(changeset, :status),
            true <- task.status == :done,
            %{} = recurrence when recurrence != %{} <- task.recurrence,
            %DateTime{} <- task.due_at do

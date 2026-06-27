@@ -35,7 +35,10 @@ defmodule Magus.Plan.Task.Changes.NotifyTaskCompletion do
   # ---------------------------------------------------------------------------
 
   defp transitioning_to_done?(changeset, old_status, task) do
-    task.status == :done and
+    # Plan tasks (no conversation_id) never notify: the agent-assignment inbox
+    # event is conversation-scoped and `source_id` would be blank for them.
+    not is_nil(task.conversation_id) and
+      task.status == :done and
       Ash.Changeset.changing_attribute?(changeset, :status) and
       old_status != :done and
       not is_nil(task.assigned_by_custom_agent_id) and
@@ -43,7 +46,7 @@ defmodule Magus.Plan.Task.Changes.NotifyTaskCompletion do
   end
 
   # ---------------------------------------------------------------------------
-  # Inbox Event (after_action — inside transaction)
+  # Inbox Event (after_action - inside transaction)
   # ---------------------------------------------------------------------------
 
   defp notify_assigner(task, actor) do
