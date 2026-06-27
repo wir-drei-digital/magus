@@ -352,10 +352,11 @@ export type BrainAttributesOnlySchema = {
 // BrainPage Schema
 export type BrainPageResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "icon" | "body" | "lockVersion" | "updatedAt" | "brainId" | "parentPageId" | "prosemirror";
+  __primitiveFields: "id" | "title" | "icon" | "kind" | "body" | "lockVersion" | "updatedAt" | "brainId" | "parentPageId" | "prosemirror";
   id: UUIDv7;
   title: string | null;
   icon: string | null;
+  kind: "page" | "plan";
   body: string | null;
   lockVersion: number;
   updatedAt: UtcDateTimeUsec;
@@ -370,10 +371,11 @@ export type BrainPageResourceSchema = {
 
 export type BrainPageAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "icon" | "body" | "lockVersion" | "updatedAt" | "brainId" | "parentPageId";
+  __primitiveFields: "id" | "title" | "icon" | "kind" | "body" | "lockVersion" | "updatedAt" | "brainId" | "parentPageId";
   id: UUIDv7;
   title: string | null;
   icon: string | null;
+  kind: "page" | "plan";
   body: string | null;
   lockVersion: number;
   updatedAt: UtcDateTimeUsec;
@@ -1425,11 +1427,12 @@ export type NotificationAttributesOnlySchema = {
 // Task Schema
 export type TaskResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "description" | "status" | "position" | "assignedToAgent" | "completedBy" | "assignedToCustomAgentId" | "assignedByCustomAgentId" | "blockedReason" | "waitingOnUser" | "resultSummary" | "metadata" | "dueAt" | "dismissedAt" | "recurrence" | "conversationId" | "parentId" | "assignedToUserId";
+  __primitiveFields: "id" | "title" | "description" | "status" | "priority" | "position" | "assignedToAgent" | "completedBy" | "assignedToCustomAgentId" | "assignedByCustomAgentId" | "blockedReason" | "waitingOnUser" | "resultSummary" | "metadata" | "dueAt" | "claimedAt" | "leaseExpiresAt" | "createdByLabel" | "dismissedAt" | "recurrence" | "conversationId" | "brainPageId" | "parentId" | "assignedToUserId" | "subtaskCount" | "completedSubtaskCount" | "openDependenciesCount" | "ready";
   id: UUIDv7;
   title: string;
   description: string | null;
   status: "archived" | "blocked" | "cancelled" | "done" | "in_progress" | "open";
+  priority: "high" | "low" | "normal" | "urgent";
   position: number | null;
   assignedToAgent: string | null;
   completedBy: string | null;
@@ -1440,14 +1443,24 @@ export type TaskResourceSchema = {
   resultSummary: string | null;
   metadata: Record<string, any> | null;
   dueAt: UtcDateTimeUsec | null;
+  claimedAt: UtcDateTimeUsec | null;
+  leaseExpiresAt: UtcDateTimeUsec | null;
+  createdByLabel: string | null;
   dismissedAt: UtcDateTimeUsec | null;
   recurrence: Record<string, any> | null;
-  conversationId: UUID;
+  conversationId: UUID | null;
+  brainPageId: UUID | null;
   parentId: UUID | null;
   assignedToUserId: UUID | null;
-  conversation: { __type: "Relationship"; __resource: ConversationResourceSchema; };
+  subtaskCount: number;
+  completedSubtaskCount: number;
+  openDependenciesCount: number;
+  ready: boolean | null;
+  conversation: { __type: "Relationship"; __resource: ConversationResourceSchema | null; };
+  brainPage: { __type: "Relationship"; __resource: BrainPageResourceSchema | null; };
   parent: { __type: "Relationship"; __resource: TaskResourceSchema | null; };
   subtasks: { __type: "Relationship"; __array: true; __resource: TaskResourceSchema; };
+  dependencies: { __type: "Relationship"; __array: true; __resource: TaskDependencyResourceSchema; };
   assignedToUser: { __type: "Relationship"; __resource: UserResourceSchema | null; };
 };
 
@@ -1455,11 +1468,12 @@ export type TaskResourceSchema = {
 
 export type TaskAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "description" | "status" | "position" | "assignedToAgent" | "completedBy" | "assignedToCustomAgentId" | "assignedByCustomAgentId" | "blockedReason" | "waitingOnUser" | "resultSummary" | "metadata" | "dueAt" | "dismissedAt" | "recurrence" | "conversationId" | "parentId" | "assignedToUserId";
+  __primitiveFields: "id" | "title" | "description" | "status" | "priority" | "position" | "assignedToAgent" | "completedBy" | "assignedToCustomAgentId" | "assignedByCustomAgentId" | "blockedReason" | "waitingOnUser" | "resultSummary" | "metadata" | "dueAt" | "claimedAt" | "leaseExpiresAt" | "createdByLabel" | "dismissedAt" | "recurrence" | "conversationId" | "brainPageId" | "parentId" | "assignedToUserId";
   id: UUIDv7;
   title: string;
   description: string | null;
   status: "archived" | "blocked" | "cancelled" | "done" | "in_progress" | "open";
+  priority: "high" | "low" | "normal" | "urgent";
   position: number | null;
   assignedToAgent: string | null;
   completedBy: string | null;
@@ -1470,11 +1484,66 @@ export type TaskAttributesOnlySchema = {
   resultSummary: string | null;
   metadata: Record<string, any> | null;
   dueAt: UtcDateTimeUsec | null;
+  claimedAt: UtcDateTimeUsec | null;
+  leaseExpiresAt: UtcDateTimeUsec | null;
+  createdByLabel: string | null;
   dismissedAt: UtcDateTimeUsec | null;
   recurrence: Record<string, any> | null;
-  conversationId: UUID;
+  conversationId: UUID | null;
+  brainPageId: UUID | null;
   parentId: UUID | null;
   assignedToUserId: UUID | null;
+};
+
+
+// TaskDependency Schema
+export type TaskDependencyResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "taskId" | "dependsOnId";
+  id: UUIDv7;
+  taskId: UUID;
+  dependsOnId: UUID;
+  task: { __type: "Relationship"; __resource: TaskResourceSchema; };
+  dependsOn: { __type: "Relationship"; __resource: TaskResourceSchema; };
+};
+
+
+
+export type TaskDependencyAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "taskId" | "dependsOnId";
+  id: UUIDv7;
+  taskId: UUID;
+  dependsOnId: UUID;
+};
+
+
+// TaskEvent Schema
+export type TaskEventResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "brainPageId" | "kind" | "actorLabel" | "metadata" | "insertedAt" | "taskId";
+  id: UUIDv7;
+  brainPageId: UUID;
+  kind: "claimed" | "completed" | "created" | "lease_expired" | "reassigned" | "released" | "status_changed";
+  actorLabel: string | null;
+  metadata: Record<string, any> | null;
+  insertedAt: UtcDateTimeUsec;
+  taskId: UUID;
+  task: { __type: "Relationship"; __resource: TaskResourceSchema; };
+};
+
+
+
+export type TaskEventAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "brainPageId" | "kind" | "actorLabel" | "metadata" | "insertedAt" | "taskId";
+  id: UUIDv7;
+  brainPageId: UUID;
+  kind: "claimed" | "completed" | "created" | "lease_expired" | "reassigned" | "released" | "status_changed";
+  actorLabel: string | null;
+  metadata: Record<string, any> | null;
+  insertedAt: UtcDateTimeUsec;
+  taskId: UUID;
 };
 
 
@@ -2589,6 +2658,12 @@ export type BrainPageFilterInput = {
     notEq?: string;
     in?: Array<string>;
     isNil?: boolean;
+  };
+
+  kind?: {
+    eq?: "page" | "plan";
+    notEq?: "page" | "plan";
+    in?: Array<"page" | "plan">;
   };
 
   body?: {
@@ -5127,6 +5202,12 @@ export type TaskFilterInput = {
     in?: Array<"archived" | "blocked" | "cancelled" | "done" | "in_progress" | "open">;
   };
 
+  priority?: {
+    eq?: "high" | "low" | "normal" | "urgent";
+    notEq?: "high" | "low" | "normal" | "urgent";
+    in?: Array<"high" | "low" | "normal" | "urgent">;
+  };
+
   position?: {
     eq?: number;
     notEq?: number;
@@ -5204,6 +5285,35 @@ export type TaskFilterInput = {
     isNil?: boolean;
   };
 
+  claimedAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
+  leaseExpiresAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
+  createdByLabel?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
   dismissedAt?: {
     eq?: UtcDateTimeUsec;
     notEq?: UtcDateTimeUsec;
@@ -5226,6 +5336,14 @@ export type TaskFilterInput = {
     eq?: UUID;
     notEq?: UUID;
     in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+  brainPageId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
   };
 
   parentId?: {
@@ -5242,14 +5360,142 @@ export type TaskFilterInput = {
     isNil?: boolean;
   };
 
+  ready?: {
+    eq?: boolean;
+    notEq?: boolean;
+    isNil?: boolean;
+  };
+
+  subtaskCount?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  completedSubtaskCount?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  openDependenciesCount?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
 
   conversation?: ConversationFilterInput;
+
+  brainPage?: BrainPageFilterInput;
 
   parent?: TaskFilterInput;
 
   subtasks?: TaskFilterInput;
 
+  dependencies?: TaskDependencyFilterInput;
+
   assignedToUser?: UserFilterInput;
+
+};
+export type TaskDependencyFilterInput = {
+  and?: Array<TaskDependencyFilterInput>;
+  or?: Array<TaskDependencyFilterInput>;
+  not?: Array<TaskDependencyFilterInput>;
+
+  id?: {
+    eq?: UUIDv7;
+    notEq?: UUIDv7;
+    in?: Array<UUIDv7>;
+  };
+
+  taskId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  dependsOnId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+
+  task?: TaskFilterInput;
+
+  dependsOn?: TaskFilterInput;
+
+};
+export type TaskEventFilterInput = {
+  and?: Array<TaskEventFilterInput>;
+  or?: Array<TaskEventFilterInput>;
+  not?: Array<TaskEventFilterInput>;
+
+  id?: {
+    eq?: UUIDv7;
+    notEq?: UUIDv7;
+    in?: Array<UUIDv7>;
+  };
+
+  brainPageId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  kind?: {
+    eq?: "claimed" | "completed" | "created" | "lease_expired" | "reassigned" | "released" | "status_changed";
+    notEq?: "claimed" | "completed" | "created" | "lease_expired" | "reassigned" | "released" | "status_changed";
+    in?: Array<"claimed" | "completed" | "created" | "lease_expired" | "reassigned" | "released" | "status_changed">;
+  };
+
+  actorLabel?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  metadata?: {
+    eq?: Record<string, any>;
+    notEq?: Record<string, any>;
+    in?: Array<Record<string, any>>;
+    isNil?: boolean;
+  };
+
+  insertedAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+  };
+
+  taskId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+
+  task?: TaskFilterInput;
 
 };
 export type UserSubscriptionFilterInput = {
@@ -5739,7 +5985,7 @@ export type MagusAgentsSlashCommandFilterField = (typeof magusAgentsSlashCommand
 export const brainFilterFields = ["id", "title", "description", "icon", "color", "workspaceId", "isSharedToWorkspace", "workspace"] as const;
 export type BrainFilterField = (typeof brainFilterFields)[number];
 
-export const brainPageFilterFields = ["id", "title", "icon", "body", "lockVersion", "updatedAt", "brainId", "parentPageId", "prosemirror", "brain", "parentPage"] as const;
+export const brainPageFilterFields = ["id", "title", "icon", "kind", "body", "lockVersion", "updatedAt", "brainId", "parentPageId", "prosemirror", "brain", "parentPage"] as const;
 export type BrainPageFilterField = (typeof brainPageFilterFields)[number];
 
 export const brainPageLinkFilterFields = ["id", "targetTitleAtLinkTime", "sourcePageId", "sourcePage"] as const;
@@ -5826,8 +6072,14 @@ export type MCPServerCredentialFilterField = (typeof mCPServerCredentialFilterFi
 export const notificationFilterFields = ["id", "title", "body", "notificationType", "readAt", "metadata", "targetConversationId", "insertedAt", "updatedAt", "userId", "user"] as const;
 export type NotificationFilterField = (typeof notificationFilterFields)[number];
 
-export const taskFilterFields = ["id", "title", "description", "status", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "dismissedAt", "recurrence", "conversationId", "parentId", "assignedToUserId", "conversation", "parent", "subtasks", "assignedToUser"] as const;
+export const taskFilterFields = ["id", "title", "description", "status", "priority", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "claimedAt", "leaseExpiresAt", "createdByLabel", "dismissedAt", "recurrence", "conversationId", "brainPageId", "parentId", "assignedToUserId", "ready", "subtaskCount", "completedSubtaskCount", "openDependenciesCount", "conversation", "brainPage", "parent", "subtasks", "dependencies", "assignedToUser"] as const;
 export type TaskFilterField = (typeof taskFilterFields)[number];
+
+export const taskDependencyFilterFields = ["id", "taskId", "dependsOnId", "task", "dependsOn"] as const;
+export type TaskDependencyFilterField = (typeof taskDependencyFilterFields)[number];
+
+export const taskEventFilterFields = ["id", "brainPageId", "kind", "actorLabel", "metadata", "insertedAt", "taskId", "task"] as const;
+export type TaskEventFilterField = (typeof taskEventFilterFields)[number];
 
 export const userSubscriptionFilterFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "extraSeats", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
 export type UserSubscriptionFilterField = (typeof userSubscriptionFilterFields)[number];
@@ -5869,7 +6121,7 @@ export type MagusAgentsSlashCommandSortField = (typeof magusAgentsSlashCommandSo
 export const brainSortFields = ["id", "title", "description", "icon", "color", "workspaceId", "isSharedToWorkspace"] as const;
 export type BrainSortField = (typeof brainSortFields)[number];
 
-export const brainPageSortFields = ["id", "title", "icon", "body", "lockVersion", "updatedAt", "brainId", "parentPageId", "prosemirror"] as const;
+export const brainPageSortFields = ["id", "title", "icon", "kind", "body", "lockVersion", "updatedAt", "brainId", "parentPageId", "prosemirror"] as const;
 export type BrainPageSortField = (typeof brainPageSortFields)[number];
 
 export const brainPageLinkSortFields = ["id", "targetTitleAtLinkTime", "sourcePageId"] as const;
@@ -5956,8 +6208,14 @@ export type MCPServerCredentialSortField = (typeof mCPServerCredentialSortFields
 export const notificationSortFields = ["id", "title", "body", "notificationType", "readAt", "metadata", "targetConversationId", "insertedAt", "updatedAt", "userId"] as const;
 export type NotificationSortField = (typeof notificationSortFields)[number];
 
-export const taskSortFields = ["id", "title", "description", "status", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "dismissedAt", "recurrence", "conversationId", "parentId", "assignedToUserId"] as const;
+export const taskSortFields = ["id", "title", "description", "status", "priority", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "claimedAt", "leaseExpiresAt", "createdByLabel", "dismissedAt", "recurrence", "conversationId", "brainPageId", "parentId", "assignedToUserId", "ready", "subtaskCount", "completedSubtaskCount", "openDependenciesCount"] as const;
 export type TaskSortField = (typeof taskSortFields)[number];
+
+export const taskDependencySortFields = ["id", "taskId", "dependsOnId"] as const;
+export type TaskDependencySortField = (typeof taskDependencySortFields)[number];
+
+export const taskEventSortFields = ["id", "brainPageId", "kind", "actorLabel", "metadata", "insertedAt", "taskId"] as const;
+export type TaskEventSortField = (typeof taskEventSortFields)[number];
 
 export const userSubscriptionSortFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "extraSeats", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
 export type UserSubscriptionSortField = (typeof userSubscriptionSortFields)[number];
