@@ -91,6 +91,7 @@ defmodule Magus.Brain do
       define :list_pages, action: :for_brain, args: [:brain_id]
       define :update_page_title, action: :update_title
       define :update_page_body, action: :update_body
+      define :set_page_kind, action: :set_kind, args: [:kind]
       define :find_page_by_title, action: :by_title_in_brain, args: [:brain_id, :title]
 
       define :find_page_by_title_ci,
