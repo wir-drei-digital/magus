@@ -5,7 +5,7 @@ Status: Approved design, pending implementation plan
 
 ## Summary
 
-Today Magus has hard-coded "skills" (`priv/skills/*.md`): prompt-only markdown that references pre-compiled Jido tools. This design adds **user-managed skills**: shareable resources that bundle their own scripts and CLIs, run in the existing sandbox, and are importable from external formats (Anthropic Agent Skills first, Codex and others later).
+Today Magus has hard-coded "skills" (`priv/skills/*.md`): prompt-only markdown that references pre-compiled Jido tools. This design adds **user-managed skills**: shareable resources that bundle their own scripts and CLIs, run in the existing sandbox, and are natively the Anthropic Agent Skills `SKILL.md` standard, with AGENTS.md and Goose as secondary adapters.
 
 The enabling insight: an Anthropic skill is "a bundle of scripts an agent runs in a code-execution environment," and Magus already has that environment. So a bundled skill needs **no new execution tooling**. The bundled CLI is the tool, run via the `exec_command` / `run_code` tools that already exist. What is new is a resource to hold the bundle, an importer that normalizes formats into one internal superset, a step that materializes the bundle into the sandbox, a per-actor discovery merge, and an execution approval gate.
 
@@ -15,7 +15,7 @@ A second capability closes the loop: an agent authoring tool (`create_skill`) th
 
 - Users create, edit, upload, share, and import skills as first-class resources with personal and workspace access scopes.
 - Skills can bundle executable artifacts (scripts, CLIs, assets) that run in the sandbox.
-- Drop-in import of existing Anthropic Agent Skills, with an adapter layer that makes other formats (Codex, etc.) additive.
+- Drop-in import/export of Anthropic Agent Skills (`SKILL.md`, our native format), with a thin adapter layer for adjacent formats (AGENTS.md, Goose).
 - An agent can author a skill from work it built in the sandbox, for reuse across conversations.
 - Built-in skills keep working unchanged; the two species unify only at the discovery and load layer.
 
@@ -33,6 +33,19 @@ A second capability closes the loop: an agent authoring tool (`create_skill`) th
 3. **Workspace-scoped resource plus import.** A skill is a resource like any other, with personal and workspace access via the existing grant model. Import is via zip upload (v1) and git/URL (Phase 2). No marketplace in v1.
 4. **Sandbox plus first-run approval.** The sandbox is the security boundary, the same isolation Magus already trusts for agent-authored code. The first time a bundled skill executes in a conversation, a human approval is required. Secrets are opt-in per manifest, never auto-injected.
 5. **Sandbox-materialized bundles, reuse existing tools.** Execution rides the existing sandbox and tools rather than compiling typed tools or running an MCP server per skill.
+
+## Standards alignment (2026-06-27 web research)
+
+A cited, adversarially verified web-research pass confirmed the design direction and sharpened the adapter list. Recency caveat: this space moves fast and much of the governance/adoption detail is post the assistant's knowledge cutoff, so re-verify field-level details against the live spec (agentskills.io) before implementation. The structural facts below match the format's original launch and are treated as stable.
+
+- **`SKILL.md` (Anthropic Agent Skills) is the convergent cross-vendor format** for portable skill bundles: a directory with a `SKILL.md` (YAML frontmatter + Markdown body) plus optional `scripts/`, `references/`, `assets/`, executed via progressive disclosure and bash-run bundled scripts. It is structurally identical to our internal model and is adopted across many harnesses (Claude Code, OpenAI Codex, Gemini CLI, Cursor, GitHub Copilot, opencode/sst, Goose, and others).
+- **Decision: our native format IS `SKILL.md`, extended as a strict superset.** Required frontmatter: `name`, `description`. Optional standard fields: `license`, `compatibility`, `metadata`, `allowed-tools` (experimental). Our `requested_tools` serializes as `allowed-tools`; our extras (`required_secrets`, `runtime_hints`, `version`) live under the arbitrary `metadata` map (exactly where the standard itself places `version`). Result: every Magus skill is a valid Agent Skill, and every Agent Skill imports losslessly.
+- **Codex needs no separate adapter:** OpenAI Codex consumes the same Agent Skills standard, so importing a Codex skill is just parsing `SKILL.md`. The previously planned `:codex` adapter is dropped.
+- **MCP is an adjacent layer, not a bundle format:** it is the typed-tool transport a skill may call into, already integrated at the Magus tool layer. No MCP skill adapter.
+- **AGENTS.md is prompt-only guidance** (no scripts, no bundle). An AGENTS.md import maps to a prompt-only skill (populates `body`, never `scripts/`).
+- **Reprioritized adapters:** (a) `SKILL.md` = native import/export, highest interop; (b) AGENTS.md = import-only, prompt-only; (c) Goose recipes = optional later (prefer exporting `SKILL.md` to Goose, which supports the standard).
+- **Governance asymmetry (recorded risk):** MCP and AGENTS.md are under the Linux Foundation's Agentic AI Foundation; `SKILL.md` is Anthropic-origin-open but not yet under neutral-foundation governance. Adoption momentum still makes it the right target; track agentskills.io.
+- **Security reinforcement:** the ecosystem already shows skill marketplaces without mandatory security review, which validates our sandbox + first-run-approval + opt-in-secrets posture for imported third-party code.
 
 ## Architecture overview
 
@@ -59,14 +72,15 @@ New domain `Magus.Skills` with a `Skill` resource. The existing `Magus.Agents.Sk
 
 ### `Magus.Skills.Skill`
 
-- Identity/display: `name` (slug, unique per owner scope), `display_name`, `description` (drives discovery), `version`, `license`, `icon`, `color`.
-- Instructions: `body` (the SKILL.md markdown, progressive-disclosure layer 2).
-- Capability declarations (the normalized superset):
-  - `requested_tools` (`{:array, :string}`): existing Magus tools the skill wants, resolved through `@skill_tool_mapping`. Superset of Anthropic `allowed-tools`.
-  - `required_secrets` (`{:array, :map}`): `[%{key, description}]`, opt-in, never auto-injected.
-  - `runtime_hints` (`:map`): optional `%{packages: [...], image: ...}`.
-- Bundle: `bundle_file_id` (FK to `Magus.Files.File`, nullable, nil means prompt-only), `file_manifest` (`{:array, :map}` of `%{path, size, sha256, executable?}`), `has_executable_bundle` (boolean, gates the approval path).
-- Provenance: `source_format` (`:magus | :anthropic | :codex`), `source_url` (nullable).
+- Identity/display: `name` (the `SKILL.md` name: lowercase, numbers, hyphens, max 64 chars, no reserved words, unique per owner scope), `display_name`, `description` (drives discovery, max 1024 chars), `license`, `compatibility`, `icon`, `color`. `version` is not top-level; it lives under `metadata` per the standard.
+- Instructions: `body` (the SKILL.md markdown body, progressive-disclosure layer 2).
+- Capability declarations (serialized as a strict `SKILL.md` superset):
+  - `requested_tools` (`{:array, :string}`): existing Magus tools the skill wants, resolved through `@skill_tool_mapping`. Serializes to/from the standard `allowed-tools` frontmatter field (experimental in the spec); unknown names retained but inert.
+  - `metadata` (`:map`): the standard arbitrary key-value map. Carries `version` plus the Magus-specific extras below under a namespaced key, so a Magus skill stays a valid Agent Skill and any Agent Skill imports losslessly.
+  - `required_secrets` (`{:array, :map}`): `[%{key, description}]`, opt-in, never auto-injected. Serialized under `metadata`.
+  - `runtime_hints` (`:map`): optional `%{packages: [...], image: ...}`. Serialized under `metadata`.
+- Bundle: `bundle_file_id` (FK to `Magus.Files.File`, nullable, nil means prompt-only), `file_manifest` (`{:array, :map}` of `%{path, size, sha256, executable?}`), `has_executable_bundle` (boolean, gates the approval path). The bundle preserves the standard `SKILL.md` layout (`scripts/`, `references/`, `assets/`), so imported relative paths resolve unchanged after materialization.
+- Provenance: `source_format` (`:skill_md` native/Anthropic/Codex, `:agents_md`, `:goose`, `:other`), `source_url` (nullable).
 - Scoping: `user_id` (owner), `workspace_id` (nullable), `deleted_at` (soft delete).
 
 Nullable attributes follow the schema rule from CLAUDE.md (use `{:or, [type, nil]}`, not a bare type with `default: nil`). AshPaperTrail versions (like Brain pages) are a Phase 2 add for import-v1-vs-edited-v2 history.
@@ -120,13 +134,14 @@ Pipeline (a dedicated multipart `/rpc/skills/import` controller, since it unpack
 4. **Normalize via adapter** (detect format, map into the superset).
 5. Persist: the `Skill` row plus the remaining bundle files as an archive in File-storage (`bundle_file_id`) plus a computed `file_manifest`.
 
-Adapters (external format to internal superset):
+Formats (our native format is `SKILL.md` itself, so most "import" is just parsing):
 
-- **`:anthropic`** (primary compatibility target): `name`, `description`, `license` map directly; `allowed-tools` maps to `requested_tools` (best-effort against `@skill_tool_mapping`, unknown names retained but inert); `metadata` maps to `runtime_hints`/metadata; body verbatim.
-- **`:magus`** (native superset): adds explicit `requested_tools`, `required_secrets`, `runtime_hints`.
-- **`:codex`**: an adapter stub. The adapter boundary keeps new formats additive: adding Codex later touches one normalizer, not the core.
+- **`SKILL.md` (Anthropic Agent Skills) = native:** round-trip import/export, no lossy mapping. `name`/`description`/`license`/`compatibility` are top-level; `allowed-tools` maps to `requested_tools` (best-effort against `@skill_tool_mapping`, unknown names retained but inert); `metadata` carries `version` and the Magus extras. OpenAI Codex consumes this same standard, so a Codex skill needs no separate adapter.
+- **AGENTS.md = import-only, prompt-only:** populates a skill's `body`/instructions, never `scripts/` (AGENTS.md bundles no executables).
+- **Goose recipes = optional, later:** a Goose-specific YAML/JSON manifest. Prefer exporting `SKILL.md` to Goose (which supports the standard) over emitting recipes; only add a recipe adapter if Goose-native features are needed.
+- **MCP is not a bundle format:** it is the orthogonal typed-tool transport a skill may call, already integrated at the Magus tool layer. No MCP skill adapter.
 
-Detection keys off the frontmatter shape with an explicit `source_format` override allowed. **Export** (repack `Skill` to a zip, regenerating `SKILL.md` from structured fields) is cheap and enables round-trip plus a future marketplace; slotted as v1-if-cheap, else Phase 2.
+The adapter boundary keeps new formats additive: each is one normalizer into the superset, never a core change. Detection keys off the frontmatter shape with an explicit `source_format` override allowed. **Export** (repack `Skill` to a `SKILL.md` bundle from structured fields) is cheap and gives portability to every skills-compatible harness plus a future marketplace; slotted as v1-if-cheap, else Phase 2.
 
 ## Security model
 
@@ -166,8 +181,8 @@ A new `skills` mode next to `prompts`, reusing the library patterns:
 ## Phasing
 
 - **Phase 1 (core runtime plus manual UI):** `Skill` resource plus `Magus.Skills` domain plus policies plus `SkillSecret`; discovery merge (built-in plus user); `load_skill` dispatch; sandbox materialization; first-run approval; capability gating plus kill-switch; RPC actions; SPA `skills` mode (list/detail/share); import (zip plus Anthropic adapter) and native authoring with artifact upload.
-- **Phase 2 (payoff plus ergonomics):** the `create_skill` agent authoring tool; git/URL import; export/round-trip; per-user "trust this skill"; `runtime_hints` package preinstall; AshPaperTrail versions. The `create_skill` tool may be pulled into late Phase 1 once the resource and storage exist (decide during planning).
-- **Phase 3 (deferred):** fully editable in-browser file tree; Codex adapter; public marketplace (publish, copy, discovery, like the public Prompt library).
+- **Phase 2 (payoff plus ergonomics):** the `create_skill` agent authoring tool; git/URL import; `SKILL.md` export/round-trip; AGENTS.md import (prompt-only); per-user "trust this skill"; `runtime_hints` package preinstall; AshPaperTrail versions. The `create_skill` tool may be pulled into late Phase 1 once the resource and storage exist (decide during planning).
+- **Phase 3 (deferred):** fully editable in-browser file tree; Goose recipe adapter; public marketplace (publish, copy, discovery, like the public Prompt library).
 
 ## Testing
 
@@ -186,7 +201,7 @@ A new `skills` mode next to `prompts`, reusing the library patterns:
 New:
 
 - `lib/magus/skills/skills.ex` (domain), `lib/magus/skills/skill.ex`, `lib/magus/skills/skill_secret.ex`.
-- `lib/magus/skills/import/` (unpack, adapters: anthropic/magus/codex, normalizer).
+- `lib/magus/skills/import/` (safe unpack, `SKILL.md` parse and normalizer; AGENTS.md and Goose adapters in later phases).
 - `lib/magus/skills/materializer.ex` (archive to sandbox, idempotent marker).
 - `lib/magus/agents/tools/skills/create_skill.ex` (authoring tool, Phase 2 or late Phase 1).
 - `lib/magus_web/rpc/skills_controller.ex` (multipart import/upload).
