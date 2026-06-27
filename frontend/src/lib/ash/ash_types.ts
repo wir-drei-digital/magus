@@ -7,7 +7,6 @@ export type AshDate = string;
 export type Decimal = string;
 export type UUID = string;
 export type UUIDv7 = string;
-export type UtcDateTime = string;
 export type UtcDateTimeUsec = string;
 
 // User Schema
@@ -81,7 +80,7 @@ export type AgentActivityLogResourceSchema = {
   id: UUIDv7;
   agentId: UUID;
   userId: UUID;
-  activityType: "approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "recovery" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "run_timed_out" | "task_completed" | "task_created" | "task_updated" | "triage_completed" | "wake_skipped" | "wake_urgent" | "watchdog_reset";
+  activityType: "approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "task_completed" | "task_created" | "task_updated" | "triage_completed";
   summary: string;
   eventId: UUID | null;
   runId: UUID | null;
@@ -103,7 +102,7 @@ export type AgentActivityLogAttributesOnlySchema = {
   id: UUIDv7;
   agentId: UUID;
   userId: UUID;
-  activityType: "approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "recovery" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "run_timed_out" | "task_completed" | "task_created" | "task_updated" | "triage_completed" | "wake_skipped" | "wake_urgent" | "watchdog_reset";
+  activityType: "approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "task_completed" | "task_created" | "task_updated" | "triage_completed";
   summary: string;
   eventId: UUID | null;
   runId: UUID | null;
@@ -210,7 +209,7 @@ export type AgentSecretAttributesOnlySchema = {
 // CustomAgent Schema
 export type CustomAgentResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "handle" | "description" | "icon" | "imagePath" | "instructions" | "chatMode" | "disabledToolCategories" | "preLoadedSkills" | "samplingSettings" | "maxIterations" | "isDefault" | "isPublic" | "canReadGlobalMemories" | "canWriteGlobalMemories" | "canAccessGlobalFiles" | "canAccessKnowledge" | "isPaused" | "pauseReason" | "maxDailyRuns" | "maxTokensPerRun" | "heartbeatEnabled" | "heartbeatInstructions" | "heartbeatDefaultIntervalMinutes" | "nextScheduledAt" | "insertedAt" | "updatedAt" | "modelId" | "imageModelId" | "videoModelId" | "workspaceId" | "imageUrl" | "editableByActor" | "isSharedToWorkspace";
+  __primitiveFields: "id" | "name" | "handle" | "description" | "icon" | "imagePath" | "instructions" | "chatMode" | "disabledToolCategories" | "preLoadedSkills" | "samplingSettings" | "maxIterations" | "isDefault" | "isPublic" | "canReadGlobalMemories" | "canWriteGlobalMemories" | "canAccessGlobalFiles" | "canAccessKnowledge" | "isPaused" | "maxDailyRuns" | "maxTokensPerRun" | "heartbeatEnabled" | "heartbeatInstructions" | "heartbeatDefaultIntervalMinutes" | "nextScheduledAt" | "insertedAt" | "updatedAt" | "modelId" | "imageModelId" | "videoModelId" | "workspaceId" | "imageUrl" | "editableByActor" | "isSharedToWorkspace";
   id: UUIDv7;
   name: string;
   handle: string;
@@ -230,7 +229,6 @@ export type CustomAgentResourceSchema = {
   canAccessGlobalFiles: boolean | null;
   canAccessKnowledge: boolean | null;
   isPaused: boolean | null;
-  pauseReason: string | null;
   maxDailyRuns: number | null;
   maxTokensPerRun: number | null;
   heartbeatEnabled: boolean | null;
@@ -257,7 +255,7 @@ export type CustomAgentResourceSchema = {
 
 export type CustomAgentAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "handle" | "description" | "icon" | "imagePath" | "instructions" | "chatMode" | "disabledToolCategories" | "preLoadedSkills" | "samplingSettings" | "maxIterations" | "isDefault" | "isPublic" | "canReadGlobalMemories" | "canWriteGlobalMemories" | "canAccessGlobalFiles" | "canAccessKnowledge" | "isPaused" | "pauseReason" | "maxDailyRuns" | "maxTokensPerRun" | "heartbeatEnabled" | "heartbeatInstructions" | "heartbeatDefaultIntervalMinutes" | "nextScheduledAt" | "insertedAt" | "updatedAt" | "modelId" | "imageModelId" | "videoModelId" | "workspaceId";
+  __primitiveFields: "id" | "name" | "handle" | "description" | "icon" | "imagePath" | "instructions" | "chatMode" | "disabledToolCategories" | "preLoadedSkills" | "samplingSettings" | "maxIterations" | "isDefault" | "isPublic" | "canReadGlobalMemories" | "canWriteGlobalMemories" | "canAccessGlobalFiles" | "canAccessKnowledge" | "isPaused" | "maxDailyRuns" | "maxTokensPerRun" | "heartbeatEnabled" | "heartbeatInstructions" | "heartbeatDefaultIntervalMinutes" | "nextScheduledAt" | "insertedAt" | "updatedAt" | "modelId" | "imageModelId" | "videoModelId" | "workspaceId";
   id: UUIDv7;
   name: string;
   handle: string;
@@ -277,7 +275,6 @@ export type CustomAgentAttributesOnlySchema = {
   canAccessGlobalFiles: boolean | null;
   canAccessKnowledge: boolean | null;
   isPaused: boolean | null;
-  pauseReason: string | null;
   maxDailyRuns: number | null;
   maxTokensPerRun: number | null;
   heartbeatEnabled: boolean | null;
@@ -355,10 +352,11 @@ export type BrainAttributesOnlySchema = {
 // BrainPage Schema
 export type BrainPageResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "icon" | "body" | "lockVersion" | "updatedAt" | "brainId" | "parentPageId" | "prosemirror";
+  __primitiveFields: "id" | "title" | "icon" | "kind" | "body" | "lockVersion" | "updatedAt" | "brainId" | "parentPageId" | "prosemirror";
   id: UUIDv7;
   title: string | null;
   icon: string | null;
+  kind: "page" | "plan";
   body: string | null;
   lockVersion: number;
   updatedAt: UtcDateTimeUsec;
@@ -373,10 +371,11 @@ export type BrainPageResourceSchema = {
 
 export type BrainPageAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "icon" | "body" | "lockVersion" | "updatedAt" | "brainId" | "parentPageId";
+  __primitiveFields: "id" | "title" | "icon" | "kind" | "body" | "lockVersion" | "updatedAt" | "brainId" | "parentPageId";
   id: UUIDv7;
   title: string | null;
   icon: string | null;
+  kind: "page" | "plan";
   body: string | null;
   lockVersion: number;
   updatedAt: UtcDateTimeUsec;
@@ -496,7 +495,7 @@ export type context_windowAttributesOnlySchema = {
 // Conversation Schema
 export type ConversationResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "isMultiplayer" | "visibility" | "chatMode" | "systemPrompt" | "skillContext" | "skillTools" | "loadedTools" | "approvedSkillIds" | "samplingSettings" | "imageGenerationSettings" | "videoGenerationSettings" | "isTaskConversation" | "isThread" | "branchedAt" | "deletedAt" | "extractionDueAt" | "insertedAt" | "updatedAt" | "userId" | "folderId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "systemPromptId" | "customAgentId" | "workspaceId" | "parentConversationId" | "sandboxConversationId" | "branchedAtMessageId" | "messageCount" | "lastMessageAt" | "isFavorited" | "isSharedToWorkspace";
+  __primitiveFields: "id" | "title" | "isMultiplayer" | "visibility" | "chatMode" | "systemPrompt" | "skillContext" | "skillTools" | "loadedTools" | "samplingSettings" | "imageGenerationSettings" | "videoGenerationSettings" | "isTaskConversation" | "isThread" | "branchedAt" | "deletedAt" | "extractionDueAt" | "insertedAt" | "updatedAt" | "userId" | "folderId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "systemPromptId" | "customAgentId" | "workspaceId" | "parentConversationId" | "sandboxConversationId" | "branchedAtMessageId" | "messageCount" | "lastMessageAt" | "isFavorited" | "isSharedToWorkspace";
   id: UUIDv7;
   title: string | null;
   isMultiplayer: boolean;
@@ -506,7 +505,6 @@ export type ConversationResourceSchema = {
   skillContext: string | null;
   skillTools: Array<string> | null;
   loadedTools: Array<string> | null;
-  approvedSkillIds: Array<UUID> | null;
   samplingSettings: Record<string, any> | null;
   imageGenerationSettings: Record<string, any> | null;
   videoGenerationSettings: Record<string, any> | null;
@@ -556,7 +554,7 @@ export type ConversationResourceSchema = {
 
 export type ConversationAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "isMultiplayer" | "visibility" | "chatMode" | "systemPrompt" | "skillContext" | "skillTools" | "loadedTools" | "approvedSkillIds" | "samplingSettings" | "imageGenerationSettings" | "videoGenerationSettings" | "isTaskConversation" | "isThread" | "branchedAt" | "deletedAt" | "extractionDueAt" | "insertedAt" | "updatedAt" | "userId" | "folderId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "systemPromptId" | "customAgentId" | "workspaceId" | "parentConversationId" | "sandboxConversationId" | "branchedAtMessageId";
+  __primitiveFields: "id" | "title" | "isMultiplayer" | "visibility" | "chatMode" | "systemPrompt" | "skillContext" | "skillTools" | "loadedTools" | "samplingSettings" | "imageGenerationSettings" | "videoGenerationSettings" | "isTaskConversation" | "isThread" | "branchedAt" | "deletedAt" | "extractionDueAt" | "insertedAt" | "updatedAt" | "userId" | "folderId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "systemPromptId" | "customAgentId" | "workspaceId" | "parentConversationId" | "sandboxConversationId" | "branchedAtMessageId";
   id: UUIDv7;
   title: string | null;
   isMultiplayer: boolean;
@@ -566,7 +564,6 @@ export type ConversationAttributesOnlySchema = {
   skillContext: string | null;
   skillTools: Array<string> | null;
   loadedTools: Array<string> | null;
-  approvedSkillIds: Array<UUID> | null;
   samplingSettings: Record<string, any> | null;
   imageGenerationSettings: Record<string, any> | null;
   videoGenerationSettings: Record<string, any> | null;
@@ -892,7 +889,6 @@ export type ModelResourceSchema = {
   internal: boolean;
   modelProviderId: UUID | null;
   requestCostCents: number | null;
-  modelProvider: { __type: "Relationship"; __resource: ModelProviderResourceSchema | null; };
 };
 
 
@@ -951,31 +947,6 @@ export type UserFolderStateAttributesOnlySchema = {
   isExpanded: boolean;
   userId: UUID;
   folderId: UUID;
-};
-
-
-// UserModelPreference Schema
-export type UserModelPreferenceResourceSchema = {
-  __type: "Resource";
-  __primitiveFields: "id" | "favorite" | "hidden" | "position" | "modelId";
-  id: UUIDv7;
-  favorite: boolean;
-  hidden: boolean;
-  position: number | null;
-  modelId: UUID;
-  model: { __type: "Relationship"; __resource: ModelResourceSchema; };
-};
-
-
-
-export type UserModelPreferenceAttributesOnlySchema = {
-  __type: "Resource";
-  __primitiveFields: "id" | "favorite" | "hidden" | "position" | "modelId";
-  id: UUIDv7;
-  favorite: boolean;
-  hidden: boolean;
-  position: number | null;
-  modelId: UUID;
 };
 
 
@@ -1134,7 +1105,7 @@ export type FileAttributesOnlySchema = {
 // UserIntegration Schema
 export type UserIntegrationResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "providerKey" | "status" | "config" | "externalId" | "lastSyncAt" | "errorMessage" | "consecutiveFailures" | "lastError" | "lastSuccessAt" | "conversationMode" | "asyncReplyEnabled" | "enabledTools";
+  __primitiveFields: "id" | "providerKey" | "status" | "config" | "externalId" | "lastSyncAt" | "errorMessage" | "conversationMode" | "asyncReplyEnabled" | "enabledTools";
   id: UUIDv7;
   providerKey: string;
   status: "active" | "disabled" | "error" | "pending" | null;
@@ -1142,9 +1113,6 @@ export type UserIntegrationResourceSchema = {
   externalId: string | null;
   lastSyncAt: UtcDateTimeUsec | null;
   errorMessage: string | null;
-  consecutiveFailures: number;
-  lastError: string | null;
-  lastSuccessAt: UtcDateTimeUsec | null;
   conversationMode: "multi" | "single" | null;
   asyncReplyEnabled: boolean | null;
   enabledTools: Array<string> | null;
@@ -1154,7 +1122,7 @@ export type UserIntegrationResourceSchema = {
 
 export type UserIntegrationAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "providerKey" | "status" | "config" | "externalId" | "lastSyncAt" | "errorMessage" | "consecutiveFailures" | "lastError" | "lastSuccessAt" | "conversationMode" | "asyncReplyEnabled" | "enabledTools";
+  __primitiveFields: "id" | "providerKey" | "status" | "config" | "externalId" | "lastSyncAt" | "errorMessage" | "conversationMode" | "asyncReplyEnabled" | "enabledTools";
   id: UUIDv7;
   providerKey: string;
   status: "active" | "disabled" | "error" | "pending" | null;
@@ -1162,9 +1130,6 @@ export type UserIntegrationAttributesOnlySchema = {
   externalId: string | null;
   lastSyncAt: UtcDateTimeUsec | null;
   errorMessage: string | null;
-  consecutiveFailures: number;
-  lastError: string | null;
-  lastSuccessAt: UtcDateTimeUsec | null;
   conversationMode: "multi" | "single" | null;
   asyncReplyEnabled: boolean | null;
   enabledTools: Array<string> | null;
@@ -1323,24 +1288,18 @@ export type PromptFavoriteAttributesOnlySchema = {
 // Tag Schema
 export type TagResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "userId" | "workspaceId";
+  __primitiveFields: "id" | "name";
   id: UUID;
   name: string;
-  userId: UUID | null;
-  workspaceId: UUID | null;
-  user: { __type: "Relationship"; __resource: UserResourceSchema | null; };
-  workspace: { __type: "Relationship"; __resource: WorkspaceResourceSchema | null; };
 };
 
 
 
 export type TagAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "userId" | "workspaceId";
+  __primitiveFields: "id" | "name";
   id: UUID;
   name: string;
-  userId: UUID | null;
-  workspaceId: UUID | null;
 };
 
 
@@ -1430,36 +1389,6 @@ export type MCPServerCredentialAttributesOnlySchema = {
 };
 
 
-// ModelProvider Schema
-export type ModelProviderResourceSchema = {
-  __type: "Resource";
-  __primitiveFields: "id" | "name" | "slug" | "reqLlmId" | "baseUrl" | "enabled" | "validationStatus" | "lastValidatedAt";
-  id: UUID;
-  name: string;
-  slug: string;
-  reqLlmId: string;
-  baseUrl: string | null;
-  enabled: boolean;
-  validationStatus: "error" | "invalid" | "pending" | "valid";
-  lastValidatedAt: UtcDateTime | null;
-};
-
-
-
-export type ModelProviderAttributesOnlySchema = {
-  __type: "Resource";
-  __primitiveFields: "id" | "name" | "slug" | "reqLlmId" | "baseUrl" | "enabled" | "validationStatus" | "lastValidatedAt";
-  id: UUID;
-  name: string;
-  slug: string;
-  reqLlmId: string;
-  baseUrl: string | null;
-  enabled: boolean;
-  validationStatus: "error" | "invalid" | "pending" | "valid";
-  lastValidatedAt: UtcDateTime | null;
-};
-
-
 // Notification Schema
 export type NotificationResourceSchema = {
   __type: "Resource";
@@ -1495,84 +1424,15 @@ export type NotificationAttributesOnlySchema = {
 };
 
 
-// Organization Schema
-export type OrganizationResourceSchema = {
-  __type: "Resource";
-  __primitiveFields: "id" | "name" | "slug" | "billingInterval" | "billingStatus" | "currentPeriodStart" | "currentPeriodEnd" | "archivedAt" | "ownerId";
-  id: UUIDv7;
-  name: string;
-  slug: string;
-  billingInterval: "annual" | "monthly";
-  billingStatus: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
-  currentPeriodStart: UtcDateTimeUsec | null;
-  currentPeriodEnd: UtcDateTimeUsec | null;
-  archivedAt: UtcDateTimeUsec | null;
-  ownerId: UUID;
-  owner: { __type: "Relationship"; __resource: UserResourceSchema; };
-  members: { __type: "Relationship"; __array: true; __resource: OrganizationMemberResourceSchema; };
-};
-
-
-
-export type OrganizationAttributesOnlySchema = {
-  __type: "Resource";
-  __primitiveFields: "id" | "name" | "slug" | "billingInterval" | "billingStatus" | "currentPeriodStart" | "currentPeriodEnd" | "archivedAt" | "ownerId";
-  id: UUIDv7;
-  name: string;
-  slug: string;
-  billingInterval: "annual" | "monthly";
-  billingStatus: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
-  currentPeriodStart: UtcDateTimeUsec | null;
-  currentPeriodEnd: UtcDateTimeUsec | null;
-  archivedAt: UtcDateTimeUsec | null;
-  ownerId: UUID;
-};
-
-
-// OrganizationMember Schema
-export type OrganizationMemberResourceSchema = {
-  __type: "Resource";
-  __primitiveFields: "id" | "role" | "status" | "spendCapCents" | "invitedAt" | "joinedAt" | "removedAt" | "inviteEmail" | "organizationId" | "userId";
-  id: UUIDv7;
-  role: "member" | "owner";
-  status: "active" | "invited" | "removed";
-  spendCapCents: number | null;
-  invitedAt: UtcDateTimeUsec | null;
-  joinedAt: UtcDateTimeUsec | null;
-  removedAt: UtcDateTimeUsec | null;
-  inviteEmail: string | null;
-  organizationId: UUID;
-  userId: UUID | null;
-  organization: { __type: "Relationship"; __resource: OrganizationResourceSchema; };
-  user: { __type: "Relationship"; __resource: UserResourceSchema | null; };
-};
-
-
-
-export type OrganizationMemberAttributesOnlySchema = {
-  __type: "Resource";
-  __primitiveFields: "id" | "role" | "status" | "spendCapCents" | "invitedAt" | "joinedAt" | "removedAt" | "inviteEmail" | "organizationId" | "userId";
-  id: UUIDv7;
-  role: "member" | "owner";
-  status: "active" | "invited" | "removed";
-  spendCapCents: number | null;
-  invitedAt: UtcDateTimeUsec | null;
-  joinedAt: UtcDateTimeUsec | null;
-  removedAt: UtcDateTimeUsec | null;
-  inviteEmail: string | null;
-  organizationId: UUID;
-  userId: UUID | null;
-};
-
-
 // Task Schema
 export type TaskResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "description" | "status" | "position" | "assignedToAgent" | "completedBy" | "assignedToCustomAgentId" | "assignedByCustomAgentId" | "blockedReason" | "waitingOnUser" | "resultSummary" | "metadata" | "dueAt" | "dismissedAt" | "recurrence" | "conversationId" | "parentId" | "assignedToUserId";
+  __primitiveFields: "id" | "title" | "description" | "status" | "priority" | "position" | "assignedToAgent" | "completedBy" | "assignedToCustomAgentId" | "assignedByCustomAgentId" | "blockedReason" | "waitingOnUser" | "resultSummary" | "metadata" | "dueAt" | "claimedAt" | "leaseExpiresAt" | "createdByLabel" | "dismissedAt" | "recurrence" | "conversationId" | "brainPageId" | "parentId" | "assignedToUserId" | "subtaskCount" | "completedSubtaskCount" | "openDependenciesCount" | "ready";
   id: UUIDv7;
   title: string;
   description: string | null;
   status: "archived" | "blocked" | "cancelled" | "done" | "in_progress" | "open";
+  priority: "high" | "low" | "normal" | "urgent";
   position: number | null;
   assignedToAgent: string | null;
   completedBy: string | null;
@@ -1583,14 +1443,24 @@ export type TaskResourceSchema = {
   resultSummary: string | null;
   metadata: Record<string, any> | null;
   dueAt: UtcDateTimeUsec | null;
+  claimedAt: UtcDateTimeUsec | null;
+  leaseExpiresAt: UtcDateTimeUsec | null;
+  createdByLabel: string | null;
   dismissedAt: UtcDateTimeUsec | null;
   recurrence: Record<string, any> | null;
-  conversationId: UUID;
+  conversationId: UUID | null;
+  brainPageId: UUID | null;
   parentId: UUID | null;
   assignedToUserId: UUID | null;
-  conversation: { __type: "Relationship"; __resource: ConversationResourceSchema; };
+  subtaskCount: number;
+  completedSubtaskCount: number;
+  openDependenciesCount: number;
+  ready: boolean | null;
+  conversation: { __type: "Relationship"; __resource: ConversationResourceSchema | null; };
+  brainPage: { __type: "Relationship"; __resource: BrainPageResourceSchema | null; };
   parent: { __type: "Relationship"; __resource: TaskResourceSchema | null; };
   subtasks: { __type: "Relationship"; __array: true; __resource: TaskResourceSchema; };
+  dependencies: { __type: "Relationship"; __array: true; __resource: TaskDependencyResourceSchema; };
   assignedToUser: { __type: "Relationship"; __resource: UserResourceSchema | null; };
 };
 
@@ -1598,11 +1468,12 @@ export type TaskResourceSchema = {
 
 export type TaskAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "description" | "status" | "position" | "assignedToAgent" | "completedBy" | "assignedToCustomAgentId" | "assignedByCustomAgentId" | "blockedReason" | "waitingOnUser" | "resultSummary" | "metadata" | "dueAt" | "dismissedAt" | "recurrence" | "conversationId" | "parentId" | "assignedToUserId";
+  __primitiveFields: "id" | "title" | "description" | "status" | "priority" | "position" | "assignedToAgent" | "completedBy" | "assignedToCustomAgentId" | "assignedByCustomAgentId" | "blockedReason" | "waitingOnUser" | "resultSummary" | "metadata" | "dueAt" | "claimedAt" | "leaseExpiresAt" | "createdByLabel" | "dismissedAt" | "recurrence" | "conversationId" | "brainPageId" | "parentId" | "assignedToUserId";
   id: UUIDv7;
   title: string;
   description: string | null;
   status: "archived" | "blocked" | "cancelled" | "done" | "in_progress" | "open";
+  priority: "high" | "low" | "normal" | "urgent";
   position: number | null;
   assignedToAgent: string | null;
   completedBy: string | null;
@@ -1613,92 +1484,78 @@ export type TaskAttributesOnlySchema = {
   resultSummary: string | null;
   metadata: Record<string, any> | null;
   dueAt: UtcDateTimeUsec | null;
+  claimedAt: UtcDateTimeUsec | null;
+  leaseExpiresAt: UtcDateTimeUsec | null;
+  createdByLabel: string | null;
   dismissedAt: UtcDateTimeUsec | null;
   recurrence: Record<string, any> | null;
-  conversationId: UUID;
+  conversationId: UUID | null;
+  brainPageId: UUID | null;
   parentId: UUID | null;
   assignedToUserId: UUID | null;
 };
 
 
-// Skill Schema
-export type SkillResourceSchema = {
+// TaskDependency Schema
+export type TaskDependencyResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "displayName" | "description" | "body" | "requestedTools" | "requiredSecrets" | "version" | "license" | "compatibility" | "icon" | "color" | "sourceFormat" | "sourceUrl" | "hasExecutableBundle" | "fileManifest" | "workspaceId" | "isSharedToWorkspace" | "isFavorited";
-  id: UUID;
-  name: string;
-  displayName: string | null;
-  description: string;
-  body: string | null;
-  requestedTools: Array<string> | null;
-  requiredSecrets: Array<Record<string, any>> | null;
-  version: string | null;
-  license: string | null;
-  compatibility: string | null;
-  icon: string | null;
-  color: string | null;
-  sourceFormat: "agents_md" | "goose" | "other" | "skill_md";
-  sourceUrl: string | null;
-  hasExecutableBundle: boolean;
-  fileManifest: Array<Record<string, any>> | null;
-  workspaceId: UUID | null;
-  isSharedToWorkspace: boolean | null;
-  isFavorited: boolean | null;
-  workspace: { __type: "Relationship"; __resource: WorkspaceResourceSchema | null; };
+  __primitiveFields: "id" | "taskId" | "dependsOnId";
+  id: UUIDv7;
+  taskId: UUID;
+  dependsOnId: UUID;
+  task: { __type: "Relationship"; __resource: TaskResourceSchema; };
+  dependsOn: { __type: "Relationship"; __resource: TaskResourceSchema; };
 };
 
 
 
-export type SkillAttributesOnlySchema = {
+export type TaskDependencyAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "displayName" | "description" | "body" | "requestedTools" | "requiredSecrets" | "version" | "license" | "compatibility" | "icon" | "color" | "sourceFormat" | "sourceUrl" | "hasExecutableBundle" | "fileManifest" | "workspaceId";
-  id: UUID;
-  name: string;
-  displayName: string | null;
-  description: string;
-  body: string | null;
-  requestedTools: Array<string> | null;
-  requiredSecrets: Array<Record<string, any>> | null;
-  version: string | null;
-  license: string | null;
-  compatibility: string | null;
-  icon: string | null;
-  color: string | null;
-  sourceFormat: "agents_md" | "goose" | "other" | "skill_md";
-  sourceUrl: string | null;
-  hasExecutableBundle: boolean;
-  fileManifest: Array<Record<string, any>> | null;
-  workspaceId: UUID | null;
+  __primitiveFields: "id" | "taskId" | "dependsOnId";
+  id: UUIDv7;
+  taskId: UUID;
+  dependsOnId: UUID;
 };
 
 
-// SkillFavorite Schema
-export type SkillFavoriteResourceSchema = {
+// TaskEvent Schema
+export type TaskEventResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "skillId";
-  id: UUID;
-  skillId: UUID;
-  skill: { __type: "Relationship"; __resource: SkillResourceSchema; };
+  __primitiveFields: "id" | "brainPageId" | "kind" | "actorLabel" | "metadata" | "insertedAt" | "taskId";
+  id: UUIDv7;
+  brainPageId: UUID;
+  kind: "claimed" | "completed" | "created" | "lease_expired" | "reassigned" | "released" | "status_changed";
+  actorLabel: string | null;
+  metadata: Record<string, any> | null;
+  insertedAt: UtcDateTimeUsec;
+  taskId: UUID;
+  task: { __type: "Relationship"; __resource: TaskResourceSchema; };
 };
 
 
 
-export type SkillFavoriteAttributesOnlySchema = {
+export type TaskEventAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "skillId";
-  id: UUID;
-  skillId: UUID;
+  __primitiveFields: "id" | "brainPageId" | "kind" | "actorLabel" | "metadata" | "insertedAt" | "taskId";
+  id: UUIDv7;
+  brainPageId: UUID;
+  kind: "claimed" | "completed" | "created" | "lease_expired" | "reassigned" | "released" | "status_changed";
+  actorLabel: string | null;
+  metadata: Record<string, any> | null;
+  insertedAt: UtcDateTimeUsec;
+  taskId: UUID;
 };
 
 
 // UserSubscription Schema
 export type UserSubscriptionResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "status" | "lastPaymentStatus" | "storageUsageBytes" | "billingInterval" | "periodUsageCents" | "monthlySpendCapCents" | "noSpendCap";
+  __primitiveFields: "id" | "status" | "lastPaymentStatus" | "storageUsageBytes" | "extraSeats" | "billingInterval" | "periodUsageCents" | "monthlySpendCapCents" | "noSpendCap";
   id: UUIDv7;
   status: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
   lastPaymentStatus: string | null;
   storageUsageBytes: number;
+  extraSeats: number;
   billingInterval: "annual" | "monthly";
   periodUsageCents: number;
   monthlySpendCapCents: number | null;
@@ -1709,11 +1566,12 @@ export type UserSubscriptionResourceSchema = {
 
 export type UserSubscriptionAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "status" | "lastPaymentStatus" | "storageUsageBytes" | "billingInterval" | "periodUsageCents" | "monthlySpendCapCents" | "noSpendCap";
+  __primitiveFields: "id" | "status" | "lastPaymentStatus" | "storageUsageBytes" | "extraSeats" | "billingInterval" | "periodUsageCents" | "monthlySpendCapCents" | "noSpendCap";
   id: UUIDv7;
   status: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
   lastPaymentStatus: string | null;
   storageUsageBytes: number;
+  extraSeats: number;
   billingInterval: "annual" | "monthly";
   periodUsageCents: number;
   monthlySpendCapCents: number | null;
@@ -1726,7 +1584,7 @@ export type TabSessionResourceSchema = {
   __type: "Resource";
   __primitiveFields: "id" | "mode" | "navFilter" | "tabs" | "activeTabId";
   id: UUID;
-  mode: "agents" | "brain" | "chat" | "files" | "library" | "prompts" | "skills";
+  mode: "agents" | "brain" | "chat" | "files" | "prompts";
   navFilter: "all" | "personal" | "shared";
   tabs: Array<Record<string, any>>;
   activeTabId: string | null;
@@ -1738,7 +1596,7 @@ export type TabSessionAttributesOnlySchema = {
   __type: "Resource";
   __primitiveFields: "id" | "mode" | "navFilter" | "tabs" | "activeTabId";
   id: UUID;
-  mode: "agents" | "brain" | "chat" | "files" | "library" | "prompts" | "skills";
+  mode: "agents" | "brain" | "chat" | "files" | "prompts";
   navFilter: "all" | "personal" | "shared";
   tabs: Array<Record<string, any>>;
   activeTabId: string | null;
@@ -1823,32 +1681,29 @@ export type JobRunAttributesOnlySchema = {
 // Workspace Schema
 export type WorkspaceResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "slug" | "allowedModelIds" | "isActive" | "storageUsageBytes" | "organizationId" | "defaultAgentId";
+  __primitiveFields: "id" | "name" | "slug" | "allowedModelIds" | "isActive" | "storageUsageBytes" | "defaultAgentId";
   id: UUIDv7;
   name: string;
   slug: string;
   allowedModelIds: Array<UUID> | null;
   isActive: boolean;
   storageUsageBytes: number;
-  organizationId: UUID | null;
   defaultAgentId: UUID | null;
   defaultAgent: { __type: "Relationship"; __resource: CustomAgentResourceSchema | null; };
   members: { __type: "Relationship"; __array: true; __resource: WorkspaceMemberResourceSchema; };
-  organization: { __type: "Relationship"; __resource: OrganizationResourceSchema | null; };
 };
 
 
 
 export type WorkspaceAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "slug" | "allowedModelIds" | "isActive" | "storageUsageBytes" | "organizationId" | "defaultAgentId";
+  __primitiveFields: "id" | "name" | "slug" | "allowedModelIds" | "isActive" | "storageUsageBytes" | "defaultAgentId";
   id: UUIDv7;
   name: string;
   slug: string;
   allowedModelIds: Array<UUID> | null;
   isActive: boolean;
   storageUsageBytes: number;
-  organizationId: UUID | null;
   defaultAgentId: UUID | null;
 };
 
@@ -2092,9 +1947,9 @@ export type AgentActivityLogFilterInput = {
   };
 
   activityType?: {
-    eq?: "approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "recovery" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "run_timed_out" | "task_completed" | "task_created" | "task_updated" | "triage_completed" | "wake_skipped" | "wake_urgent" | "watchdog_reset";
-    notEq?: "approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "recovery" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "run_timed_out" | "task_completed" | "task_created" | "task_updated" | "triage_completed" | "wake_skipped" | "wake_urgent" | "watchdog_reset";
-    in?: Array<"approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "recovery" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "run_timed_out" | "task_completed" | "task_created" | "task_updated" | "triage_completed" | "wake_skipped" | "wake_urgent" | "watchdog_reset">;
+    eq?: "approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "task_completed" | "task_created" | "task_updated" | "triage_completed";
+    notEq?: "approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "task_completed" | "task_created" | "task_updated" | "triage_completed";
+    in?: Array<"approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "task_completed" | "task_created" | "task_updated" | "triage_completed">;
   };
 
   summary?: {
@@ -2558,13 +2413,6 @@ export type CustomAgentFilterInput = {
     isNil?: boolean;
   };
 
-  pauseReason?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-    isNil?: boolean;
-  };
-
   maxDailyRuns?: {
     eq?: number;
     notEq?: number;
@@ -2810,6 +2658,12 @@ export type BrainPageFilterInput = {
     notEq?: string;
     in?: Array<string>;
     isNil?: boolean;
+  };
+
+  kind?: {
+    eq?: "page" | "plan";
+    notEq?: "page" | "plan";
+    in?: Array<"page" | "plan">;
   };
 
   body?: {
@@ -3150,13 +3004,6 @@ export type ConversationFilterInput = {
     eq?: Array<string>;
     notEq?: Array<string>;
     in?: Array<Array<string>>;
-    isNil?: boolean;
-  };
-
-  approvedSkillIds?: {
-    eq?: Array<UUID>;
-    notEq?: Array<UUID>;
-    in?: Array<Array<UUID>>;
     isNil?: boolean;
   };
 
@@ -4164,7 +4011,6 @@ export type ModelFilterInput = {
   };
 
 
-  modelProvider?: ModelProviderFilterInput;
 
 };
 export type UserFolderStateFilterInput = {
@@ -4199,48 +4045,6 @@ export type UserFolderStateFilterInput = {
   user?: UserFilterInput;
 
   folder?: FolderFilterInput;
-
-};
-export type UserModelPreferenceFilterInput = {
-  and?: Array<UserModelPreferenceFilterInput>;
-  or?: Array<UserModelPreferenceFilterInput>;
-  not?: Array<UserModelPreferenceFilterInput>;
-
-  id?: {
-    eq?: UUIDv7;
-    notEq?: UUIDv7;
-    in?: Array<UUIDv7>;
-  };
-
-  favorite?: {
-    eq?: boolean;
-    notEq?: boolean;
-  };
-
-  hidden?: {
-    eq?: boolean;
-    notEq?: boolean;
-  };
-
-  position?: {
-    eq?: number;
-    notEq?: number;
-    greaterThan?: number;
-    greaterThanOrEqual?: number;
-    lessThan?: number;
-    lessThanOrEqual?: number;
-    in?: Array<number>;
-    isNil?: boolean;
-  };
-
-  modelId?: {
-    eq?: UUID;
-    notEq?: UUID;
-    in?: Array<UUID>;
-  };
-
-
-  model?: ModelFilterInput;
 
 };
 export type DraftFilterInput = {
@@ -4664,34 +4468,6 @@ export type UserIntegrationFilterInput = {
     isNil?: boolean;
   };
 
-  consecutiveFailures?: {
-    eq?: number;
-    notEq?: number;
-    greaterThan?: number;
-    greaterThanOrEqual?: number;
-    lessThan?: number;
-    lessThanOrEqual?: number;
-    in?: Array<number>;
-  };
-
-  lastError?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-    isNil?: boolean;
-  };
-
-  lastSuccessAt?: {
-    eq?: UtcDateTimeUsec;
-    notEq?: UtcDateTimeUsec;
-    greaterThan?: UtcDateTimeUsec;
-    greaterThanOrEqual?: UtcDateTimeUsec;
-    lessThan?: UtcDateTimeUsec;
-    lessThanOrEqual?: UtcDateTimeUsec;
-    in?: Array<UtcDateTimeUsec>;
-    isNil?: boolean;
-  };
-
   conversationMode?: {
     eq?: "multi" | "single";
     notEq?: "multi" | "single";
@@ -5103,24 +4879,7 @@ export type TagFilterInput = {
     in?: Array<string>;
   };
 
-  userId?: {
-    eq?: UUID;
-    notEq?: UUID;
-    in?: Array<UUID>;
-    isNil?: boolean;
-  };
 
-  workspaceId?: {
-    eq?: UUID;
-    notEq?: UUID;
-    in?: Array<UUID>;
-    isNil?: boolean;
-  };
-
-
-  user?: UserFilterInput;
-
-  workspace?: WorkspaceFilterInput;
 
 };
 export type MCPServerFilterInput = {
@@ -5327,67 +5086,6 @@ export type MCPServerCredentialFilterInput = {
   user?: UserFilterInput;
 
 };
-export type ModelProviderFilterInput = {
-  and?: Array<ModelProviderFilterInput>;
-  or?: Array<ModelProviderFilterInput>;
-  not?: Array<ModelProviderFilterInput>;
-
-  id?: {
-    eq?: UUID;
-    notEq?: UUID;
-    in?: Array<UUID>;
-  };
-
-  name?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-  };
-
-  slug?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-  };
-
-  reqLlmId?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-  };
-
-  baseUrl?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-    isNil?: boolean;
-  };
-
-  enabled?: {
-    eq?: boolean;
-    notEq?: boolean;
-  };
-
-  validationStatus?: {
-    eq?: "error" | "invalid" | "pending" | "valid";
-    notEq?: "error" | "invalid" | "pending" | "valid";
-    in?: Array<"error" | "invalid" | "pending" | "valid">;
-  };
-
-  lastValidatedAt?: {
-    eq?: UtcDateTime;
-    notEq?: UtcDateTime;
-    greaterThan?: UtcDateTime;
-    greaterThanOrEqual?: UtcDateTime;
-    lessThan?: UtcDateTime;
-    lessThanOrEqual?: UtcDateTime;
-    in?: Array<UtcDateTime>;
-    isNil?: boolean;
-  };
-
-
-
-};
 export type NotificationFilterInput = {
   and?: Array<NotificationFilterInput>;
   or?: Array<NotificationFilterInput>;
@@ -5474,179 +5172,6 @@ export type NotificationFilterInput = {
   user?: UserFilterInput;
 
 };
-export type OrganizationFilterInput = {
-  and?: Array<OrganizationFilterInput>;
-  or?: Array<OrganizationFilterInput>;
-  not?: Array<OrganizationFilterInput>;
-
-  id?: {
-    eq?: UUIDv7;
-    notEq?: UUIDv7;
-    in?: Array<UUIDv7>;
-  };
-
-  name?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-  };
-
-  slug?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-  };
-
-  billingInterval?: {
-    eq?: "annual" | "monthly";
-    notEq?: "annual" | "monthly";
-    in?: Array<"annual" | "monthly">;
-  };
-
-  billingStatus?: {
-    eq?: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
-    notEq?: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
-    in?: Array<"active" | "canceled" | "incomplete" | "past_due" | "trialing">;
-  };
-
-  currentPeriodStart?: {
-    eq?: UtcDateTimeUsec;
-    notEq?: UtcDateTimeUsec;
-    greaterThan?: UtcDateTimeUsec;
-    greaterThanOrEqual?: UtcDateTimeUsec;
-    lessThan?: UtcDateTimeUsec;
-    lessThanOrEqual?: UtcDateTimeUsec;
-    in?: Array<UtcDateTimeUsec>;
-    isNil?: boolean;
-  };
-
-  currentPeriodEnd?: {
-    eq?: UtcDateTimeUsec;
-    notEq?: UtcDateTimeUsec;
-    greaterThan?: UtcDateTimeUsec;
-    greaterThanOrEqual?: UtcDateTimeUsec;
-    lessThan?: UtcDateTimeUsec;
-    lessThanOrEqual?: UtcDateTimeUsec;
-    in?: Array<UtcDateTimeUsec>;
-    isNil?: boolean;
-  };
-
-  archivedAt?: {
-    eq?: UtcDateTimeUsec;
-    notEq?: UtcDateTimeUsec;
-    greaterThan?: UtcDateTimeUsec;
-    greaterThanOrEqual?: UtcDateTimeUsec;
-    lessThan?: UtcDateTimeUsec;
-    lessThanOrEqual?: UtcDateTimeUsec;
-    in?: Array<UtcDateTimeUsec>;
-    isNil?: boolean;
-  };
-
-  ownerId?: {
-    eq?: UUID;
-    notEq?: UUID;
-    in?: Array<UUID>;
-  };
-
-
-  owner?: UserFilterInput;
-
-  members?: OrganizationMemberFilterInput;
-
-};
-export type OrganizationMemberFilterInput = {
-  and?: Array<OrganizationMemberFilterInput>;
-  or?: Array<OrganizationMemberFilterInput>;
-  not?: Array<OrganizationMemberFilterInput>;
-
-  id?: {
-    eq?: UUIDv7;
-    notEq?: UUIDv7;
-    in?: Array<UUIDv7>;
-  };
-
-  role?: {
-    eq?: "member" | "owner";
-    notEq?: "member" | "owner";
-    in?: Array<"member" | "owner">;
-  };
-
-  status?: {
-    eq?: "active" | "invited" | "removed";
-    notEq?: "active" | "invited" | "removed";
-    in?: Array<"active" | "invited" | "removed">;
-  };
-
-  spendCapCents?: {
-    eq?: number;
-    notEq?: number;
-    greaterThan?: number;
-    greaterThanOrEqual?: number;
-    lessThan?: number;
-    lessThanOrEqual?: number;
-    in?: Array<number>;
-    isNil?: boolean;
-  };
-
-  invitedAt?: {
-    eq?: UtcDateTimeUsec;
-    notEq?: UtcDateTimeUsec;
-    greaterThan?: UtcDateTimeUsec;
-    greaterThanOrEqual?: UtcDateTimeUsec;
-    lessThan?: UtcDateTimeUsec;
-    lessThanOrEqual?: UtcDateTimeUsec;
-    in?: Array<UtcDateTimeUsec>;
-    isNil?: boolean;
-  };
-
-  joinedAt?: {
-    eq?: UtcDateTimeUsec;
-    notEq?: UtcDateTimeUsec;
-    greaterThan?: UtcDateTimeUsec;
-    greaterThanOrEqual?: UtcDateTimeUsec;
-    lessThan?: UtcDateTimeUsec;
-    lessThanOrEqual?: UtcDateTimeUsec;
-    in?: Array<UtcDateTimeUsec>;
-    isNil?: boolean;
-  };
-
-  removedAt?: {
-    eq?: UtcDateTimeUsec;
-    notEq?: UtcDateTimeUsec;
-    greaterThan?: UtcDateTimeUsec;
-    greaterThanOrEqual?: UtcDateTimeUsec;
-    lessThan?: UtcDateTimeUsec;
-    lessThanOrEqual?: UtcDateTimeUsec;
-    in?: Array<UtcDateTimeUsec>;
-    isNil?: boolean;
-  };
-
-  inviteEmail?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-    isNil?: boolean;
-  };
-
-  organizationId?: {
-    eq?: UUID;
-    notEq?: UUID;
-    in?: Array<UUID>;
-  };
-
-  userId?: {
-    eq?: UUID;
-    notEq?: UUID;
-    in?: Array<UUID>;
-    isNil?: boolean;
-  };
-
-
-  organization?: OrganizationFilterInput;
-
-  user?: UserFilterInput;
-
-};
 export type TaskFilterInput = {
   and?: Array<TaskFilterInput>;
   or?: Array<TaskFilterInput>;
@@ -5675,6 +5200,12 @@ export type TaskFilterInput = {
     eq?: "archived" | "blocked" | "cancelled" | "done" | "in_progress" | "open";
     notEq?: "archived" | "blocked" | "cancelled" | "done" | "in_progress" | "open";
     in?: Array<"archived" | "blocked" | "cancelled" | "done" | "in_progress" | "open">;
+  };
+
+  priority?: {
+    eq?: "high" | "low" | "normal" | "urgent";
+    notEq?: "high" | "low" | "normal" | "urgent";
+    in?: Array<"high" | "low" | "normal" | "urgent">;
   };
 
   position?: {
@@ -5754,6 +5285,35 @@ export type TaskFilterInput = {
     isNil?: boolean;
   };
 
+  claimedAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
+  leaseExpiresAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
+  createdByLabel?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
   dismissedAt?: {
     eq?: UtcDateTimeUsec;
     notEq?: UtcDateTimeUsec;
@@ -5776,6 +5336,14 @@ export type TaskFilterInput = {
     eq?: UUID;
     notEq?: UUID;
     in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+  brainPageId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
   };
 
   parentId?: {
@@ -5792,169 +5360,142 @@ export type TaskFilterInput = {
     isNil?: boolean;
   };
 
+  ready?: {
+    eq?: boolean;
+    notEq?: boolean;
+    isNil?: boolean;
+  };
+
+  subtaskCount?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  completedSubtaskCount?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  openDependenciesCount?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
 
   conversation?: ConversationFilterInput;
+
+  brainPage?: BrainPageFilterInput;
 
   parent?: TaskFilterInput;
 
   subtasks?: TaskFilterInput;
 
+  dependencies?: TaskDependencyFilterInput;
+
   assignedToUser?: UserFilterInput;
 
 };
-export type SkillFilterInput = {
-  and?: Array<SkillFilterInput>;
-  or?: Array<SkillFilterInput>;
-  not?: Array<SkillFilterInput>;
+export type TaskDependencyFilterInput = {
+  and?: Array<TaskDependencyFilterInput>;
+  or?: Array<TaskDependencyFilterInput>;
+  not?: Array<TaskDependencyFilterInput>;
 
   id?: {
+    eq?: UUIDv7;
+    notEq?: UUIDv7;
+    in?: Array<UUIDv7>;
+  };
+
+  taskId?: {
     eq?: UUID;
     notEq?: UUID;
     in?: Array<UUID>;
   };
 
-  name?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-  };
-
-  displayName?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-    isNil?: boolean;
-  };
-
-  description?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-  };
-
-  body?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-    isNil?: boolean;
-  };
-
-  requestedTools?: {
-    eq?: Array<string>;
-    notEq?: Array<string>;
-    in?: Array<Array<string>>;
-    isNil?: boolean;
-  };
-
-  requiredSecrets?: {
-    eq?: Array<Record<string, any>>;
-    notEq?: Array<Record<string, any>>;
-    in?: Array<Array<Record<string, any>>>;
-    isNil?: boolean;
-  };
-
-  version?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-    isNil?: boolean;
-  };
-
-  license?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-    isNil?: boolean;
-  };
-
-  compatibility?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-    isNil?: boolean;
-  };
-
-  icon?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-    isNil?: boolean;
-  };
-
-  color?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-    isNil?: boolean;
-  };
-
-  sourceFormat?: {
-    eq?: "agents_md" | "goose" | "other" | "skill_md";
-    notEq?: "agents_md" | "goose" | "other" | "skill_md";
-    in?: Array<"agents_md" | "goose" | "other" | "skill_md">;
-  };
-
-  sourceUrl?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-    isNil?: boolean;
-  };
-
-  hasExecutableBundle?: {
-    eq?: boolean;
-    notEq?: boolean;
-  };
-
-  fileManifest?: {
-    eq?: Array<Record<string, any>>;
-    notEq?: Array<Record<string, any>>;
-    in?: Array<Array<Record<string, any>>>;
-    isNil?: boolean;
-  };
-
-  workspaceId?: {
+  dependsOnId?: {
     eq?: UUID;
     notEq?: UUID;
     in?: Array<UUID>;
-    isNil?: boolean;
-  };
-
-  isSharedToWorkspace?: {
-    eq?: boolean;
-    notEq?: boolean;
-    isNil?: boolean;
-  };
-
-  isFavorited?: {
-    eq?: boolean;
-    notEq?: boolean;
-    isNil?: boolean;
   };
 
 
-  workspace?: WorkspaceFilterInput;
+  task?: TaskFilterInput;
+
+  dependsOn?: TaskFilterInput;
 
 };
-export type SkillFavoriteFilterInput = {
-  and?: Array<SkillFavoriteFilterInput>;
-  or?: Array<SkillFavoriteFilterInput>;
-  not?: Array<SkillFavoriteFilterInput>;
+export type TaskEventFilterInput = {
+  and?: Array<TaskEventFilterInput>;
+  or?: Array<TaskEventFilterInput>;
+  not?: Array<TaskEventFilterInput>;
 
   id?: {
+    eq?: UUIDv7;
+    notEq?: UUIDv7;
+    in?: Array<UUIDv7>;
+  };
+
+  brainPageId?: {
     eq?: UUID;
     notEq?: UUID;
     in?: Array<UUID>;
   };
 
-  skillId?: {
+  kind?: {
+    eq?: "claimed" | "completed" | "created" | "lease_expired" | "reassigned" | "released" | "status_changed";
+    notEq?: "claimed" | "completed" | "created" | "lease_expired" | "reassigned" | "released" | "status_changed";
+    in?: Array<"claimed" | "completed" | "created" | "lease_expired" | "reassigned" | "released" | "status_changed">;
+  };
+
+  actorLabel?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  metadata?: {
+    eq?: Record<string, any>;
+    notEq?: Record<string, any>;
+    in?: Array<Record<string, any>>;
+    isNil?: boolean;
+  };
+
+  insertedAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+  };
+
+  taskId?: {
     eq?: UUID;
     notEq?: UUID;
     in?: Array<UUID>;
   };
 
 
-  skill?: SkillFilterInput;
+  task?: TaskFilterInput;
 
 };
 export type UserSubscriptionFilterInput = {
@@ -5982,6 +5523,16 @@ export type UserSubscriptionFilterInput = {
   };
 
   storageUsageBytes?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+  };
+
+  extraSeats?: {
     eq?: number;
     notEq?: number;
     greaterThan?: number;
@@ -6038,9 +5589,9 @@ export type TabSessionFilterInput = {
   };
 
   mode?: {
-    eq?: "agents" | "brain" | "chat" | "files" | "library" | "prompts" | "skills";
-    notEq?: "agents" | "brain" | "chat" | "files" | "library" | "prompts" | "skills";
-    in?: Array<"agents" | "brain" | "chat" | "files" | "library" | "prompts" | "skills">;
+    eq?: "agents" | "brain" | "chat" | "files" | "prompts";
+    notEq?: "agents" | "brain" | "chat" | "files" | "prompts";
+    in?: Array<"agents" | "brain" | "chat" | "files" | "prompts">;
   };
 
   navFilter?: {
@@ -6311,13 +5862,6 @@ export type WorkspaceFilterInput = {
     in?: Array<number>;
   };
 
-  organizationId?: {
-    eq?: UUID;
-    notEq?: UUID;
-    in?: Array<UUID>;
-    isNil?: boolean;
-  };
-
   defaultAgentId?: {
     eq?: UUID;
     notEq?: UUID;
@@ -6329,8 +5873,6 @@ export type WorkspaceFilterInput = {
   defaultAgent?: CustomAgentFilterInput;
 
   members?: WorkspaceMemberFilterInput;
-
-  organization?: OrganizationFilterInput;
 
 };
 export type WorkspaceMemberFilterInput = {
@@ -6434,7 +5976,7 @@ export type AgentInboxEventFilterField = (typeof agentInboxEventFilterFields)[nu
 export const agentSecretFilterFields = ["id", "key", "value", "scope", "description", "insertedAt", "customAgentId", "customAgent"] as const;
 export type AgentSecretFilterField = (typeof agentSecretFilterFields)[number];
 
-export const customAgentFilterFields = ["id", "name", "handle", "description", "icon", "imagePath", "instructions", "slashCommands", "chatMode", "disabledToolCategories", "preLoadedSkills", "samplingSettings", "maxIterations", "isDefault", "isPublic", "canReadGlobalMemories", "canWriteGlobalMemories", "canAccessGlobalFiles", "canAccessKnowledge", "isPaused", "pauseReason", "maxDailyRuns", "maxTokensPerRun", "heartbeatEnabled", "heartbeatInstructions", "heartbeatDefaultIntervalMinutes", "nextScheduledAt", "insertedAt", "updatedAt", "modelId", "imageModelId", "videoModelId", "workspaceId", "imageUrl", "editableByActor", "isSharedToWorkspace", "model", "imageModel", "videoModel", "workspace", "attachments"] as const;
+export const customAgentFilterFields = ["id", "name", "handle", "description", "icon", "imagePath", "instructions", "slashCommands", "chatMode", "disabledToolCategories", "preLoadedSkills", "samplingSettings", "maxIterations", "isDefault", "isPublic", "canReadGlobalMemories", "canWriteGlobalMemories", "canAccessGlobalFiles", "canAccessKnowledge", "isPaused", "maxDailyRuns", "maxTokensPerRun", "heartbeatEnabled", "heartbeatInstructions", "heartbeatDefaultIntervalMinutes", "nextScheduledAt", "insertedAt", "updatedAt", "modelId", "imageModelId", "videoModelId", "workspaceId", "imageUrl", "editableByActor", "isSharedToWorkspace", "model", "imageModel", "videoModel", "workspace", "attachments"] as const;
 export type CustomAgentFilterField = (typeof customAgentFilterFields)[number];
 
 export const magusAgentsSlashCommandFilterFields = ["name", "title", "instruction", "icon"] as const;
@@ -6443,7 +5985,7 @@ export type MagusAgentsSlashCommandFilterField = (typeof magusAgentsSlashCommand
 export const brainFilterFields = ["id", "title", "description", "icon", "color", "workspaceId", "isSharedToWorkspace", "workspace"] as const;
 export type BrainFilterField = (typeof brainFilterFields)[number];
 
-export const brainPageFilterFields = ["id", "title", "icon", "body", "lockVersion", "updatedAt", "brainId", "parentPageId", "prosemirror", "brain", "parentPage"] as const;
+export const brainPageFilterFields = ["id", "title", "icon", "kind", "body", "lockVersion", "updatedAt", "brainId", "parentPageId", "prosemirror", "brain", "parentPage"] as const;
 export type BrainPageFilterField = (typeof brainPageFilterFields)[number];
 
 export const brainPageLinkFilterFields = ["id", "targetTitleAtLinkTime", "sourcePageId", "sourcePage"] as const;
@@ -6458,7 +6000,7 @@ export type BrainSourceFilterField = (typeof brainSourceFilterFields)[number];
 export const context_windowFilterFields = ["id", "strategy", "windowStartAt", "summary", "summaryMessageCount", "lastBreakdown", "lastTotalTokens", "lastActualInputTokens", "lastCachedTokens", "lastModelKey", "lastMaxContext", "compactionStatus"] as const;
 export type context_windowFilterField = (typeof context_windowFilterFields)[number];
 
-export const conversationFilterFields = ["id", "title", "isMultiplayer", "visibility", "chatMode", "systemPrompt", "skillContext", "skillTools", "loadedTools", "approvedSkillIds", "samplingSettings", "imageGenerationSettings", "videoGenerationSettings", "isTaskConversation", "isThread", "branchedAt", "deletedAt", "extractionDueAt", "insertedAt", "updatedAt", "userId", "folderId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "systemPromptId", "customAgentId", "workspaceId", "parentConversationId", "sandboxConversationId", "branchedAtMessageId", "isFavorited", "isSharedToWorkspace", "messageCount", "lastMessageAt", "messages", "members", "inviteLinks", "invitations", "shareLinks", "user", "folder", "selectedModel", "selectedImageModel", "selectedVideoModel", "activeSystemPrompt", "customAgent", "workspace", "parentConversation", "sandboxConversation", "branchedAtMessage", "childConversations", "favorites", "memories"] as const;
+export const conversationFilterFields = ["id", "title", "isMultiplayer", "visibility", "chatMode", "systemPrompt", "skillContext", "skillTools", "loadedTools", "samplingSettings", "imageGenerationSettings", "videoGenerationSettings", "isTaskConversation", "isThread", "branchedAt", "deletedAt", "extractionDueAt", "insertedAt", "updatedAt", "userId", "folderId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "systemPromptId", "customAgentId", "workspaceId", "parentConversationId", "sandboxConversationId", "branchedAtMessageId", "isFavorited", "isSharedToWorkspace", "messageCount", "lastMessageAt", "messages", "members", "inviteLinks", "invitations", "shareLinks", "user", "folder", "selectedModel", "selectedImageModel", "selectedVideoModel", "activeSystemPrompt", "customAgent", "workspace", "parentConversation", "sandboxConversation", "branchedAtMessage", "childConversations", "favorites", "memories"] as const;
 export type ConversationFilterField = (typeof conversationFilterFields)[number];
 
 export const conversationCompanionFilterFields = ["id", "resourceType", "resourceId", "conversationId", "conversation"] as const;
@@ -6491,9 +6033,6 @@ export type ModelFilterField = (typeof modelFilterFields)[number];
 export const userFolderStateFilterFields = ["id", "isExpanded", "userId", "folderId", "user", "folder"] as const;
 export type UserFolderStateFilterField = (typeof userFolderStateFilterFields)[number];
 
-export const userModelPreferenceFilterFields = ["id", "favorite", "hidden", "position", "modelId", "model"] as const;
-export type UserModelPreferenceFilterField = (typeof userModelPreferenceFilterFields)[number];
-
 export const draftFilterFields = ["id", "title", "content", "status", "version", "metadata", "updatedAt", "conversationId", "conversation"] as const;
 export type DraftFilterField = (typeof draftFilterFields)[number];
 
@@ -6506,7 +6045,7 @@ export type FeatureUsageEventFilterField = (typeof featureUsageEventFilterFields
 export const fileFilterFields = ["id", "name", "type", "source", "mimeType", "fileSize", "filePath", "status", "errorMessage", "chunkCount", "externalId", "externalEtag", "externalUpdatedAt", "externalUrl", "lastSyncedAt", "deletedAt", "isTemplate", "uploadedViaAgentId", "insertedAt", "updatedAt", "userId", "conversationId", "folderId", "workspaceId", "knowledgeCollectionId", "isSharedToWorkspace", "user", "conversation", "folder", "workspace", "knowledgeCollection", "uploadedViaAgent"] as const;
 export type FileFilterField = (typeof fileFilterFields)[number];
 
-export const userIntegrationFilterFields = ["id", "providerKey", "status", "config", "externalId", "lastSyncAt", "errorMessage", "consecutiveFailures", "lastError", "lastSuccessAt", "conversationMode", "asyncReplyEnabled", "enabledTools"] as const;
+export const userIntegrationFilterFields = ["id", "providerKey", "status", "config", "externalId", "lastSyncAt", "errorMessage", "conversationMode", "asyncReplyEnabled", "enabledTools"] as const;
 export type UserIntegrationFilterField = (typeof userIntegrationFilterFields)[number];
 
 export const knowledgeCollectionFilterFields = ["id", "name", "externalId", "externalPath", "syncStatus", "syncStrategy", "syncIntervalMinutes", "lastSyncedAt", "contentUpdatedAt", "syncCursor", "itemCount", "errorCount", "lastError", "settings", "syncLog", "workspaceId", "isSharedToWorkspace", "workspace"] as const;
@@ -6521,7 +6060,7 @@ export type PromptFilterField = (typeof promptFilterFields)[number];
 export const promptFavoriteFilterFields = ["id", "promptId", "prompt"] as const;
 export type PromptFavoriteFilterField = (typeof promptFavoriteFilterFields)[number];
 
-export const tagFilterFields = ["id", "name", "userId", "workspaceId", "user", "workspace"] as const;
+export const tagFilterFields = ["id", "name"] as const;
 export type TagFilterField = (typeof tagFilterFields)[number];
 
 export const mCPServerFilterFields = ["id", "name", "handle", "url", "transport", "mcpPath", "enabled", "authType", "cachedTools", "toolsCachedAt", "oauthMetadata", "reachability", "lastError", "lastReachableAt", "source", "registryName", "registryVersion", "description", "repositoryUrl", "userId", "workspaceId", "user", "workspace"] as const;
@@ -6530,28 +6069,19 @@ export type MCPServerFilterField = (typeof mCPServerFilterFields)[number];
 export const mCPServerCredentialFilterFields = ["id", "authKind", "oauthExpiresAt", "status", "mcpServerId", "userId", "mcpServer", "user"] as const;
 export type MCPServerCredentialFilterField = (typeof mCPServerCredentialFilterFields)[number];
 
-export const modelProviderFilterFields = ["id", "name", "slug", "reqLlmId", "baseUrl", "enabled", "validationStatus", "lastValidatedAt"] as const;
-export type ModelProviderFilterField = (typeof modelProviderFilterFields)[number];
-
 export const notificationFilterFields = ["id", "title", "body", "notificationType", "readAt", "metadata", "targetConversationId", "insertedAt", "updatedAt", "userId", "user"] as const;
 export type NotificationFilterField = (typeof notificationFilterFields)[number];
 
-export const organizationFilterFields = ["id", "name", "slug", "billingInterval", "billingStatus", "currentPeriodStart", "currentPeriodEnd", "archivedAt", "ownerId", "owner", "members"] as const;
-export type OrganizationFilterField = (typeof organizationFilterFields)[number];
-
-export const organizationMemberFilterFields = ["id", "role", "status", "spendCapCents", "invitedAt", "joinedAt", "removedAt", "inviteEmail", "organizationId", "userId", "organization", "user"] as const;
-export type OrganizationMemberFilterField = (typeof organizationMemberFilterFields)[number];
-
-export const taskFilterFields = ["id", "title", "description", "status", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "dismissedAt", "recurrence", "conversationId", "parentId", "assignedToUserId", "conversation", "parent", "subtasks", "assignedToUser"] as const;
+export const taskFilterFields = ["id", "title", "description", "status", "priority", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "claimedAt", "leaseExpiresAt", "createdByLabel", "dismissedAt", "recurrence", "conversationId", "brainPageId", "parentId", "assignedToUserId", "ready", "subtaskCount", "completedSubtaskCount", "openDependenciesCount", "conversation", "brainPage", "parent", "subtasks", "dependencies", "assignedToUser"] as const;
 export type TaskFilterField = (typeof taskFilterFields)[number];
 
-export const skillFilterFields = ["id", "name", "displayName", "description", "body", "requestedTools", "requiredSecrets", "version", "license", "compatibility", "icon", "color", "sourceFormat", "sourceUrl", "hasExecutableBundle", "fileManifest", "workspaceId", "isSharedToWorkspace", "isFavorited", "workspace"] as const;
-export type SkillFilterField = (typeof skillFilterFields)[number];
+export const taskDependencyFilterFields = ["id", "taskId", "dependsOnId", "task", "dependsOn"] as const;
+export type TaskDependencyFilterField = (typeof taskDependencyFilterFields)[number];
 
-export const skillFavoriteFilterFields = ["id", "skillId", "skill"] as const;
-export type SkillFavoriteFilterField = (typeof skillFavoriteFilterFields)[number];
+export const taskEventFilterFields = ["id", "brainPageId", "kind", "actorLabel", "metadata", "insertedAt", "taskId", "task"] as const;
+export type TaskEventFilterField = (typeof taskEventFilterFields)[number];
 
-export const userSubscriptionFilterFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
+export const userSubscriptionFilterFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "extraSeats", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
 export type UserSubscriptionFilterField = (typeof userSubscriptionFilterFields)[number];
 
 export const tabSessionFilterFields = ["id", "mode", "navFilter", "tabs", "activeTabId"] as const;
@@ -6563,7 +6093,7 @@ export type JobFilterField = (typeof jobFilterFields)[number];
 export const jobRunFilterFields = ["id", "status", "startedAt", "completedAt", "errorMessage", "retryAttempt", "metadata"] as const;
 export type JobRunFilterField = (typeof jobRunFilterFields)[number];
 
-export const workspaceFilterFields = ["id", "name", "slug", "allowedModelIds", "isActive", "storageUsageBytes", "organizationId", "defaultAgentId", "defaultAgent", "members", "organization"] as const;
+export const workspaceFilterFields = ["id", "name", "slug", "allowedModelIds", "isActive", "storageUsageBytes", "defaultAgentId", "defaultAgent", "members"] as const;
 export type WorkspaceFilterField = (typeof workspaceFilterFields)[number];
 
 export const workspaceMemberFilterFields = ["id", "role", "status", "isActive", "invitedAt", "joinedAt", "deactivatedAt", "inviteEmail", "workspaceId", "userId", "workspace", "user"] as const;
@@ -6582,7 +6112,7 @@ export type AgentInboxEventSortField = (typeof agentInboxEventSortFields)[number
 export const agentSecretSortFields = ["id", "key", "value", "scope", "description", "insertedAt", "customAgentId"] as const;
 export type AgentSecretSortField = (typeof agentSecretSortFields)[number];
 
-export const customAgentSortFields = ["id", "name", "handle", "description", "icon", "imagePath", "instructions", "slashCommands", "chatMode", "disabledToolCategories", "preLoadedSkills", "samplingSettings", "maxIterations", "isDefault", "isPublic", "canReadGlobalMemories", "canWriteGlobalMemories", "canAccessGlobalFiles", "canAccessKnowledge", "isPaused", "pauseReason", "maxDailyRuns", "maxTokensPerRun", "heartbeatEnabled", "heartbeatInstructions", "heartbeatDefaultIntervalMinutes", "nextScheduledAt", "insertedAt", "updatedAt", "modelId", "imageModelId", "videoModelId", "workspaceId", "imageUrl", "editableByActor", "isSharedToWorkspace"] as const;
+export const customAgentSortFields = ["id", "name", "handle", "description", "icon", "imagePath", "instructions", "slashCommands", "chatMode", "disabledToolCategories", "preLoadedSkills", "samplingSettings", "maxIterations", "isDefault", "isPublic", "canReadGlobalMemories", "canWriteGlobalMemories", "canAccessGlobalFiles", "canAccessKnowledge", "isPaused", "maxDailyRuns", "maxTokensPerRun", "heartbeatEnabled", "heartbeatInstructions", "heartbeatDefaultIntervalMinutes", "nextScheduledAt", "insertedAt", "updatedAt", "modelId", "imageModelId", "videoModelId", "workspaceId", "imageUrl", "editableByActor", "isSharedToWorkspace"] as const;
 export type CustomAgentSortField = (typeof customAgentSortFields)[number];
 
 export const magusAgentsSlashCommandSortFields = ["name", "title", "instruction", "icon"] as const;
@@ -6591,7 +6121,7 @@ export type MagusAgentsSlashCommandSortField = (typeof magusAgentsSlashCommandSo
 export const brainSortFields = ["id", "title", "description", "icon", "color", "workspaceId", "isSharedToWorkspace"] as const;
 export type BrainSortField = (typeof brainSortFields)[number];
 
-export const brainPageSortFields = ["id", "title", "icon", "body", "lockVersion", "updatedAt", "brainId", "parentPageId", "prosemirror"] as const;
+export const brainPageSortFields = ["id", "title", "icon", "kind", "body", "lockVersion", "updatedAt", "brainId", "parentPageId", "prosemirror"] as const;
 export type BrainPageSortField = (typeof brainPageSortFields)[number];
 
 export const brainPageLinkSortFields = ["id", "targetTitleAtLinkTime", "sourcePageId"] as const;
@@ -6606,7 +6136,7 @@ export type BrainSourceSortField = (typeof brainSourceSortFields)[number];
 export const context_windowSortFields = ["id", "strategy", "windowStartAt", "summary", "summaryMessageCount", "lastBreakdown", "lastTotalTokens", "lastActualInputTokens", "lastCachedTokens", "lastModelKey", "lastMaxContext", "compactionStatus"] as const;
 export type context_windowSortField = (typeof context_windowSortFields)[number];
 
-export const conversationSortFields = ["id", "title", "isMultiplayer", "visibility", "chatMode", "systemPrompt", "skillContext", "skillTools", "loadedTools", "approvedSkillIds", "samplingSettings", "imageGenerationSettings", "videoGenerationSettings", "isTaskConversation", "isThread", "branchedAt", "deletedAt", "extractionDueAt", "insertedAt", "updatedAt", "userId", "folderId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "systemPromptId", "customAgentId", "workspaceId", "parentConversationId", "sandboxConversationId", "branchedAtMessageId", "isFavorited", "isSharedToWorkspace", "messageCount", "lastMessageAt"] as const;
+export const conversationSortFields = ["id", "title", "isMultiplayer", "visibility", "chatMode", "systemPrompt", "skillContext", "skillTools", "loadedTools", "samplingSettings", "imageGenerationSettings", "videoGenerationSettings", "isTaskConversation", "isThread", "branchedAt", "deletedAt", "extractionDueAt", "insertedAt", "updatedAt", "userId", "folderId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "systemPromptId", "customAgentId", "workspaceId", "parentConversationId", "sandboxConversationId", "branchedAtMessageId", "isFavorited", "isSharedToWorkspace", "messageCount", "lastMessageAt"] as const;
 export type ConversationSortField = (typeof conversationSortFields)[number];
 
 export const conversationCompanionSortFields = ["id", "resourceType", "resourceId", "conversationId"] as const;
@@ -6639,9 +6169,6 @@ export type ModelSortField = (typeof modelSortFields)[number];
 export const userFolderStateSortFields = ["id", "isExpanded", "userId", "folderId"] as const;
 export type UserFolderStateSortField = (typeof userFolderStateSortFields)[number];
 
-export const userModelPreferenceSortFields = ["id", "favorite", "hidden", "position", "modelId"] as const;
-export type UserModelPreferenceSortField = (typeof userModelPreferenceSortFields)[number];
-
 export const draftSortFields = ["id", "title", "content", "status", "version", "metadata", "updatedAt", "conversationId"] as const;
 export type DraftSortField = (typeof draftSortFields)[number];
 
@@ -6654,7 +6181,7 @@ export type FeatureUsageEventSortField = (typeof featureUsageEventSortFields)[nu
 export const fileSortFields = ["id", "name", "type", "source", "mimeType", "fileSize", "filePath", "status", "errorMessage", "chunkCount", "externalId", "externalEtag", "externalUpdatedAt", "externalUrl", "lastSyncedAt", "deletedAt", "isTemplate", "uploadedViaAgentId", "insertedAt", "updatedAt", "userId", "conversationId", "folderId", "workspaceId", "knowledgeCollectionId", "isSharedToWorkspace"] as const;
 export type FileSortField = (typeof fileSortFields)[number];
 
-export const userIntegrationSortFields = ["id", "providerKey", "status", "config", "externalId", "lastSyncAt", "errorMessage", "consecutiveFailures", "lastError", "lastSuccessAt", "conversationMode", "asyncReplyEnabled", "enabledTools"] as const;
+export const userIntegrationSortFields = ["id", "providerKey", "status", "config", "externalId", "lastSyncAt", "errorMessage", "conversationMode", "asyncReplyEnabled", "enabledTools"] as const;
 export type UserIntegrationSortField = (typeof userIntegrationSortFields)[number];
 
 export const knowledgeCollectionSortFields = ["id", "name", "externalId", "externalPath", "syncStatus", "syncStrategy", "syncIntervalMinutes", "lastSyncedAt", "contentUpdatedAt", "syncCursor", "itemCount", "errorCount", "lastError", "settings", "syncLog", "workspaceId", "isSharedToWorkspace"] as const;
@@ -6669,7 +6196,7 @@ export type PromptSortField = (typeof promptSortFields)[number];
 export const promptFavoriteSortFields = ["id", "promptId"] as const;
 export type PromptFavoriteSortField = (typeof promptFavoriteSortFields)[number];
 
-export const tagSortFields = ["id", "name", "userId", "workspaceId"] as const;
+export const tagSortFields = ["id", "name"] as const;
 export type TagSortField = (typeof tagSortFields)[number];
 
 export const mCPServerSortFields = ["id", "name", "handle", "url", "transport", "mcpPath", "enabled", "authType", "cachedTools", "toolsCachedAt", "oauthMetadata", "reachability", "lastError", "lastReachableAt", "source", "registryName", "registryVersion", "description", "repositoryUrl", "userId", "workspaceId"] as const;
@@ -6678,28 +6205,19 @@ export type MCPServerSortField = (typeof mCPServerSortFields)[number];
 export const mCPServerCredentialSortFields = ["id", "authKind", "oauthExpiresAt", "status", "mcpServerId", "userId"] as const;
 export type MCPServerCredentialSortField = (typeof mCPServerCredentialSortFields)[number];
 
-export const modelProviderSortFields = ["id", "name", "slug", "reqLlmId", "baseUrl", "enabled", "validationStatus", "lastValidatedAt"] as const;
-export type ModelProviderSortField = (typeof modelProviderSortFields)[number];
-
 export const notificationSortFields = ["id", "title", "body", "notificationType", "readAt", "metadata", "targetConversationId", "insertedAt", "updatedAt", "userId"] as const;
 export type NotificationSortField = (typeof notificationSortFields)[number];
 
-export const organizationSortFields = ["id", "name", "slug", "billingInterval", "billingStatus", "currentPeriodStart", "currentPeriodEnd", "archivedAt", "ownerId"] as const;
-export type OrganizationSortField = (typeof organizationSortFields)[number];
-
-export const organizationMemberSortFields = ["id", "role", "status", "spendCapCents", "invitedAt", "joinedAt", "removedAt", "inviteEmail", "organizationId", "userId"] as const;
-export type OrganizationMemberSortField = (typeof organizationMemberSortFields)[number];
-
-export const taskSortFields = ["id", "title", "description", "status", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "dismissedAt", "recurrence", "conversationId", "parentId", "assignedToUserId"] as const;
+export const taskSortFields = ["id", "title", "description", "status", "priority", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "claimedAt", "leaseExpiresAt", "createdByLabel", "dismissedAt", "recurrence", "conversationId", "brainPageId", "parentId", "assignedToUserId", "ready", "subtaskCount", "completedSubtaskCount", "openDependenciesCount"] as const;
 export type TaskSortField = (typeof taskSortFields)[number];
 
-export const skillSortFields = ["id", "name", "displayName", "description", "body", "requestedTools", "requiredSecrets", "version", "license", "compatibility", "icon", "color", "sourceFormat", "sourceUrl", "hasExecutableBundle", "fileManifest", "workspaceId", "isSharedToWorkspace", "isFavorited"] as const;
-export type SkillSortField = (typeof skillSortFields)[number];
+export const taskDependencySortFields = ["id", "taskId", "dependsOnId"] as const;
+export type TaskDependencySortField = (typeof taskDependencySortFields)[number];
 
-export const skillFavoriteSortFields = ["id", "skillId"] as const;
-export type SkillFavoriteSortField = (typeof skillFavoriteSortFields)[number];
+export const taskEventSortFields = ["id", "brainPageId", "kind", "actorLabel", "metadata", "insertedAt", "taskId"] as const;
+export type TaskEventSortField = (typeof taskEventSortFields)[number];
 
-export const userSubscriptionSortFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
+export const userSubscriptionSortFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "extraSeats", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
 export type UserSubscriptionSortField = (typeof userSubscriptionSortFields)[number];
 
 export const tabSessionSortFields = ["id", "mode", "navFilter", "tabs", "activeTabId"] as const;
@@ -6711,7 +6229,7 @@ export type JobSortField = (typeof jobSortFields)[number];
 export const jobRunSortFields = ["id", "status", "startedAt", "completedAt", "errorMessage", "retryAttempt", "metadata"] as const;
 export type JobRunSortField = (typeof jobRunSortFields)[number];
 
-export const workspaceSortFields = ["id", "name", "slug", "allowedModelIds", "isActive", "storageUsageBytes", "organizationId", "defaultAgentId"] as const;
+export const workspaceSortFields = ["id", "name", "slug", "allowedModelIds", "isActive", "storageUsageBytes", "defaultAgentId"] as const;
 export type WorkspaceSortField = (typeof workspaceSortFields)[number];
 
 export const workspaceMemberSortFields = ["id", "role", "status", "isActive", "invitedAt", "joinedAt", "deactivatedAt", "inviteEmail", "workspaceId", "userId"] as const;
