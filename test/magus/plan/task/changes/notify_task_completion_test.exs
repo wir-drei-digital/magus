@@ -73,7 +73,7 @@ defmodule Magus.Plan.Task.Changes.NotifyTaskCompletionTest do
       assert event.payload["conversation_id"] == task.conversation_id
     end
 
-    test "is idempotent — second completion update does not create a duplicate event" do
+    test "is idempotent - second completion update does not create a duplicate event" do
       %{user: user, conversation: conversation, orchestrator: orchestrator, worker: worker} =
         create_context()
 
@@ -89,7 +89,7 @@ defmodule Magus.Plan.Task.Changes.NotifyTaskCompletionTest do
         )
 
       {:ok, done_task} = Plan.update_task(task, %{status: :done}, actor: user)
-      # Update again (status is already :done — should not trigger again)
+      # Update again (status is already :done - should not trigger again)
       {:ok, _} = Plan.update_task(done_task, %{title: "Idempotent task (renamed)"}, actor: user)
 
       {:ok, events} = Agents.list_agent_events(orchestrator.id, actor: user)
@@ -285,7 +285,7 @@ defmodule Magus.Plan.Task.Changes.NotifyTaskCompletionTest do
           actor: user
         )
 
-      # Update a non-status field — status stays :done but it's not a transition
+      # Update a non-status field - status stays :done but it's not a transition
       {:ok, _} = Plan.update_task(task, %{title: "Already done (renamed)"}, actor: user)
 
       {:ok, events} = Agents.list_agent_events(orchestrator.id, actor: user)

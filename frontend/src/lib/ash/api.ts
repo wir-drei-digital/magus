@@ -1979,9 +1979,9 @@ export function connectKnowledgeSource(input: {
 	name?: string | null;
 	workspaceId?: string | null;
 }): Promise<RpcResult<KnowledgeSourceEntry>> {
-	return run((opts) =>
-		rpc.connectKnowledgeSource({ input, ...opts })
-	) as Promise<RpcResult<KnowledgeSourceEntry>>;
+	return run((opts) => rpc.connectKnowledgeSource({ input, ...opts })) as Promise<
+		RpcResult<KnowledgeSourceEntry>
+	>;
 }
 
 /** Browse a connected source's folders (null parent = root; lazy on expand). */
@@ -2093,6 +2093,8 @@ export type BrainPageDetail = {
 	icon: string | null;
 	body: string | null;
 	updatedAt: string;
+	/** `'plan'` pages render the structured task board below the editor. */
+	kind: 'page' | 'plan';
 	/** Scope pill: workspaceId null = personal brain. */
 	brain: { id: string; workspaceId: string | null };
 };
@@ -2101,7 +2103,15 @@ export function getBrainPage(id: string): Promise<RpcResult<BrainPageDetail>> {
 	return run((opts) =>
 		rpc.getBrainPage({
 			getBy: { id },
-			fields: ['id', 'title', 'icon', 'body', 'updatedAt', { brain: ['id', 'workspaceId'] }],
+			fields: [
+				'id',
+				'title',
+				'icon',
+				'body',
+				'updatedAt',
+				'kind',
+				{ brain: ['id', 'workspaceId'] }
+			],
 			...opts
 		})
 	);
@@ -3001,8 +3011,7 @@ export async function agentIntegrations(agentId: string): Promise<RpcResult<Agen
 			availableTools: (
 				(Array.isArray(row.available_tools) ? row.available_tools : []) as Record<string, unknown>[]
 			).map((tool) => ({ key: String(tool.key ?? ''), name: String(tool.name ?? tool.key ?? '') })),
-			config:
-				row.config && typeof row.config === 'object' ? (row.config as IntegrationConfig) : {}
+			config: row.config && typeof row.config === 'object' ? (row.config as IntegrationConfig) : {}
 		}))
 	};
 }
@@ -3413,6 +3422,7 @@ export function getBrainPageForEdit(id: string): Promise<RpcResult<BrainPageEdit
 				'icon',
 				'body',
 				'updatedAt',
+				'kind',
 				'lockVersion',
 				'prosemirror',
 				{ brain: ['id', 'workspaceId'] }
@@ -4231,6 +4241,379 @@ export function updateConversationTask(
 
 export function destroyConversationTask(id: string): Promise<RpcResult<Record<string, never>>> {
 	return run((opts) => rpc.destroyConversationTask({ identity: id, ...opts }));
+}
+
+// ─── Plan-page task board (brain plan view) ──────────────────────────────────
+
+export type TaskPriority = 'urgent' | 'high' | 'normal' | 'low';
+
+/**
+ * A task on a Brain plan page (`Brain.Page` with `kind === 'plan'`). Carries the
+ * coordination fields the board renders: assignment (`assignedTo*`), the claim
+ * timestamp + `leaseExpiresAt` (the lease the reaper reclaims once it lapses,
+ * driving the freshness treatment), the `ready` calc (open + unassigned +
+ * dependencies clear), and the subtask/open-dependency count aggregates.
+ */
+export type PlanTask = {
+	id: string;
+	title: string;
+	status: TaskStatus;
+	priority: TaskPriority;
+	position: number | null;
+	dueAt: string | null;
+	claimedAt: string | null;
+	/** When the active claim's lease expires; the reaper reclaims it once past. Null when no live lease. */
+	leaseExpiresAt: string | null;
+	/** Free-text label for who created the task (e.g. an external agent name). */
+	createdByLabel: string | null;
+	assignedToAgent: string | null;
+	assignedToUserId: string | null;
+	assignedToCustomAgentId: string | null;
+	brainPageId: string | null;
+	resultSummary: string | null;
+	/** Open + unassigned + all dependencies done. Null when not selected/derivable. */
+	ready: boolean | null;
+	subtaskCount: number;
+	completedSubtaskCount: number;
+	openDependenciesCount: number;
+};
+
+const PLAN_TASK_FIELDS = [
+	'id',
+	'title',
+	'status',
+	'priority',
+	'position',
+	'dueAt',
+	'claimedAt',
+	'leaseExpiresAt',
+	'createdByLabel',
+	'assignedToAgent',
+	'assignedToUserId',
+	'assignedToCustomAgentId',
+	'brainPageId',
+	'resultSummary',
+	'ready',
+	'subtaskCount',
+	'completedSubtaskCount',
+	'openDependenciesCount'
+] satisfies rpc.PlanTasksFields;
+
+/** All non-archived tasks on a plan page, position-sorted. */
+export function planTasks(brainPageId: string): Promise<RpcResult<PlanTask[]>> {
+	return run((opts) =>
+		rpc.planTasks({ input: { brainPageId }, fields: PLAN_TASK_FIELDS, ...opts })
+	) as Promise<RpcResult<PlanTask[]>>;
+}
+
+/** Ready (open, unassigned, dependency-clear) tasks on a plan page, priority-sorted. */
+export function readyPlanTasks(brainPageId: string): Promise<RpcResult<PlanTask[]>> {
+	return run((opts) =>
+		rpc.readyPlanTasks({
+			input: { brainPageId },
+			fields: PLAN_TASK_FIELDS as rpc.ReadyPlanTasksFields,
+			...opts
+		})
+	) as Promise<RpcResult<PlanTask[]>>;
+}
+
+/** Every non-archived task across all of a brain's plan pages (overview rollup). */
+export function brainTasks(brainId: string): Promise<RpcResult<PlanTask[]>> {
+	return run((opts) =>
+		rpc.brainTasks({
+			input: { brainId },
+			fields: PLAN_TASK_FIELDS as rpc.BrainTasksFields,
+			...opts
+		})
+	) as Promise<RpcResult<PlanTask[]>>;
+}
+
+export function createPlanTask(
+	brainPageId: string,
+	input: {
+		title: string;
+		description?: string | null;
+		priority?: TaskPriority;
+		parentId?: string | null;
+		dueAt?: string | null;
+	}
+): Promise<RpcResult<PlanTask>> {
+	return run((opts) =>
+		rpc.createPlanTask({
+			input: { brainPageId, ...input },
+			fields: PLAN_TASK_FIELDS as rpc.CreatePlanTaskFields,
+			...opts
+		})
+	) as Promise<RpcResult<PlanTask>>;
+}
+
+export function updatePlanTask(
+	id: string,
+	input: Partial<{
+		title: string;
+		description: string | null;
+		status: TaskStatus;
+		priority: TaskPriority;
+		position: number;
+		assignedToAgent: string | null;
+		assignedToUserId: string | null;
+		blockedReason: string | null;
+		resultSummary: string | null;
+		dueAt: string | null;
+	}>
+): Promise<RpcResult<PlanTask>> {
+	return run((opts) =>
+		rpc.updatePlanTask({
+			identity: id,
+			input,
+			fields: PLAN_TASK_FIELDS as rpc.UpdatePlanTaskFields,
+			...opts
+		})
+	) as Promise<RpcResult<PlanTask>>;
+}
+
+/** Atomically claim an unassigned, open task for a user or an (external) agent. */
+export function claimPlanTask(
+	id: string,
+	input: { assignedToUserId?: string | null; assignedToAgent?: string | null }
+): Promise<RpcResult<PlanTask>> {
+	return run((opts) =>
+		rpc.claimPlanTask({
+			identity: id,
+			input,
+			fields: PLAN_TASK_FIELDS as rpc.ClaimPlanTaskFields,
+			...opts
+		})
+	) as Promise<RpcResult<PlanTask>>;
+}
+
+/** Release a claim, returning the task to the open/unassigned ready pool. */
+export function releasePlanTask(id: string): Promise<RpcResult<PlanTask>> {
+	return run((opts) =>
+		rpc.releasePlanTask({
+			identity: id,
+			fields: PLAN_TASK_FIELDS as rpc.ReleasePlanTaskFields,
+			...opts
+		})
+	) as Promise<RpcResult<PlanTask>>;
+}
+
+export type TaskDependencyEntry = {
+	id: string;
+	taskId: string;
+	dependsOnId: string;
+};
+
+const TASK_DEPENDENCY_FIELDS = [
+	'id',
+	'taskId',
+	'dependsOnId'
+] satisfies rpc.AddTaskDependencyFields;
+
+/** Add a `task depends on dependsOn` edge (intra-plan, acyclic). */
+export function addTaskDependency(
+	taskId: string,
+	dependsOnId: string
+): Promise<RpcResult<TaskDependencyEntry>> {
+	return run((opts) =>
+		rpc.addTaskDependency({
+			input: { taskId, dependsOnId },
+			fields: TASK_DEPENDENCY_FIELDS,
+			...opts
+		})
+	) as Promise<RpcResult<TaskDependencyEntry>>;
+}
+
+export function removeTaskDependency(id: string): Promise<RpcResult<Record<string, never>>> {
+	return run((opts) => rpc.removeTaskDependency({ identity: id, ...opts }));
+}
+
+/** Dependency edges where the given task is the dependent (its "blocked by" set). */
+export function taskDependencies(taskId: string): Promise<RpcResult<TaskDependencyEntry[]>> {
+	return run((opts) =>
+		rpc.taskDependencies({
+			input: { taskId },
+			fields: TASK_DEPENDENCY_FIELDS as rpc.TaskDependenciesFields,
+			...opts
+		})
+	) as Promise<RpcResult<TaskDependencyEntry[]>>;
+}
+
+export type TaskEventKind =
+	| 'created'
+	| 'claimed'
+	| 'released'
+	| 'status_changed'
+	| 'completed'
+	| 'reassigned'
+	| 'lease_expired';
+
+/** One append-only coordination/audit event for a plan task (overview activity feed). */
+export type TaskEventEntry = {
+	id: string;
+	taskId: string;
+	brainPageId: string;
+	kind: TaskEventKind;
+	actorLabel: string | null;
+	metadata: Record<string, unknown> | null;
+	insertedAt: string;
+};
+
+const TASK_EVENT_FIELDS = [
+	'id',
+	'taskId',
+	'brainPageId',
+	'kind',
+	'actorLabel',
+	'metadata',
+	'insertedAt'
+] satisfies rpc.PlanTaskEventsFields;
+
+/** Recent task activity for one plan page, newest first. */
+export function planTaskEvents(brainPageId: string): Promise<RpcResult<TaskEventEntry[]>> {
+	return run((opts) =>
+		rpc.planTaskEvents({ input: { brainPageId }, fields: TASK_EVENT_FIELDS, ...opts })
+	) as Promise<RpcResult<TaskEventEntry[]>>;
+}
+
+/** Recent task activity across all of a brain's plan pages, newest first (max 50). */
+export function brainTaskEvents(brainId: string): Promise<RpcResult<TaskEventEntry[]>> {
+	return run((opts) =>
+		rpc.brainTaskEvents({
+			input: { brainId },
+			fields: TASK_EVENT_FIELDS as rpc.BrainTaskEventsFields,
+			...opts
+		})
+	) as Promise<RpcResult<TaskEventEntry[]>>;
+}
+
+// ─── Plan delivery lifecycle ─────────────────────────────────────────────────
+
+/** A page's delivery lifecycle, derived server-side from the task rollup + the
+ *  explicit delivery gate. `done` (every task complete but never delivered) is
+ *  the stranded state the overview surfaces; `delivered` is the closed-out gate. */
+export type Lifecycle = 'draft' | 'active' | 'done' | 'delivered';
+
+/** What a page is: a normal markdown page, a structured plan board, or a spec. */
+export type PageKind = 'page' | 'plan' | 'spec';
+
+/**
+ * A plan / spec page with its lifecycle fields, for the unified plan tree and the
+ * overview stranded-work section. `lifecycle` is the recursive rollup calc;
+ * `deliveredAt` / `deliveryRef` are the explicit gate (set by mark-delivered).
+ * The string-typed `lifecycle` from the calc is narrowed to {@link Lifecycle}.
+ */
+export type PlanPage = {
+	id: string;
+	title: string | null;
+	icon: string | null;
+	kind: PageKind;
+	parentPageId: string | null;
+	specPageId: string | null;
+	lifecycle: Lifecycle;
+	deliveredAt: string | null;
+	deliveryRef: string | null;
+};
+
+const PLAN_PAGE_FIELDS = [
+	'id',
+	'title',
+	'icon',
+	'kind',
+	'parentPageId',
+	'specPageId',
+	'lifecycle',
+	'deliveredAt',
+	'deliveryRef'
+] satisfies rpc.BrainPagesFields;
+
+/** The raw row shape the generated client returns for PLAN_PAGE_FIELDS (lifecycle is the calc's loose `string | null`). */
+type RawPlanPage = Omit<PlanPage, 'lifecycle'> & { lifecycle: string | null };
+
+/** Narrow the calc's `string | null` lifecycle to the known set (defaulting to draft). */
+function asLifecycle(value: string | null): Lifecycle {
+	return value === 'active' || value === 'done' || value === 'delivered' ? value : 'draft';
+}
+
+function toPlanPage(row: RawPlanPage): PlanPage {
+	return { ...row, lifecycle: asLifecycle(row.lifecycle) };
+}
+
+/**
+ * Every page of a brain with its lifecycle fields loaded. The plan tree assembles
+ * the spec -> plan -> phases hierarchy from this flat list (parentPageId / specPageId
+ * are the edges); the lifecycle calc rolls up recursively server-side.
+ */
+export async function brainPlanPages(brainId: string): Promise<RpcResult<PlanPage[]>> {
+	const result = await run<RawPlanPage[]>((opts) =>
+		rpc.brainPages({ input: { brainId }, fields: PLAN_PAGE_FIELDS, ...opts })
+	);
+	if (!result.success) return result;
+	return { success: true, data: result.data.map(toPlanPage) };
+}
+
+/**
+ * Plan pages in a brain that are `done` (every task complete) but were never
+ * delivered: the anti-stranding alarm. Server filters to plans whose recursive
+ * lifecycle is `done` with no `deliveredAt`.
+ */
+export async function brainStrandedPlans(brainId: string): Promise<RpcResult<PlanPage[]>> {
+	const result = await run<RawPlanPage[]>((opts) =>
+		rpc.brainStrandedPlans({
+			input: { brainId },
+			fields: PLAN_PAGE_FIELDS as rpc.BrainStrandedPlansFields,
+			...opts
+		})
+	);
+	if (!result.success) return result;
+	return { success: true, data: result.data.map(toPlanPage) };
+}
+
+/** Close out a `done` plan: stamps the delivery gate, with an optional reference. */
+export async function markBrainPageDelivered(
+	id: string,
+	deliveryRef?: string | null
+): Promise<RpcResult<PlanPage>> {
+	const result = await run<RawPlanPage>((opts) =>
+		rpc.markBrainPageDelivered({
+			identity: id,
+			input: { deliveryRef: deliveryRef ?? null },
+			fields: PLAN_PAGE_FIELDS as rpc.MarkBrainPageDeliveredFields,
+			...opts
+		})
+	);
+	if (!result.success) return result;
+	return { success: true, data: toPlanPage(result.data) };
+}
+
+/** Clear the delivery gate, returning the plan to its derived lifecycle (for mistakes). */
+export async function undeliverBrainPage(id: string): Promise<RpcResult<PlanPage>> {
+	const result = await run<RawPlanPage>((opts) =>
+		rpc.undeliverBrainPage({
+			identity: id,
+			fields: PLAN_PAGE_FIELDS as rpc.UndeliverBrainPageFields,
+			...opts
+		})
+	);
+	if (!result.success) return result;
+	return { success: true, data: toPlanPage(result.data) };
+}
+
+/** Link a plan page to the spec it implements (or clear it with null). */
+export async function setBrainPageSpec(
+	id: string,
+	specPageId: string | null
+): Promise<RpcResult<PlanPage>> {
+	const result = await run<RawPlanPage>((opts) =>
+		rpc.setBrainPageSpec({
+			identity: id,
+			input: { specPageId },
+			fields: PLAN_PAGE_FIELDS as rpc.SetBrainPageSpecFields,
+			...opts
+		})
+	);
+	if (!result.success) return result;
+	return { success: true, data: toPlanPage(result.data) };
 }
 
 // ─── Onboarding cards (new-chat landing) ─────────────────────────────────────

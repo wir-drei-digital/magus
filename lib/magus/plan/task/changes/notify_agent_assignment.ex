@@ -37,7 +37,7 @@ defmodule Magus.Plan.Task.Changes.NotifyAgentAssignment do
   end
 
   # ============================================================================
-  # Inbox Event Management (after_action — inside transaction)
+  # Inbox Event Management (after_action - inside transaction)
   # ============================================================================
 
   defp handle_inbox_events(_task, same, same, _actor), do: :ok
@@ -55,7 +55,7 @@ defmodule Magus.Plan.Task.Changes.NotifyAgentAssignment do
 
       _ ->
         Logger.debug(
-          "NotifyAgentAssignment: skipping inbox events — actor is not a User " <>
+          "NotifyAgentAssignment: skipping inbox events - actor is not a User " <>
             "(task #{task.id}, agent #{new_agent_id})"
         )
     end

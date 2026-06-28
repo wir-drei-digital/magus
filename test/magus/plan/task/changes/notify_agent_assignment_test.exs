@@ -130,7 +130,7 @@ defmodule Magus.Plan.Task.Changes.NotifyAgentAssignmentTest do
           actor: user
         )
 
-      # Update a non-assignment field — agent stays the same
+      # Update a non-assignment field - agent stays the same
       {:ok, _updated} = Plan.update_task(task, %{title: "Stable task (renamed)"}, actor: user)
 
       {:ok, events} = Agents.list_agent_events(agent.id, actor: user)

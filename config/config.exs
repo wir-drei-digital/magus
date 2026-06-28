@@ -151,6 +151,8 @@ config :magus, Oban,
     knowledge_sync: [limit: 5],
     # Agent run stale cleanup
     agent_run_cleanup: 1,
+    # Plan-task expired-lease reaper (mirrors agent_run_cleanup)
+    plan_task_cleanup: 1,
     # Stale streaming message cleanup
     maintenance: 1,
     # Agent heartbeat scheduler (checks every 5 min via cron)
@@ -282,6 +284,13 @@ config :magus,
   # will pin a full GPT-4o-class judge for leaderboard comparability.
   eval_judge_model: "openrouter:openai/gpt-4o-mini",
   eval_judge_prompt_version: "v1",
+  # Plan-task leased claims (autonomous coordination). A claim sets a TTL lease;
+  # a heartbeat or any task activity renews it; the :reap_expired_claims AshOban
+  # trigger returns expired-lease tasks to :open. Generous TTL because heads-down
+  # agent work is normal; the */2 reaper cadence keeps reclaim latency bounded.
+  task_lease_ttl_seconds: 900,
+  # Per-plan open-task cap: a backstop against runaway autonomous decomposition.
+  max_open_tasks_per_plan: 200,
   # The core Ash domain list (read by Ash tooling + AshOban at boot). Mirrors
   # `Magus.Domains.core_domains/0`, kept as a literal here because config is
   # evaluated before the app modules are compiled.

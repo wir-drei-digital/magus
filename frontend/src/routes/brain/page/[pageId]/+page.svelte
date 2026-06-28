@@ -38,6 +38,7 @@
 	import * as Resizable from '$lib/components/ui/resizable';
 	import BrainEditor from '$lib/components/brain/brain-editor.svelte';
 	import BrainFilePickerDialog from '$lib/components/brain/brain-file-picker-dialog.svelte';
+	import PlanBoard from '$lib/components/plan/plan-board.svelte';
 	import { brainNav } from '$lib/stores/brain-nav.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { workbench } from '$lib/stores/workbench.svelte';
@@ -511,6 +512,15 @@
 					getDoc={() => editorRef?.getJSON() ?? pageData?.prosemirror ?? null}
 					onViewVersion={(versionId) => void viewVersion(versionId)}
 				/>
+
+				<!-- Plan pages pin a task board below the editor/spec: the document
+				     stays on top, the kanban/list board claims up to ~55% of the
+				     pane with its own scroll. -->
+				{#if pageData.kind === 'plan'}
+					<div class="flex max-h-[55%] min-h-0 shrink-0 flex-col">
+						<PlanBoard brainPageId={pageData.id} />
+					</div>
+				{/if}
 
 				<BrainFilePickerDialog
 					bind:open={filePickerOpen}

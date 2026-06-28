@@ -497,6 +497,29 @@ defmodule MagusWeb.CoreRouter do
         get "/sources/:id", SourcesController, :show
 
         get "/brains/:brain_id/tags", TagsController, :index
+
+        # Plans & Tasks v2 (brain plan-page task tracker)
+        get "/plans/:plan_id/tasks", TasksController, :index
+        post "/plans/:plan_id/tasks", TasksController, :create
+        get "/tasks/:id", TasksController, :show
+        patch "/tasks/:id", TasksController, :update
+        post "/tasks/:id/claim", TasksController, :claim
+        post "/tasks/:id/release", TasksController, :release
+        post "/tasks/:id/heartbeat", TasksController, :heartbeat
+        post "/tasks/:id/dependencies", TasksController, :add_dependency
+        delete "/tasks/:id/dependencies/:dep_id", TasksController, :remove_dependency
+        get "/brains/:brain_id/overview", OverviewController, :show
+
+        # Plan delivery lifecycle (deliver / undeliver / spec-link / stranded).
+        # `/plans/:id/...` coexists with `/plans/:plan_id/tasks` above: Phoenix
+        # matches by path segments, so `/plans/:id/deliver` and
+        # `/plans/:plan_id/tasks` are distinct, non-conflicting routes.
+        get "/plans/:id", PlansController, :show
+        post "/plans/:id/deliver", PlansController, :deliver
+        post "/plans/:id/undeliver", PlansController, :undeliver
+        post "/plans/:id/spec", PlansController, :set_spec
+        get "/brains/:brain_id/stranded", PlansController, :stranded
+        get "/specs/:id/plans", PlansController, :for_spec
       end
 
       # OAuth routes for integration providers (requires authenticated user)
