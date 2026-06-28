@@ -2514,6 +2514,53 @@ export async function brainPages<Fields extends BrainPagesFields>(
 }
 
 
+export type BrainStrandedPlansInput = {
+  brainId: UUID;
+};
+
+export type BrainStrandedPlansFields = UnifiedFieldSelection<BrainPageResourceSchema>[];
+export type InferBrainStrandedPlansResult<
+  Fields extends BrainStrandedPlansFields,
+> = Array<InferResult<BrainPageResourceSchema, Fields>>;
+
+export type BrainStrandedPlansResult<Fields extends BrainStrandedPlansFields> = | { success: true; data: InferBrainStrandedPlansResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Read Page records
+ *
+ * @ashActionType :read
+ */
+export async function brainStrandedPlans<Fields extends BrainStrandedPlansFields>(
+  config: {
+  tenant?: string;
+  input: BrainStrandedPlansInput;
+  fields: Fields;
+  filter?: BrainPageFilterInput;
+  sort?: SortString<BrainPageSortField> | SortString<BrainPageSortField>[];
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<BrainStrandedPlansResult<Fields>> {
+  const payload = {
+    action: "brain_stranded_plans",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields }),
+    ...(config.filter && { filter: config.filter }),
+    ...(config.sort && { sort: Array.isArray(config.sort) ? config.sort.join(",") : config.sort })
+  };
+
+  return executeActionRpcRequest<BrainStrandedPlansResult<Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type CreateBrainPageInput = {
   title?: string | null;
   icon?: string | null;
@@ -2635,6 +2682,52 @@ export async function listBrainPageVersions(
   };
 
   return executeActionRpcRequest<ListBrainPageVersionsResult>(
+    payload,
+    config
+  );
+}
+
+
+export type MarkBrainPageDeliveredInput = {
+  deliveryRef?: string | null;
+};
+
+export type MarkBrainPageDeliveredFields = UnifiedFieldSelection<BrainPageResourceSchema>[];
+
+export type InferMarkBrainPageDeliveredResult<
+  Fields extends MarkBrainPageDeliveredFields | undefined,
+> = InferResult<BrainPageResourceSchema, Fields>;
+
+export type MarkBrainPageDeliveredResult<Fields extends MarkBrainPageDeliveredFields | undefined = undefined> = | { success: true; data: InferMarkBrainPageDeliveredResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Update an existing Page
+ *
+ * @ashActionType :update
+ */
+export async function markBrainPageDelivered<Fields extends MarkBrainPageDeliveredFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: UUIDv7;
+  input?: MarkBrainPageDeliveredInput;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<MarkBrainPageDeliveredResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "mark_brain_page_delivered",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<MarkBrainPageDeliveredResult<Fields extends undefined ? [] : Fields>>(
     payload,
     config
   );
@@ -2860,6 +2953,52 @@ export async function saveBrainPageProsemirror(
 }
 
 
+export type SetBrainPageSpecInput = {
+  specPageId?: UUID | null;
+};
+
+export type SetBrainPageSpecFields = UnifiedFieldSelection<BrainPageResourceSchema>[];
+
+export type InferSetBrainPageSpecResult<
+  Fields extends SetBrainPageSpecFields | undefined,
+> = InferResult<BrainPageResourceSchema, Fields>;
+
+export type SetBrainPageSpecResult<Fields extends SetBrainPageSpecFields | undefined = undefined> = | { success: true; data: InferSetBrainPageSpecResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Update an existing Page
+ *
+ * @ashActionType :update
+ */
+export async function setBrainPageSpec<Fields extends SetBrainPageSpecFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: UUIDv7;
+  input?: SetBrainPageSpecInput;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<SetBrainPageSpecResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "set_brain_page_spec",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<SetBrainPageSpecResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type TrashBrainPageFields = UnifiedFieldSelection<BrainPageResourceSchema>[];
 
 export type InferTrashBrainPageResult<
@@ -2964,6 +3103,46 @@ export async function trashedBrainPages<Fields extends TrashedBrainPagesFields, 
   };
 
   return executeActionRpcRequest<TrashedBrainPagesResult<Fields, Config["page"]>>(
+    payload,
+    config
+  );
+}
+
+
+export type UndeliverBrainPageFields = UnifiedFieldSelection<BrainPageResourceSchema>[];
+
+export type InferUndeliverBrainPageResult<
+  Fields extends UndeliverBrainPageFields | undefined,
+> = InferResult<BrainPageResourceSchema, Fields>;
+
+export type UndeliverBrainPageResult<Fields extends UndeliverBrainPageFields | undefined = undefined> = | { success: true; data: InferUndeliverBrainPageResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Update an existing Page
+ *
+ * @ashActionType :update
+ */
+export async function undeliverBrainPage<Fields extends UndeliverBrainPageFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: UUIDv7;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<UndeliverBrainPageResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "undeliver_brain_page",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<UndeliverBrainPageResult<Fields extends undefined ? [] : Fields>>(
     payload,
     config
   );

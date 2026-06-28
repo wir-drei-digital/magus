@@ -1979,9 +1979,9 @@ export function connectKnowledgeSource(input: {
 	name?: string | null;
 	workspaceId?: string | null;
 }): Promise<RpcResult<KnowledgeSourceEntry>> {
-	return run((opts) =>
-		rpc.connectKnowledgeSource({ input, ...opts })
-	) as Promise<RpcResult<KnowledgeSourceEntry>>;
+	return run((opts) => rpc.connectKnowledgeSource({ input, ...opts })) as Promise<
+		RpcResult<KnowledgeSourceEntry>
+	>;
 }
 
 /** Browse a connected source's folders (null parent = root; lazy on expand). */
@@ -3011,8 +3011,7 @@ export async function agentIntegrations(agentId: string): Promise<RpcResult<Agen
 			availableTools: (
 				(Array.isArray(row.available_tools) ? row.available_tools : []) as Record<string, unknown>[]
 			).map((tool) => ({ key: String(tool.key ?? ''), name: String(tool.name ?? tool.key ?? '') })),
-			config:
-				row.config && typeof row.config === 'object' ? (row.config as IntegrationConfig) : {}
+			config: row.config && typeof row.config === 'object' ? (row.config as IntegrationConfig) : {}
 		}))
 	};
 }
@@ -4486,6 +4485,135 @@ export function brainTaskEvents(brainId: string): Promise<RpcResult<TaskEventEnt
 			...opts
 		})
 	) as Promise<RpcResult<TaskEventEntry[]>>;
+}
+
+// ─── Plan delivery lifecycle ─────────────────────────────────────────────────
+
+/** A page's delivery lifecycle, derived server-side from the task rollup + the
+ *  explicit delivery gate. `done` (every task complete but never delivered) is
+ *  the stranded state the overview surfaces; `delivered` is the closed-out gate. */
+export type Lifecycle = 'draft' | 'active' | 'done' | 'delivered';
+
+/** What a page is: a normal markdown page, a structured plan board, or a spec. */
+export type PageKind = 'page' | 'plan' | 'spec';
+
+/**
+ * A plan / spec page with its lifecycle fields, for the unified plan tree and the
+ * overview stranded-work section. `lifecycle` is the recursive rollup calc;
+ * `deliveredAt` / `deliveryRef` are the explicit gate (set by mark-delivered).
+ * The string-typed `lifecycle` from the calc is narrowed to {@link Lifecycle}.
+ */
+export type PlanPage = {
+	id: string;
+	title: string | null;
+	icon: string | null;
+	kind: PageKind;
+	parentPageId: string | null;
+	specPageId: string | null;
+	lifecycle: Lifecycle;
+	deliveredAt: string | null;
+	deliveryRef: string | null;
+};
+
+const PLAN_PAGE_FIELDS = [
+	'id',
+	'title',
+	'icon',
+	'kind',
+	'parentPageId',
+	'specPageId',
+	'lifecycle',
+	'deliveredAt',
+	'deliveryRef'
+] satisfies rpc.BrainPagesFields;
+
+/** The raw row shape the generated client returns for PLAN_PAGE_FIELDS (lifecycle is the calc's loose `string | null`). */
+type RawPlanPage = Omit<PlanPage, 'lifecycle'> & { lifecycle: string | null };
+
+/** Narrow the calc's `string | null` lifecycle to the known set (defaulting to draft). */
+function asLifecycle(value: string | null): Lifecycle {
+	return value === 'active' || value === 'done' || value === 'delivered' ? value : 'draft';
+}
+
+function toPlanPage(row: RawPlanPage): PlanPage {
+	return { ...row, lifecycle: asLifecycle(row.lifecycle) };
+}
+
+/**
+ * Every page of a brain with its lifecycle fields loaded. The plan tree assembles
+ * the spec -> plan -> phases hierarchy from this flat list (parentPageId / specPageId
+ * are the edges); the lifecycle calc rolls up recursively server-side.
+ */
+export async function brainPlanPages(brainId: string): Promise<RpcResult<PlanPage[]>> {
+	const result = await run<RawPlanPage[]>((opts) =>
+		rpc.brainPages({ input: { brainId }, fields: PLAN_PAGE_FIELDS, ...opts })
+	);
+	if (!result.success) return result;
+	return { success: true, data: result.data.map(toPlanPage) };
+}
+
+/**
+ * Plan pages in a brain that are `done` (every task complete) but were never
+ * delivered: the anti-stranding alarm. Server filters to plans whose recursive
+ * lifecycle is `done` with no `deliveredAt`.
+ */
+export async function brainStrandedPlans(brainId: string): Promise<RpcResult<PlanPage[]>> {
+	const result = await run<RawPlanPage[]>((opts) =>
+		rpc.brainStrandedPlans({
+			input: { brainId },
+			fields: PLAN_PAGE_FIELDS as rpc.BrainStrandedPlansFields,
+			...opts
+		})
+	);
+	if (!result.success) return result;
+	return { success: true, data: result.data.map(toPlanPage) };
+}
+
+/** Close out a `done` plan: stamps the delivery gate, with an optional reference. */
+export async function markBrainPageDelivered(
+	id: string,
+	deliveryRef?: string | null
+): Promise<RpcResult<PlanPage>> {
+	const result = await run<RawPlanPage>((opts) =>
+		rpc.markBrainPageDelivered({
+			identity: id,
+			input: { deliveryRef: deliveryRef ?? null },
+			fields: PLAN_PAGE_FIELDS as rpc.MarkBrainPageDeliveredFields,
+			...opts
+		})
+	);
+	if (!result.success) return result;
+	return { success: true, data: toPlanPage(result.data) };
+}
+
+/** Clear the delivery gate, returning the plan to its derived lifecycle (for mistakes). */
+export async function undeliverBrainPage(id: string): Promise<RpcResult<PlanPage>> {
+	const result = await run<RawPlanPage>((opts) =>
+		rpc.undeliverBrainPage({
+			identity: id,
+			fields: PLAN_PAGE_FIELDS as rpc.UndeliverBrainPageFields,
+			...opts
+		})
+	);
+	if (!result.success) return result;
+	return { success: true, data: toPlanPage(result.data) };
+}
+
+/** Link a plan page to the spec it implements (or clear it with null). */
+export async function setBrainPageSpec(
+	id: string,
+	specPageId: string | null
+): Promise<RpcResult<PlanPage>> {
+	const result = await run<RawPlanPage>((opts) =>
+		rpc.setBrainPageSpec({
+			identity: id,
+			input: { specPageId },
+			fields: PLAN_PAGE_FIELDS as rpc.SetBrainPageSpecFields,
+			...opts
+		})
+	);
+	if (!result.success) return result;
+	return { success: true, data: toPlanPage(result.data) };
 }
 
 // ─── Onboarding cards (new-chat landing) ─────────────────────────────────────

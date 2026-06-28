@@ -36,6 +36,14 @@ defmodule Magus.Brain do
       rpc_action :move_brain_page, :move_to_parent
       rpc_action :trash_brain_page, :soft_delete
 
+      # Delivery lifecycle (project-state iteration). The SPA reads :lifecycle /
+      # :delivered_at / :delivery_ref directly off the page schema (all public)
+      # via the existing tree reads; these expose the writes + the stranded read.
+      rpc_action :brain_stranded_plans, :stranded_plans
+      rpc_action :set_brain_page_spec, :set_spec
+      rpc_action :mark_brain_page_delivered, :mark_delivered
+      rpc_action :undeliver_brain_page, :undeliver
+
       rpc_action :restore_brain_page, :restore do
         # The default record loader is the primary :read, which filters out
         # trashed rows — exactly the rows restore targets. Loading bypasses
