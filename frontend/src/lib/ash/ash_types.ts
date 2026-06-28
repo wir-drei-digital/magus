@@ -352,18 +352,21 @@ export type BrainAttributesOnlySchema = {
 // BrainPage Schema
 export type BrainPageResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "icon" | "kind" | "body" | "lockVersion" | "updatedAt" | "brainId" | "parentPageId" | "specPageId" | "prosemirror";
+  __primitiveFields: "id" | "title" | "icon" | "kind" | "body" | "lockVersion" | "deliveredAt" | "deliveryRef" | "updatedAt" | "brainId" | "parentPageId" | "specPageId" | "prosemirror" | "lifecycle";
   id: UUIDv7;
   title: string | null;
   icon: string | null;
   kind: "page" | "plan" | "spec";
   body: string | null;
   lockVersion: number;
+  deliveredAt: UtcDateTimeUsec | null;
+  deliveryRef: string | null;
   updatedAt: UtcDateTimeUsec;
   brainId: UUID;
   parentPageId: UUID | null;
   specPageId: UUID | null;
   prosemirror: Record<string, any> | null;
+  lifecycle: string | null;
   brain: { __type: "Relationship"; __resource: BrainResourceSchema; };
   parentPage: { __type: "Relationship"; __resource: BrainPageResourceSchema | null; };
   specPage: { __type: "Relationship"; __resource: BrainPageResourceSchema | null; };
@@ -373,13 +376,15 @@ export type BrainPageResourceSchema = {
 
 export type BrainPageAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "icon" | "kind" | "body" | "lockVersion" | "updatedAt" | "brainId" | "parentPageId" | "specPageId";
+  __primitiveFields: "id" | "title" | "icon" | "kind" | "body" | "lockVersion" | "deliveredAt" | "deliveryRef" | "updatedAt" | "brainId" | "parentPageId" | "specPageId";
   id: UUIDv7;
   title: string | null;
   icon: string | null;
   kind: "page" | "plan" | "spec";
   body: string | null;
   lockVersion: number;
+  deliveredAt: UtcDateTimeUsec | null;
+  deliveryRef: string | null;
   updatedAt: UtcDateTimeUsec;
   brainId: UUID;
   parentPageId: UUID | null;
@@ -2686,6 +2691,24 @@ export type BrainPageFilterInput = {
     in?: Array<number>;
   };
 
+  deliveredAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
+  deliveryRef?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
   updatedAt?: {
     eq?: UtcDateTimeUsec;
     notEq?: UtcDateTimeUsec;
@@ -2720,6 +2743,13 @@ export type BrainPageFilterInput = {
     eq?: Record<string, any>;
     notEq?: Record<string, any>;
     in?: Array<Record<string, any>>;
+    isNil?: boolean;
+  };
+
+  lifecycle?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
     isNil?: boolean;
   };
 
@@ -5997,7 +6027,7 @@ export type MagusAgentsSlashCommandFilterField = (typeof magusAgentsSlashCommand
 export const brainFilterFields = ["id", "title", "description", "icon", "color", "workspaceId", "isSharedToWorkspace", "workspace"] as const;
 export type BrainFilterField = (typeof brainFilterFields)[number];
 
-export const brainPageFilterFields = ["id", "title", "icon", "kind", "body", "lockVersion", "updatedAt", "brainId", "parentPageId", "specPageId", "prosemirror", "brain", "parentPage", "specPage"] as const;
+export const brainPageFilterFields = ["id", "title", "icon", "kind", "body", "lockVersion", "deliveredAt", "deliveryRef", "updatedAt", "brainId", "parentPageId", "specPageId", "prosemirror", "lifecycle", "brain", "parentPage", "specPage"] as const;
 export type BrainPageFilterField = (typeof brainPageFilterFields)[number];
 
 export const brainPageLinkFilterFields = ["id", "targetTitleAtLinkTime", "sourcePageId", "sourcePage"] as const;
@@ -6133,7 +6163,7 @@ export type MagusAgentsSlashCommandSortField = (typeof magusAgentsSlashCommandSo
 export const brainSortFields = ["id", "title", "description", "icon", "color", "workspaceId", "isSharedToWorkspace"] as const;
 export type BrainSortField = (typeof brainSortFields)[number];
 
-export const brainPageSortFields = ["id", "title", "icon", "kind", "body", "lockVersion", "updatedAt", "brainId", "parentPageId", "specPageId", "prosemirror"] as const;
+export const brainPageSortFields = ["id", "title", "icon", "kind", "body", "lockVersion", "deliveredAt", "deliveryRef", "updatedAt", "brainId", "parentPageId", "specPageId", "prosemirror", "lifecycle"] as const;
 export type BrainPageSortField = (typeof brainPageSortFields)[number];
 
 export const brainPageLinkSortFields = ["id", "targetTitleAtLinkTime", "sourcePageId"] as const;
