@@ -78,6 +78,9 @@ defmodule Magus.Brain.Page do
     references do
       reference :brain, on_delete: :delete
       reference :parent_page, on_delete: :delete
+      # Deleting a spec page nilifies its plans' links rather than cascading:
+      # a plan outlives the spec it implemented.
+      reference :spec_page, on_delete: :nilify
     end
 
     custom_indexes do
@@ -206,8 +209,15 @@ defmodule Magus.Brain.Page do
     end
 
     update :set_kind do
-      description "Promote/demote a page between :page and :plan."
+      description "Promote/demote a page between :page, :plan, and :spec."
       accept [:kind]
+      require_atomic? false
+      change {Magus.Brain.Changes.BroadcastBrainEvent, resource_type: :page}
+    end
+
+    update :set_spec do
+      description "Link a :plan page to the :spec page it implements (or clear it with nil)."
+      accept [:spec_page_id]
       require_atomic? false
       change {Magus.Brain.Changes.BroadcastBrainEvent, resource_type: :page}
     end
@@ -295,6 +305,18 @@ defmodule Magus.Brain.Page do
 
       filter expr(
                parent_page_id == ^arg(:parent_page_id) and is_nil(deleted_at) and
+                 ^no_trashed_ancestor()
+             )
+
+      prepare build(sort: [position: :asc])
+    end
+
+    read :plans_for_spec do
+      description "The :plan pages that implement a given :spec page (reverse of :spec_page)."
+      argument :spec_page_id, :uuid, allow_nil?: false
+
+      filter expr(
+               spec_page_id == ^arg(:spec_page_id) and is_nil(deleted_at) and
                  ^no_trashed_ancestor()
              )
 
@@ -466,6 +488,7 @@ defmodule Magus.Brain.Page do
              :by_title_in_brain_ci,
              :root_pages,
              :children_of,
+             :plans_for_spec,
              :trashed
            ]) do
       authorize_if {Magus.Brain.Checks.BrainAccessFilter, path: :direct, min_role: :viewer}
@@ -479,7 +502,8 @@ defmodule Magus.Brain.Page do
              :move_to_parent,
              :soft_delete,
              :restore,
-             :set_kind
+             :set_kind,
+             :set_spec
            ]) do
       authorize_if {Magus.Brain.Checks.BrainAccessFilter, path: :direct, min_role: :editor}
     end
@@ -501,11 +525,15 @@ defmodule Magus.Brain.Page do
     attribute :icon, :string, public?: true
 
     attribute :kind, :atom do
-      description "A :plan page renders a structured task board; :page is a normal markdown page."
+      description """
+      A :plan page renders a structured task board; :spec page captures the
+      requirements a plan implements; :page is a normal markdown page.
+      """
+
       allow_nil? false
       default :page
       public? true
-      constraints one_of: [:page, :plan]
+      constraints one_of: [:page, :plan, :spec]
     end
 
     attribute :contributor_type, :atom,
@@ -550,11 +578,22 @@ defmodule Magus.Brain.Page do
     belongs_to :brain, Magus.Brain.BrainResource, allow_nil?: false, public?: true
     belongs_to :parent_page, __MODULE__, allow_nil?: true, public?: true
 
+    # A :plan page points at the :spec page it implements (nullable, explicit,
+    # queryable). Self-referential on Brain.Page; deleting a spec nilifies the
+    # link rather than cascading (see the migration's on_delete: :nilify).
+    belongs_to :spec_page, __MODULE__ do
+      allow_nil? true
+      public? true
+    end
+
     has_many :blocks, Magus.Brain.Block do
       sort position: :asc
     end
 
     has_many :children_pages, __MODULE__, destination_attribute: :parent_page_id
+
+    # Reverse of :spec_page: the plans that implement this spec page.
+    has_many :implementing_plans, __MODULE__, destination_attribute: :spec_page_id
   end
 
   calculations do
