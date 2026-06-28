@@ -65,6 +65,41 @@ defmodule Magus.Brain.PageLifecycleTest do
       assert lifecycle(plan, user) == :draft
     end
 
+    test "a plan with a done task and an archived task is :done (archived does not block)", %{
+      user: user,
+      brain: brain
+    } do
+      # Archived is terminal everywhere else in the Plan domain, so an archived
+      # task must not keep a plan :active forever. done task + archived task =>
+      # :done.
+      {:ok, plan} =
+        Brain.create_page(brain.id, %{title: "Done w/ Archived", kind: :plan}, actor: user)
+
+      {:ok, t1} = Plan.create_plan_task(plan.id, %{title: "Done one"}, actor: user)
+      {:ok, t2} = Plan.create_plan_task(plan.id, %{title: "Archived one"}, actor: user)
+
+      {:ok, _} = Plan.update_task(t1, %{status: :done}, actor: user)
+      # The archived task must NOT block :done.
+      {:ok, _} = Plan.update_task(t2, %{status: :archived}, actor: user)
+
+      assert lifecycle(plan, user) == :done
+    end
+
+    test "a plan with a single archived task (no real work) is :draft", %{
+      user: user,
+      brain: brain
+    } do
+      # Like the cancelled edge: an archived-only plan has no active work, so it
+      # is not vacuously :done and stays :draft.
+      {:ok, plan} =
+        Brain.create_page(brain.id, %{title: "Archived Plan", kind: :plan}, actor: user)
+
+      {:ok, t1} = Plan.create_plan_task(plan.id, %{title: "Only"}, actor: user)
+      {:ok, _} = Plan.update_task(t1, %{status: :archived}, actor: user)
+
+      assert lifecycle(plan, user) == :draft
+    end
+
     test "a plan with one in_progress task is :active", %{user: user, brain: brain} do
       {:ok, plan} = Brain.create_page(brain.id, %{title: "WIP Plan", kind: :plan}, actor: user)
       {:ok, t1} = Plan.create_plan_task(plan.id, %{title: "A"}, actor: user)
