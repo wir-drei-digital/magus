@@ -222,6 +222,28 @@ defmodule Magus.Brain.Page do
       change {Magus.Brain.Changes.BroadcastBrainEvent, resource_type: :page}
     end
 
+    update :mark_delivered do
+      description """
+      Explicit delivery gate: stamps :delivered_at now (so :lifecycle becomes
+      :delivered) and optionally records a :delivery_ref. The anti-stranding
+      counterpart of the auto-derived :done.
+      """
+
+      accept [:delivery_ref]
+      require_atomic? false
+      change set_attribute(:delivered_at, &DateTime.utc_now/0)
+      change {Magus.Brain.Changes.BroadcastBrainEvent, resource_type: :page}
+    end
+
+    update :undeliver do
+      description "Clears the delivery gate, returning the page to its derived lifecycle (:done/:active/:draft)."
+      accept []
+      require_atomic? false
+      change set_attribute(:delivered_at, nil)
+      change set_attribute(:delivery_ref, nil)
+      change {Magus.Brain.Changes.BroadcastBrainEvent, resource_type: :page}
+    end
+
     update :move_to_parent do
       accept [:parent_page_id]
       require_atomic? false
@@ -320,6 +342,28 @@ defmodule Magus.Brain.Page do
                  ^no_trashed_ancestor()
              )
 
+      prepare build(sort: [position: :asc])
+    end
+
+    read :stranded_plans do
+      description """
+      Anti-stranding detector: :plan pages in a brain whose computed lifecycle
+      is :done but were never delivered (delivered_at unset). Excludes :active,
+      :delivered, trashed pages, and non-:plan pages.
+
+      `lifecycle` is an Elixir-evaluated calc (recursive over child phases), so
+      it cannot be a SQL filter. The SQL filter narrows to candidate :plan pages
+      and the preparation loads `:lifecycle` and keeps only the `:done` ones.
+      """
+
+      argument :brain_id, :uuid, allow_nil?: false
+
+      filter expr(
+               brain_id == ^arg(:brain_id) and kind == :plan and is_nil(delivered_at) and
+                 is_nil(deleted_at) and ^no_trashed_ancestor()
+             )
+
+      prepare Magus.Brain.Page.Preparations.FilterDonePlans
       prepare build(sort: [position: :asc])
     end
 
@@ -489,6 +533,7 @@ defmodule Magus.Brain.Page do
              :root_pages,
              :children_of,
              :plans_for_spec,
+             :stranded_plans,
              :trashed
            ]) do
       authorize_if {Magus.Brain.Checks.BrainAccessFilter, path: :direct, min_role: :viewer}
@@ -503,7 +548,9 @@ defmodule Magus.Brain.Page do
              :soft_delete,
              :restore,
              :set_kind,
-             :set_spec
+             :set_spec,
+             :mark_delivered,
+             :undeliver
            ]) do
       authorize_if {Magus.Brain.Checks.BrainAccessFilter, path: :direct, min_role: :editor}
     end
@@ -570,6 +617,21 @@ defmodule Magus.Brain.Page do
       description "When set, the page is in the trash. Cleared by :restore, used by :trashed and :trashed_for_cleanup reads."
     end
 
+    attribute :delivered_at, :utc_datetime_usec do
+      description """
+      Explicit delivery gate for :plan pages. When set, the page's computed
+      :lifecycle is :delivered regardless of the task rollup. Set by
+      :mark_delivered, cleared by :undeliver.
+      """
+
+      public? true
+    end
+
+    attribute :delivery_ref, :string do
+      description "Optional human reference for what was delivered (release tag, PR link, ...). Set by :mark_delivered, cleared by :undeliver."
+      public? true
+    end
+
     create_timestamp :inserted_at
     update_timestamp :updated_at, public?: true
   end
@@ -594,6 +656,18 @@ defmodule Magus.Brain.Page do
 
     # Reverse of :spec_page: the plans that implement this spec page.
     has_many :implementing_plans, __MODULE__, destination_attribute: :spec_page_id
+
+    # Direct tasks of a :plan page. Drives the lifecycle rollup.
+    has_many :tasks, Magus.Plan.Task do
+      destination_attribute :brain_page_id
+    end
+
+    # Child pages that are themselves :plan phases. The recursive lifecycle
+    # rollup walks these; plain (:page) and :spec children are excluded.
+    has_many :child_plan_pages, __MODULE__ do
+      destination_attribute :parent_page_id
+      filter expr(kind == :plan and is_nil(deleted_at))
+    end
   end
 
   calculations do
@@ -609,6 +683,13 @@ defmodule Magus.Brain.Page do
     calculate :prosemirror, :map do
       public? true
       calculation Magus.Brain.Page.Calculations.Prosemirror
+    end
+
+    # Delivery lifecycle for :plan pages: :draft -> :active -> :done ->
+    # :delivered. :done is the recursive task rollup; :delivered is the explicit
+    # gate (delivered_at). See the calc module for the exact predicate.
+    calculate :lifecycle, :atom, {Magus.Brain.Page.Calculations.Lifecycle, []} do
+      public? true
     end
   end
 
