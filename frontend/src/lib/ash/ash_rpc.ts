@@ -2518,7 +2518,7 @@ export type CreateBrainPageInput = {
   title?: string | null;
   icon?: string | null;
   parentPageId?: UUID | null;
-  kind?: "page" | "plan";
+  kind?: "page" | "plan" | "spec";
   brainId: UUID;
 };
 

@@ -35,7 +35,7 @@ defmodule Magus.Brain.PageKindTest do
     test "rejects an unknown kind", %{user: user, brain: brain} do
       {:ok, page} = Brain.create_page(brain.id, %{title: "Roadmap"}, actor: user)
 
-      assert {:error, %Ash.Error.Invalid{}} = Brain.set_page_kind(page, :spec, actor: user)
+      assert {:error, %Ash.Error.Invalid{}} = Brain.set_page_kind(page, :bogus, actor: user)
     end
   end
 end
