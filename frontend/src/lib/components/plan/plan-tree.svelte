@@ -21,8 +21,8 @@
 	 * the badge + count chips, never a colored side-stripe. Tokens only.
 	 *
 	 * Decoupled from any one store: it takes the assembled `tree`, the set of plan
-	 * ids with a mutation in flight, and deliver/undeliver callbacks, so both the
-	 * standalone {@link PlanTreeStore} and the brain overview store can drive it.
+	 * ids with a mutation in flight, and deliver/undeliver callbacks, so any caller
+	 * (today the brain overview store) can drive it.
 	 */
 	let {
 		tree,
