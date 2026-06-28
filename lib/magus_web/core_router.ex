@@ -493,6 +493,18 @@ defmodule MagusWeb.CoreRouter do
         get "/sources/:id", SourcesController, :show
 
         get "/brains/:brain_id/tags", TagsController, :index
+
+        # Plans & Tasks v2 (brain plan-page task tracker)
+        get "/plans/:plan_id/tasks", TasksController, :index
+        post "/plans/:plan_id/tasks", TasksController, :create
+        get "/tasks/:id", TasksController, :show
+        patch "/tasks/:id", TasksController, :update
+        post "/tasks/:id/claim", TasksController, :claim
+        post "/tasks/:id/release", TasksController, :release
+        post "/tasks/:id/heartbeat", TasksController, :heartbeat
+        post "/tasks/:id/dependencies", TasksController, :add_dependency
+        delete "/tasks/:id/dependencies/:dep_id", TasksController, :remove_dependency
+        get "/brains/:brain_id/overview", OverviewController, :show
       end
 
       # OAuth routes for integration providers (requires authenticated user)
