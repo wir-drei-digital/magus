@@ -60,9 +60,10 @@ defmodule Magus.Brain.Page.Calculations.Lifecycle do
       Enum.any?(page.child_plan_pages || [], &(&1.lifecycle != :draft))
   end
 
-  # Cancelled tasks are excluded from the rollup: they neither block `:done` nor
-  # count as real work keeping a plan out of `:draft`.
+  # Tasks that are cancelled or archived (terminal, removed from consideration)
+  # are excluded from the rollup: they neither block `:done` nor count as real
+  # work keeping a plan out of `:draft`.
   defp active_tasks(page) do
-    Enum.reject(page.tasks || [], &(&1.status == :cancelled))
+    Enum.reject(page.tasks || [], &(&1.status in [:cancelled, :archived]))
   end
 end
