@@ -68,7 +68,7 @@
 		<span class="truncate font-medium">{assignee.self ? 'You' : assignee.name}</span>
 	</span>
 {:else if assignee.kind === 'external'}
-	<!-- Terminal treatment: monospace, a bracketed prompt glyph, warm tint:	     instantly readable as "an agent on the wire", not a person. -->
+	<!-- Terminal treatment: monospace, a bracketed prompt glyph, warm tint: instantly readable as "an agent on the wire", not a person. -->
 	<span
 		data-testid="assignee-chip"
 		data-assignee-kind="external"

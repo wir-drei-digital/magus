@@ -14,19 +14,10 @@
  * (a :plan that is `done` but never `delivered`: the anti-stranding alarm).
  *
  * The pure assembly (`buildPlanTree`, `isStranded`) is unit-tested
- * (plan-tree.svelte.test.ts); the store is a thin `$state` shell over the api.ts
- * seam with optimistic deliver / undeliver mutations reconciled from the server
- * row, refetching on error (mirrors the plan-board store's claim flow).
+ * (plan-tree.svelte.test.ts). Pages + tasks are fetched and the delivery
+ * mutations driven by the brain overview store, which renders this tree.
  */
-import {
-	brainPlanPages,
-	brainTasks,
-	markBrainPageDelivered,
-	undeliverBrainPage,
-	type PlanPage,
-	type PlanTask,
-	type Lifecycle
-} from '$lib/ash/api';
+import type { PlanPage, PlanTask, Lifecycle } from '$lib/ash/api';
 import { isReady } from './plan-board-store.svelte';
 
 /** A node in the unified plan tree: a :plan or :spec page plus its tasks + children. */
@@ -141,85 +132,4 @@ export function buildPlanTree(pages: PlanPage[], tasks: PlanTask[]): PlanTreeNod
 	for (const root of roots) rollup(root);
 
 	return roots;
-}
-
-export class PlanTreeStore {
-	brainId = $state('');
-	pages = $state<PlanPage[]>([]);
-	tasks = $state<PlanTask[]>([]);
-	loading = $state(true);
-	loadError = $state<string | null>(null);
-	/** Page ids with a deliver/undeliver mutation in flight (disables the control). */
-	pending = $state<Set<string>>(new Set());
-
-	constructor(brainId: string) {
-		this.brainId = brainId;
-	}
-
-	async load(): Promise<void> {
-		const id = this.brainId;
-		this.loading = true;
-		this.loadError = null;
-		const [pagesResult, tasksResult] = await Promise.all([brainPlanPages(id), brainTasks(id)]);
-		if (id !== this.brainId) return;
-		if (tasksResult.success) this.tasks = tasksResult.data;
-		if (pagesResult.success) {
-			this.pages = pagesResult.data;
-		} else {
-			this.loadError = pagesResult.errors[0]?.message ?? 'Plans could not be loaded';
-		}
-		this.loading = false;
-	}
-
-	async reload(): Promise<void> {
-		await this.load();
-	}
-
-	private async refetch(): Promise<void> {
-		const id = this.brainId;
-		const result = await brainPlanPages(id);
-		if (id === this.brainId && result.success) this.pages = result.data;
-	}
-
-	private upsertPage(page: PlanPage): void {
-		const index = this.pages.findIndex((p) => p.id === page.id);
-		this.pages =
-			index >= 0 ? this.pages.map((p) => (p.id === page.id ? page : p)) : [...this.pages, page];
-	}
-
-	private setPending(id: string, on: boolean): void {
-		const next = new Set(this.pending);
-		if (on) next.add(id);
-		else next.delete(id);
-		this.pending = next;
-	}
-
-	/** The assembled tree (pure, recomputed from pages + tasks). */
-	get tree(): PlanTreeNode[] {
-		return buildPlanTree(this.pages, this.tasks);
-	}
-
-	/** The flat stranded set (done-but-not-delivered plans) for the overview alarm. */
-	get stranded(): PlanPage[] {
-		return this.pages.filter(isStranded);
-	}
-
-	// ── Mutations (optimistic, server-reconciled) ───────────────────────────
-	async markDelivered(pageId: string, deliveryRef: string | null): Promise<void> {
-		if (this.pending.has(pageId)) return;
-		this.setPending(pageId, true);
-		const result = await markBrainPageDelivered(pageId, deliveryRef);
-		if (result.success) this.upsertPage(result.data);
-		else await this.refetch();
-		this.setPending(pageId, false);
-	}
-
-	async undeliver(pageId: string): Promise<void> {
-		if (this.pending.has(pageId)) return;
-		this.setPending(pageId, true);
-		const result = await undeliverBrainPage(pageId);
-		if (result.success) this.upsertPage(result.data);
-		else await this.refetch();
-		this.setPending(pageId, false);
-	}
 }

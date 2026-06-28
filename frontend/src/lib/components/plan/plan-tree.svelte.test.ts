@@ -1,35 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 /**
- * Logic coverage for the plan-tree store: the recursive spec -> plan -> phases ->
- * tasks assembly from the brain's flat page + task lists, the ready/blocked task
- * counts each node carries, and the "done but not delivered" (stranded) flag the
- * tree and the overview surface.
+ * Logic coverage for the pure plan-tree assembly: the recursive spec -> plan ->
+ * phases -> tasks tree built from the brain's flat page + task lists, the
+ * ready/blocked task counts each node carries, and the "done but not delivered"
+ * (stranded) flag the tree and the overview surface.
  *
  * Runs under the vitest `node` env; the sveltekit() vite plugin compiles the
- * `.svelte.ts` runes module so $state/$derived work without jsdom (mirrors
- * plan-board-store.svelte.test.ts). The api.ts seam is mocked: no network.
+ * `.svelte.ts` runes module (mirrors plan-board-store.svelte.test.ts).
  */
 
-// ─── api.ts mock ─────────────────────────────────────────────────────────────
-const brainPlanPages = vi.fn();
-const brainTasks = vi.fn();
-const markBrainPageDelivered = vi.fn();
-const undeliverBrainPage = vi.fn();
-
-vi.mock('$lib/ash/api', () => ({
-	brainPlanPages: (...args: unknown[]) => brainPlanPages(...args),
-	brainTasks: (...args: unknown[]) => brainTasks(...args),
-	markBrainPageDelivered: (...args: unknown[]) => markBrainPageDelivered(...args),
-	undeliverBrainPage: (...args: unknown[]) => undeliverBrainPage(...args)
-}));
-
-import {
-	buildPlanTree,
-	PlanTreeStore,
-	type PlanTreeNode,
-	isStranded
-} from './plan-tree-store.svelte';
+import { buildPlanTree, type PlanTreeNode, isStranded } from './plan-tree-store.svelte';
 import type { PlanPage, PlanTask, Lifecycle } from '$lib/ash/api';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -69,12 +50,6 @@ function taskOf(overrides: Partial<PlanTask> & { id: string }): PlanTask {
 		...overrides
 	};
 }
-
-const ok = <T>(data: T) => ({ success: true as const, data });
-const fail = (message: string) => ({
-	success: false as const,
-	errors: [{ type: 'x', message, shortMessage: message, vars: {}, fields: [], path: [] }]
-});
 
 /** Flatten the tree to id -> node for assertions. */
 function index(nodes: PlanTreeNode[]): Map<string, PlanTreeNode> {
@@ -243,93 +218,5 @@ describe('buildPlanTree counts and flags', () => {
 		expect(byId.get('plan')!.lifecycle).toBe('done');
 		// A spec page has no rollup lifecycle of its own; it reports its raw value.
 		expect(byId.get('spec')!.kind).toBe('spec');
-	});
-});
-
-// ─── PlanTreeStore ───────────────────────────────────────────────────────────
-describe('PlanTreeStore', () => {
-	beforeEach(() => {
-		vi.clearAllMocks();
-	});
-
-	it('loads pages + tasks and exposes the assembled tree + stranded set', async () => {
-		brainPlanPages.mockResolvedValue(
-			ok([
-				pageOf({ id: 'plan', kind: 'plan', lifecycle: 'done' }),
-				pageOf({ id: 'active', kind: 'plan', lifecycle: 'active' })
-			])
-		);
-		brainTasks.mockResolvedValue(ok([taskOf({ id: 't', brainPageId: 'active', ready: true })]));
-
-		const store = new PlanTreeStore('brain-1');
-		await store.load();
-
-		expect(store.loading).toBe(false);
-		expect(store.tree.map((n) => n.id).sort()).toEqual(['active', 'plan']);
-		expect(store.stranded.map((p) => p.id)).toEqual(['plan']);
-	});
-
-	it('surfaces a load error from the pages call', async () => {
-		brainPlanPages.mockResolvedValue(fail('nope'));
-		brainTasks.mockResolvedValue(ok([]));
-
-		const store = new PlanTreeStore('brain-1');
-		await store.load();
-
-		expect(store.loadError).toBe('nope');
-		expect(store.tree).toEqual([]);
-	});
-
-	it('marks a plan delivered and reconciles the row optimistically', async () => {
-		brainPlanPages.mockResolvedValue(ok([pageOf({ id: 'plan', kind: 'plan', lifecycle: 'done' })]));
-		brainTasks.mockResolvedValue(ok([]));
-		markBrainPageDelivered.mockResolvedValue(
-			ok(pageOf({ id: 'plan', kind: 'plan', lifecycle: 'delivered', deliveryRef: 'v1.2.0' }))
-		);
-
-		const store = new PlanTreeStore('brain-1');
-		await store.load();
-		expect(store.stranded.map((p) => p.id)).toEqual(['plan']);
-
-		await store.markDelivered('plan', 'v1.2.0');
-
-		expect(markBrainPageDelivered).toHaveBeenCalledWith('plan', 'v1.2.0');
-		expect(store.stranded).toEqual([]); // no longer stranded
-		expect(index(store.tree).get('plan')!.lifecycle).toBe('delivered');
-	});
-
-	it('refetches when a delivery mutation fails', async () => {
-		brainPlanPages
-			.mockResolvedValueOnce(ok([pageOf({ id: 'plan', kind: 'plan', lifecycle: 'done' })]))
-			.mockResolvedValueOnce(ok([pageOf({ id: 'plan', kind: 'plan', lifecycle: 'done' })]));
-		brainTasks.mockResolvedValue(ok([]));
-		markBrainPageDelivered.mockResolvedValue(fail('forbidden'));
-
-		const store = new PlanTreeStore('brain-1');
-		await store.load();
-		await store.markDelivered('plan', null);
-
-		// One initial load + one refetch on error.
-		expect(brainPlanPages).toHaveBeenCalledTimes(2);
-		expect(index(store.tree).get('plan')!.lifecycle).toBe('done');
-	});
-
-	it('undelivers a plan, returning it to the stranded set', async () => {
-		brainPlanPages.mockResolvedValue(
-			ok([pageOf({ id: 'plan', kind: 'plan', lifecycle: 'delivered' })])
-		);
-		brainTasks.mockResolvedValue(ok([]));
-		undeliverBrainPage.mockResolvedValue(
-			ok(pageOf({ id: 'plan', kind: 'plan', lifecycle: 'done' }))
-		);
-
-		const store = new PlanTreeStore('brain-1');
-		await store.load();
-		expect(store.stranded).toEqual([]);
-
-		await store.undeliver('plan');
-
-		expect(undeliverBrainPage).toHaveBeenCalledWith('plan');
-		expect(store.stranded.map((p) => p.id)).toEqual(['plan']);
 	});
 });
