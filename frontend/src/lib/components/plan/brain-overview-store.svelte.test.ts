@@ -16,13 +16,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ─── api.ts mock ─────────────────────────────────────────────────────────────
 const brainTasks = vi.fn();
 const brainTaskEvents = vi.fn();
-const brainPages = vi.fn();
+const brainPlanPages = vi.fn();
+const markBrainPageDelivered = vi.fn();
+const undeliverBrainPage = vi.fn();
 const myAgents = vi.fn();
 
 vi.mock('$lib/ash/api', () => ({
 	brainTasks: (...args: unknown[]) => brainTasks(...args),
 	brainTaskEvents: (...args: unknown[]) => brainTaskEvents(...args),
-	brainPages: (...args: unknown[]) => brainPages(...args),
+	brainPlanPages: (...args: unknown[]) => brainPlanPages(...args),
+	markBrainPageDelivered: (...args: unknown[]) => markBrainPageDelivered(...args),
+	undeliverBrainPage: (...args: unknown[]) => undeliverBrainPage(...args),
 	myAgents: (...args: unknown[]) => myAgents(...args),
 	// plan-board-store.svelte (imported transitively for isReady/isStale) also
 	// pulls these from the api module; stub them so the import resolves.
@@ -43,7 +47,7 @@ import {
 	progressOf,
 	LEASE_EXPIRING_MS
 } from './brain-overview-store.svelte';
-import type { PlanTask, TaskEventEntry, TaskEventKind } from '$lib/ash/api';
+import type { PlanTask, PlanPage, TaskEventEntry, TaskEventKind } from '$lib/ash/api';
 
 function task(overrides: Partial<PlanTask> & { id: string }): PlanTask {
 	return {
@@ -102,13 +106,33 @@ beforeEach(() => {
 	vi.setSystemTime(NOW);
 	myAgents.mockResolvedValue(ok([{ id: 'agent-teal', name: 'Atlas' }]));
 	brainTaskEvents.mockResolvedValue(ok([]));
-	brainPages.mockResolvedValue(
+	brainPlanPages.mockResolvedValue(
 		ok([
-			{ id: 'plan-a', title: 'Launch plan', icon: null, parentPageId: null },
-			{ id: 'plan-b', title: 'Research plan', icon: null, parentPageId: null }
+			planPage({ id: 'plan-a', title: 'Launch plan', lifecycle: 'active' }),
+			planPage({ id: 'plan-b', title: 'Research plan', lifecycle: 'active' })
 		])
 	);
 });
+
+/** A plan page fixture (defaults non-stranded). */
+function planPage(overrides: Partial<PlanPage> & { id: string }): PlanPage {
+	return {
+		title: 'Plan',
+		icon: null,
+		kind: 'plan',
+		parentPageId: null,
+		specPageId: null,
+		lifecycle: 'active',
+		deliveredAt: null,
+		deliveryRef: null,
+		...overrides
+	};
+}
+
+/** A done-but-not-delivered plan fixture for the stranded section. */
+function strandedPage(overrides: Partial<PlanPage> & { id: string }): PlanPage {
+	return planPage({ lifecycle: 'done', ...overrides });
+}
 
 async function build(
 	tasks: PlanTask[],
@@ -407,5 +431,78 @@ describe('planTitle', () => {
 		expect(store.planTitle('plan-a')).toBe('Launch plan');
 		expect(store.planTitle('unknown')).toBe('Untitled plan');
 		expect(store.planTitle(null)).toBe('Unfiled');
+	});
+});
+
+// ─── stranded work (anti-stranding alarm) ─────────────────────────────────────
+describe('stranded plans + plan tree', () => {
+	it('derives the stranded set + count from the loaded plan pages', async () => {
+		brainPlanPages.mockResolvedValue(
+			ok([
+				strandedPage({ id: 'plan-a' }),
+				strandedPage({ id: 'plan-b' }),
+				planPage({ id: 'plan-c', lifecycle: 'delivered' })
+			])
+		);
+		const store = await build([]);
+		expect(store.strandedCount).toBe(2);
+		expect(store.strandedPlans.map((p) => p.id).sort()).toEqual(['plan-a', 'plan-b']);
+	});
+
+	it('exposes the assembled tree from the same loaded pages', async () => {
+		brainPlanPages.mockResolvedValue(
+			ok([
+				planPage({ id: 'plan', lifecycle: 'active' }),
+				planPage({ id: 'phase', parentPageId: 'plan', lifecycle: 'active' })
+			])
+		);
+		const store = await build([]);
+		expect(store.tree.map((n) => n.id)).toEqual(['plan']);
+		expect(store.tree[0].children.map((n) => n.id)).toEqual(['phase']);
+	});
+
+	it('reconciles the whole set on mark-delivered (recursive rollup can shift ancestors)', async () => {
+		brainPlanPages
+			.mockResolvedValueOnce(ok([strandedPage({ id: 'plan-a' })]))
+			.mockResolvedValueOnce(
+				ok([planPage({ id: 'plan-a', lifecycle: 'delivered', deliveryRef: 'v2' })])
+			);
+		markBrainPageDelivered.mockResolvedValue(
+			ok(planPage({ id: 'plan-a', lifecycle: 'delivered', deliveryRef: 'v2' }))
+		);
+		const store = await build([]);
+		expect(store.strandedCount).toBe(1);
+
+		await store.markDelivered('plan-a', 'v2');
+
+		expect(markBrainPageDelivered).toHaveBeenCalledWith('plan-a', 'v2');
+		expect(brainPlanPages).toHaveBeenCalledTimes(2); // load + reconcile
+		expect(store.strandedPlans).toEqual([]);
+	});
+
+	it('leaves the alarm intact when a delivery fails (server refetch restores it)', async () => {
+		brainPlanPages
+			.mockResolvedValueOnce(ok([strandedPage({ id: 'plan-a' })]))
+			.mockResolvedValueOnce(ok([strandedPage({ id: 'plan-a' })]));
+		markBrainPageDelivered.mockResolvedValue(err('forbidden'));
+		const store = await build([]);
+
+		await store.markDelivered('plan-a', null);
+
+		expect(store.strandedPlans.map((p) => p.id)).toEqual(['plan-a']);
+	});
+
+	it('returns a plan to the stranded set after an undeliver', async () => {
+		brainPlanPages
+			.mockResolvedValueOnce(ok([planPage({ id: 'plan-a', lifecycle: 'delivered' })]))
+			.mockResolvedValueOnce(ok([strandedPage({ id: 'plan-a' })]));
+		undeliverBrainPage.mockResolvedValue(ok(strandedPage({ id: 'plan-a' })));
+		const store = await build([]);
+		expect(store.strandedCount).toBe(0);
+
+		await store.undeliver('plan-a');
+
+		expect(undeliverBrainPage).toHaveBeenCalledWith('plan-a');
+		expect(store.strandedPlans.map((p) => p.id)).toEqual(['plan-a']);
 	});
 });
