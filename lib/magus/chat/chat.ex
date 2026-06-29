@@ -34,6 +34,7 @@ defmodule Magus.Chat do
       rpc_action :deactivate_conversation_prompt, :deactivate_system_prompt
       rpc_action :create_thread, :create_thread
       rpc_action :conversation_threads, :threads_for_conversation
+      rpc_action :conversations_threads, :threads_for_conversations
       rpc_action :conversation_history, :history
       rpc_action :trashed_conversations, :trashed
       rpc_action :restore_conversation, :restore

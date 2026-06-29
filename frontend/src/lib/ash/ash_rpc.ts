@@ -3486,6 +3486,53 @@ export async function conversationThreads<Fields extends ConversationThreadsFiel
 }
 
 
+export type ConversationsThreadsInput = {
+  conversationIds: Array<UUID>;
+};
+
+export type ConversationsThreadsFields = UnifiedFieldSelection<ConversationResourceSchema>[];
+export type InferConversationsThreadsResult<
+  Fields extends ConversationsThreadsFields,
+> = Array<InferResult<ConversationResourceSchema, Fields>>;
+
+export type ConversationsThreadsResult<Fields extends ConversationsThreadsFields> = | { success: true; data: InferConversationsThreadsResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Read Conversation records
+ *
+ * @ashActionType :read
+ */
+export async function conversationsThreads<Fields extends ConversationsThreadsFields>(
+  config: {
+  tenant?: string;
+  input: ConversationsThreadsInput;
+  fields: Fields;
+  filter?: ConversationFilterInput;
+  sort?: SortString<ConversationSortField> | SortString<ConversationSortField>[];
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ConversationsThreadsResult<Fields>> {
+  const payload = {
+    action: "conversations_threads",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields }),
+    ...(config.filter && { filter: config.filter }),
+    ...(config.sort && { sort: Array.isArray(config.sort) ? config.sort.join(",") : config.sort })
+  };
+
+  return executeActionRpcRequest<ConversationsThreadsResult<Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type CreateConversationInput = {
   title?: string | null;
   folderId?: UUID | null;
