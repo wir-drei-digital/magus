@@ -21,7 +21,6 @@
 		Sun
 	} from '@lucide/svelte';
 	import { session } from '$lib/stores/session.svelte';
-	import { notificationFeed } from '$lib/stores/notifications.svelte';
 	import { workbench, type WorkbenchMode } from '$lib/stores/workbench.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import CreditIndicator from './credit-indicator.svelte';
@@ -118,7 +117,7 @@
 				type="button"
 				class="relative flex size-10 items-center justify-center rounded-lg transition-colors {workbench.mode ===
 				mode.key
-					? 'text-foreground'
+					? 'text-primary'
 					: 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'}"
 				title={mode.label}
 				data-testid="mode-{mode.key}"
@@ -138,18 +137,6 @@
 	</div>
 
 	<div class="flex flex-col items-center gap-1.5 pb-3" data-testid="mode-strip-footer">
-		<span
-			data-testid="connection-status"
-			role="status"
-			aria-label="Live connection: {notificationFeed.connection}"
-			title="Live connection: {notificationFeed.connection}"
-			class="size-2 rounded-full {notificationFeed.connection === 'live'
-				? 'bg-success'
-				: notificationFeed.connection === 'connecting'
-					? 'bg-warning'
-					: 'bg-destructive'}"
-		></span>
-
 		<CreditIndicator />
 		<NotificationBell />
 

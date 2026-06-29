@@ -41,6 +41,7 @@
 		pages = [],
 		pageId,
 		workspaceId = null,
+		editable = true,
 		onChange,
 		onPageRefClick,
 		onBubbleAction,
@@ -48,6 +49,8 @@
 	}: {
 		/** Server-converted ProseMirror document. */
 		content: Record<string, unknown>;
+		/** When false, renders the document read-only (e.g. version preview). */
+		editable?: boolean;
 		/** Wikilink suggestion source ([[ trigger). */
 		pages?: PageTreeNode[];
 		/**
@@ -207,6 +210,7 @@
 				new Editor({
 					element,
 					content,
+					editable,
 					editorProps: {
 						attributes: {
 							// tiptap-phoenix's stylesheet targets .tiptap-editor-content.

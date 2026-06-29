@@ -165,11 +165,12 @@
 		return () => {
 			if (draftTimer) clearTimeout(draftTimer);
 			// Flush the draft so keystrokes inside the debounce window survive a
-			// quick navigation away.
-			saveDraft(localStorage, DRAFT_KEY, value);
-			// Never-sent uploads are discarded so they don't orphan storage quota
-			// (skipped once a send has handed them to the new conversation).
+			// quick navigation away — but not once a send has consumed it, which
+			// would re-persist the text and leave it in the box on the next mount.
 			if (!consumed) {
+				saveDraft(localStorage, DRAFT_KEY, value);
+				// Never-sent uploads are discarded so they don't orphan storage quota
+				// (skipped once a send has handed them to the new conversation).
 				for (const file of attachments) void deleteFile(file.id);
 			}
 		};
@@ -294,6 +295,11 @@
 		workbench.upsertConversation(summary);
 
 		setPendingMessage(conversation.id, { text, resources });
+		// Cancel any pending debounced save before clearing, otherwise it fires
+		// after navigation and re-persists the text — leaving it in the box the
+		// next time the landing composer mounts.
+		if (draftTimer) clearTimeout(draftTimer);
+		value = '';
 		clearDraft(localStorage, DRAFT_KEY);
 		consumed = true;
 		await goto(`${base}/chat/${conversation.id}`);

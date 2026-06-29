@@ -6,6 +6,7 @@
 	import { uploadFile } from '$lib/ash/api';
 	import { session } from '$lib/stores/session.svelte';
 	import { workbench } from '$lib/stores/workbench.svelte';
+	import { searchOverlay } from '$lib/stores/search-overlay.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import AgentsNav from './agents-nav.svelte';
 	import BrainNav from './brain-nav.svelte';
@@ -13,7 +14,6 @@
 	import FilesNav from './files-nav.svelte';
 	import NewResourceDialog, { type NewResourceKind } from './new-resource-dialog.svelte';
 	import PromptsNav from './prompts-nav.svelte';
-	import SearchOverlay from './search-overlay.svelte';
 	import SettingsNav from './settings-nav.svelte';
 	import WorkspaceSwitcher from './workspace-switcher.svelte';
 
@@ -21,7 +21,6 @@
 	const inSettings = $derived(page.url.pathname.startsWith(`${base}/settings`));
 
 	let fileInput = $state<HTMLInputElement | null>(null);
-	let searchOpen = $state(false);
 
 	// Prompt/agent/brain creation share one shadcn dialog, keyed by kind.
 	let createKind = $state<NewResourceKind>('prompt');
@@ -35,7 +34,7 @@
 	function onKeydown(event: KeyboardEvent) {
 		if (event.key === 'k' && (event.metaKey || event.ctrlKey)) {
 			event.preventDefault();
-			searchOpen = true;
+			searchOverlay.open = true;
 		}
 	}
 
@@ -71,7 +70,7 @@
 			<!-- Search opens the classic global overlay (also via ⌘K). -->
 			<Sidebar.Menu>
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton data-testid="nav-search" onclick={() => (searchOpen = true)}>
+					<Sidebar.MenuButton data-testid="nav-search" onclick={() => (searchOverlay.open = true)}>
 						<Search class="text-muted-foreground" />
 						<span>Search</span>
 					</Sidebar.MenuButton>
@@ -195,6 +194,4 @@
 		{/if}
 	</Sidebar.Root>
 </Sidebar.Provider>
-
-<SearchOverlay bind:open={searchOpen} />
 <NewResourceDialog kind={createKind} bind:open={createOpen} />

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick } from 'svelte';
+	import { onDestroy, tick } from 'svelte';
 	import { ArrowDown, ChevronRight } from '@lucide/svelte';
 	import {
 		conversationThreads,
@@ -26,11 +26,14 @@
 
 	let {
 		store,
-		onCompanionRequest
+		onCompanionRequest,
+		highlightMessageId = null
 	}: {
 		store: ConversationStore;
 		/** Opens a companion on this conversation's tab (wired by the page). */
 		onCompanionRequest?: (spec: CompanionSpec) => void;
+		/** Search deep-link target: scroll to + briefly flash this message. */
+		highlightMessageId?: string | null;
 	} = $props();
 
 	const conversationId = $derived(store.conversationId);
@@ -115,6 +118,33 @@
 		if (stickToBottom) {
 			void tick().then(() => scroller?.scrollTo({ top: scroller.scrollHeight }));
 		}
+	});
+
+	// Search deep-link: once the target message is in the loaded set, scroll to
+	// it and flash it briefly. Guarded so it fires once per highlight target and
+	// doesn't fight the auto-scroll-to-bottom.
+	let flashMessageId = $state<string | null>(null);
+	let lastHighlighted: string | null = null;
+	let flashTimer: ReturnType<typeof setTimeout> | null = null;
+
+	$effect(() => {
+		const target = highlightMessageId;
+		if (!target || target === lastHighlighted) return;
+		if (!store.messages.some((message) => message.id === target)) return;
+		lastHighlighted = target;
+		stickToBottom = false;
+		void tick().then(() => {
+			scroller
+				?.querySelector(`[data-message-id="${target}"]`)
+				?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+			flashMessageId = target;
+			if (flashTimer) clearTimeout(flashTimer);
+			flashTimer = setTimeout(() => (flashMessageId = null), 2500);
+		});
+	});
+
+	onDestroy(() => {
+		if (flashTimer) clearTimeout(flashTimer);
 	});
 
 	// px from the top at which scrolling up triggers the next older page. A
@@ -259,20 +289,27 @@
 				     persisted event row lands. -->
 				{#each chatStream as item (item.key)}
 					{#if item.kind === 'message'}
-						<MessageItem
-							message={item.message}
-							onDelete={(id) => void store.removeMessage(id)}
-							thread={threadsByMessage.get(item.message.id) ?? null}
-							onStartThread={onCompanionRequest ? (id) => void startThread(id) : undefined}
-							onOpenThread={onCompanionRequest ? openThread : undefined}
-							attachmentFor={(id) => attachmentCache.get(id) ?? null}
-							onOpenPdf={onCompanionRequest ? openPdfAttachment : undefined}
-							onToggleDisabled={(id) => void store.toggleDisabled(id)}
-							onRetry={(text) => void store.send(text)}
-							onCreatePrompt={createPromptFrom}
-							onOpenCompanion={onCompanionRequest}
-							conversationId={store.conversationId}
-						/>
+						<div
+							data-message-id={item.message.id}
+							class="scroll-mt-4 rounded-xl transition-colors duration-700 {flashMessageId ===
+							item.message.id
+								? 'bg-primary/10 ring-2 ring-primary/30'
+								: ''}"
+						>
+							<MessageItem
+								message={item.message}
+								thread={threadsByMessage.get(item.message.id) ?? null}
+								onStartThread={onCompanionRequest ? (id) => void startThread(id) : undefined}
+								onOpenThread={onCompanionRequest ? openThread : undefined}
+								attachmentFor={(id) => attachmentCache.get(id) ?? null}
+								onOpenPdf={onCompanionRequest ? openPdfAttachment : undefined}
+								onToggleDisabled={(id) => void store.toggleDisabled(id)}
+								onRetry={(text) => void store.send(text)}
+								onCreatePrompt={createPromptFrom}
+								onOpenCompanion={onCompanionRequest}
+								conversationId={store.conversationId}
+							/>
+						</div>
 					{:else}
 						<ToolCard
 							view={toolViewFromLive(item.tool)}

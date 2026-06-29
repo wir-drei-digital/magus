@@ -8,6 +8,8 @@
 	import { workbench } from '$lib/stores/workbench.svelte';
 
 	const conversationId = $derived(page.params.conversationId!);
+	// Search deep-links carry ?highlight=<messageId> to flash + scroll to a hit.
+	const highlightMessageId = $derived(page.url.searchParams.get('highlight'));
 
 	// The page owns the store so the companion host (split-pane chrome around
 	// the conversation) can react to its channel events too.
@@ -66,6 +68,7 @@
 		>
 			<ConversationView
 				{store}
+				{highlightMessageId}
 				onCompanionRequest={(spec) => openCompanion(conversationId, spec)}
 			/>
 		</CompanionHost>

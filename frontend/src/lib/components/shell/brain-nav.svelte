@@ -84,7 +84,13 @@
 						: ''}"
 				/>
 			</button>
-			<a href="{base}/brain/page/{node.id}" class="flex min-w-0 flex-1 items-center gap-1.5">
+			<!-- Navigating to a page also reveals its subtree (only when it has
+			     subpages), so a parent page expands as it opens. -->
+			<a
+				href="{base}/brain/page/{node.id}"
+				class="flex min-w-0 flex-1 items-center gap-1.5"
+				onclick={() => void brainNav.expandPageIfHasChildren(node.id)}
+			>
 				<span class="min-w-0 truncate text-sm">{node.title ?? 'Untitled'}</span>
 			</a>
 			<button

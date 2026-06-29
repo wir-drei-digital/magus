@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { ChevronLeft, X } from '@lucide/svelte';
+	import { X } from '@lucide/svelte';
 
 	let {
 		title,
@@ -42,17 +42,6 @@
 	<!-- pl-14 on mobile clears the floating hamburger during a full-width
 	     companion takeover; desktop keeps the normal padding. -->
 	<header class="flex shrink-0 items-center gap-2 border-b py-2.5 pr-4 pl-14 md:pl-4">
-		<!-- Below md the companion takes over the screen, so the leading control
-		     reads as "back to the conversation" rather than a pane close. -->
-		<button
-			type="button"
-			class="wb-pill-btn wb-pill-btn-square shrink-0 md:hidden"
-			aria-label="Back to conversation"
-			data-testid="companion-back"
-			onclick={onClose}
-		>
-			<ChevronLeft class="size-4" />
-		</button>
 		{#if icon}
 			{@render icon()}
 		{/if}
@@ -108,7 +97,7 @@
 		{/if}
 		<button
 			type="button"
-			class="wb-pill-btn wb-pill-btn-square shrink-0 max-md:hidden"
+			class="wb-pill-btn wb-pill-btn-square shrink-0"
 			aria-label="Close companion"
 			data-testid="companion-close"
 			onclick={onClose}

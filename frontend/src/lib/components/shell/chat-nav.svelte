@@ -245,7 +245,7 @@
 			</span>
 		</Sidebar.MenuButton>
 		<span
-			class="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100"
+			class="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 rounded-md bg-sidebar-accent pl-1.5 opacity-0 shadow-[-8px_0_8px_-4px_var(--color-sidebar-accent)] transition-opacity group-hover/row:opacity-100"
 		>
 			{#if workspaceId && conversation.workspaceId}
 				<button
@@ -363,7 +363,7 @@
 					</Sidebar.MenuSub>
 				{/if}
 				<span
-					class="absolute right-1 top-1.5 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/folder:opacity-100"
+					class="absolute right-1 top-1.5 flex items-center gap-0.5 rounded-md bg-sidebar-accent pl-1.5 opacity-0 shadow-[-8px_0_8px_-4px_var(--color-sidebar-accent)] transition-opacity group-hover/folder:opacity-100"
 				>
 					<button
 						type="button"

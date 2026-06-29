@@ -3,7 +3,6 @@ import { getSocket } from '$lib/realtime/socket';
 import {
 	clearContextWindow,
 	compactContextWindow,
-	deleteMessage,
 	enqueueMessage,
 	getContextWindow,
 	messageHistoryPage,
@@ -322,23 +321,6 @@ export class ConversationStore {
 		}
 		this.#typing = isTyping;
 		this.#channel.push('typing', { is_typing: isTyping });
-	}
-
-	/**
-	 * Optimistically removes the message; on failure re-inserts just that
-	 * message (not a whole-array snapshot, which would clobber broadcasts
-	 * that landed during the RPC).
-	 */
-	async removeMessage(id: string): Promise<boolean> {
-		const removed = this.messages.find((message) => message.id === id);
-		this.messages = this.messages.filter((message) => message.id !== id);
-
-		const result = await deleteMessage(id);
-		if (!result.success) {
-			if (removed) this.messages = upsertMessage(this.messages, removed);
-			return false;
-		}
-		return true;
 	}
 
 	/** Classic eye toggle: optimistic flip, server-reconciled. */

@@ -1979,9 +1979,9 @@ export function connectKnowledgeSource(input: {
 	name?: string | null;
 	workspaceId?: string | null;
 }): Promise<RpcResult<KnowledgeSourceEntry>> {
-	return run((opts) =>
-		rpc.connectKnowledgeSource({ input, ...opts })
-	) as Promise<RpcResult<KnowledgeSourceEntry>>;
+	return run((opts) => rpc.connectKnowledgeSource({ input, ...opts })) as Promise<
+		RpcResult<KnowledgeSourceEntry>
+	>;
 }
 
 /** Browse a connected source's folders (null parent = root; lazy on expand). */
@@ -2211,6 +2211,68 @@ export function updateDraftContent(
 export function renameDraft(id: string, title: string): Promise<RpcResult<DraftDetail>> {
 	return run((opts) =>
 		rpc.renameDraft({ identity: id, input: { title }, fields: DRAFT_FIELDS, ...opts })
+	);
+}
+
+export type DraftExportFormat = 'pdf' | 'docx' | 'latex' | 'markdown';
+
+export type DraftVersion = {
+	id: string;
+	/** The action that produced this version (e.g. "update_content"). */
+	action: string;
+	insertedAt: string | null;
+	title: string | null;
+	/** ProseMirror document JSON at this version (for read-only preview). */
+	content: Record<string, unknown> | null;
+};
+
+/** Paper-trail versions for a draft, newest first. */
+export async function draftVersions(draftId: string): Promise<RpcResult<DraftVersion[]>> {
+	const result = await run<Array<Record<string, unknown>>>((opts) =>
+		rpc.draftVersions({ input: { draftId }, ...opts })
+	);
+	if (!result.success) return result;
+	return {
+		success: true,
+		data: result.data.map((version) => ({
+			id: String(version.id ?? ''),
+			action: String(version.action ?? ''),
+			insertedAt: (version.inserted_at ?? null) as string | null,
+			title: (version.title ?? null) as string | null,
+			content: (version.content ?? null) as Record<string, unknown> | null
+		}))
+	};
+}
+
+/**
+ * Kicks off a draft export: the agent generates the file and streams it into
+ * the conversation. Resolves once the job is enqueued (the result arrives via
+ * the conversation channel, not this call).
+ */
+export async function exportDraft(
+	draftId: string,
+	conversationId: string,
+	exportFormat: DraftExportFormat
+): Promise<RpcResult<Record<string, never>>> {
+	const result = await run<Record<string, unknown>>((opts) =>
+		rpc.exportDraft({ input: { draftId, conversationId, exportFormat }, ...opts })
+	);
+	if (!result.success) return result;
+	return { success: true, data: {} };
+}
+
+/** Restores draft content + title from a paper-trail version snapshot. */
+export function restoreDraftVersion(
+	id: string,
+	versionId: string
+): Promise<RpcResult<DraftDetail>> {
+	return run((opts) =>
+		rpc.restoreDraftVersion({
+			identity: id,
+			input: { versionId },
+			fields: DRAFT_FIELDS as rpc.RestoreDraftVersionFields,
+			...opts
+		})
 	);
 }
 
@@ -3001,8 +3063,7 @@ export async function agentIntegrations(agentId: string): Promise<RpcResult<Agen
 			availableTools: (
 				(Array.isArray(row.available_tools) ? row.available_tools : []) as Record<string, unknown>[]
 			).map((tool) => ({ key: String(tool.key ?? ''), name: String(tool.name ?? tool.key ?? '') })),
-			config:
-				row.config && typeof row.config === 'object' ? (row.config as IntegrationConfig) : {}
+			config: row.config && typeof row.config === 'object' ? (row.config as IntegrationConfig) : {}
 		}))
 	};
 }

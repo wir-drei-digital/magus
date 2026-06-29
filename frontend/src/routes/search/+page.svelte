@@ -82,7 +82,7 @@
 	function resultUrl(result: SearchResult): string {
 		switch (result.type) {
 			case 'message':
-				return `${base}/chat/${result.metadata.conversation_id}`;
+				return `${base}/chat/${result.metadata.conversation_id}?highlight=${result.id}`;
 			case 'conversation':
 				return `${base}/chat/${result.id}`;
 			case 'prompt':

@@ -24,7 +24,6 @@
 		ScanSearch,
 		Search,
 		Sparkles,
-		Trash2,
 		Zap,
 		ZapOff
 	} from '@lucide/svelte';
@@ -46,7 +45,6 @@
 
 	let {
 		message,
-		onDelete,
 		thread = null,
 		onStartThread,
 		onOpenThread,
@@ -59,7 +57,6 @@
 		conversationId
 	}: {
 		message: ChatMessage;
-		onDelete?: (id: string) => void;
 		/** Existing thread branched at this message, if any. */
 		thread?: { id: string; messageCount?: number } | null;
 		onStartThread?: (messageId: string) => void;
@@ -98,27 +95,6 @@
 	const canBranch = $derived(
 		message.status === 'complete' && (onStartThread !== undefined || thread !== null)
 	);
-
-	// Two-step inline confirm; resets after a short window. Authorization is
-	// the server's call — the store rolls back if the delete is rejected.
-	let confirming = $state(false);
-	let confirmTimer: ReturnType<typeof setTimeout> | null = null;
-
-	onDestroy(() => {
-		if (confirmTimer) clearTimeout(confirmTimer);
-	});
-
-	function requestDelete() {
-		if (!onDelete) return;
-		if (confirming) {
-			if (confirmTimer) clearTimeout(confirmTimer);
-			confirming = false;
-			onDelete(message.id);
-			return;
-		}
-		confirming = true;
-		confirmTimer = setTimeout(() => (confirming = false), 3000);
-	}
 
 	function branch() {
 		if (thread) onOpenThread?.(thread.id);
@@ -274,19 +250,6 @@
 			</button>
 		{/if}
 		{@render threadAction()}
-		{#if onDelete && message.status !== 'pending'}
-			<button
-				type="button"
-				class="shrink-0 rounded-md px-1.5 py-1 text-xs transition-colors {confirming
-					? 'bg-destructive text-destructive-foreground'
-					: 'text-muted-foreground hover:bg-accent hover:text-foreground'}"
-				data-testid="message-delete"
-				aria-label={confirming ? 'Confirm delete' : 'Delete message'}
-				onclick={requestDelete}
-			>
-				{#if confirming}Delete?{:else}<Trash2 class="size-3.5" />{/if}
-			</button>
-		{/if}
 	</div>
 {/snippet}
 

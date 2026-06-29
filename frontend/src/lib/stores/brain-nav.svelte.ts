@@ -109,6 +109,19 @@ class BrainNav {
 		}
 	}
 
+	/**
+	 * Expand-on-navigate: reveal the subtree only when the page actually has
+	 * subpages, so clicking a leaf page just navigates without flashing an
+	 * empty "No sub-pages" branch. No-op if already expanded.
+	 */
+	async expandPageIfHasChildren(parentId: string): Promise<void> {
+		if (this.children[parentId]) return;
+		const result = await brainPageChildren(parentId);
+		if (result.success && result.data.length > 0) {
+			this.children = { ...this.children, [parentId]: result.data };
+		}
+	}
+
 	collapsePage(parentId: string): void {
 		const next = { ...this.children };
 		delete next[parentId];

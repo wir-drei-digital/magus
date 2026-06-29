@@ -25,6 +25,7 @@ defmodule Magus.Agents.Plugins.InboxEventPlugin do
   require Logger
 
   alias Magus.Agents.Plugins.Support.Helpers
+  alias Magus.Agents.Signals
   alias Magus.Agents.Support.HomeConversation
   alias Magus.Agents.Support.MentionParser
   alias Magus.Agents.RunOrchestrator
@@ -64,6 +65,15 @@ defmodule Magus.Agents.Plugins.InboxEventPlugin do
       Logger.debug(
         "InboxEventPlugin: dispatched to #{length(dispatched)} agent(s), suppressing main agent"
       )
+
+      # Suppressing the main agent with a Noop skips the ReAct turn entirely, so
+      # PersistencePlugin never emits the terminal signals that clear the UI's
+      # "thinking" state. Emit them here (same pattern as the preflight Noop
+      # paths) so the conversation doesn't stay stuck until the watchdog fires.
+      if conversation_id do
+        Signals.state_change(conversation_id, :idle)
+        Signals.response_complete(conversation_id, %{})
+      end
 
       {:ok, {:override, Jido.Actions.Control.Noop}}
     else

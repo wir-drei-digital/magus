@@ -231,7 +231,37 @@ defmodule Magus.Drafts.Draft do
                  %{export_format: format},
                  actor: actor
                ) do
-          {:ok, %{draft: draft, message: message}}
+          # Plain, JSON-serializable map (the RPC client and classic both only
+          # need success/failure; the export streams into the conversation).
+          {:ok, %{draft_id: draft.id, message_id: message.id, export_format: to_string(format)}}
+        else
+          {:ok, nil} -> {:error, "Draft not found"}
+          {:error, error} -> {:error, error}
+        end
+      end
+    end
+
+    action :list_versions, {:array, :map} do
+      description "Paper-trail versions for a draft (newest first), for the version history view."
+      argument :draft_id, :uuid, allow_nil?: false
+
+      run fn input, context ->
+        draft_id = input.arguments.draft_id
+        actor = context.actor
+
+        with {:ok, %{}} <- Magus.Drafts.get_draft(draft_id, actor: actor),
+             {:ok, versions} <- Magus.Drafts.list_draft_versions(draft_id, actor: actor) do
+          {:ok,
+           Enum.map(versions, fn version ->
+             %{
+               id: version.id,
+               action: to_string(version.version_action_name),
+               inserted_at:
+                 version.version_inserted_at && DateTime.to_iso8601(version.version_inserted_at),
+               title: version.changes["title"],
+               content: version.changes["content"]
+             }
+           end)}
         else
           {:ok, nil} -> {:error, "Draft not found"}
           {:error, error} -> {:error, error}
@@ -281,6 +311,10 @@ defmodule Magus.Drafts.Draft do
     end
 
     bypass action(:export) do
+      authorize_if always()
+    end
+
+    bypass action(:list_versions) do
       authorize_if always()
     end
   end

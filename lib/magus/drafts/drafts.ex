@@ -22,6 +22,9 @@ defmodule Magus.Drafts do
       rpc_action :update_draft_content, :update_content_json
       rpc_action :rename_draft, :update_title
       rpc_action :delete_draft, :destroy
+      rpc_action :export_draft, :export
+      rpc_action :draft_versions, :list_versions
+      rpc_action :restore_draft_version, :restore_version
 
       rpc_action :get_draft, :read do
         get_by [:id]

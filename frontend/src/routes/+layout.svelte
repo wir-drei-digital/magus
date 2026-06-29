@@ -12,6 +12,8 @@
 	import TabBar from '$lib/components/shell/tab-bar.svelte';
 	import ConfirmDialog from '$lib/components/shell/confirm-dialog.svelte';
 	import ToastHost from '$lib/components/shell/toast-host.svelte';
+	import SearchOverlay from '$lib/components/shell/search-overlay.svelte';
+	import { searchOverlay } from '$lib/stores/search-overlay.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Card } from '$lib/components/ui/card';
 
@@ -146,9 +148,12 @@
 	{/if}
 </div>
 
-<!-- Global, app-wide overlays: branded confirm dialog + transient/undo toasts. -->
+<!-- Global, app-wide overlays: branded confirm dialog + transient/undo toasts.
+     SearchOverlay renders here (not in the nav pane) so its full-screen
+     `fixed inset-0` isn't clamped by the left rail's translate-x transform. -->
 <ConfirmDialog />
 <ToastHost />
+<SearchOverlay bind:open={searchOverlay.open} />
 
 <svelte:window
 	onkeydown={(event) => {

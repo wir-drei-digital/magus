@@ -6518,6 +6518,84 @@ export async function deleteDraft(
 }
 
 
+export type DraftVersionsInput = {
+  draftId: UUID;
+};
+
+export type InferDraftVersionsResult = Array<Record<string, any>>;
+
+export type DraftVersionsResult = | { success: true; data: InferDraftVersionsResult; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Draft
+ *
+ * @ashActionType :action
+ */
+export async function draftVersions(
+  config: {
+  tenant?: string;
+  input: DraftVersionsInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<DraftVersionsResult> {
+  const payload = {
+    action: "draft_versions",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeActionRpcRequest<DraftVersionsResult>(
+    payload,
+    config
+  );
+}
+
+
+export type ExportDraftInput = {
+  draftId: UUID;
+  conversationId: UUID;
+  exportFormat: "docx" | "latex" | "markdown" | "pdf";
+};
+
+export type InferExportDraftResult = Record<string, any>;
+
+export type ExportDraftResult = | { success: true; data: InferExportDraftResult; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Draft
+ *
+ * @ashActionType :action
+ */
+export async function exportDraft(
+  config: {
+  tenant?: string;
+  input: ExportDraftInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ExportDraftResult> {
+  const payload = {
+    action: "export_draft",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeActionRpcRequest<ExportDraftResult>(
+    payload,
+    config
+  );
+}
+
+
 export type GetDraftFields = UnifiedFieldSelection<DraftResourceSchema>[];
 export type InferGetDraftResult<
   Fields extends GetDraftFields,
@@ -6599,6 +6677,52 @@ export async function renameDraft<Fields extends RenameDraftFields | undefined =
   };
 
   return executeActionRpcRequest<RenameDraftResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
+export type RestoreDraftVersionInput = {
+  versionId: UUIDv7;
+};
+
+export type RestoreDraftVersionFields = UnifiedFieldSelection<DraftResourceSchema>[];
+
+export type InferRestoreDraftVersionResult<
+  Fields extends RestoreDraftVersionFields | undefined,
+> = InferResult<DraftResourceSchema, Fields>;
+
+export type RestoreDraftVersionResult<Fields extends RestoreDraftVersionFields | undefined = undefined> = | { success: true; data: InferRestoreDraftVersionResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Update an existing Draft
+ *
+ * @ashActionType :update
+ */
+export async function restoreDraftVersion<Fields extends RestoreDraftVersionFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: UUIDv7;
+  input: RestoreDraftVersionInput;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<RestoreDraftVersionResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "restore_draft_version",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<RestoreDraftVersionResult<Fields extends undefined ? [] : Fields>>(
     payload,
     config
   );
