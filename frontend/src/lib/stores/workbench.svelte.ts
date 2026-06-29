@@ -2,6 +2,7 @@ import {
 	activateWorkbenchTab,
 	archiveConversation,
 	closeWorkbenchTab,
+	conversationsThreads,
 	createConversation,
 	favoriteConversation,
 	moveConversationToFolder,
@@ -21,10 +22,12 @@ import {
 	workspaceConversations,
 	type CompanionSpec,
 	type ConversationSummary,
+	type ThreadNavSummary,
 	type TabSession,
 	type WorkbenchTab,
 	type WorkspaceSummary
 } from '$lib/ash/api';
+import { groupThreadsByParent } from '$lib/chat/thread-nav';
 import { untrack } from 'svelte';
 import { modeFromPath } from '$lib/route-mode';
 import { readShellCache, writeShellCache } from '$lib/shell-cache';
@@ -49,6 +52,7 @@ const isOptimisticTabId = (tabId: string) => tabId.startsWith('optimistic-');
 class WorkbenchStore {
 	session = $state<TabSession | null>(null);
 	conversations = $state<ConversationSummary[]>([]);
+	threadsByParent = $state<Map<string, ThreadNavSummary[]>>(new Map());
 	workspaces = $state<WorkspaceSummary[]>([]);
 	navLoading = $state(true);
 
@@ -193,9 +197,17 @@ class WorkbenchStore {
 				.slice()
 				.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 		}
+		if (conversationsResult.success) {
+			void this.#loadThreadsFor(conversationsResult.data.map((c) => c.id));
+		}
 		if (workspacesResult.success) this.workspaces = workspacesResult.data;
 		this.navLoading = false;
 		this.#persistSnapshot();
+	}
+
+	async #loadThreadsFor(conversationIds: string[]): Promise<void> {
+		const result = await conversationsThreads(conversationIds);
+		if (result.success) this.threadsByParent = groupThreadsByParent(result.data);
 	}
 
 	async refreshConversations(): Promise<void> {
@@ -207,6 +219,7 @@ class WorkbenchStore {
 				.slice()
 				.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 			this.#persistSnapshot();
+			void this.#loadThreadsFor(result.data.map((c) => c.id));
 		}
 	}
 
@@ -316,6 +329,32 @@ class WorkbenchStore {
 
 	conversation(id: string): ConversationSummary | null {
 		return this.conversations.find((conversation) => conversation.id === id) ?? null;
+	}
+
+	/** Threads branched off a conversation, oldest first (empty when none). */
+	threadsFor(conversationId: string): ThreadNavSummary[] {
+		return this.threadsByParent.get(conversationId) ?? [];
+	}
+
+	/** Reload nav threads for the currently loaded conversations. */
+	async refreshThreads(): Promise<void> {
+		await this.#loadThreadsFor(this.conversations.map((c) => c.id));
+	}
+
+	/** Soft-deletes a thread (a child conversation) and drops it from the nav. */
+	async deleteThread(threadId: string, parentConversationId: string): Promise<boolean> {
+		const result = await archiveConversation(threadId);
+		if (!result.success) return false;
+
+		const list = this.threadsByParent.get(parentConversationId);
+		if (list) {
+			const next = list.filter((thread) => thread.id !== threadId);
+			const map = new Map(this.threadsByParent);
+			if (next.length > 0) map.set(parentConversationId, next);
+			else map.delete(parentConversationId);
+			this.threadsByParent = map;
+		}
+		return true;
 	}
 
 	/**
