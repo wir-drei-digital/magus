@@ -107,7 +107,7 @@ defmodule MagusWeb.E2E.RegistrationFlowTest do
       # After registration, the native form POST goes to the auth controller
       # which creates the user, logs them in, and redirects.
 
-      conn = assert_path(conn, "/chat", timeout: 15_000)
+      conn = assert_path(conn, "/next", timeout: 15_000)
 
       # Confirmation email should be sent
       assert {:ok, confirmation_email} = find_email(:mail_verification, timeout: 5_000)
@@ -161,7 +161,7 @@ defmodule MagusWeb.E2E.RegistrationFlowTest do
         |> fill_in("Password", with: @password)
         |> click_button("Sign in")
       end)
-      |> assert_path("/chat", timeout: 10_000)
+      |> assert_path("/next", timeout: 10_000)
     end
 
     test "registration shows error for mismatched passwords", %{conn: conn} do

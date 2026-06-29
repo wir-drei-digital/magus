@@ -154,7 +154,7 @@ defmodule MagusWeb.E2E.MagicLinkFlowTest do
         )
 
       # Should redirect to /chat after profile completion
-      _conn = assert_path(conn, "/chat", timeout: 15_000)
+      _conn = assert_path(conn, "/next", timeout: 15_000)
 
       # Welcome email should now be sent
       assert_welcome_email_sent(timeout: 5_000)
@@ -214,7 +214,7 @@ defmodule MagusWeb.E2E.MagicLinkFlowTest do
       conn = submit_magic_link_confirm_form(conn)
 
       # Existing user with accepted_terms=true goes straight to /chat
-      assert_path(conn, "/chat", timeout: 15_000)
+      assert_path(conn, "/next", timeout: 15_000)
     end
   end
 end

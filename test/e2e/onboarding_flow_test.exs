@@ -223,7 +223,7 @@ defmodule MagusWeb.E2E.OnboardingFlowTest do
 
       # After registration, the native form POST creates the user, logs them in,
       # and redirects to /chat.
-      conn = assert_path(conn, "/chat", timeout: 15_000)
+      conn = assert_path(conn, "/next", timeout: 15_000)
 
       # --- Step 2: Confirm the email address ---
       assert {:ok, confirmation_email} = find_email(:mail_verification, timeout: 5_000)
@@ -272,7 +272,7 @@ defmodule MagusWeb.E2E.OnboardingFlowTest do
       conn = fill_password_and_submit_sign_in(conn, @password)
 
       # --- Step 5: Verify we land in the chat interface ---
-      conn = assert_path(conn, "/chat", timeout: 10_000)
+      conn = assert_path(conn, "/next", timeout: 10_000)
 
       assert_has(conn, "p", text: "What's on your mind today?", timeout: 10_000)
     end
@@ -336,7 +336,7 @@ defmodule MagusWeb.E2E.OnboardingFlowTest do
       conn = submit_complete_profile_form(conn)
 
       # --- Step 4: Verify we land in the chat interface ---
-      conn = assert_path(conn, "/chat", timeout: 15_000)
+      conn = assert_path(conn, "/next", timeout: 15_000)
 
       conn = assert_has(conn, "p", text: "What's on your mind today?", timeout: 10_000)
 
@@ -385,7 +385,7 @@ defmodule MagusWeb.E2E.OnboardingFlowTest do
 
       conn = submit_complete_profile_form(conn)
 
-      conn = assert_path(conn, "/chat", timeout: 15_000)
+      conn = assert_path(conn, "/next", timeout: 15_000)
 
       assert_has(conn, "p", text: "What's on your mind today?", timeout: 10_000)
     end

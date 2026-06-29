@@ -14,9 +14,9 @@ defmodule MagusWeb.OnboardingLive.CompleteProfileLive do
   def mount(_params, _session, socket) do
     user = socket.assigns.current_user
 
-    # If profile is already complete, redirect to chat
+    # If profile is already complete, land on the SPA (the primary UI).
     if user.accepted_terms do
-      {:ok, push_navigate(socket, to: ~p"/chat")}
+      {:ok, push_navigate(socket, to: ~p"/next")}
     else
       form =
         user
@@ -162,7 +162,7 @@ defmodule MagusWeb.OnboardingLive.CompleteProfileLive do
         {:noreply,
          socket
          |> put_flash(:info, gettext("Profile completed successfully!"))
-         |> push_navigate(to: ~p"/chat")}
+         |> push_navigate(to: ~p"/next")}
 
       {:error, form} ->
         {:noreply, assign(socket, :form, to_form(form))}

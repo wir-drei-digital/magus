@@ -6,7 +6,9 @@ defmodule MagusWeb.AuthController do
 
   def success(conn, activity, user, _token) do
     invite_token = get_session(conn, :invite_token)
-    return_to = get_session(conn, :return_to) || ~p"/chat"
+    # The SPA (/next) is the primary UI; the classic workbench (/chat) stays
+    # reachable by direct URL. `return_to` still wins for deep-link sign-ins.
+    return_to = get_session(conn, :return_to) || ~p"/next"
 
     message =
       case activity do

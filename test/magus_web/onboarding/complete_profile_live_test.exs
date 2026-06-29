@@ -61,7 +61,7 @@ defmodule MagusWeb.OnboardingLive.CompleteProfileLiveTest do
       conn = log_in_user(conn, user)
 
       # push_navigate produces a live_redirect
-      assert {:error, {:live_redirect, %{to: "/chat"}}} = live(conn, ~p"/complete-profile")
+      assert {:error, {:live_redirect, %{to: "/next"}}} = live(conn, ~p"/complete-profile")
     end
   end
 
@@ -102,7 +102,7 @@ defmodule MagusWeb.OnboardingLive.CompleteProfileLiveTest do
       |> render_submit()
 
       # push_navigate produces a live_redirect
-      assert_redirect(view, "/chat")
+      assert_redirect(view, "/next")
     end
 
     test "completes profile without display_name", %{conn: conn} do
@@ -121,7 +121,7 @@ defmodule MagusWeb.OnboardingLive.CompleteProfileLiveTest do
       )
       |> render_submit()
 
-      assert_redirect(view, "/chat")
+      assert_redirect(view, "/next")
     end
 
     test "shows errors when terms not accepted", %{conn: conn} do

@@ -69,7 +69,8 @@ defmodule MagusWeb.E2E.SignInFlowTest do
 
       conn = fill_and_submit_sign_in(conn, @password)
 
-      assert_path(conn, "/chat", timeout: 15_000)
+      # The SPA is the primary post-login UI now.
+      assert_path(conn, "/next", timeout: 15_000)
     end
 
     test "invalid credentials show error", %{conn: conn} do
