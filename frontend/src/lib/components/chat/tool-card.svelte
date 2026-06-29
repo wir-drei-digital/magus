@@ -1,8 +1,6 @@
 <script lang="ts">
 	import {
 		AlertCircle,
-		ChevronDown,
-		ChevronRight,
 		CircleCheck,
 		CircleX,
 		Download,
@@ -70,6 +68,11 @@
 		}
 	}
 
+	const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+		!!value && typeof value === 'object' && !Array.isArray(value);
+	const isPrimitive = (value: unknown): boolean =>
+		value === null || ['string', 'number', 'boolean'].includes(typeof value);
+
 	function fileIcon(mime: string | null) {
 		if (mime === 'application/pdf') return FileText;
 		if (mime?.startsWith('image/')) return ImageIcon;
@@ -87,6 +90,33 @@
 		if (open && view.status === 'running' && body) body.scrollTop = body.scrollHeight;
 	});
 </script>
+
+<!-- Friendlier than raw JSON: a shallow object becomes a key/value list;
+     nested values and non-objects fall back to formatted JSON. -->
+{#snippet valueBlock(value: unknown)}
+	{#if isPlainObject(value) && Object.keys(value).length > 0}
+		<dl class="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1">
+			{#each Object.entries(value) as [key, val] (key)}
+				<dt class="font-mono text-muted-foreground">{key}</dt>
+				<dd class="min-w-0">
+					{#if isPrimitive(val)}
+						<span class="break-words whitespace-pre-wrap">{val === null ? '—' : String(val)}</span>
+					{:else}
+						<pre
+							class="overflow-x-auto rounded bg-secondary/60 px-2 py-1 font-mono text-[11px] whitespace-pre-wrap">{pretty(
+								val
+							)}</pre>
+					{/if}
+				</dd>
+			{/each}
+		</dl>
+	{:else}
+		<pre
+			class="overflow-x-auto rounded bg-secondary/60 px-2 py-1 font-mono text-[11px] whitespace-pre-wrap">{pretty(
+				value
+			)}</pre>
+	{/if}
+{/snippet}
 
 {#if type === 'service'}
 	<!-- Sandbox service: compact card with a "View in Pane" action. -->
@@ -244,12 +274,6 @@
 					({(view.durationMs / 1000).toFixed(1)}s)
 				</span>
 			{/if}
-
-			{#if hasDetails}
-				<span class="ml-auto shrink-0 text-muted-foreground">
-					{#if open}<ChevronDown class="size-3.5" />{:else}<ChevronRight class="size-3.5" />{/if}
-				</span>
-			{/if}
 		</button>
 
 		{#if open && hasDetails}
@@ -261,10 +285,7 @@
 				{#if hasInputs && !isRich}
 					<div>
 						<p class="mb-0.5 font-medium text-muted-foreground">Inputs</p>
-						<pre
-							class="overflow-x-auto rounded bg-secondary/60 px-2 py-1 font-mono text-[11px] whitespace-pre-wrap">{pretty(
-								view.inputs
-							)}</pre>
+						{@render valueBlock(view.inputs)}
 					</div>
 				{/if}
 
@@ -301,10 +322,7 @@
 				{:else if hasOutput}
 					<div>
 						<p class="mb-0.5 font-medium text-muted-foreground">Output</p>
-						<pre
-							class="overflow-x-auto rounded bg-secondary/60 px-2 py-1 font-mono text-[11px] whitespace-pre-wrap">{pretty(
-								view.output
-							)}</pre>
+						{@render valueBlock(view.output)}
 					</div>
 				{/if}
 			</div>
