@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import type { CompanionSpec } from '$lib/ash/api';
 	import { ConversationStore } from '$lib/chat/conversation-store.svelte';
+	import { takePendingCompanion } from '$lib/chat/pending-companion';
 	import { takePendingMessage } from '$lib/chat/pending-message';
 	import CompanionHost from '$lib/components/companions/companion-host.svelte';
 	import ConversationView from '$lib/components/chat/conversation-view.svelte';
@@ -34,6 +35,7 @@
 
 	// Deep links open/focus a tab once the shell state is loaded. Guarded so
 	// session updates from the open/activate round trip don't re-trigger it.
+	// Also applies any stashed thread companion once the tab is open/active.
 	$effect(() => {
 		const session = workbench.session;
 		if (!session || !conversationId) return;
@@ -41,9 +43,17 @@
 		const existing = session.tabs.find(
 			(tab) => tab.primary.type === 'conversation' && tab.primary.id === conversationId
 		);
-		if (existing && session.activeTabId === existing.id) return;
+		if (existing && session.activeTabId === existing.id) {
+			const pending = takePendingCompanion(conversationId);
+			if (pending) void workbench.setCompanion(existing.id, pending);
+			return;
+		}
 
-		void workbench.openTab({ type: 'conversation', id: conversationId });
+		void workbench.openTab({ type: 'conversation', id: conversationId }).then(() => {
+			const pending = takePendingCompanion(conversationId);
+			const tab = workbench.tabForConversation(conversationId);
+			if (pending && tab) void workbench.setCompanion(tab.id, pending);
+		});
 	});
 
 	const tab = $derived(workbench.tabForConversation(conversationId));
