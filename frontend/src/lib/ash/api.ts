@@ -2085,6 +2085,36 @@ export function conversationThreads(conversationId: string): Promise<RpcResult<T
 	);
 }
 
+export type ThreadNavSummary = {
+	id: string;
+	title: string | null;
+	parentConversationId: string | null;
+	insertedAt: string;
+	messageCount: number;
+};
+
+const THREAD_NAV_FIELDS: rpc.ConversationsThreadsFields = [
+	'id',
+	'title',
+	'parentConversationId',
+	'insertedAt',
+	'messageCount'
+];
+
+/** Threads for many parent conversations, oldest first, grouped by the caller. */
+export function conversationsThreads(
+	conversationIds: string[]
+): Promise<RpcResult<ThreadNavSummary[]>> {
+	if (conversationIds.length === 0) return Promise.resolve({ success: true, data: [] });
+	return run((opts) =>
+		rpc.conversationsThreads({
+			input: { conversationIds },
+			fields: THREAD_NAV_FIELDS,
+			...opts
+		})
+	);
+}
+
 // ─── Brain (read-only companion) ─────────────────────────────────────────────
 
 export type BrainPageDetail = {
