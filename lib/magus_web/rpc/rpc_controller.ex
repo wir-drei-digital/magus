@@ -37,7 +37,7 @@ defmodule MagusWeb.Rpc.RpcController do
   Finalizes a knowledge-source OAuth connect for the SPA.
 
   The shared OAuth callback stashes the provider tokens in the session and
-  redirects to `/next/settings/knowledge?wizard_provider=<key>`; the SPA posts
+  redirects to `/settings/knowledge?wizard_provider=<key>`; the SPA posts
   here so the source is created server-side from the session tokens. The tokens
   never reach the browser, and the session copy is consumed (one-time).
   """

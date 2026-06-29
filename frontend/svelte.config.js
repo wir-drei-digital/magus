@@ -7,8 +7,10 @@ const config = {
 
 	kit: {
 		// Pure SPA: no prerendering, index.html fallback for client-side routing.
-		// Built straight into priv/static so Plug.Static serves the assets and
-		// MagusWeb.NextUiController serves the shell for non-asset paths.
+		// Built into priv/static/next (its own dir so the SvelteKit build never
+		// clobbers Phoenix's priv/static); a dedicated Plug.Static serves that dir
+		// at the site root and MagusWeb.NextUiController serves the shell for
+		// non-asset paths.
 		adapter: adapter({
 			pages: '../priv/static/next',
 			assets: '../priv/static/next',
@@ -17,16 +19,10 @@ const config = {
 			strict: true
 		}),
 		paths: {
-			// Served under /next during the migration (preview path + asset base).
-			// When panes start serving at workbench routes (iteration 3+), assets
-			// keep resolving absolutely under /next/_app from any path.
-			//
-			// PWA cutover note: when the SPA takes over /chat (or moves to base '/'),
-			// set this app's manifest "id" to "/chat" (matching the classic
-			// priv/static/manifest.webmanifest) so already-installed PWAs upgrade in
-			// place instead of being stranded as a separate identity, and register the
-			// service worker at scope "/" so it supersedes the classic /sw.js.
-			base: '/next'
+			// The SPA is the primary UI, served at the site root. Assets resolve
+			// absolutely under /_app from any path; the service worker registers at
+			// scope "/" so it supersedes the classic /sw.js.
+			base: ''
 		}
 	}
 };

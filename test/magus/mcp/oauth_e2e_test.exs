@@ -56,7 +56,7 @@ defmodule Magus.MCP.OAuthE2ETest do
 
   @moduletag :mcp_integration
 
-  @settings_path "/next/settings/mcp-servers"
+  @settings_path "/settings/mcp-servers"
   @session_id "mock-session-id"
 
   setup %{conn: conn} do

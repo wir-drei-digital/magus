@@ -56,12 +56,12 @@ defmodule MagusWeb.OnboardingLive.CompleteProfileLiveTest do
       assert html =~ "Continue"
     end
 
-    test "redirects to chat if profile is already complete", %{conn: conn} do
+    test "redirects to the app if profile is already complete", %{conn: conn} do
       user = generate(user())
       conn = log_in_user(conn, user)
 
       # push_navigate produces a live_redirect
-      assert {:error, {:live_redirect, %{to: "/next"}}} = live(conn, ~p"/complete-profile")
+      assert {:error, {:live_redirect, %{to: "/"}}} = live(conn, ~p"/complete-profile")
     end
   end
 
@@ -102,7 +102,7 @@ defmodule MagusWeb.OnboardingLive.CompleteProfileLiveTest do
       |> render_submit()
 
       # push_navigate produces a live_redirect
-      assert_redirect(view, "/next")
+      assert_redirect(view, "/")
     end
 
     test "completes profile without display_name", %{conn: conn} do
@@ -121,7 +121,7 @@ defmodule MagusWeb.OnboardingLive.CompleteProfileLiveTest do
       )
       |> render_submit()
 
-      assert_redirect(view, "/next")
+      assert_redirect(view, "/")
     end
 
     test "shows errors when terms not accepted", %{conn: conn} do
@@ -144,12 +144,13 @@ defmodule MagusWeb.OnboardingLive.CompleteProfileLiveTest do
   end
 
   describe "redirect guard" do
-    test "live_user_required redirects incomplete profile to complete-profile", %{conn: conn} do
+    test "SPA shell redirects an incomplete profile to complete-profile", %{conn: conn} do
       user = create_incomplete_user()
       conn = log_in_user(conn, user)
 
-      # Trying to access a page with :live_user_required should redirect
-      assert {:error, {:redirect, %{to: "/complete-profile"}}} = live(conn, ~p"/chat")
+      # The SPA catch-all (NextUiController) gates on accepted_terms.
+      conn = get(conn, ~p"/chat")
+      assert redirected_to(conn) == "/complete-profile"
     end
   end
 end

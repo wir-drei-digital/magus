@@ -8,7 +8,7 @@ defmodule MagusWeb.MCP.OAuthControllerTest do
 
   ## Query-param contract (read by Task 6's SPA settings page)
 
-  Every branch redirects to `/next/settings/mcp-servers` with exactly one of:
+  Every branch redirects to `/settings/mcp-servers` with exactly one of:
 
     * `?mcp_oauth=connected`              — tokens stored, status :connected
     * `?mcp_oauth_error=<code>` where <code> is one of the fixed safe set:
@@ -26,7 +26,7 @@ defmodule MagusWeb.MCP.OAuthControllerTest do
 
   @moduletag :mcp_integration
 
-  @settings_path "/next/settings/mcp-servers"
+  @settings_path "/settings/mcp-servers"
 
   # Mirror the controller's fixed, non-secret error-code set (the SPA contract).
   @error_codes ~w(client_id_required discovery_failed not_oauth invalid_state denied exchange_failed server_unavailable)

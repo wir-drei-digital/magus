@@ -23,6 +23,16 @@ defmodule MagusWeb.Endpoint do
     websocket: true,
     longpoll: false
 
+  # SPA build (SvelteKit, base "/"): hashed assets live under /_app and the
+  # static files (service worker, icons, manifest, favicon) at the root. Served
+  # from the SPA's own build dir, ahead of Phoenix's static so the SPA's
+  # favicon/manifest/icons take precedence over the classic ones.
+  plug Plug.Static,
+    at: "/",
+    from: {:magus, "priv/static/next"},
+    gzip: not code_reloading?,
+    only: ~w(_app service-worker.js favicon.svg icons manifest.webmanifest)
+
   # Serve at "/" the static files from "priv/static" directory.
   #
   # When code reloading is disabled (e.g., in production),

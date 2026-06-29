@@ -221,14 +221,8 @@ defmodule MagusWeb.CoreRouter do
         get "/search", SearchController, :search
       end
 
-      # SvelteKit workbench preview path — always serves the SPA shell regardless
-      # of the ui_preferences toggle. Static assets under /next/_app/* are served
-      # by Plug.Static; this catch-all enables client-side routing.
-      scope "/next", MagusWeb do
-        pipe_through [:browser, :require_auth_browser]
-
-        get "/*path", NextUiController, :spa
-      end
+      # The SPA is served at the site root (see the catch-all in each composing
+      # router). Its assets live under /_app and are handled by Plug.Static.
 
       # Authenticated file serving (replaces Plug.Static for uploads)
       scope "/uploads/files", MagusWeb do
@@ -255,55 +249,15 @@ defmodule MagusWeb.CoreRouter do
       scope "/", MagusWeb do
         pipe_through :browser
 
-        ash_authentication_live_session :authenticated_routes,
-          on_mount: [{MagusWeb.Hooks.NotificationSubscription, :default}] do
-          live "/jobs", Workbench.WorkbenchLive, :jobs
-          live "/jobs/:id", Workbench.WorkbenchLive, :jobs
-          live "/search", Workbench.WorkbenchLive, :search
-          live "/history", Workbench.WorkbenchLive, :history
-          live "/workspaces/new", WorkspaceLive.New, :new
-          live "/workspaces/:slug", Workbench.WorkbenchLive, :workspace_settings
-          live "/workspaces/:slug/members", Workbench.WorkbenchLive, :workspace_members
-          live "/workspaces/:slug/usage", Workbench.WorkbenchLive, :workspace_usage
+        # The authenticated workbench (classic LiveView) is retired: the SPA now
+        # owns /chat, /brain, /agents, /files, /settings, /jobs, /search,
+        # /history, /workspaces, and /prompts via the root catch-all. The classic
+        # modules remain under lib/magus_web/legacy/ for reference. The public
+        # entry points below (catalogs, invite + share links) are NOT the
+        # workbench and stay routed.
 
-          live "/settings", Workbench.WorkbenchLive, :settings
-          live "/settings/api-tokens", SettingsLive.ApiTokensLive, :index
-          live "/settings/:section", Workbench.WorkbenchLive, :settings
-
-          live "/chat", Workbench.WorkbenchLive, :default
-          live "/chat/:conversation_id", Workbench.WorkbenchLive, :conversation
-          live "/agents", Workbench.WorkbenchLive, :agents_list
-          live "/agents/new", Workbench.WorkbenchLive, :new_agent
-          live "/agents/:agent_id", Workbench.WorkbenchLive, :agent
-          live "/brain", Workbench.WorkbenchLive, :brain_list
-          live "/brain/trash", Workbench.WorkbenchLive, :brain_trash
-          live "/brain/:page_id", Workbench.WorkbenchLive, :brain_page
-          live "/files", Workbench.WorkbenchLive, :files_browser
-          live "/files/folder/:id", Workbench.WorkbenchLive, :files_browser_folder
-          live "/files/knowledge/:id", Workbench.WorkbenchLive, :files_browser_knowledge
-          live "/files/:id", Workbench.WorkbenchLive, :file
-          live "/prompts_library", Workbench.WorkbenchLive, :prompts_list
-          live "/prompts_library/new", Workbench.WorkbenchLive, :new_prompt
-          live "/prompts_library/:prompt_id", Workbench.WorkbenchLive, :prompt
-
-          # in each liveview, add one of the following at the top of the module:
-          #
-          # If an authenticated user must be present:
-          # on_mount {MagusWeb.LiveUserAuth, :live_user_required}
-          #
-          # If an authenticated user *may* be present:
-          # on_mount {MagusWeb.LiveUserAuth, :live_user_optional}
-          #
-          # If an authenticated user must *not* be present:
-          # on_mount {MagusWeb.LiveUserAuth, :live_no_user}
-        end
-
-        # Public prompts routes (optional auth for favorites)
-        ash_authentication_live_session :public_prompts,
-          on_mount: [{MagusWeb.LiveUserAuth, :live_user_optional}] do
-          live "/prompts", PromptsLive, :index
-          live "/prompts/:id", PromptDetailLive, :show
-        end
+        # /prompts and /prompts/:id are now owned by the SPA (the root catch-all);
+        # the classic PromptsLive/PromptDetailLive stay in lib/ for reference.
 
         # Public models routes
         ash_authentication_live_session :public_models,

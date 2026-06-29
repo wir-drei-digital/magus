@@ -13,12 +13,14 @@ defmodule MagusWeb.Router do
   core_pipelines()
   core_routes()
 
-  # The root route is owned by the composing router, not `core_routes/0`, so
-  # each edition picks its own root. Open core hands `/` to the workbench;
-  # `magus_cloud` overrides it with a marketing landing.
+  # The SPA is the primary UI: every remaining browser GET (including `/`) serves
+  # the SvelteKit shell, and client-side routing takes over. Anonymous visitors
+  # are redirected to sign-in by `require_auth_browser`. This catch-all lives in
+  # the composing router so each edition owns its root — `magus_cloud` places a
+  # public marketing landing ahead of its own catch-all.
   scope "/", MagusWeb do
-    pipe_through :browser
+    pipe_through [:browser, :require_auth_browser]
 
-    get "/", RootController, :index
+    get "/*path", NextUiController, :spa
   end
 end

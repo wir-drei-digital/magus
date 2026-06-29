@@ -15,8 +15,8 @@ defmodule MagusWeb.MCP.OAuthController do
 
   ## Redirect-target + query-param contract (READ BY THE SPA — Task 6)
 
-  The MCP settings UI is SPA-only, served under `/next`. Every branch performs an
-  INTERNAL redirect to `/next/settings/mcp-servers` with exactly one query param.
+  The MCP settings UI is SPA-only, served at the site root. Every branch performs
+  an INTERNAL redirect to `/settings/mcp-servers` with exactly one query param.
   Phoenix flash does not reach the client-rendered SPA, so the query param — not
   the flash — is the contract:
 
@@ -47,8 +47,8 @@ defmodule MagusWeb.MCP.OAuthController do
   alias Magus.MCP.Auth.Flow
   alias Magus.MCP.Auth.State
 
-  # SPA-only MCP settings page (served under /next). Internal redirect target.
-  @settings_path "/next/settings/mcp-servers"
+  # SPA MCP settings page (served at the site root). Internal redirect target.
+  @settings_path "/settings/mcp-servers"
 
   # The fixed, non-secret set of error codes the SPA may receive. Anything else
   # would risk leaking provider/secret detail, so the controller only ever emits

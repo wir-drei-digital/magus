@@ -16,7 +16,7 @@ defmodule MagusWeb.OnboardingLive.CompleteProfileLive do
 
     # If profile is already complete, land on the SPA (the primary UI).
     if user.accepted_terms do
-      {:ok, push_navigate(socket, to: ~p"/next")}
+      {:ok, push_navigate(socket, to: ~p"/")}
     else
       form =
         user
@@ -162,7 +162,7 @@ defmodule MagusWeb.OnboardingLive.CompleteProfileLive do
         {:noreply,
          socket
          |> put_flash(:info, gettext("Profile completed successfully!"))
-         |> push_navigate(to: ~p"/next")}
+         |> push_navigate(to: ~p"/")}
 
       {:error, form} ->
         {:noreply, assign(socket, :form, to_form(form))}
