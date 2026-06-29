@@ -106,7 +106,7 @@ for (const theme of ['light', 'dark'] as const) {
 	test(`chat view screenshot (${theme})`, async ({ page }) => {
 		await mockRpc(page);
 		await page.addInitScript((t) => localStorage.setItem('phx:theme', t), theme);
-		await page.goto(`/next/chat/${convId}`);
+		await page.goto(`/chat/${convId}`);
 		await page.getByTestId('message-list').waitFor();
 		await page.waitForTimeout(400);
 		await page.screenshot({ path: `test-results/chat-${theme}.png`, fullPage: true });

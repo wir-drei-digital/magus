@@ -61,7 +61,7 @@ test('phx:theme localStorage key drives dark/light, in sync with the classic UI'
 	await mockRpc(page);
 
 	await page.addInitScript(() => localStorage.setItem('phx:theme', 'light'));
-	await page.goto('/next/chat');
+	await page.goto('/chat');
 	await expect(page.getByTestId('mode-strip')).toBeVisible();
 
 	const lightBg = await backgroundColor(page);
@@ -87,7 +87,7 @@ test('phx:theme localStorage key drives dark/light, in sync with the classic UI'
 test('without a stored theme the system preference applies', async ({ page }) => {
 	await mockRpc(page);
 	await page.emulateMedia({ colorScheme: 'dark' });
-	await page.goto('/next/chat');
+	await page.goto('/chat');
 
 	await expect(page.locator('html')).toHaveClass(/dark/);
 });

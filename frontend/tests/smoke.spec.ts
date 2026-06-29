@@ -309,7 +309,7 @@ async function mockRpc(
 
 test('unauthenticated users get the sign-in state', async ({ page }) => {
 	await mockRpc(page, { authenticated: false });
-	await page.goto('/next');
+	await page.goto('/');
 
 	await expect(page.getByText("You're not signed in.")).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
@@ -317,10 +317,10 @@ test('unauthenticated users get the sign-in state', async ({ page }) => {
 
 test('authenticated users see the workbench shell with their conversations', async ({ page }) => {
 	await mockRpc(page, { authenticated: true });
-	await page.goto('/next');
+	await page.goto('/');
 
 	// Index redirects into chat mode with the shell chrome.
-	await expect(page).toHaveURL(/\/next\/chat$/);
+	await expect(page).toHaveURL(/\/chat$/);
 	await expect(page.getByTestId('mode-strip')).toBeVisible();
 	await expect(page.getByTestId('conversation-list')).toBeVisible();
 	await expect(page.getByText('Quarterly planning')).toBeVisible();
@@ -329,7 +329,7 @@ test('authenticated users see the workbench shell with their conversations', asy
 
 test('switching modes swaps the nav but keeps the open view', async ({ page }) => {
 	const rpc = await mockRpc(page, { authenticated: true });
-	await page.goto(`/next/chat/${conversations[1].id}`);
+	await page.goto(`/chat/${conversations[1].id}`);
 	await expect(page.getByTestId('message-list')).toBeVisible();
 	// The conversation list only renders client-side after the session load,
 	// so waiting for it guarantees hydration finished before the click (CI
@@ -341,7 +341,7 @@ test('switching modes swaps the nav but keeps the open view', async ({ page }) =
 
 	// The open conversation stays in the center pane; only the nav changed.
 	await expect(page.getByTestId('message-list')).toBeVisible();
-	await expect(page).toHaveURL(new RegExp(`/next/chat/${conversations[1].id}$`));
+	await expect(page).toHaveURL(new RegExp(`/chat/${conversations[1].id}$`));
 
 	// Switching back restores the chat nav without touching the view.
 	await page.getByTestId('mode-chat').click();
@@ -379,7 +379,7 @@ test('the rail footer shows the notification bell and credit indicator', async (
 			]
 		}
 	});
-	await page.goto('/next/chat');
+	await page.goto('/chat');
 
 	// Bell badge counts both unread rows; the popover groups them (+1 more).
 	await expect(page.getByTestId('notification-badge')).toHaveText('2');
@@ -423,7 +423,7 @@ test('the chat nav renders a folder tree with date-grouped conversations', async
 			my_folder_states: () => [{ id: 's-1', folderId: folder.id, isExpanded: false }]
 		}
 	});
-	await page.goto('/next/chat');
+	await page.goto('/chat');
 
 	// Folder renders collapsed; its conversation is hidden until expanded.
 	const folderRow = page.getByTestId('chat-folder');
@@ -446,11 +446,11 @@ test('the chat nav renders a folder tree with date-grouped conversations', async
 
 test('opening a conversation renders history, markdown, and a tab', async ({ page }) => {
 	await mockRpc(page, { authenticated: true });
-	await page.goto('/next/chat');
+	await page.goto('/chat');
 
 	await page.getByText('Rust borrow checker').click();
 
-	await expect(page).toHaveURL(new RegExp(`/next/chat/${conversations[1].id}$`));
+	await expect(page).toHaveURL(new RegExp(`/chat/${conversations[1].id}$`));
 	await expect(page.getByTestId('message-list')).toBeVisible();
 	await expect(page.getByText('Why does Rust have a borrow checker?')).toBeVisible();
 	// Agent markdown is rendered (bold), not shown raw.
@@ -475,7 +475,7 @@ test('with tabs disabled the bar is hidden and the session trims to one tab', as
 		],
 		initialActiveTabId: 'tab-a'
 	});
-	await page.goto(`/next/chat/${conversations[1].id}`);
+	await page.goto(`/chat/${conversations[1].id}`);
 
 	await expect(page.getByTestId('message-list')).toBeVisible();
 	await expect(page.getByTestId('tab-bar')).toHaveCount(0);
@@ -511,7 +511,7 @@ test('the history view lists conversations and restores from trash', async ({ pa
 			restore_conversation: () => conversations[0]
 		}
 	});
-	await page.goto('/next/history');
+	await page.goto('/history');
 
 	await expect(page.getByTestId('history-view')).toBeVisible();
 	await expect(page.getByTestId('history-list')).toBeVisible();
@@ -543,7 +543,7 @@ test('the share dialog creates and revokes read-only links', async ({ page }) =>
 			revoke_share_link: () => ({ ...link, isActive: false })
 		}
 	});
-	await page.goto(`/next/chat/${conversations[1].id}`);
+	await page.goto(`/chat/${conversations[1].id}`);
 	await expect(page.getByTestId('message-list')).toBeVisible();
 
 	await page.getByTestId('conversation-menu').click();
@@ -583,7 +583,7 @@ test('the members panel enables collaboration and lists participants', async ({ 
 			conversation_invite_links: () => []
 		}
 	});
-	await page.goto(`/next/chat/${conversations[1].id}`);
+	await page.goto(`/chat/${conversations[1].id}`);
 	await expect(page.getByTestId('message-list')).toBeVisible();
 
 	await page.getByTestId('right-rail-toggle').click();
@@ -623,8 +623,8 @@ test('the settings routes render profile and preferences sections', async ({ pag
 	});
 
 	// The index redirects into the profile section.
-	await page.goto('/next/settings');
-	await expect(page).toHaveURL(/\/next\/settings\/profile$/);
+	await page.goto('/settings');
+	await expect(page).toHaveURL(/\/settings\/profile$/);
 	await expect(page.getByTestId('settings-view')).toBeVisible();
 	await expect(page.getByTestId('settings-profile')).toBeVisible();
 	await expect(page.getByTestId('profile-display-name')).toHaveValue('Ada');
@@ -633,7 +633,7 @@ test('the settings routes render profile and preferences sections', async ({ pag
 
 	// Section nav switches to preferences: model defaults + interface toggles.
 	await page.getByTestId('settings-nav-preferences').click();
-	await expect(page).toHaveURL(/\/next\/settings\/preferences$/);
+	await expect(page).toHaveURL(/\/settings\/preferences$/);
 	await expect(page.getByTestId('default-chat-model')).toBeVisible();
 	await expect(page.getByTestId('preferences-autoscroll')).toBeVisible();
 	await expect(page.getByTestId('preferences-tabs')).toHaveAttribute('aria-checked', 'true');
@@ -669,7 +669,7 @@ test('the api-tokens settings page creates a token and shows the plaintext once'
 		return route.fulfill({ json: { success: true, data: [] } });
 	});
 
-	await page.goto('/next/settings/api-tokens');
+	await page.goto('/settings/api-tokens');
 	await expect(page.getByTestId('settings-api-tokens')).toBeVisible();
 
 	await page.getByTestId('api-token-new').click();
@@ -709,7 +709,7 @@ test('the data settings page exports and guards account deletion', async ({ page
 		})
 	);
 
-	await page.goto('/next/settings/data');
+	await page.goto('/settings/data');
 	await expect(page.getByTestId('settings-data')).toBeVisible();
 
 	// Export is a browser download link to the Phoenix controller.
@@ -761,7 +761,7 @@ test('the jobs route shows a master-detail with schedule and run history', async
 		}
 	});
 
-	await page.goto('/next/jobs');
+	await page.goto('/jobs');
 	await expect(page.getByTestId('jobs-view')).toBeVisible();
 	await expect(page.getByTestId('jobs-list').getByText('Daily digest')).toBeVisible();
 
@@ -803,7 +803,7 @@ test('the search route renders unified results and filters by type', async ({ pa
 	});
 
 	// ?q seeds the query (the Cmd+K overlay navigates here).
-	await page.goto('/next/search?q=rust');
+	await page.goto('/search?q=rust');
 	await expect(page.getByTestId('search-view')).toBeVisible();
 	await expect(page.getByTestId('search-input')).toHaveValue('rust');
 	await expect(page.getByTestId('search-results')).toBeVisible();
@@ -821,7 +821,7 @@ test('the search route renders unified results and filters by type', async ({ pa
 
 test('the composer sends a message with Enter and renders the reply bubble', async ({ page }) => {
 	await mockRpc(page, { authenticated: true });
-	await page.goto(`/next/chat/${conversations[1].id}`);
+	await page.goto(`/chat/${conversations[1].id}`);
 
 	await expect(page.getByTestId('message-list')).toBeVisible();
 
@@ -836,7 +836,7 @@ test('the composer sends a message with Enter and renders the reply bubble', asy
 
 test('the chat surface shows header actions and composer controls', async ({ page }) => {
 	await mockRpc(page, { authenticated: true });
-	await page.goto(`/next/chat/${conversations[1].id}`);
+	await page.goto(`/chat/${conversations[1].id}`);
 
 	// Header: avatar/title/menu. Composer footer: model selector + mode toggles.
 	await expect(page.getByTestId('conversation-header')).toBeVisible();
@@ -878,7 +878,7 @@ test('the right rail opens, inserts a prompt, and switches panels', async ({ pag
 			})
 		}
 	});
-	await page.goto(`/next/chat/${conversations[1].id}`);
+	await page.goto(`/chat/${conversations[1].id}`);
 
 	await page.getByTestId('right-rail-toggle').click();
 	await expect(page.getByTestId('right-rail')).toBeVisible();
@@ -904,7 +904,7 @@ test('the right rail opens, inserts a prompt, and switches panels', async ({ pag
 
 test('the search item opens the global overlay and Escape closes it', async ({ page }) => {
 	await mockRpc(page, { authenticated: true });
-	await page.goto('/next/chat');
+	await page.goto('/chat');
 
 	await page.getByTestId('nav-search').click();
 	await expect(page.getByTestId('search-overlay')).toBeVisible();
@@ -920,7 +920,7 @@ test('the search item opens the global overlay and Escape closes it', async ({ p
 
 test('the composer plus menu lists slash commands and injects one', async ({ page }) => {
 	await mockRpc(page, { authenticated: true });
-	await page.goto(`/next/chat/${conversations[1].id}`);
+	await page.goto(`/chat/${conversations[1].id}`);
 
 	await page.getByTestId('composer-actions').click();
 	const commands = page.getByTestId('composer-slash-command');
@@ -957,7 +957,7 @@ test('Open chat docks a conversation companion beside the file', async ({ page }
 			})
 		}
 	});
-	await page.goto('/next/files/file/f0000000-0000-0000-0000-00000000000f');
+	await page.goto('/files/file/f0000000-0000-0000-0000-00000000000f');
 	await expect(page.getByTestId('file-detail-name')).toHaveText('report.txt');
 
 	// The file stays primary; the chat docks beside it as a companion pane.
@@ -973,7 +973,7 @@ test('Open chat docks a conversation companion beside the file', async ({ page }
 
 test('typing @ opens the mention dropdown and picks an agent handle', async ({ page }) => {
 	await mockRpc(page, { authenticated: true });
-	await page.goto(`/next/chat/${conversations[1].id}`);
+	await page.goto(`/chat/${conversations[1].id}`);
 
 	const input = page.getByTestId('composer-input');
 	await input.click();
@@ -988,7 +988,7 @@ test('typing @ opens the mention dropdown and picks an agent handle', async ({ p
 
 test('drafts persist across reloads and clear after sending', async ({ page }) => {
 	await mockRpc(page, { authenticated: true });
-	await page.goto(`/next/chat/${conversations[1].id}`);
+	await page.goto(`/chat/${conversations[1].id}`);
 
 	const input = page.getByTestId('composer-input');
 	await input.fill('draft in progress');
@@ -1009,7 +1009,7 @@ test('drafts persist across reloads and clear after sending', async ({ page }) =
 
 test('client-side routing serves unknown paths through the SPA fallback', async ({ page }) => {
 	await mockRpc(page, { authenticated: false });
-	const response = await page.goto('/next/some/future/route');
+	const response = await page.goto('/some/future/route');
 
 	expect(response?.status()).toBeLessThan(500);
 });
@@ -1058,7 +1058,7 @@ test('a persisted brain-page companion renders in a split pane and closes', asyn
 		}
 	});
 
-	await page.goto(`/next/chat/${conversations[1].id}`);
+	await page.goto(`/chat/${conversations[1].id}`);
 
 	// Split pane restored from the TabSession: chat on the left, page right.
 	await expect(page.getByTestId('message-list')).toBeVisible();
@@ -1109,7 +1109,7 @@ test('the files browser lists folders and files with scope navigation', async ({
 		}
 	});
 
-	await page.goto('/next/files');
+	await page.goto('/files');
 
 	await expect(page.getByTestId('files-browser')).toBeVisible();
 	await expect(page.getByTestId('files-nav')).toBeVisible();
@@ -1140,7 +1140,7 @@ test('creating a folder and renaming a file work inline', async ({ page }) => {
 		}
 	});
 
-	await page.goto('/next/files');
+	await page.goto('/files');
 	await expect(page.getByTestId('file-entry')).toBeVisible();
 
 	await page.getByTestId('new-folder').click();
@@ -1183,7 +1183,7 @@ test('prompts mode lists the library and opens a prompt', async ({ page }) => {
 		}
 	});
 
-	await page.goto('/next/prompts');
+	await page.goto('/prompts');
 	await expect(page.getByTestId('prompts-nav')).toBeVisible();
 	await expect(page.getByText('Code review checklist')).toBeVisible();
 
@@ -1229,7 +1229,7 @@ test('agents mode renders the config sections', async ({ page }) => {
 		}
 	});
 
-	await page.goto(`/next/agents/${agentDetail.id}`);
+	await page.goto(`/agents/${agentDetail.id}`);
 	await expect(page.getByTestId('agent-title')).toHaveText('Researcher');
 	await expect(page.getByTestId('agent-sections')).toBeVisible();
 	await expect(page.getByTestId('agent-instructions')).toHaveValue('Research thoroughly.');
@@ -1318,7 +1318,7 @@ test('brain mode shows the page tree and autosaves rich edits with LWW conflicts
 		return route.fallback();
 	});
 
-	await page.goto('/next/brain');
+	await page.goto('/brain');
 	await expect(page.getByTestId('brain-nav')).toBeVisible();
 	// The first brain auto-expands as a tree root with its pages nested.
 	await expect(page.getByTestId('brain-root')).toContainText('Research');
@@ -1374,7 +1374,7 @@ test('starting a thread from a message opens the thread companion', async ({ pag
 		}
 	});
 
-	await page.goto(`/next/chat/${conversations[1].id}`);
+	await page.goto(`/chat/${conversations[1].id}`);
 	await expect(page.getByTestId('message-list')).toBeVisible();
 
 	await page.getByText('data races').hover();
