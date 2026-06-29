@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import {
 		ArrowRight,
 		Bell,
@@ -56,6 +56,13 @@
 
 	let { store }: { store: ConversationStore } = $props();
 
+	// Captured once at mount: the route reassigns its reactive `store` during a
+	// conversation switch, which can briefly point this (dying) instance at the
+	// next conversation. Persisting drafts against the live `store.conversationId`
+	// then flushes one conversation's text under another's key. This instance is
+	// keyed per conversation, so a fixed id is always the right draft key.
+	const draftKey = untrack(() => store.conversationId);
+
 	let value = $state('');
 	let textarea = $state<HTMLTextAreaElement | null>(null);
 	let fileInput = $state<HTMLInputElement | null>(null);
@@ -78,7 +85,7 @@
 		textarea?.focus();
 		requestAnimationFrame(autoGrow);
 		if (draftTimer) clearTimeout(draftTimer);
-		draftTimer = setTimeout(() => saveDraft(localStorage, store.conversationId, value), 400);
+		draftTimer = setTimeout(() => saveDraft(localStorage, draftKey, value), 400);
 	}
 
 	// Right-rail prompt inserts arrive through the store (the rail lives in the
@@ -165,7 +172,7 @@
 	let draftTimer: ReturnType<typeof setTimeout> | null = null;
 
 	onMount(() => {
-		value = loadDraft(localStorage, store.conversationId);
+		value = loadDraft(localStorage, draftKey);
 		void cachedMyAgents().then((result) => {
 			if (result.success) agents = result.data;
 		});
@@ -180,7 +187,7 @@
 			// Flush on unmount — keystrokes within the debounce window would
 			// otherwise be lost on a fast conversation switch. saveDraft treats
 			// empty text as a remove, so a cleared composer clears the key.
-			saveDraft(localStorage, store.conversationId, value);
+			saveDraft(localStorage, draftKey, value);
 			// Attachment chips don't survive a remount, so never-sent uploads
 			// are discarded with them (skipped mid-send: the message may
 			// already reference these files).
@@ -203,7 +210,7 @@
 		refreshMention();
 
 		if (draftTimer) clearTimeout(draftTimer);
-		draftTimer = setTimeout(() => saveDraft(localStorage, store.conversationId, value), 400);
+		draftTimer = setTimeout(() => saveDraft(localStorage, draftKey, value), 400);
 	}
 
 	function refreshMention() {
@@ -312,7 +319,7 @@
 		const sent = await store.send(text, resources);
 		if (sent) {
 			attachments = [];
-			clearDraft(localStorage, store.conversationId);
+			clearDraft(localStorage, draftKey);
 		} else {
 			// Keep the user's words (and attachments) on failure so they can retry.
 			value = text;
