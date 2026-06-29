@@ -355,6 +355,13 @@
 	--color-primary: var(--primary);
 }
 
+/* tiptap-phoenix renders the drag handle at left:2px of the editor's outer
+   container (it expects the content to carry left padding so the handle sits in
+   a gutter). Without it the handle overlaps the first character of each block. */
+.tiptap-editor-content {
+	padding-left: 1.75rem;
+}
+
 /* Wikilink + tag chips inside the brain editor (assets/css/brain.css). */
 .brain-page-ref {
 	color: var(--primary-link);

@@ -1,18 +1,27 @@
 <script lang="ts">
 	import { ChevronDown, ChevronUp, ExternalLink, FileText, NotebookPen } from '@lucide/svelte';
 	import {
-		getBrainPage,
+		brainPages,
+		getBrainPageForEdit,
 		listBrainPageVersions,
 		listPageBacklinks,
 		listPageSources,
-		type BrainPageDetail,
+		saveBrainPageProsemirror,
+		type BrainPageEditable,
 		type BrainPageVersion,
 		type PageBacklink,
-		type PageSourceEntry
+		type PageSourceEntry,
+		type PageTreeNode
 	} from '$lib/ash/api';
 	import { extractOutline, stripFrontmatter, type OutlineEntry } from '$lib/brain/outline';
+	import {
+		clearBrainFileMap,
+		extractBrainFileIds,
+		populateBrainFileMap
+	} from '$lib/brain/file-map';
+	import { bubbleSelectionText } from '$lib/chat/bubble-action';
 	import { relativeTime } from '$lib/time';
-	import Markdown from '$lib/components/chat/markdown.svelte';
+	import BrainEditor from '$lib/components/brain/brain-editor.svelte';
 	import PresenceAvatars from '$lib/components/chat/presence-avatars.svelte';
 	import { ResourcePresence } from '$lib/chat/resource-presence.svelte';
 	import { session } from '$lib/stores/session.svelte';
@@ -22,7 +31,8 @@
 		pageId,
 		revision = 0,
 		onClose,
-		onOpenPage
+		onOpenPage,
+		onAsk
 	}: {
 		pageId: string;
 		/** Bumped by the conversation store while the agent writes the page. */
@@ -30,6 +40,8 @@
 		onClose: () => void;
 		/** Related-tab click: swap the companion to another page. */
 		onOpenPage: (pageId: string) => void;
+		/** Editor bubble Ask/Refine: drop the selection into the conversation composer. */
+		onAsk?: (text: string) => void;
 	} = $props();
 
 	const TABS = ['outline', 'sources', 'related', 'activity'] as const;
@@ -42,15 +54,79 @@
 		return () => presence.stop();
 	});
 
-	let page = $state<BrainPageDetail | null>(null);
+	let page = $state<BrainPageEditable | null>(null);
 	let sources = $state<PageSourceEntry[]>([]);
 	let backlinks = $state<PageBacklink[]>([]);
 	let versions = $state<BrainPageVersion[]>([]);
+	let siblingPages = $state<PageTreeNode[]>([]);
 	let loadError = $state<string | null>(null);
+
+	let editorRef = $state<BrainEditor | null>(null);
+	let lockVersion = 0;
+	let dirty = $state(false);
+	let saveState = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
+	let saveError = $state<string | null>(null);
+	let conflictNotice = $state<string | null>(null);
+	let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 	let activeTab = $state<Tab>('outline');
 	let panelOpen = $state(false);
 	let body = $state<HTMLElement | null>(null);
+
+	function scheduleSave() {
+		dirty = true;
+		if (saveTimer) clearTimeout(saveTimer);
+		saveTimer = setTimeout(() => void save(), 1000);
+	}
+
+	async function save(retrying = false) {
+		const doc = editorRef?.getJSON();
+		if (!page || !doc) return;
+		saveState = 'saving';
+		saveError = null;
+		const id = page.id;
+
+		const result = await saveBrainPageProsemirror(id, doc, lockVersion);
+		if (id !== pageId) return;
+
+		if (result.status === 'saved') {
+			lockVersion = result.lockVersion;
+			dirty = false;
+			saveState = 'saved';
+			return;
+		}
+		if (result.status === 'conflict' && !retrying) {
+			// LWW recovery (classic parity): adopt the server version, resave on top.
+			const refreshed = await getBrainPageForEdit(id);
+			if (id !== pageId) return;
+			lockVersion = result.currentVersion ?? (refreshed.success ? refreshed.data.lockVersion : 0);
+			conflictNotice = 'This page changed elsewhere. Your version was saved over it.';
+			await save(true);
+			return;
+		}
+		saveState = 'error';
+		saveError = result.message;
+	}
+
+	function onBubbleAction(event: string, payload: Record<string, unknown>) {
+		const text = bubbleSelectionText(event, payload);
+		if (text) onAsk?.(text);
+	}
+
+	function openPageByTitle(title: string) {
+		const hit = siblingPages.find(
+			(node) => (node.title ?? '').toLowerCase() === title.toLowerCase()
+		);
+		if (hit) onOpenPage(hit.id);
+	}
+
+	// Resolve file/image blocks so their NodeViews render the real file rather
+	// than the "no longer available" placeholder (classic parity).
+	async function refreshFileBlocks(id: string, bodyMd: string | null | undefined) {
+		const hasFiles = extractBrainFileIds(bodyMd).length > 0;
+		await populateBrainFileMap(id, bodyMd);
+		if (hasFiles && id === pageId && !dirty) editorRef?.setContent(page?.prosemirror ?? {});
+	}
 
 	// Resizable outline/sources panel (classic 180px–50vh; SPA was fixed h-44).
 	const PANEL_MIN = 180;
@@ -84,34 +160,30 @@
 		window.addEventListener('pointerup', onUp);
 	}
 
-	// Last page id that finished loading. Plain field (not state): only the
-	// effect below reads it, to tell "new page" from "refresh in place".
-	let loadedId: string | null = null;
-
 	const markdown = $derived(page?.body ? stripFrontmatter(page.body) : '');
 	const outline = $derived<OutlineEntry[]>(markdown ? extractOutline(markdown) : []);
 
-	// pageId is reactive (Related-tab clicks swap the companion in place);
-	// revision bumps refetch WITHOUT blanking, so live agent writes update
-	// the rendered page instead of flashing the skeleton.
+	// Initial load + page swap (Related-tab clicks reuse this companion). The
+	// editor is keyed by page id, so it remounts with fresh content on swap.
 	$effect(() => {
 		const id = pageId;
-		void revision;
+		page = null;
+		loadError = null;
+		panelOpen = false;
+		activeTab = 'outline';
+		dirty = false;
+		saveState = 'idle';
+		conflictNotice = null;
 
-		if (loadedId !== id) {
-			page = null;
-			loadError = null;
-			panelOpen = false;
-			activeTab = 'outline';
-		}
-
-		// Each callback drops stale responses: a fetch started before a page
-		// swap must not land on the newer page's state.
-		void getBrainPage(id).then((result) => {
+		void getBrainPageForEdit(id).then((result) => {
 			if (id !== pageId) return;
 			if (result.success) {
 				page = result.data;
-				loadedId = id;
+				lockVersion = result.data.lockVersion;
+				void refreshFileBlocks(id, result.data.body);
+				void brainPages(result.data.brain.id).then((pagesResult) => {
+					if (id === pageId && pagesResult.success) siblingPages = pagesResult.data;
+				});
 			} else {
 				loadError = result.errors[0]?.message ?? 'Page could not be loaded';
 			}
@@ -121,6 +193,38 @@
 		});
 		void listPageBacklinks(id).then((result) => {
 			if (id === pageId && result.success) backlinks = result.data;
+		});
+		void listBrainPageVersions(id).then((result) => {
+			if (id === pageId && result.success) versions = result.data;
+		});
+
+		return () => {
+			if (saveTimer) clearTimeout(saveTimer);
+			clearBrainFileMap(id);
+		};
+	});
+
+	// Live agent writes bump `revision`: refetch in place (no skeleton flash).
+	// When the user is mid-edit, note the overwrite instead of clobbering them.
+	let revisionArmed = false;
+	$effect(() => {
+		void revision;
+		if (!revisionArmed) {
+			revisionArmed = true;
+			return;
+		}
+		const id = pageId;
+		void getBrainPageForEdit(id).then((result) => {
+			if (id !== pageId || !result.success || !page) return;
+			if (dirty) {
+				conflictNotice =
+					'Someone else is editing this page. Your next save will overwrite their changes.';
+				return;
+			}
+			page = result.data;
+			lockVersion = result.data.lockVersion;
+			editorRef?.setContent(result.data.prosemirror);
+			void refreshFileBlocks(id, result.data.body);
 		});
 		void listBrainPageVersions(id).then((result) => {
 			if (id === pageId && result.success) versions = result.data;
@@ -160,7 +264,16 @@
 		<PresenceAvatars viewers={presence.viewers} selfUserId={session.user?.id} max={3} />
 	{/snippet}
 
-	<div class="wb-scroll min-h-0 flex-1 overflow-y-auto px-5 py-4" bind:this={body}>
+	{#if conflictNotice}
+		<p class="border-b bg-warning/10 px-4 py-1.5 text-xs text-warning" data-testid="page-conflict">
+			{conflictNotice}
+		</p>
+	{/if}
+	{#if saveError}
+		<p class="border-b bg-destructive/10 px-4 py-1.5 text-xs text-destructive">{saveError}</p>
+	{/if}
+
+	<div class="wb-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4" bind:this={body}>
 		{#if loadError}
 			<p class="text-sm text-destructive">{loadError}</p>
 		{:else if !page}
@@ -169,10 +282,19 @@
 				<div class="h-4 w-full animate-pulse rounded bg-muted"></div>
 				<div class="h-4 w-2/3 animate-pulse rounded bg-muted"></div>
 			</div>
-		{:else if markdown}
-			<Markdown text={markdown} />
 		{:else}
-			<p class="text-sm text-muted-foreground">This page is empty.</p>
+			{#key page.id}
+				<BrainEditor
+					bind:this={editorRef}
+					content={page.prosemirror}
+					pages={siblingPages}
+					pageId={page.id}
+					workspaceId={page.brain.workspaceId}
+					onChange={scheduleSave}
+					onPageRefClick={openPageByTitle}
+					{onBubbleAction}
+				/>
+			{/key}
 		{/if}
 	</div>
 
@@ -318,6 +440,15 @@
 				</button>
 			{/each}
 			<span class="flex-1"></span>
+			<span class="px-2 text-[11px] text-muted-foreground" data-testid="page-save-state">
+				{#if saveState === 'saving'}
+					Saving…
+				{:else if dirty}
+					Unsaved
+				{:else if saveState === 'saved'}
+					Saved
+				{/if}
+			</span>
 			<button
 				type="button"
 				class="rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"

@@ -65,6 +65,7 @@
 			companion={tab?.companion ?? null}
 			draftRevision={store.draftRevision}
 			brainRevision={store.brainRevision}
+			onInsertText={(text) => store?.requestInsertText(text)}
 		>
 			<ConversationView
 				{store}

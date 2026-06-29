@@ -12,6 +12,7 @@
 		type DraftVersion
 	} from '$lib/ash/api';
 	import { relativeTime } from '$lib/time';
+	import { bubbleSelectionText } from '$lib/chat/bubble-action';
 	import BrainEditor from '$lib/components/brain/brain-editor.svelte';
 	import PresenceAvatars from '$lib/components/chat/presence-avatars.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -22,13 +23,21 @@
 	let {
 		draftId,
 		revision = 0,
-		onClose
+		onClose,
+		onAsk
 	}: {
 		draftId: string;
 		/** Bumped by the conversation store on draft.* channel events. */
 		revision?: number;
 		onClose: () => void;
+		/** Editor bubble Ask/Refine: drop the selection into the conversation composer. */
+		onAsk?: (text: string) => void;
 	} = $props();
+
+	function onBubbleAction(event: string, payload: Record<string, unknown>) {
+		const text = bubbleSelectionText(event, payload);
+		if (text) onAsk?.(text);
+	}
 
 	// Live co-viewers on this draft's shared presence topic (SPA + classic).
 	const presence = new ResourcePresence();
@@ -307,7 +316,12 @@
 			     history, so its content/cursor and the autosave timer survive. -->
 			<div class:hidden={view === 'history' || previewVersion !== null}>
 				{#key `${draft.id}:${reloadKey}`}
-					<BrainEditor bind:this={editorRef} content={draft.content} onChange={scheduleSave} />
+					<BrainEditor
+						bind:this={editorRef}
+						content={draft.content}
+						onChange={scheduleSave}
+						{onBubbleAction}
+					/>
 				{/key}
 			</div>
 

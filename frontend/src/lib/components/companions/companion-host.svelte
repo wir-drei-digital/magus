@@ -22,12 +22,15 @@
 		companion,
 		draftRevision = 0,
 		brainRevision = 0,
+		onInsertText,
 		children
 	}: {
 		tabId: string | null;
 		companion: CompanionSpec | null;
 		draftRevision?: number;
 		brainRevision?: number;
+		/** Drops text (e.g. an Ask/Refine selection) into the primary conversation composer. */
+		onInsertText?: (text: string) => void;
 		children: Snippet;
 	} = $props();
 
@@ -66,6 +69,7 @@
 						revision={brainRevision}
 						onClose={close}
 						onOpenPage={openPage}
+						onAsk={onInsertText}
 					/>
 				{:else if companion.type === 'thread'}
 					<ThreadCompanion threadId={companion.id} onClose={close} />
@@ -81,7 +85,12 @@
 					<TasksCompanion conversationId={companion.id} onClose={close} />
 				{:else if companion.type === 'draft'}
 					{#await loadDraftCompanion() then { default: DraftCompanion }}
-						<DraftCompanion draftId={companion.id} revision={draftRevision} onClose={close} />
+						<DraftCompanion
+							draftId={companion.id}
+							revision={draftRevision}
+							onClose={close}
+							onAsk={onInsertText}
+						/>
 					{/await}
 				{:else}
 					<ClassicCompanion spec={companion} onClose={close} />

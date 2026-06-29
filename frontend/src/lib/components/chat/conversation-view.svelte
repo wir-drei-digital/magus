@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onDestroy, tick } from 'svelte';
-	import { ArrowDown, ChevronRight } from '@lucide/svelte';
+	import { ArrowDown, ChevronRight, MessagesSquare } from '@lucide/svelte';
 	import {
 		conversationThreads,
 		createThread,
@@ -147,12 +147,43 @@
 		if (flashTimer) clearTimeout(flashTimer);
 	});
 
+	// Selecting text inside a message surfaces a floating "Ask chat" button that
+	// drops the quoted selection into the composer (classic MessageTextSelection
+	// parity). Scoped to this conversation's message list via [data-message-id].
+	let askSelection = $state<{ text: string; x: number; y: number } | null>(null);
+
+	function refreshAskSelection() {
+		const selection = window.getSelection();
+		if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+			askSelection = null;
+			return;
+		}
+		const text = selection.toString().trim();
+		const anchor = selection.anchorNode;
+		const node = anchor instanceof Element ? anchor : anchor?.parentElement;
+		const messageEl = node?.closest('[data-message-id]');
+		if (!text || !messageEl || !scroller?.contains(messageEl)) {
+			askSelection = null;
+			return;
+		}
+		const rect = selection.getRangeAt(0).getBoundingClientRect();
+		askSelection = { text, x: rect.left + rect.width / 2, y: rect.top };
+	}
+
+	function askAboutSelection() {
+		if (!askSelection) return;
+		store.requestInsertText(`> ${askSelection.text}\n\n`);
+		window.getSelection()?.removeAllRanges();
+		askSelection = null;
+	}
+
 	// px from the top at which scrolling up triggers the next older page. A
 	// generous margin so loading kicks in before the user hits the very top.
 	const LOAD_OLDER_MARGIN = 600;
 
 	function onScroll() {
 		if (!scroller) return;
+		askSelection = null;
 		stickToBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80;
 		if (scroller.scrollTop < LOAD_OLDER_MARGIN) void loadOlder();
 	}
@@ -230,6 +261,31 @@
 		return () => clearTimeout(timer);
 	});
 </script>
+
+<svelte:document
+	onmouseup={refreshAskSelection}
+	onselectionchange={() => {
+		const selection = window.getSelection();
+		if (!selection || selection.isCollapsed) askSelection = null;
+	}}
+/>
+
+{#if askSelection}
+	<!-- mousedown (not click) + preventDefault so pressing the button doesn't
+	     collapse the selection before the handler reads it. -->
+	<button
+		type="button"
+		class="fixed z-40 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground shadow-lg hover:bg-primary/90"
+		style="left: {askSelection.x}px; top: {askSelection.y - 6}px"
+		data-testid="message-ask-selection"
+		onmousedown={(event) => {
+			event.preventDefault();
+			askAboutSelection();
+		}}
+	>
+		<MessagesSquare class="size-3" /> Ask chat
+	</button>
+{/if}
 
 <div class="flex h-full min-h-0 flex-col" data-testid="conversation-view">
 	<ConversationHeader {store} {onCompanionRequest} />
