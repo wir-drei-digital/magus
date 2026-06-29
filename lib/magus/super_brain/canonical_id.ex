@@ -47,11 +47,11 @@ defmodule Magus.SuperBrain.CanonicalId do
 
   @doc """
   Compute the 32-char lowercase hex `CanonicalEntity.id` for a given
-  `(super_graph, type, normalized_subtype)` tuple.
+  `(super_graph, type, normalized_subtype, name_hint)` tuple.
 
-  `name_hint` is accepted but unused today; pass whatever name the
-  caller has on hand so future versions can incorporate it without
-  changing call sites.
+  `name_hint` is folded into the hash via `name_key/1` (trimmed and
+  downcased, with blank collapsing to `__noname__`), so distinct names
+  yield distinct canonicals. See the moduledoc for the rationale.
   """
   @spec for(String.t(), String.t() | atom() | nil, String.t() | nil, String.t() | nil) ::
           String.t()

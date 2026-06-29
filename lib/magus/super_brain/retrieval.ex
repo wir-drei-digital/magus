@@ -88,23 +88,30 @@ defmodule Magus.SuperBrain.Retrieval do
 
       super_row = fetch_super_graph_metadata(super_graph_name)
 
-      result =
+      {mode, result} =
         cond do
           super_row == nil or super_row.last_built_at == nil ->
             enqueue_initial_build(actor, workspace_context)
-            legacy_fan_out_search(actor, opts)
+            {:cold_start, legacy_fan_out_search(actor, opts)}
 
           read_set_drifted?(super_row, actor, workspace_context) ->
             enqueue_rebuild(actor, workspace_context)
-            legacy_fan_out_search(actor, opts)
+            {:drift, legacy_fan_out_search(actor, opts)}
 
           true ->
-            super_graph_search(super_graph_name, opts)
+            {:super_graph, super_graph_search(super_graph_name, opts)}
         end
 
-      {result, metadata}
+      enriched = Map.merge(metadata, %{mode: mode, result_count: result_count(result)})
+      {result, enriched}
     end)
   end
+
+  # Count results across the super-graph shape (`%{entities: [...]}`) and the
+  # legacy fan-out shape (a bare list). Errors/unknown shapes count as 0.
+  defp result_count({:ok, %{entities: entities}}) when is_list(entities), do: length(entities)
+  defp result_count({:ok, list}) when is_list(list), do: length(list)
+  defp result_count(_), do: 0
 
   # ---------------------------------------------------------------------------
   # Super-graph-first dispatch
