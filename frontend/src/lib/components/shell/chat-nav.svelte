@@ -4,6 +4,7 @@
 	import { base } from '$app/paths';
 	import {
 		ChevronRight,
+		CornerDownRight,
 		Folder,
 		FolderOpen,
 		FolderPlus,
@@ -15,7 +16,8 @@
 		Trash2,
 		Users
 	} from '@lucide/svelte';
-	import type { ConversationSummary } from '$lib/ash/api';
+	import type { CompanionSpec, ConversationSummary, ThreadNavSummary } from '$lib/ash/api';
+	import { setPendingCompanion } from '$lib/chat/pending-companion';
 	import { confirmAction } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import {
@@ -184,6 +186,31 @@
 		});
 	}
 
+	async function openThreadRow(thread: ThreadNavSummary) {
+		if (!thread.parentConversationId) return;
+		const parentId = thread.parentConversationId;
+		const spec: CompanionSpec = { type: 'thread', id: thread.id };
+		const onParent = page.url.pathname.endsWith(`/chat/${parentId}`);
+		const tab = workbench.tabForConversation(parentId);
+		if (onParent && tab) {
+			await workbench.setCompanion(tab.id, spec);
+			return;
+		}
+		setPendingCompanion(parentId, spec);
+		await goto(`${base}/chat/${parentId}`);
+	}
+
+	async function deleteThreadRow(thread: ThreadNavSummary) {
+		if (!thread.parentConversationId) return;
+		const ok = await confirmAction({
+			title: 'Delete thread?',
+			description: 'The thread and its messages are removed.',
+			confirmLabel: 'Delete thread'
+		});
+		if (!ok) return;
+		await workbench.deleteThread(thread.id, thread.parentConversationId);
+	}
+
 	function startRenameFolder(node: FolderNode) {
 		renamingFolderId = node.id;
 		renameDraft = node.name;
@@ -283,6 +310,34 @@
 				<Trash2 class="size-3" />
 			</button>
 		</span>
+		{#if workbench.threadsFor(conversation.id).length > 0}
+			<Sidebar.MenuSub class="mr-0 pr-0">
+				{#each workbench.threadsFor(conversation.id) as thread (thread.id)}
+					<Sidebar.MenuItem class="group/thread">
+						<Sidebar.MenuButton
+							data-testid="thread-row"
+							onclick={() => void openThreadRow(thread)}
+						>
+							<CornerDownRight class="text-muted-foreground" />
+							<span class="min-w-0 flex-1 truncate">{thread.title ?? 'Thread'}</span>
+						</Sidebar.MenuButton>
+						<span
+							class="absolute right-1 top-1/2 flex -translate-y-1/2 items-center opacity-0 transition-opacity group-hover/thread:opacity-100"
+						>
+							<button
+								type="button"
+								class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-destructive"
+								title="Delete thread"
+								data-testid="thread-delete"
+								onclick={() => void deleteThreadRow(thread)}
+							>
+								<Trash2 class="size-3" />
+							</button>
+						</span>
+					</Sidebar.MenuItem>
+				{/each}
+			</Sidebar.MenuSub>
+		{/if}
 	</Sidebar.MenuItem>
 {/snippet}
 
