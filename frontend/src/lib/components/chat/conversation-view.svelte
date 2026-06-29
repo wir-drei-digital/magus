@@ -14,6 +14,7 @@
 	import { floorBoundaryMessageId, floorDividerLabel } from '$lib/chat/context-window';
 	import { buildChatStream, toolViewFromLive } from '$lib/chat/events';
 	import { readThreads, writeThreads } from '$lib/chat/threads-cache';
+	import { workbench } from '$lib/stores/workbench.svelte';
 	import NewResourceDialog from '$lib/components/shell/new-resource-dialog.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -217,6 +218,7 @@
 
 		threads = [...threads, result.data];
 		writeThreads(conversationId, threads);
+		void workbench.refreshThreads();
 		onCompanionRequest?.({ type: 'thread', id: result.data.id });
 	}
 
