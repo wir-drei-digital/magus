@@ -311,8 +311,9 @@
 			</button>
 		</span>
 		{#if workbench.threadsFor(conversation.id).length > 0}
+			{@const threads = workbench.threadsFor(conversation.id)}
 			<Sidebar.MenuSub class="mr-0 pr-0">
-				{#each workbench.threadsFor(conversation.id) as thread (thread.id)}
+				{#each threads as thread (thread.id)}
 					<Sidebar.MenuItem class="group/thread">
 						<Sidebar.MenuButton
 							data-testid="thread-row"

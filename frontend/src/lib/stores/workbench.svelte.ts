@@ -206,8 +206,11 @@ class WorkbenchStore {
 	}
 
 	async #loadThreadsFor(conversationIds: string[]): Promise<void> {
+		const seqAtStart = this.#mutationSeq;
 		const result = await conversationsThreads(conversationIds);
-		if (result.success) this.threadsByParent = groupThreadsByParent(result.data);
+		if (result.success && this.#mutationSeq === seqAtStart) {
+			this.threadsByParent = groupThreadsByParent(result.data);
+		}
 	}
 
 	async refreshConversations(): Promise<void> {
