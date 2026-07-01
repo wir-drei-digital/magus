@@ -65,11 +65,8 @@ defmodule Magus.Organizations.Organization do
       authorize_if actor_present()
     end
 
-    # TODO(Task 2): restore members relationship + read policy.
-    # Task 2 adds Magus.Organizations.OrganizationMember and restores this to
-    # `authorize_if expr(exists(members, status == :active and user_id == ^actor(:id)))`.
     policy action_type(:read) do
-      authorize_if expr(owner_id == ^actor(:id))
+      authorize_if expr(exists(members, status == :active and user_id == ^actor(:id)))
     end
 
     policy action_type(:update) do
@@ -121,11 +118,9 @@ defmodule Magus.Organizations.Organization do
       public? true
     end
 
-    # TODO(Task 2): restore members relationship.
-    # Depends on Magus.Organizations.OrganizationMember (created in Task 2).
-    # has_many :members, Magus.Organizations.OrganizationMember do
-    #   public? true
-    # end
+    has_many :members, Magus.Organizations.OrganizationMember do
+      public? true
+    end
   end
 
   identities do

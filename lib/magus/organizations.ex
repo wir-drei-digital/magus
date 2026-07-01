@@ -33,6 +33,12 @@ defmodule Magus.Organizations do
         get_by [:slug]
       end
     end
+
+    resource Magus.Organizations.OrganizationMember do
+      rpc_action :invite_org_member, :invite
+      rpc_action :list_org_members, :by_organization
+      rpc_action :get_org_member_by_token, :by_invite_token
+    end
   end
 
   resources do
@@ -42,5 +48,33 @@ defmodule Magus.Organizations do
       define :get_organization_by_slug, action: :read, get_by: [:slug]
       define :update_organization, action: :update
     end
+
+    resource Magus.Organizations.OrganizationMember do
+      define :invite_org_member, action: :invite, args: [:organization_id, :invite_email]
+      define :list_org_members, action: :by_organization, args: [:organization_id]
+      define :get_org_member_by_token, action: :by_invite_token, args: [:invite_token]
+    end
+  end
+
+  def accept_invite(invite_token, opts \\ []) do
+    case get_org_member_by_token(invite_token, authorize?: false) do
+      {:ok, member} ->
+        if invite_expired?(member) do
+          {:error, :expired}
+        else
+          member
+          |> Ash.Changeset.for_update(:accept, %{}, opts)
+          |> Ash.update(opts)
+        end
+
+      {:error, _} ->
+        {:error, :not_found}
+    end
+  end
+
+  defp invite_expired?(%{invite_expires_at: nil}), do: false
+
+  defp invite_expired?(%{invite_expires_at: expires_at}) do
+    DateTime.compare(expires_at, DateTime.utc_now()) != :gt
   end
 end
