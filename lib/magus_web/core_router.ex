@@ -47,11 +47,21 @@ defmodule MagusWeb.CoreRouter do
         end
       end
 
-      # Plug to capture invite_token from params into session for post-auth acceptance
+      # Plug to capture invite_token / org_invite_token from params into session
+      # for post-auth acceptance
       defp capture_invite_token(conn, _opts) do
-        case conn.params["invite_token"] do
+        conn =
+          case conn.params["invite_token"] do
+            token when is_binary(token) and token != "" ->
+              Plug.Conn.put_session(conn, :invite_token, token)
+
+            _ ->
+              conn
+          end
+
+        case conn.params["org_invite_token"] do
           token when is_binary(token) and token != "" ->
-            Plug.Conn.put_session(conn, :invite_token, token)
+            Plug.Conn.put_session(conn, :org_invite_token, token)
 
           _ ->
             conn
@@ -281,6 +291,12 @@ defmodule MagusWeb.CoreRouter do
         ash_authentication_live_session :workspace_invites,
           on_mount: [{MagusWeb.LiveUserAuth, :live_user_optional}] do
           live "/workspaces/invite/:token", WorkspaceLive.AcceptInvite, :accept
+        end
+
+        # Organization invite acceptance (optional auth - handles both logged-in and new users)
+        ash_authentication_live_session :organization_invites,
+          on_mount: [{MagusWeb.LiveUserAuth, :live_user_optional}] do
+          live "/organizations/invite/:token", OrganizationLive.AcceptInvite, :accept
         end
 
         # Shared conversation (read-only view)
