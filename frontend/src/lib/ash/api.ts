@@ -1080,6 +1080,48 @@ export function createOrganization(
 	) as Promise<RpcResult<OrganizationDetail>>;
 }
 
+/** A member's pooled-spend contribution for the org Usage tab, keyed by user. */
+export type OrgUsageMember = {
+	userId: string;
+	displayName: string | null;
+	spentCents: number;
+	capCents: number | null;
+};
+
+/** Pooled + per-member spend for the org Usage tab. */
+export type OrgUsageOverview = {
+	pooledSpentCents: number;
+	seatCount: number;
+	members: OrgUsageMember[];
+};
+
+/**
+ * Pooled + per-member spend for the org Usage tab. The generic map action scopes
+ * the visible member set server-side (owner: all; member: own) and returns
+ * untyped snake_case keys; map them to a typed shape as `billingOverview` does.
+ */
+export async function orgUsageOverview(orgId: string): Promise<RpcResult<OrgUsageOverview>> {
+	const result = await run<Record<string, unknown> | null>((opts) =>
+		rpc.orgUsageOverview({ input: { organizationId: orgId }, ...opts })
+	);
+	if (!result.success) return result;
+	const data = result.data ?? {};
+	const rows = Array.isArray(data.members) ? (data.members as Record<string, unknown>[]) : [];
+	return {
+		success: true,
+		data: {
+			pooledSpentCents: Number(data.pooled_spent_cents ?? 0),
+			seatCount: Number(data.seat_count ?? 0),
+			members: rows.map((row) => ({
+				userId: String(row.user_id ?? ''),
+				displayName: typeof row.display_name === 'string' ? row.display_name : null,
+				spentCents: Number(row.spent_cents ?? 0),
+				capCents: row.cap_cents == null ? null : Number(row.cap_cents)
+			}))
+		}
+	};
+}
+
 // ─── Chat ────────────────────────────────────────────────────────────────────
 
 export type ChatMode = 'chat' | 'search' | 'reasoning' | 'image_generation' | 'video_generation';
