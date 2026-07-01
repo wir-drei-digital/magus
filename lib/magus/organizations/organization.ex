@@ -40,6 +40,12 @@ defmodule Magus.Organizations.Organization do
       accept [:name]
     end
 
+    update :update_owner do
+      description "Repoint the denormalized owner_id (used by ownership transfer)."
+      accept [:owner_id]
+      require_atomic? false
+    end
+
     update :set_billing do
       description "Cloud-written Stripe linkage + billing status. Not for end users."
 
@@ -59,6 +65,10 @@ defmodule Magus.Organizations.Organization do
 
   policies do
     bypass action(:set_billing) do
+      authorize_if always()
+    end
+
+    bypass action(:update_owner) do
       authorize_if always()
     end
 
