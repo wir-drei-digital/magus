@@ -167,7 +167,8 @@ defmodule Magus.Models.Resolver do
   # {:ok, model}).
   defp get_owned_or_global_model(id, actor_id) when is_binary(id) do
     case Magus.Chat.Model
-         |> Ash.Query.filter(id == ^id and (is_nil(owner_user_id) or owner_user_id == ^actor_id))
+         |> Ash.Query.filter(id == ^id)
+         |> scope_owner(actor_id)
          |> Ash.read_one(authorize?: false) do
       {:ok, %{} = model} -> {:ok, model}
       _ -> :error
@@ -176,14 +177,22 @@ defmodule Magus.Models.Resolver do
 
   defp fetch_by_key(key, actor_id) when is_binary(key) do
     case Magus.Chat.Model
-         |> Ash.Query.filter(
-           key == ^key and (is_nil(owner_user_id) or owner_user_id == ^actor_id)
-         )
+         |> Ash.Query.filter(key == ^key)
+         |> scope_owner(actor_id)
          |> Ash.read_one(authorize?: false) do
       {:ok, %{} = model} -> model
       _ -> nil
     end
   end
+
+  # Scope owned-model visibility. A binary actor sees global rows plus their own
+  # owned rows. A nil actor sees global rows only; branching here avoids the
+  # `owner_user_id == nil` comparison Ash warns about (always false).
+  defp scope_owner(query, actor_id) when is_binary(actor_id),
+    do: Ash.Query.filter(query, is_nil(owner_user_id) or owner_user_id == ^actor_id)
+
+  defp scope_owner(query, _actor_id),
+    do: Ash.Query.filter(query, is_nil(owner_user_id))
 
   defp find_preloaded(preloaded, key) when is_list(preloaded) and is_binary(key) do
     Enum.find(preloaded, fn
