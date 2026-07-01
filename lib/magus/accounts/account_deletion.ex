@@ -255,6 +255,11 @@ defmodule Magus.Accounts.AccountDeletion do
     # path (cleans up files + sandbox sprites).
     destroy_via_action(Magus.Chat.Conversation, :delete_full_conversation, user.id)
 
+    # Owned models/providers (BYOK). Runs after conversations so the user's
+    # messages and their message_usage rows are already gone; any usage rows
+    # still pointing at an owned model get their model_id nilled below.
+    delete_owned_models_and_providers(user.id)
+
     # CustomAgent's :destroy is a soft delete that also rejects the
     # default agent. For account-deletion we want a true hard delete,
     # so go straight to Ecto. Must come AFTER conversations are gone
@@ -545,6 +550,31 @@ defmodule Magus.Accounts.AccountDeletion do
     end
 
     :ok
+  end
+
+  # Deletes the user's owned models and providers (BYOK). Ordering matters:
+  # models reference providers (NO ACTION FK), so models must go first, and
+  # message_usages reference models (NO ACTION FK), so those references are
+  # nilled before the model delete or Postgres would restrict it.
+  defp delete_owned_models_and_providers(user_id) do
+    import Ecto.Query
+    uid = user_id_uuid_binary(user_id)
+
+    owned_model_ids =
+      from(m in "models", where: m.owner_user_id == ^uid, select: m.id)
+      |> Magus.Repo.all()
+
+    # message_usages.model_id is a NO ACTION FK; nil it for owned models so the
+    # delete is not restricted. These usage rows belong to the owner's own
+    # (already-deleted) messages in 2b-1, since owned models are private.
+    if owned_model_ids != [] do
+      from(mu in "message_usages", where: mu.model_id in ^owned_model_ids)
+      |> Magus.Repo.update_all(set: [model_id: nil])
+    end
+
+    # Models reference providers (NO ACTION), so delete models before providers.
+    from(m in "models", where: m.owner_user_id == ^uid) |> Magus.Repo.delete_all()
+    from(p in "model_providers", where: p.owner_user_id == ^uid) |> Magus.Repo.delete_all()
   end
 
   defp user_id_uuid_binary(user_id) do
