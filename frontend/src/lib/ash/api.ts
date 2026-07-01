@@ -900,6 +900,186 @@ export async function workspaceMemberUsage(
 	};
 }
 
+// ─── Organizations ─────────────────────────────────────────────────────────────
+
+export type OrgBillingInterval = 'annual' | 'monthly';
+export type OrgBillingStatus = 'active' | 'canceled' | 'incomplete' | 'past_due' | 'trialing';
+
+export type OrganizationDetail = {
+	id: string;
+	name: string;
+	slug: string;
+	billingInterval: OrgBillingInterval;
+	billingStatus: OrgBillingStatus;
+	currentPeriodStart: string | null;
+	currentPeriodEnd: string | null;
+	ownerId: string;
+};
+
+export type OrgMemberRole = 'member' | 'owner';
+export type OrgMemberStatus = 'active' | 'invited' | 'removed';
+
+export type OrgMemberEntry = {
+	id: string;
+	role: OrgMemberRole;
+	status: OrgMemberStatus;
+	spendCapCents: number | null;
+	inviteEmail: string | null;
+	invitedAt: string | null;
+	joinedAt: string | null;
+	organizationId: string;
+	userId: string | null;
+	user: { id: string; email: string; displayName: string | null } | null;
+};
+
+/** The signed-in user's own membership row, with the organization loaded. */
+export type MyOrgMembership = OrgMemberEntry & { organization: OrganizationDetail };
+
+const ORG_DETAIL_FIELDS = [
+	'id',
+	'name',
+	'slug',
+	'billingInterval',
+	'billingStatus',
+	'currentPeriodStart',
+	'currentPeriodEnd',
+	'ownerId'
+] as rpc.CreateOrganizationFields;
+
+const ORG_MEMBER_FIELDS = [
+	'id',
+	'role',
+	'status',
+	'spendCapCents',
+	'inviteEmail',
+	'invitedAt',
+	'joinedAt',
+	'organizationId',
+	'userId',
+	{ user: ['id', 'email', 'displayName'] }
+] as rpc.ListOrgMembersFields;
+
+const MY_ORG_FIELDS = [
+	...(ORG_MEMBER_FIELDS as unknown[]),
+	{ organization: ORG_DETAIL_FIELDS }
+] as rpc.MyOrganizationFields;
+
+/**
+ * The signed-in user's org membership (0 or 1 rows) with the organization
+ * loaded. Empty means "not in an org yet" — the settings shell then offers to
+ * create one. This action requires an explicit `fields` selection.
+ */
+export function myOrganization(): Promise<RpcResult<MyOrgMembership[]>> {
+	return run((opts) =>
+		rpc.myOrganization({ fields: MY_ORG_FIELDS, ...opts })
+	) as Promise<RpcResult<MyOrgMembership[]>>;
+}
+
+export function listOrgMembers(organizationId: string): Promise<RpcResult<OrgMemberEntry[]>> {
+	return run((opts) =>
+		rpc.listOrgMembers({ input: { organizationId }, fields: ORG_MEMBER_FIELDS, ...opts })
+	) as Promise<RpcResult<OrgMemberEntry[]>>;
+}
+
+export function inviteOrgMember(
+	organizationId: string,
+	inviteEmail: string
+): Promise<RpcResult<OrgMemberEntry>> {
+	return run((opts) =>
+		rpc.inviteOrgMember({
+			input: { organizationId, inviteEmail },
+			fields: ORG_MEMBER_FIELDS as rpc.InviteOrgMemberFields,
+			...opts
+		})
+	) as Promise<RpcResult<OrgMemberEntry>>;
+}
+
+/** Update action: takes the member row's primary key as `identity`. */
+export function changeOrgMemberRole(
+	memberId: string,
+	role: OrgMemberRole
+): Promise<RpcResult<OrgMemberEntry>> {
+	return run((opts) =>
+		rpc.changeOrgMemberRole({
+			identity: memberId,
+			input: { role },
+			fields: ORG_MEMBER_FIELDS as rpc.ChangeOrgMemberRoleFields,
+			...opts
+		})
+	) as Promise<RpcResult<OrgMemberEntry>>;
+}
+
+/** Soft-removes a member (or revokes a pending invite). */
+export function removeOrgMember(memberId: string): Promise<RpcResult<OrgMemberEntry>> {
+	return run((opts) =>
+		rpc.removeOrgMember({
+			identity: memberId,
+			fields: ORG_MEMBER_FIELDS as rpc.RemoveOrgMemberFields,
+			...opts
+		})
+	) as Promise<RpcResult<OrgMemberEntry>>;
+}
+
+/** Promotes the target member to owner and demotes the acting owner to member. */
+export function transferOrgOwnership(memberId: string): Promise<RpcResult<OrgMemberEntry>> {
+	return run((opts) =>
+		rpc.transferOrgOwnership({
+			identity: memberId,
+			fields: ORG_MEMBER_FIELDS as rpc.TransferOrgOwnershipFields,
+			...opts
+		})
+	) as Promise<RpcResult<OrgMemberEntry>>;
+}
+
+export function resendOrgInvite(memberId: string): Promise<RpcResult<OrgMemberEntry>> {
+	return run((opts) =>
+		rpc.resendOrgInvite({
+			identity: memberId,
+			fields: ORG_MEMBER_FIELDS as rpc.ResendOrgInviteFields,
+			...opts
+		})
+	) as Promise<RpcResult<OrgMemberEntry>>;
+}
+
+/** Sets (or clears, with `null`) the per-member monthly spend cap in cents. */
+export function setMemberSpendCap(
+	memberId: string,
+	spendCapCents: number | null
+): Promise<RpcResult<OrgMemberEntry>> {
+	return run((opts) =>
+		rpc.setMemberSpendCap({
+			identity: memberId,
+			input: { spendCapCents },
+			fields: ORG_MEMBER_FIELDS as rpc.SetMemberSpendCapFields,
+			...opts
+		})
+	) as Promise<RpcResult<OrgMemberEntry>>;
+}
+
+/** The signed-in member leaves the organization (own membership row). */
+export function leaveOrg(memberId: string): Promise<RpcResult<OrgMemberEntry>> {
+	return run((opts) =>
+		rpc.leaveOrg({
+			identity: memberId,
+			fields: ORG_MEMBER_FIELDS as rpc.LeaveOrgFields,
+			...opts
+		})
+	) as Promise<RpcResult<OrgMemberEntry>>;
+}
+
+export function createOrganization(
+	name: string,
+	slug: string
+): Promise<RpcResult<OrganizationDetail>> {
+	return run((opts) =>
+		rpc.createOrganization({
+			input: { name, slug },
+			fields: ORG_DETAIL_FIELDS,
+			...opts
+		})
+	) as Promise<RpcResult<OrganizationDetail>>;
+}
+
 // ─── Chat ────────────────────────────────────────────────────────────────────
 
 export type ChatMode = 'chat' | 'search' | 'reasoning' | 'image_generation' | 'video_generation';
