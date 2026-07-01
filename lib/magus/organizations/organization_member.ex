@@ -133,6 +133,7 @@ defmodule Magus.Organizations.OrganizationMember do
       change set_attribute(:joined_at, &DateTime.utc_now/0)
       change relate_actor(:user)
       change {Magus.Organizations.OrganizationMember.Changes.FireSeatSync, event: :activated}
+      change {Magus.Organizations.OrganizationMember.Changes.AddToSharedWorkspace, []}
     end
 
     update :change_role do
@@ -231,6 +232,12 @@ defmodule Magus.Organizations.OrganizationMember do
       argument :invite_token, :string, allow_nil?: false
       get? true
       filter expr(invite_token == ^arg(:invite_token) and status == :invited)
+    end
+
+    read :my_active_membership do
+      description "The current actor's active membership (with its organization)."
+      filter expr(status == :active and user_id == ^actor(:id))
+      prepare build(load: [:organization])
     end
   end
 

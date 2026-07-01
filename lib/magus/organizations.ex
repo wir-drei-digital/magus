@@ -44,6 +44,8 @@ defmodule Magus.Organizations do
       rpc_action :resend_org_invite, :resend_invite
       rpc_action :set_member_spend_cap, :set_member_spend_cap
       rpc_action :leave_org, :leave_org
+      rpc_action :my_organization, :my_active_membership
+      rpc_action :accept_org_member, :accept
     end
   end
 
@@ -75,6 +77,7 @@ defmodule Magus.Organizations do
       define :resend_org_invite, action: :resend_invite
       define :set_member_spend_cap, action: :set_member_spend_cap
       define :leave_org, action: :leave_org
+      define :my_organization, action: :my_active_membership
     end
   end
 
