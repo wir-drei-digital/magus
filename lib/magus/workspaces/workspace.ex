@@ -142,6 +142,7 @@ defmodule Magus.Workspaces.Workspace do
 
     policy action(:read) do
       authorize_if expr(exists(members, is_active == true and user_id == ^actor(:id)))
+      authorize_if expr(exists(organization, owner_id == ^actor(:id)))
     end
 
     policy action_type([:update, :destroy]) do
@@ -151,6 +152,8 @@ defmodule Magus.Workspaces.Workspace do
                        is_active == true and role == :admin and user_id == ^actor(:id)
                      )
                    )
+
+      authorize_if expr(exists(organization, owner_id == ^actor(:id)))
     end
   end
 
