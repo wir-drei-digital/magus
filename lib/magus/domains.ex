@@ -39,7 +39,8 @@ defmodule Magus.Domains do
     Magus.Brain,
     Magus.Workbench,
     Magus.SuperBrain,
-    Magus.MCP
+    Magus.MCP,
+    Magus.Skills
   ]
 
   @doc "The list of core Ash domain modules."
