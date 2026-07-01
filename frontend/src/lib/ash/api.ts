@@ -1114,6 +1114,40 @@ export async function orgUsageOverview(orgId: string): Promise<RpcResult<OrgUsag
 	};
 }
 
+/** Org-level billing summary for the org Billing tab (owner-only surface). */
+export type OrgBillingOverview = {
+	billingStatus: string;
+	currentPeriodEnd: string | null;
+	seatCount: number;
+	/** Whether the org has started Stripe checkout (has a subscription). */
+	billingSetUp: boolean;
+	/** Whether the commercial billing edition is present (false = open-core self-host). */
+	billingEdition: boolean;
+};
+
+/**
+ * Org billing summary for the Billing tab. The generic map action returns
+ * untyped snake_case keys; map them to a typed shape as `billingOverview` does.
+ */
+export async function orgBillingOverview(orgId: string): Promise<RpcResult<OrgBillingOverview>> {
+	const result = await run<Record<string, unknown> | null>((opts) =>
+		rpc.orgBillingOverview({ input: { organizationId: orgId }, ...opts })
+	);
+	if (!result.success) return result;
+	const data = result.data ?? {};
+	return {
+		success: true,
+		data: {
+			billingStatus: String(data.billing_status ?? 'none'),
+			currentPeriodEnd:
+				typeof data.current_period_end === 'string' ? data.current_period_end : null,
+			seatCount: Number(data.seat_count ?? 0),
+			billingSetUp: data.billing_set_up === true,
+			billingEdition: data.billing_edition === true
+		}
+	};
+}
+
 // ─── Chat ────────────────────────────────────────────────────────────────────
 
 export type ChatMode = 'chat' | 'search' | 'reasoning' | 'image_generation' | 'video_generation';
@@ -4211,6 +4245,22 @@ export function openBillingPortal(returnTo?: string): Promise<boolean> {
 export function startBaseCheckout(returnTo?: string): Promise<boolean> {
 	return stripeRedirect('/api/stripe/base-checkout', {
 		interval: 'monthly',
+		...(returnTo ? { return_to: returnTo } : {})
+	});
+}
+
+/** Starts org billing checkout for an organization (owner-only). */
+export function startOrgCheckout(organizationId: string, returnTo?: string): Promise<boolean> {
+	return stripeRedirect('/api/stripe/org-checkout', {
+		organization_id: organizationId,
+		...(returnTo ? { return_to: returnTo } : {})
+	});
+}
+
+/** Opens the Stripe billing portal for an organization (owner-only). */
+export function openOrgBillingPortal(organizationId: string, returnTo?: string): Promise<boolean> {
+	return stripeRedirect('/api/stripe/org-portal', {
+		organization_id: organizationId,
 		...(returnTo ? { return_to: returnTo } : {})
 	});
 }
