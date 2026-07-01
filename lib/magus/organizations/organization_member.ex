@@ -163,6 +163,16 @@ defmodule Magus.Organizations.OrganizationMember do
       change {Magus.Organizations.OrganizationMember.Changes.FireSeatSync, event: :removed}
     end
 
+    update :leave_org do
+      description "A member removes their own active membership (revert-to-personal)."
+      accept []
+      require_atomic? false
+      change set_attribute(:status, :removed)
+      change set_attribute(:removed_at, &DateTime.utc_now/0)
+      validate {Magus.Organizations.OrganizationMember.Validations.NotLastOwner, []}
+      change {Magus.Organizations.OrganizationMember.Changes.FireSeatSync, event: :removed}
+    end
+
     update :transfer_ownership do
       accept []
       require_atomic? false
@@ -242,6 +252,10 @@ defmodule Magus.Organizations.OrganizationMember do
 
     policy action(:accept) do
       authorize_if actor_present()
+    end
+
+    policy action(:leave_org) do
+      authorize_if expr(user_id == ^actor(:id))
     end
 
     policy action_type(:read) do
