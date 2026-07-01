@@ -478,6 +478,7 @@ defmodule MagusWeb.CoreRouter do
           live "/", Admin.DashboardLive, :index
           live "/dashboard", Admin.DashboardLive, :index
           live "/users", Admin.UsersLive, :index
+          live "/users/test-accounts/new", Admin.BulkCreateUsersLive, :new
           live "/users/:id", Admin.UserDetailLive, :show
           live "/models", Admin.ModelsLive, :index
           live "/models/new", Admin.ModelsLive, :new

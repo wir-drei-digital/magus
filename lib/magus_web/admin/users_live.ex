@@ -19,7 +19,7 @@ defmodule MagusWeb.Admin.UsersLive do
       |> assign(:sort_order, :desc)
       |> assign(:page, 1)
       |> assign(:per_page, @per_page)
-      |> assign(:filter_admin, nil)
+      |> assign(:filter, "all")
       |> load_users()
 
     {:ok, socket}
@@ -34,7 +34,7 @@ defmodule MagusWeb.Admin.UsersLive do
       sort_order: sort_order,
       page: page,
       per_page: per_page,
-      filter_admin: filter_admin
+      filter: filter
     } = socket.assigns
 
     offset = (page - 1) * per_page
@@ -51,11 +51,12 @@ defmodule MagusWeb.Admin.UsersLive do
         base_query
       end
 
-    # Apply admin filter
+    # Apply the selected filter
     base_query =
-      case filter_admin do
-        true -> Ash.Query.filter(base_query, is_admin == true)
-        false -> Ash.Query.filter(base_query, is_admin == false)
+      case filter do
+        "admins" -> Ash.Query.filter(base_query, is_admin == true)
+        "non_admins" -> Ash.Query.filter(base_query, is_admin == false)
+        "demo" -> Ash.Query.filter(base_query, test_account == true)
         _ -> base_query
       end
 
@@ -180,17 +181,10 @@ defmodule MagusWeb.Admin.UsersLive do
   end
 
   @impl true
-  def handle_event("filter_admin", %{"value" => value}, socket) do
-    filter =
-      case value do
-        "all" -> nil
-        "true" -> true
-        "false" -> false
-      end
-
+  def handle_event("filter", %{"value" => value}, socket) do
     socket =
       socket
-      |> assign(:filter_admin, filter)
+      |> assign(:filter, value)
       |> assign(:page, 1)
       |> load_users()
 
@@ -244,12 +238,13 @@ defmodule MagusWeb.Admin.UsersLive do
 
             <select
               class="select select-bordered select-sm"
-              phx-change="filter_admin"
+              phx-change="filter"
               name="value"
             >
-              <option value="all" selected={@filter_admin == nil}>All Users</option>
-              <option value="true" selected={@filter_admin == true}>Admins Only</option>
-              <option value="false" selected={@filter_admin == false}>Non-Admins</option>
+              <option value="all" selected={@filter == "all"}>All Users</option>
+              <option value="admins" selected={@filter == "admins"}>Admins Only</option>
+              <option value="non_admins" selected={@filter == "non_admins"}>Non-Admins</option>
+              <option value="demo" selected={@filter == "demo"}>Demo Accounts</option>
             </select>
           </div>
         </div>
@@ -317,6 +312,13 @@ defmodule MagusWeb.Admin.UsersLive do
                             </span>
                           </div>
                           <span class="text-sm">{user.email}</span>
+                          <span
+                            :if={user.test_account}
+                            class="badge badge-info badge-sm"
+                            title="Demo account"
+                          >
+                            demo
+                          </span>
                         </div>
                       </td>
                       <td class="text-base-content/70">{user.display_name || "-"}</td>
@@ -388,6 +390,13 @@ defmodule MagusWeb.Admin.UsersLive do
               </div>
             </div>
           <% end %>
+        </div>
+
+        <%!-- Actions --%>
+        <div class="flex justify-end">
+          <.link navigate={~p"/admin/users/test-accounts/new"} class="btn btn-primary btn-sm">
+            <.icon name="lucide-user-plus" class="w-4 h-4" /> Add Demo Users
+          </.link>
         </div>
       </div>
     </Layouts.admin>

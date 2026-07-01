@@ -23,6 +23,7 @@ defmodule MagusWeb.Admin.UserDetailLive do
           |> assign(:page_title, "User: #{user.email}")
           |> assign(:current_path, "/admin/users")
           |> assign(:user, user)
+          |> assign(:show_password, false)
           |> load_subscription(user.id)
           |> load_plans()
           |> load_usage_stats(user)
@@ -161,6 +162,37 @@ defmodule MagusWeb.Admin.UserDetailLive do
   end
 
   @impl true
+  def handle_event("toggle_password", _params, socket) do
+    {:noreply, assign(socket, :show_password, !socket.assigns.show_password)}
+  end
+
+  @impl true
+  def handle_event("delete_test_user", _params, socket) do
+    user = socket.assigns.user
+
+    cond do
+      not user.test_account ->
+        {:noreply, put_flash(socket, :error, "Only demo accounts can be deleted here.")}
+
+      true ->
+        case Magus.Accounts.AccountDeletion.execute(user) do
+          :ok ->
+            {:noreply,
+             socket
+             |> put_flash(:info, "Deleted demo account #{user.email}")
+             |> push_navigate(to: ~p"/admin/users")}
+
+          {:error, :sole_admin_workspaces, _workspaces} ->
+            {:noreply,
+             put_flash(socket, :error, "Can't delete: user is the sole admin of a workspace.")}
+
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, "Delete failed: #{inspect(reason)}")}
+        end
+    end
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <Layouts.admin flash={@flash} current_user={@current_user} current_path={@current_path}>
@@ -205,6 +237,64 @@ defmodule MagusWeb.Admin.UserDetailLive do
               <% else %>
                 <span class="badge badge-warning">Unconfirmed</span>
               <% end %>
+            </div>
+          </div>
+        </div>
+
+        <%!-- Demo Account Card --%>
+        <div :if={@user.test_account} class="card bg-base-200 border border-info/40">
+          <div class="card-body">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <h2 class="card-title">
+                  <.icon name="lucide-flask-conical" class="w-5 h-5 text-info" /> Demo Account
+                </h2>
+                <p class="text-sm text-base-content/60">
+                  Demo account — unlimited usage, no Stripe.
+                </p>
+              </div>
+              <button
+                type="button"
+                phx-click="delete_test_user"
+                data-confirm={"Permanently delete #{@user.email} and all its data? This cannot be undone."}
+                class="btn btn-error btn-sm"
+              >
+                <.icon name="lucide-trash-2" class="w-4 h-4" /> Delete account
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+              <div>
+                <p class="text-xs text-base-content/60">Password</p>
+                <div class="flex items-center gap-2 mt-0.5">
+                  <span class="font-mono font-medium">
+                    <%= cond do %>
+                      <% is_nil(@user.test_account_password) -> %>
+                        <span class="text-base-content/40">not stored</span>
+                      <% @show_password -> %>
+                        {@user.test_account_password}
+                      <% true -> %>
+                        ••••••••••
+                    <% end %>
+                  </span>
+                  <button
+                    :if={@user.test_account_password}
+                    type="button"
+                    phx-click="toggle_password"
+                    class="btn btn-ghost btn-xs"
+                    title={if @show_password, do: "Hide", else: "Show"}
+                  >
+                    <.icon
+                      name={if @show_password, do: "lucide-eye-off", else: "lucide-eye"}
+                      class="w-4 h-4"
+                    />
+                  </button>
+                </div>
+              </div>
+              <div>
+                <p class="text-xs text-base-content/60">Deletes on</p>
+                <p class="font-medium">{format_period_end(@user.test_account_expires_at)}</p>
+              </div>
             </div>
           </div>
         </div>
