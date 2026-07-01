@@ -114,5 +114,39 @@ defmodule MagusWeb.OnboardingLive.CreateOrganizationLiveTest do
       assert html =~ "organization"
       assert {:ok, []} = Organizations.my_organization(actor: user)
     end
+
+    test "surfaces a server error (duplicate slug) on the form instead of a silent no-op",
+         %{conn: conn} do
+      taken_slug = "taken-#{System.unique_integer([:positive])}"
+
+      # A prior org already claims the slug via the DB-level unique identity.
+      owner = generate(user())
+      ensure_workspace_plan(owner)
+
+      {:ok, _org} =
+        Organizations.create_organization(
+          %{name: "First Org", slug: taken_slug},
+          actor: owner
+        )
+
+      # A brand-new user (no org yet) reaches the form and submits the same slug.
+      user = generate(user())
+      ensure_workspace_plan(user)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding/organization")
+
+      html =
+        view
+        |> form("#create-organization-form",
+          organization: %{name: "Second Org", slug: taken_slug}
+        )
+        |> render_submit()
+
+      # The unique-constraint failure is surfaced on the form (not swallowed),
+      # no redirect happens, and no org is created for this user.
+      assert html =~ "has already been taken"
+      assert {:ok, []} = Organizations.my_organization(actor: user)
+    end
   end
 end
