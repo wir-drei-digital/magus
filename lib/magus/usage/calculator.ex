@@ -300,6 +300,10 @@ defmodule Magus.Usage.Calculator do
     end
   end
 
+  # An org-sponsored account is billable via the org's subscription even though
+  # it has no personal Stripe subscription id. A personal account is billable
+  # once it carries a Stripe subscription id.
+  defp billable?(%{sponsor_org_id: org_id}) when is_binary(org_id), do: true
   defp billable?(%{stripe_subscription_id: id}), do: is_binary(id) and id != ""
   defp billable?(_), do: false
 
