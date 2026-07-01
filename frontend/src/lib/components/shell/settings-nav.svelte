@@ -3,6 +3,7 @@
 	import { base } from '$app/paths';
 	import {
 		Boxes,
+		Building2,
 		CreditCard,
 		Database,
 		FolderSync,
@@ -20,6 +21,7 @@
 		{ id: 'profile', label: 'Profile', icon: User },
 		{ id: 'preferences', label: 'Preferences', icon: SlidersHorizontal },
 		{ id: 'models', label: 'Models', icon: Boxes },
+		{ id: 'organization', label: 'Organization', icon: Building2 },
 		{ id: 'subscription', label: 'Subscription', icon: CreditCard },
 		{ id: 'integrations', label: 'Integrations', icon: Plug },
 		{ id: 'knowledge', label: 'Knowledge', icon: FolderSync },
