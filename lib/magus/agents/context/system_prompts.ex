@@ -268,16 +268,15 @@ defmodule Magus.Agents.Context.SystemPrompts do
   def mode_rules(_), do: @chat_rules
 
   @doc """
-  Skills section for the system prompt. Arity 1 keeps the built-in-only
-  behavior for callers without an actor; arity 2 merges built-in skills with
-  the actor's accessible user skills via `Magus.Skills.Discovery`, listing
-  each with its `load_skill` ref.
-  """
-  @spec skills_capabilities(list(String.t()) | nil) :: String.t()
-  def skills_capabilities(loaded_tools \\ nil) do
-    Magus.Agents.Skills.Registry.get_skills_section(loaded_tools)
-  end
+  Skills section for the system prompt. Merges built-in skills with the
+  actor's accessible user skills via `Magus.Skills.Discovery`, listing each
+  with its `load_skill` ref.
 
+  The `_loaded_tools` parameter is intentionally unused for the actor-scoped
+  view: the Discovery list shows all accessible skills without annotating
+  which are already loaded into the conversation, so there is nothing to
+  thread through here.
+  """
   @spec skills_capabilities(list(String.t()) | nil, struct() | nil) :: String.t()
   def skills_capabilities(_loaded_tools, actor) do
     actor

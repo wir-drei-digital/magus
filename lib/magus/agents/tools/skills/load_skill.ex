@@ -42,6 +42,8 @@ defmodule Magus.Agents.Tools.Skills.LoadSkill do
   alias Magus.Agents.Skills.Registry
   alias Magus.Agents.Tools.ToolBuilder
 
+  import Magus.Agents.Tools.Helpers, only: [get_param: 2, get_context_value: 2]
+
   @doc "User-friendly display name shown in the UI when this tool is executing"
   def display_name, do: "Loading skill..."
 
@@ -49,8 +51,6 @@ defmodule Magus.Agents.Tools.Skills.LoadSkill do
   def summarize_output(%{skill: name}), do: "Loaded: #{name}"
   def summarize_output(%{error: _}), do: "Skill not found"
   def summarize_output(_), do: "Completed"
-
-  import Magus.Agents.Tools.Helpers, only: [get_param: 2, get_context_value: 2]
 
   @impl true
   def run(params, context) do
@@ -125,6 +125,7 @@ defmodule Magus.Agents.Tools.Skills.LoadSkill do
     conversation_id = get_context_value(context, :conversation_id)
     user_id = get_context_value(context, :user_id)
 
+    # authorize?: false: internal read of the current conversation to check approval state
     case Magus.Chat.get_conversation(conversation_id, authorize?: false) do
       {:ok, conversation} ->
         if Magus.Skills.Approval.approved?(conversation, skill.id) do
@@ -162,22 +163,26 @@ defmodule Magus.Agents.Tools.Skills.LoadSkill do
     end
   end
 
-  # Persist a user skill's body + requested tool names onto the conversation,
-  # mirroring persist_skill/2 but sourced from a Magus.Skills.Skill.
-  defp persist_user_skill(context, body, tools) do
+  # Shared helper: persists content and tool names onto the conversation so they
+  # remain available for all subsequent messages in the session.
+  # `already_loaded?` is a fun(existing_context, existing_tools -> boolean) that
+  # encodes each path's idempotency rule.
+  # authorize?: false: internal write to the agent's current conversation; the
+  # acting user is not always threaded into the tool context (autonomy runs).
+  defp persist_context_and_tools(context, content, tools, already_loaded?) do
     conversation_id = get_context_value(context, :conversation_id)
-    body = body || ""
 
-    if conversation_id != nil and body != "" do
+    if conversation_id != nil and content not in [nil, ""] do
       case Magus.Chat.get_conversation(conversation_id, authorize?: false) do
         {:ok, conversation} ->
           existing_context = conversation.skill_context || ""
           existing_tools = conversation.skill_tools || []
 
-          # Skip if this exact body is already present (idempotent re-load).
-          unless String.contains?(existing_context, body) do
+          unless already_loaded?.(existing_context, existing_tools) do
             merged_context =
-              if existing_context == "", do: body, else: existing_context <> "\n\n---\n\n" <> body
+              if existing_context == "",
+                do: content,
+                else: existing_context <> "\n\n---\n\n" <> content
 
             merged_tools = Enum.uniq(existing_tools ++ tools)
 
@@ -187,7 +192,7 @@ defmodule Magus.Agents.Tools.Skills.LoadSkill do
                    authorize?: false
                  ) do
               {:ok, _} -> :ok
-              {:error, reason} -> Logger.warning("persist_user_skill failed: #{inspect(reason)}")
+              {:error, reason} -> Logger.warning("persist skill failed: #{inspect(reason)}")
             end
           end
 
@@ -195,6 +200,16 @@ defmodule Magus.Agents.Tools.Skills.LoadSkill do
           :ok
       end
     end
+  end
+
+  # Persist a user skill's body + requested tool names onto the conversation.
+  # Idempotent: skips if the exact body is already present in skill_context.
+  defp persist_user_skill(context, body, tools) do
+    body = body || ""
+
+    persist_context_and_tools(context, body, tools, fn existing_context, _existing_tools ->
+      String.contains?(existing_context, body)
+    end)
   end
 
   # Attach resolved tool modules so the ReAct runner can register them mid-turn.
@@ -210,41 +225,17 @@ defmodule Magus.Agents.Tools.Skills.LoadSkill do
   # Note: tool event messages are filtered out of LLM context on subsequent
   # turns (message_type == :message only), so skill_context is the only way
   # the skill instructions survive across turns.
+  # Idempotent: skips if all of the skill's tools are already registered.
   defp persist_skill(context, skill) do
-    conversation_id = get_context_value(context, :conversation_id)
+    new_tools = skill.tools || []
 
-    if conversation_id do
-      case Magus.Chat.get_conversation(conversation_id, authorize?: false) do
-        {:ok, conversation} ->
-          existing_context = conversation.skill_context || ""
-          existing_tools = conversation.skill_tools || []
-          new_tools = skill.tools || []
-
-          # Skip if this skill's tools are already loaded (prevents duplicate context)
-          already_loaded? =
-            new_tools != [] and Enum.all?(new_tools, &(&1 in existing_tools))
-
-          unless already_loaded? do
-            merged_context =
-              if existing_context == "",
-                do: skill.content,
-                else: existing_context <> "\n\n---\n\n" <> skill.content
-
-            merged_tools = Enum.uniq(existing_tools ++ new_tools)
-
-            Magus.Chat.set_conversation_skill(
-              conversation,
-              %{
-                skill_context: merged_context,
-                skill_tools: merged_tools
-              },
-              authorize?: false
-            )
-          end
-
-        _ ->
-          :ok
+    persist_context_and_tools(
+      context,
+      skill.content,
+      new_tools,
+      fn _existing_context, existing_tools ->
+        new_tools != [] and Enum.all?(new_tools, &(&1 in existing_tools))
       end
-    end
+    )
   end
 end

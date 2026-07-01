@@ -25,24 +25,20 @@ defmodule Magus.Agents.Tools.Skills.CreateSkill do
 
   @impl true
   def run(params, context) do
-    with {:ok, ctx} <- validate_context(context, [:user_id, :conversation_id, :user]) do
-      user = get_context_value(context, :user)
-      name = get_param(params, :name)
-      include = get_param(params, :include_paths) || []
-
-      with {:ok, files} <- read_sandbox_files(ctx.conversation_id, include, ctx.user_id),
-           {:ok, zip} <- build_zip(name, params, files),
-           {:ok, skill} <-
-             Magus.Skills.Import.import_bundle(zip,
-               actor: user,
-               workspace_id: get_param(params, :workspace_id)
-             ) do
-        {:ok, %{skill_id: skill.id, name: skill.name}}
-      else
-        {:error, reason} -> {:ok, %{error: "Could not create skill: #{inspect(reason)}"}}
-      end
+    with {:ok, ctx} <- validate_context(context, [:user_id, :conversation_id, :user]),
+         user = get_context_value(context, :user),
+         include = get_param(params, :include_paths) || [],
+         {:ok, files} <- read_sandbox_files(ctx.conversation_id, include, ctx.user_id),
+         {:ok, zip} <- build_zip(get_param(params, :name), params, files),
+         {:ok, skill} <-
+           Magus.Skills.Import.import_bundle(zip,
+             actor: user,
+             workspace_id: get_param(params, :workspace_id)
+           ) do
+      {:ok, %{skill_id: skill.id, name: skill.name}}
     else
-      {:error, msg} -> {:ok, %{error: msg}}
+      {:error, reason} when is_binary(reason) -> {:ok, %{error: reason}}
+      {:error, reason} -> {:ok, %{error: "Could not create skill: #{inspect(reason)}"}}
     end
   end
 
