@@ -195,17 +195,23 @@ defmodule Magus.Agents.Plugins.InboxEventPlugin do
   defp maybe_record_skill_approval("Approve skill: " <> skill_id, conversation_id, user_id)
        when is_binary(conversation_id) do
     with {:ok, user} when not is_nil(user) <- Magus.Accounts.get_user(user_id, authorize?: false),
-         {:ok, conversation} <- Magus.Chat.get_conversation(conversation_id, actor: user) do
-      Magus.Chat.record_skill_approval(conversation, %{skill_id: String.trim(skill_id)},
-        actor: user
-      )
-    end
+         {:ok, conversation} <- Magus.Chat.get_conversation(conversation_id, actor: user),
+         {:ok, _} <-
+           Magus.Chat.record_skill_approval(conversation, %{skill_id: String.trim(skill_id)},
+             actor: user
+           ) do
+      :ok
+    else
+      error ->
+        Logger.warning(
+          "Skill approval not recorded (conversation #{conversation_id}): #{inspect(error)}"
+        )
 
-    :ok
+        :ok
+    end
   rescue
     e ->
-      require Logger
-      Logger.warning("Skill approval record failed: #{inspect(e)}")
+      Logger.warning("Skill approval record crashed: #{inspect(e)}")
       :ok
   end
 

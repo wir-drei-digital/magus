@@ -598,11 +598,7 @@ defmodule Magus.Chat.Conversation do
       require_atomic? false
       argument :skill_id, :uuid, allow_nil?: false
 
-      change fn changeset, _context ->
-        id = Ash.Changeset.get_argument(changeset, :skill_id)
-        existing = Ash.Changeset.get_attribute(changeset, :approved_skill_ids) || []
-        Ash.Changeset.change_attribute(changeset, :approved_skill_ids, Enum.uniq([id | existing]))
-      end
+      change Magus.Chat.Conversation.Changes.RecordSkillApproval
     end
 
     action :build_message_history, {:array, :struct} do
