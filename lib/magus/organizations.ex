@@ -38,6 +38,10 @@ defmodule Magus.Organizations do
       rpc_action :invite_org_member, :invite
       rpc_action :list_org_members, :by_organization
       rpc_action :get_org_member_by_token, :by_invite_token
+      rpc_action :change_org_member_role, :change_role
+      rpc_action :remove_org_member, :remove
+      rpc_action :transfer_org_ownership, :transfer_ownership
+      rpc_action :resend_org_invite, :resend_invite
     end
   end
 
