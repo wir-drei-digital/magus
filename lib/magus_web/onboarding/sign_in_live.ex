@@ -16,6 +16,9 @@ defmodule MagusWeb.OnboardingLive.SignInLive do
     lang = Map.get(params, "lang")
     invite_token = Map.get(params, "invite_token") || Map.get(session, "invite_token")
 
+    org_invite_token =
+      Map.get(params, "org_invite_token") || Map.get(session, "org_invite_token")
+
     password_form =
       Form.for_action(User, :sign_in_with_password,
         domain: Magus.Accounts,
@@ -28,6 +31,7 @@ defmodule MagusWeb.OnboardingLive.SignInLive do
       |> assign(:selected_plan, selected_plan)
       |> assign(:lang, lang)
       |> assign(:invite_token, invite_token)
+      |> assign(:org_invite_token, org_invite_token)
       |> assign(:password_form, to_form(password_form))
       |> assign(:trigger_action, false)
       |> assign(:magic_link_email, "")
@@ -60,6 +64,12 @@ defmodule MagusWeb.OnboardingLive.SignInLive do
             class="space-y-4"
           >
             <input :if={@invite_token} type="hidden" name="invite_token" value={@invite_token} />
+            <input
+              :if={@org_invite_token}
+              type="hidden"
+              name="org_invite_token"
+              value={@org_invite_token}
+            />
 
             <.input
               field={@password_form[:email]}
@@ -85,7 +95,9 @@ defmodule MagusWeb.OnboardingLive.SignInLive do
               </.link>
 
               <.link
-                navigate={~p"/register?#{register_params(@selected_plan, @lang, @invite_token)}"}
+                navigate={
+                  ~p"/register?#{register_params(@selected_plan, @lang, @invite_token, @org_invite_token)}"
+                }
                 class="link link-primary text-sm"
               >
                 {gettext("Need an account?")}
@@ -195,12 +207,15 @@ defmodule MagusWeb.OnboardingLive.SignInLive do
      |> assign(:magic_link_email, email)}
   end
 
-  defp register_params(plan, lang, invite_token) do
+  defp register_params(plan, lang, invite_token, org_invite_token) do
     %{}
     |> then(fn p -> if plan, do: Map.put(p, "plan", plan), else: p end)
     |> then(fn p -> if lang, do: Map.put(p, "lang", lang), else: p end)
     |> then(fn p ->
       if invite_token, do: Map.put(p, "invite_token", invite_token), else: p
+    end)
+    |> then(fn p ->
+      if org_invite_token, do: Map.put(p, "org_invite_token", org_invite_token), else: p
     end)
   end
 end
