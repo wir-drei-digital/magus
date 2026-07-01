@@ -51,6 +51,8 @@ defmodule Magus.Organizations.OrganizationMember do
       change set_attribute(:invited_at, &DateTime.utc_now/0)
       change set_attribute(:joined_at, &DateTime.utc_now/0)
 
+      validate {Magus.Organizations.OrganizationMember.Validations.OneOrgPerUser, []}
+
       change fn changeset, _context ->
         Ash.Changeset.force_change_attribute(changeset, :invite_token, generate_token())
       end
@@ -69,6 +71,8 @@ defmodule Magus.Organizations.OrganizationMember do
       change set_attribute(:status, :active)
       change set_attribute(:invited_at, &DateTime.utc_now/0)
       change set_attribute(:joined_at, &DateTime.utc_now/0)
+
+      validate {Magus.Organizations.OrganizationMember.Validations.OneOrgPerUser, []}
 
       change fn changeset, _context ->
         Ash.Changeset.force_change_attribute(changeset, :invite_token, generate_token())
@@ -99,6 +103,7 @@ defmodule Magus.Organizations.OrganizationMember do
     update :accept do
       accept []
       require_atomic? false
+      validate {Magus.Organizations.OrganizationMember.Validations.OneOrgPerUser, []}
       change set_attribute(:status, :active)
       change set_attribute(:joined_at, &DateTime.utc_now/0)
       change relate_actor(:user)
