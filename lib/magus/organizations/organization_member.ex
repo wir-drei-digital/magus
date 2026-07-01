@@ -202,6 +202,15 @@ defmodule Magus.Organizations.OrganizationMember do
       filter expr(organization_id == ^arg(:organization_id))
     end
 
+    read :active_with_user_by_organization do
+      argument :organization_id, :uuid, allow_nil?: false
+
+      filter expr(
+               organization_id == ^arg(:organization_id) and status == :active and
+                 not is_nil(user_id)
+             )
+    end
+
     read :by_invite_token do
       argument :invite_token, :string, allow_nil?: false
       get? true

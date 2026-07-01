@@ -188,7 +188,7 @@ defmodule Magus.Usage.Calculator do
         # are in good standing. A billable subscription that is NOT active is
         # delinquent (e.g. `past_due` during the dunning window): it gets no new
         # postpaid spend and its `no_spend_cap` opt-out is suspended — only the
-        # only the spend cap remains. Billing status is resolved through the
+        # spend cap remains. Billing status is resolved through the
         # provider seam; its Default reads the same `status` column, so behavior
         # is identical (cloud edition later reads live from Stripe).
         active =
