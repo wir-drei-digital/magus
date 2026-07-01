@@ -79,6 +79,34 @@ defmodule Magus.Organizations.Organization do
         )
       end
     end
+
+    action :org_billing_overview, :map do
+      description "Billing status snapshot for the org Billing tab (owner-only)."
+      argument :organization_id, :uuid, allow_nil?: false
+
+      run fn input, _context ->
+        org =
+          Ash.get!(Magus.Organizations.Organization, input.arguments.organization_id,
+            authorize?: false
+          )
+
+        seat_count =
+          case Magus.Organizations.list_active_org_members(org.id, authorize?: false) do
+            {:ok, members} -> length(members)
+            _ -> 0
+          end
+
+        {:ok,
+         %{
+           billing_status: to_string(org.billing_status),
+           current_period_end:
+             org.current_period_end && DateTime.to_iso8601(org.current_period_end),
+           seat_count: seat_count,
+           billing_set_up: is_binary(org.stripe_subscription_id),
+           billing_edition: Magus.Usage.billing_edition?()
+         }}
+      end
+    end
   end
 
   policies do
@@ -100,6 +128,10 @@ defmodule Magus.Organizations.Organization do
 
     policy action(:org_usage_overview) do
       authorize_if actor_present()
+    end
+
+    policy action(:org_billing_overview) do
+      authorize_if Magus.Organizations.Organization.Checks.ActorIsOwner
     end
 
     policy action_type(:update) do
