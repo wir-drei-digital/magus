@@ -493,7 +493,7 @@ export type context_windowAttributesOnlySchema = {
 // Conversation Schema
 export type ConversationResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "isMultiplayer" | "visibility" | "chatMode" | "systemPrompt" | "skillContext" | "skillTools" | "loadedTools" | "samplingSettings" | "imageGenerationSettings" | "videoGenerationSettings" | "isTaskConversation" | "isThread" | "branchedAt" | "deletedAt" | "extractionDueAt" | "insertedAt" | "updatedAt" | "userId" | "folderId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "systemPromptId" | "customAgentId" | "workspaceId" | "parentConversationId" | "sandboxConversationId" | "branchedAtMessageId" | "messageCount" | "lastMessageAt" | "isFavorited" | "isSharedToWorkspace";
+  __primitiveFields: "id" | "title" | "isMultiplayer" | "visibility" | "chatMode" | "systemPrompt" | "skillContext" | "skillTools" | "loadedTools" | "approvedSkillIds" | "samplingSettings" | "imageGenerationSettings" | "videoGenerationSettings" | "isTaskConversation" | "isThread" | "branchedAt" | "deletedAt" | "extractionDueAt" | "insertedAt" | "updatedAt" | "userId" | "folderId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "systemPromptId" | "customAgentId" | "workspaceId" | "parentConversationId" | "sandboxConversationId" | "branchedAtMessageId" | "messageCount" | "lastMessageAt" | "isFavorited" | "isSharedToWorkspace";
   id: UUIDv7;
   title: string | null;
   isMultiplayer: boolean;
@@ -503,6 +503,7 @@ export type ConversationResourceSchema = {
   skillContext: string | null;
   skillTools: Array<string> | null;
   loadedTools: Array<string> | null;
+  approvedSkillIds: Array<UUID> | null;
   samplingSettings: Record<string, any> | null;
   imageGenerationSettings: Record<string, any> | null;
   videoGenerationSettings: Record<string, any> | null;
@@ -552,7 +553,7 @@ export type ConversationResourceSchema = {
 
 export type ConversationAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "isMultiplayer" | "visibility" | "chatMode" | "systemPrompt" | "skillContext" | "skillTools" | "loadedTools" | "samplingSettings" | "imageGenerationSettings" | "videoGenerationSettings" | "isTaskConversation" | "isThread" | "branchedAt" | "deletedAt" | "extractionDueAt" | "insertedAt" | "updatedAt" | "userId" | "folderId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "systemPromptId" | "customAgentId" | "workspaceId" | "parentConversationId" | "sandboxConversationId" | "branchedAtMessageId";
+  __primitiveFields: "id" | "title" | "isMultiplayer" | "visibility" | "chatMode" | "systemPrompt" | "skillContext" | "skillTools" | "loadedTools" | "approvedSkillIds" | "samplingSettings" | "imageGenerationSettings" | "videoGenerationSettings" | "isTaskConversation" | "isThread" | "branchedAt" | "deletedAt" | "extractionDueAt" | "insertedAt" | "updatedAt" | "userId" | "folderId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "systemPromptId" | "customAgentId" | "workspaceId" | "parentConversationId" | "sandboxConversationId" | "branchedAtMessageId";
   id: UUIDv7;
   title: string | null;
   isMultiplayer: boolean;
@@ -562,6 +563,7 @@ export type ConversationAttributesOnlySchema = {
   skillContext: string | null;
   skillTools: Array<string> | null;
   loadedTools: Array<string> | null;
+  approvedSkillIds: Array<UUID> | null;
   samplingSettings: Record<string, any> | null;
   imageGenerationSettings: Record<string, any> | null;
   videoGenerationSettings: Record<string, any> | null;
@@ -1590,7 +1592,7 @@ export type TabSessionResourceSchema = {
   __type: "Resource";
   __primitiveFields: "id" | "mode" | "navFilter" | "tabs" | "activeTabId";
   id: UUID;
-  mode: "agents" | "brain" | "chat" | "files" | "prompts";
+  mode: "agents" | "brain" | "chat" | "files" | "prompts" | "skills";
   navFilter: "all" | "personal" | "shared";
   tabs: Array<Record<string, any>>;
   activeTabId: string | null;
@@ -1602,7 +1604,7 @@ export type TabSessionAttributesOnlySchema = {
   __type: "Resource";
   __primitiveFields: "id" | "mode" | "navFilter" | "tabs" | "activeTabId";
   id: UUID;
-  mode: "agents" | "brain" | "chat" | "files" | "prompts";
+  mode: "agents" | "brain" | "chat" | "files" | "prompts" | "skills";
   navFilter: "all" | "personal" | "shared";
   tabs: Array<Record<string, any>>;
   activeTabId: string | null;
@@ -3004,6 +3006,13 @@ export type ConversationFilterInput = {
     eq?: Array<string>;
     notEq?: Array<string>;
     in?: Array<Array<string>>;
+    isNil?: boolean;
+  };
+
+  approvedSkillIds?: {
+    eq?: Array<UUID>;
+    notEq?: Array<UUID>;
+    in?: Array<Array<UUID>>;
     isNil?: boolean;
   };
 
@@ -5588,9 +5597,9 @@ export type TabSessionFilterInput = {
   };
 
   mode?: {
-    eq?: "agents" | "brain" | "chat" | "files" | "prompts";
-    notEq?: "agents" | "brain" | "chat" | "files" | "prompts";
-    in?: Array<"agents" | "brain" | "chat" | "files" | "prompts">;
+    eq?: "agents" | "brain" | "chat" | "files" | "prompts" | "skills";
+    notEq?: "agents" | "brain" | "chat" | "files" | "prompts" | "skills";
+    in?: Array<"agents" | "brain" | "chat" | "files" | "prompts" | "skills">;
   };
 
   navFilter?: {
@@ -5999,7 +6008,7 @@ export type BrainSourceFilterField = (typeof brainSourceFilterFields)[number];
 export const context_windowFilterFields = ["id", "strategy", "windowStartAt", "summary", "summaryMessageCount", "lastBreakdown", "lastTotalTokens", "lastActualInputTokens", "lastCachedTokens", "lastModelKey", "lastMaxContext", "compactionStatus"] as const;
 export type context_windowFilterField = (typeof context_windowFilterFields)[number];
 
-export const conversationFilterFields = ["id", "title", "isMultiplayer", "visibility", "chatMode", "systemPrompt", "skillContext", "skillTools", "loadedTools", "samplingSettings", "imageGenerationSettings", "videoGenerationSettings", "isTaskConversation", "isThread", "branchedAt", "deletedAt", "extractionDueAt", "insertedAt", "updatedAt", "userId", "folderId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "systemPromptId", "customAgentId", "workspaceId", "parentConversationId", "sandboxConversationId", "branchedAtMessageId", "isFavorited", "isSharedToWorkspace", "messageCount", "lastMessageAt", "messages", "members", "inviteLinks", "invitations", "shareLinks", "user", "folder", "selectedModel", "selectedImageModel", "selectedVideoModel", "activeSystemPrompt", "customAgent", "workspace", "parentConversation", "sandboxConversation", "branchedAtMessage", "childConversations", "favorites", "memories"] as const;
+export const conversationFilterFields = ["id", "title", "isMultiplayer", "visibility", "chatMode", "systemPrompt", "skillContext", "skillTools", "loadedTools", "approvedSkillIds", "samplingSettings", "imageGenerationSettings", "videoGenerationSettings", "isTaskConversation", "isThread", "branchedAt", "deletedAt", "extractionDueAt", "insertedAt", "updatedAt", "userId", "folderId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "systemPromptId", "customAgentId", "workspaceId", "parentConversationId", "sandboxConversationId", "branchedAtMessageId", "isFavorited", "isSharedToWorkspace", "messageCount", "lastMessageAt", "messages", "members", "inviteLinks", "invitations", "shareLinks", "user", "folder", "selectedModel", "selectedImageModel", "selectedVideoModel", "activeSystemPrompt", "customAgent", "workspace", "parentConversation", "sandboxConversation", "branchedAtMessage", "childConversations", "favorites", "memories"] as const;
 export type ConversationFilterField = (typeof conversationFilterFields)[number];
 
 export const conversationCompanionFilterFields = ["id", "resourceType", "resourceId", "conversationId", "conversation"] as const;
@@ -6135,7 +6144,7 @@ export type BrainSourceSortField = (typeof brainSourceSortFields)[number];
 export const context_windowSortFields = ["id", "strategy", "windowStartAt", "summary", "summaryMessageCount", "lastBreakdown", "lastTotalTokens", "lastActualInputTokens", "lastCachedTokens", "lastModelKey", "lastMaxContext", "compactionStatus"] as const;
 export type context_windowSortField = (typeof context_windowSortFields)[number];
 
-export const conversationSortFields = ["id", "title", "isMultiplayer", "visibility", "chatMode", "systemPrompt", "skillContext", "skillTools", "loadedTools", "samplingSettings", "imageGenerationSettings", "videoGenerationSettings", "isTaskConversation", "isThread", "branchedAt", "deletedAt", "extractionDueAt", "insertedAt", "updatedAt", "userId", "folderId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "systemPromptId", "customAgentId", "workspaceId", "parentConversationId", "sandboxConversationId", "branchedAtMessageId", "isFavorited", "isSharedToWorkspace", "messageCount", "lastMessageAt"] as const;
+export const conversationSortFields = ["id", "title", "isMultiplayer", "visibility", "chatMode", "systemPrompt", "skillContext", "skillTools", "loadedTools", "approvedSkillIds", "samplingSettings", "imageGenerationSettings", "videoGenerationSettings", "isTaskConversation", "isThread", "branchedAt", "deletedAt", "extractionDueAt", "insertedAt", "updatedAt", "userId", "folderId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "systemPromptId", "customAgentId", "workspaceId", "parentConversationId", "sandboxConversationId", "branchedAtMessageId", "isFavorited", "isSharedToWorkspace", "messageCount", "lastMessageAt"] as const;
 export type ConversationSortField = (typeof conversationSortFields)[number];
 
 export const conversationCompanionSortFields = ["id", "resourceType", "resourceId", "conversationId"] as const;
