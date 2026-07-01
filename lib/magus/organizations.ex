@@ -48,7 +48,6 @@ defmodule Magus.Organizations do
       rpc_action :set_member_spend_cap, :set_member_spend_cap
       rpc_action :leave_org, :leave_org
       rpc_action :my_organization, :my_active_membership
-      rpc_action :accept_org_member, :accept
     end
   end
 
@@ -63,6 +62,7 @@ defmodule Magus.Organizations do
         args: [:stripe_subscription_id]
 
       define :update_organization, action: :update
+      define :org_usage_overview, action: :org_usage_overview
       define :org_billing_overview, action: :org_billing_overview
     end
 

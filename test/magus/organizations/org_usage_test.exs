@@ -27,12 +27,16 @@ defmodule Magus.Organizations.OrgUsageTest do
     {:ok, _sub} = Magus.Usage.get_user_subscription(m1.id, authorize?: false)
     Magus.Usage.deduct_usage(m1.id, 300, authorize?: false)
 
-    {:ok, owner_view} = Magus.Organizations.OrgUsage.for_organization(org.id, actor: owner)
+    {:ok, owner_view} =
+      Magus.Organizations.org_usage_overview(%{organization_id: org.id}, actor: owner)
+
     assert owner_view.seat_count == 2
     assert owner_view.pooled_spent_cents >= 300
     assert length(owner_view.members) == 2
 
-    {:ok, member_view} = Magus.Organizations.OrgUsage.for_organization(org.id, actor: m1)
+    {:ok, member_view} =
+      Magus.Organizations.org_usage_overview(%{organization_id: org.id}, actor: m1)
+
     assert length(member_view.members) == 1
     assert hd(member_view.members).user_id == m1.id
   end
@@ -49,7 +53,12 @@ defmodule Magus.Organizations.OrgUsageTest do
         actor: owner
       )
 
-    assert {:error, :forbidden} =
-             Magus.Organizations.OrgUsage.for_organization(org.id, actor: stranger)
+    # The action policy only gates `actor_present()`; the real membership check
+    # lives in `OrgUsage.for_organization`, whose `{:error, :forbidden}` surfaces
+    # through the generic action as a wrapped `Ash.Error.Unknown`.
+    assert {:error, %Ash.Error.Unknown{} = error} =
+             Magus.Organizations.org_usage_overview(%{organization_id: org.id}, actor: stranger)
+
+    assert Exception.message(error) =~ "forbidden"
   end
 end

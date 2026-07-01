@@ -96,14 +96,18 @@ defmodule MagusWeb.Organizations.ManagementFlowTest do
 
     # 6. Usage: accrue spend for the invitee, then check pooled + per-member views.
     {:ok, _sub} = Magus.Usage.get_user_subscription(invitee.id, authorize?: false)
-    Magus.Usage.deduct_usage(invitee.id, 250, authorize?: false)
+    {:ok, _} = Magus.Usage.deduct_usage(invitee.id, 250, authorize?: false)
 
-    {:ok, owner_usage} = Organizations.OrgUsage.for_organization(org.id, actor: owner)
+    {:ok, owner_usage} =
+      Organizations.org_usage_overview(%{organization_id: org.id}, actor: owner)
+
     assert owner_usage.seat_count == 2
     assert owner_usage.pooled_spent_cents >= 250
     assert length(owner_usage.members) == 2
 
-    {:ok, member_usage} = Organizations.OrgUsage.for_organization(org.id, actor: invitee)
+    {:ok, member_usage} =
+      Organizations.org_usage_overview(%{organization_id: org.id}, actor: invitee)
+
     assert length(member_usage.members) == 1
     assert hd(member_usage.members).user_id == invitee.id
 

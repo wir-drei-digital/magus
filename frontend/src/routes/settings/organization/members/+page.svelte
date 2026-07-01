@@ -12,6 +12,7 @@
 		type OrgMemberRole,
 		type RpcResult
 	} from '$lib/ash/api';
+	import { formatCents } from '$lib/billing/format';
 	import { Button, Section, confirmAction, CONTROL_CLASS } from '$lib/components/crud';
 	import { getOrgAdmin } from '$lib/components/organizations/context';
 	import { isValidInviteEmail, memberDisplayName, sortMembers } from '$lib/organizations/members';
@@ -31,9 +32,11 @@
 		return memberDisplayName(member).slice(0, 1).toUpperCase();
 	}
 
+	// Reuse the shared CHF formatter so Members and the Usage tab render caps the
+	// same way for a given `spend_cap_cents`; show "No cap" when unset.
 	function formatCap(cents: number | null): string {
 		if (cents === null) return 'No cap';
-		return `$${(cents / 100).toFixed(2)}/mo`;
+		return formatCents(cents);
 	}
 
 	// ── Invite (owner only) ──
@@ -120,12 +123,12 @@
 		const trimmed = capDraft.trim();
 		let cents: number | null = null;
 		if (trimmed !== '') {
-			const dollars = Number(trimmed);
-			if (!Number.isFinite(dollars) || dollars < 0) {
-				actionError = 'Enter a spend cap in dollars (e.g. 50).';
+			const amount = Number(trimmed);
+			if (!Number.isFinite(amount) || amount < 0) {
+				actionError = 'Enter a spend cap in CHF (e.g. 50).';
 				return;
 			}
-			cents = Math.round(dollars * 100);
+			cents = Math.round(amount * 100);
 		}
 		void run(member.id, () => setMemberSpendCap(member.id, cents));
 	}
@@ -311,7 +314,7 @@
 								saveCap(member);
 							}}
 						>
-							<span class="text-xs text-muted-foreground">Monthly spend cap ($)</span>
+							<span class="text-xs text-muted-foreground">Monthly spend cap (CHF)</span>
 							<input
 								type="number"
 								min="0"
