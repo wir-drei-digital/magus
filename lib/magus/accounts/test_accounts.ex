@@ -4,8 +4,8 @@ defmodule Magus.Accounts.TestAccounts do
 
   Test accounts are real users with:
 
-    * an email synthesised from a memorable username under a fixed domain
-      (`demo1@magus.digital`),
+    * an email synthesised from a memorable username under a configured domain
+      (`demo1@magus.digital` by default; see `domain/0`),
     * an auto-generated, easy-to-type password (returned to the admin so it
       can be handed out),
     * NO Stripe connection and an `:exemption` usage override so they have no
@@ -23,7 +23,7 @@ defmodule Magus.Accounts.TestAccounts do
   alias Magus.Accounts
   alias Magus.Accounts.User
 
-  @domain "magus.digital"
+  @default_domain "magus.digital"
 
   # Simple, unambiguous words so generated passwords are easy to dictate and
   # type for non-technical workshop participants. Format: "adj-noun-NN".
@@ -32,11 +32,21 @@ defmodule Magus.Accounts.TestAccounts do
   @nouns ~w(tiger river cloud forest mango panda eagle lemon ocean planet
             garden meadow falcon maple pebble willow comet harbor cedar otter)
 
-  @doc "The fixed email domain used for all test accounts."
-  def domain, do: @domain
+  @doc """
+  The email domain used for all test accounts.
+
+  Configurable via `config :magus, :test_accounts, email_domain: "..."`
+  (or the `TEST_ACCOUNT_EMAIL_DOMAIN` env var in production); defaults to
+  `#{@default_domain}`.
+  """
+  def domain do
+    :magus
+    |> Application.get_env(:test_accounts, [])
+    |> Keyword.get(:email_domain, @default_domain)
+  end
 
   @doc "Builds the login email for a username, e.g. `demo1` -> `demo1@magus.digital`."
-  def email_for(username), do: "#{sanitize_username(username)}@#{@domain}"
+  def email_for(username), do: "#{sanitize_username(username)}@#{domain()}"
 
   @doc """
   Generates an easy-to-type password like `sunny-tiger-42`.
@@ -166,7 +176,7 @@ defmodule Magus.Accounts.TestAccounts do
   end
 
   defp existing_indices(base) do
-    suffix = "@#{@domain}"
+    suffix = "@#{domain()}"
     regex = ~r/^#{Regex.escape(base)}(\d+)#{Regex.escape(suffix)}$/
 
     # All test-account emails share the fixed domain; fetch those and pick out

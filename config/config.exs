@@ -343,6 +343,11 @@ config :magus, :super_brain_embedder, Magus.Embeddings.OpenAIEmbedder
 # SuperBrain extraction-time batch embedder (overridden in test.exs to a Mox mock)
 config :magus, :super_brain_extraction_embedder, Magus.Embeddings.OpenAIBatchEmbedder
 
+# Admin-created workshop/demo test accounts: the email domain their logins are
+# synthesised under (e.g. demo1@magus.digital). Override per-deployment via the
+# TEST_ACCOUNT_EMAIL_DOMAIN env var (see runtime.exs).
+config :magus, :test_accounts, email_domain: "magus.digital"
+
 # Chat domain configuration
 config :magus, Magus.Chat, unfiled_conversations_limit: 20
 
