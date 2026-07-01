@@ -43,6 +43,7 @@ defmodule Magus.Organizations do
       rpc_action :transfer_org_ownership, :transfer_ownership
       rpc_action :resend_org_invite, :resend_invite
       rpc_action :set_member_spend_cap, :set_member_spend_cap
+      rpc_action :leave_org, :leave_org
     end
   end
 
@@ -73,6 +74,7 @@ defmodule Magus.Organizations do
       define :transfer_org_ownership, action: :transfer_ownership
       define :resend_org_invite, action: :resend_invite
       define :set_member_spend_cap, action: :set_member_spend_cap
+      define :leave_org, action: :leave_org
     end
   end
 
