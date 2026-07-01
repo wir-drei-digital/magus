@@ -86,6 +86,18 @@ defmodule Magus.Models.Provider do
       description "Providers owned by the actor."
       filter expr(owner_user_id == ^actor(:id))
     end
+
+    update :stamp_validation do
+      description "Writes credential validation results (worker only)."
+      accept [:validation_status, :last_validated_at]
+    end
+
+    update :validate do
+      description "Re-enqueues credential validation for an owned provider."
+      accept []
+      require_atomic? false
+      change Magus.Models.Provider.Changes.EnqueueCredentialValidation
+    end
   end
 
   policies do
@@ -103,6 +115,14 @@ defmodule Magus.Models.Provider do
 
     policy action(:update_owned) do
       authorize_if expr(owner_user_id == ^actor(:id))
+    end
+
+    policy action(:validate) do
+      authorize_if expr(owner_user_id == ^actor(:id))
+    end
+
+    policy action(:stamp_validation) do
+      authorize_if always()
     end
 
     policy action(:create) do
