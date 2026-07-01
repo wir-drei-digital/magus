@@ -32,6 +32,8 @@ defmodule Magus.Organizations do
       rpc_action :get_organization_by_slug, :read do
         get_by [:slug]
       end
+
+      rpc_action :org_usage_overview, :org_usage_overview
     end
 
     resource Magus.Organizations.OrganizationMember do

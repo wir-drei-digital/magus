@@ -68,6 +68,17 @@ defmodule Magus.Organizations.Organization do
       filter expr(stripe_subscription_id == ^arg(:stripe_subscription_id))
       get? true
     end
+
+    action :org_usage_overview, :map do
+      description "Pooled + per-member spend for the org Usage tab (owner: all; member: own)."
+      argument :organization_id, :uuid, allow_nil?: false
+
+      run fn input, context ->
+        Magus.Organizations.OrgUsage.for_organization(input.arguments.organization_id,
+          actor: context.actor
+        )
+      end
+    end
   end
 
   policies do
@@ -85,6 +96,10 @@ defmodule Magus.Organizations.Organization do
 
     policy action_type(:read) do
       authorize_if expr(exists(members, status == :active and user_id == ^actor(:id)))
+    end
+
+    policy action(:org_usage_overview) do
+      authorize_if actor_present()
     end
 
     policy action_type(:update) do
