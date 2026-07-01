@@ -148,6 +148,12 @@ defmodule Magus.Organizations.OrganizationMember do
       validate {Magus.Organizations.OrganizationMember.Validations.NotLastOwner, []}
     end
 
+    update :set_member_spend_cap do
+      description "Owner sets or clears a member's monthly spend cap override (CHF cents)."
+      accept [:spend_cap_cents]
+      require_atomic? false
+    end
+
     update :remove do
       accept []
       require_atomic? false
@@ -223,7 +229,14 @@ defmodule Magus.Organizations.OrganizationMember do
       authorize_if always()
     end
 
-    policy action([:invite, :resend_invite, :change_role, :remove, :transfer_ownership]) do
+    policy action([
+             :invite,
+             :resend_invite,
+             :change_role,
+             :remove,
+             :transfer_ownership,
+             :set_member_spend_cap
+           ]) do
       authorize_if {Magus.Organizations.OrganizationMember.Checks.ActorIsOrgOwner, []}
     end
 
