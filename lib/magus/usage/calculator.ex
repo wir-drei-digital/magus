@@ -188,7 +188,7 @@ defmodule Magus.Usage.Calculator do
         # are in good standing. A billable subscription that is NOT active is
         # delinquent (e.g. `past_due` during the dunning window): it gets no new
         # postpaid spend and its `no_spend_cap` opt-out is suspended — only the
-        # only the spend cap remains. Billing status is resolved through the
+        # spend cap remains. Billing status is resolved through the
         # provider seam; its Default reads the same `status` column, so behavior
         # is identical (cloud edition later reads live from Stripe).
         active =
@@ -300,7 +300,11 @@ defmodule Magus.Usage.Calculator do
     end
   end
 
-  defp billable?(%{stripe_subscription_id: id}), do: is_binary(id) and id != ""
+  # An org-sponsored account is billable via the org's subscription even though
+  # it has no personal Stripe subscription id. A personal account is billable
+  # once it carries a Stripe subscription id.
+  defp billable?(%{sponsor_org_id: org_id}) when is_binary(org_id), do: true
+  defp billable?(%{stripe_subscription_id: id}) when is_binary(id) and id != "", do: true
   defp billable?(_), do: false
 
   defp exempt?(user_id) do

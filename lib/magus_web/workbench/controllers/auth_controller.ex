@@ -6,6 +6,8 @@ defmodule MagusWeb.AuthController do
 
   def success(conn, activity, user, _token) do
     invite_token = get_session(conn, :invite_token)
+    org_invite_token = get_session(conn, :org_invite_token)
+    create_org? = get_session(conn, :create_org) == true
     # The SPA at the site root is the primary (and only) UI. `return_to` still
     # wins for deep-link sign-ins.
     return_to = get_session(conn, :return_to) || ~p"/"
@@ -21,11 +23,16 @@ defmodule MagusWeb.AuthController do
       conn
       |> delete_session(:return_to)
       |> delete_session(:invite_token)
+      |> delete_session(:org_invite_token)
+      |> delete_session(:create_org)
       |> store_in_session(user)
       |> assign(:current_user, user)
       |> put_flash(:info, message)
 
     cond do
+      org_invite_token != nil ->
+        redirect(conn, to: ~p"/organizations/invite/#{org_invite_token}")
+
       invite_token != nil ->
         redirect(conn, to: ~p"/workspaces/invite/#{invite_token}")
 
@@ -34,6 +41,11 @@ defmodule MagusWeb.AuthController do
       # selected_plan_key never routes to the dead /onboarding/checkout (magus-rim5).
       Magus.Usage.billing_edition?() and user.selected_plan_key not in [nil, "free"] ->
         redirect(conn, to: "/onboarding/checkout?plan=#{user.selected_plan_key}")
+
+      # Optional post-registration org setup — only when the user opted in on the
+      # register page. Default signup (no flag) falls through to `return_to`.
+      create_org? ->
+        redirect(conn, to: ~p"/onboarding/organization")
 
       true ->
         redirect(conn, to: return_to)

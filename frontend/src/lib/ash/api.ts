@@ -892,6 +892,262 @@ export async function workspaceMemberUsage(
 	};
 }
 
+// ─── Organizations ─────────────────────────────────────────────────────────────
+
+export type OrgBillingInterval = 'annual' | 'monthly';
+export type OrgBillingStatus = 'active' | 'canceled' | 'incomplete' | 'past_due' | 'trialing';
+
+export type OrganizationDetail = {
+	id: string;
+	name: string;
+	slug: string;
+	billingInterval: OrgBillingInterval;
+	billingStatus: OrgBillingStatus;
+	currentPeriodStart: string | null;
+	currentPeriodEnd: string | null;
+	ownerId: string;
+};
+
+export type OrgMemberRole = 'member' | 'owner';
+export type OrgMemberStatus = 'active' | 'invited' | 'removed';
+
+export type OrgMemberEntry = {
+	id: string;
+	role: OrgMemberRole;
+	status: OrgMemberStatus;
+	spendCapCents: number | null;
+	inviteEmail: string | null;
+	invitedAt: string | null;
+	joinedAt: string | null;
+	organizationId: string;
+	userId: string | null;
+	user: { id: string; email: string; displayName: string | null } | null;
+};
+
+/** The signed-in user's own membership row, with the organization loaded. */
+export type MyOrgMembership = OrgMemberEntry & { organization: OrganizationDetail };
+
+const ORG_DETAIL_FIELDS = [
+	'id',
+	'name',
+	'slug',
+	'billingInterval',
+	'billingStatus',
+	'currentPeriodStart',
+	'currentPeriodEnd',
+	'ownerId'
+] as rpc.CreateOrganizationFields;
+
+const ORG_MEMBER_FIELDS = [
+	'id',
+	'role',
+	'status',
+	'spendCapCents',
+	'inviteEmail',
+	'invitedAt',
+	'joinedAt',
+	'organizationId',
+	'userId',
+	{ user: ['id', 'email', 'displayName'] }
+] as rpc.ListOrgMembersFields;
+
+const MY_ORG_FIELDS = [
+	...(ORG_MEMBER_FIELDS as unknown[]),
+	{ organization: ORG_DETAIL_FIELDS }
+] as rpc.MyOrganizationFields;
+
+/**
+ * The signed-in user's org membership (0 or 1 rows) with the organization
+ * loaded. Empty means "not in an org yet" — the settings shell then offers to
+ * create one. This action requires an explicit `fields` selection.
+ */
+export function myOrganization(): Promise<RpcResult<MyOrgMembership[]>> {
+	return run((opts) =>
+		rpc.myOrganization({ fields: MY_ORG_FIELDS, ...opts })
+	) as Promise<RpcResult<MyOrgMembership[]>>;
+}
+
+export function listOrgMembers(organizationId: string): Promise<RpcResult<OrgMemberEntry[]>> {
+	return run((opts) =>
+		rpc.listOrgMembers({ input: { organizationId }, fields: ORG_MEMBER_FIELDS, ...opts })
+	) as Promise<RpcResult<OrgMemberEntry[]>>;
+}
+
+export function inviteOrgMember(
+	organizationId: string,
+	inviteEmail: string
+): Promise<RpcResult<OrgMemberEntry>> {
+	return run((opts) =>
+		rpc.inviteOrgMember({
+			input: { organizationId, inviteEmail },
+			fields: ORG_MEMBER_FIELDS as rpc.InviteOrgMemberFields,
+			...opts
+		})
+	) as Promise<RpcResult<OrgMemberEntry>>;
+}
+
+/** Update action: takes the member row's primary key as `identity`. */
+export function changeOrgMemberRole(
+	memberId: string,
+	role: OrgMemberRole
+): Promise<RpcResult<OrgMemberEntry>> {
+	return run((opts) =>
+		rpc.changeOrgMemberRole({
+			identity: memberId,
+			input: { role },
+			fields: ORG_MEMBER_FIELDS as rpc.ChangeOrgMemberRoleFields,
+			...opts
+		})
+	) as Promise<RpcResult<OrgMemberEntry>>;
+}
+
+/** Soft-removes a member (or revokes a pending invite). */
+export function removeOrgMember(memberId: string): Promise<RpcResult<OrgMemberEntry>> {
+	return run((opts) =>
+		rpc.removeOrgMember({
+			identity: memberId,
+			fields: ORG_MEMBER_FIELDS as rpc.RemoveOrgMemberFields,
+			...opts
+		})
+	) as Promise<RpcResult<OrgMemberEntry>>;
+}
+
+/** Promotes the target member to owner and demotes the acting owner to member. */
+export function transferOrgOwnership(memberId: string): Promise<RpcResult<OrgMemberEntry>> {
+	return run((opts) =>
+		rpc.transferOrgOwnership({
+			identity: memberId,
+			fields: ORG_MEMBER_FIELDS as rpc.TransferOrgOwnershipFields,
+			...opts
+		})
+	) as Promise<RpcResult<OrgMemberEntry>>;
+}
+
+export function resendOrgInvite(memberId: string): Promise<RpcResult<OrgMemberEntry>> {
+	return run((opts) =>
+		rpc.resendOrgInvite({
+			identity: memberId,
+			fields: ORG_MEMBER_FIELDS as rpc.ResendOrgInviteFields,
+			...opts
+		})
+	) as Promise<RpcResult<OrgMemberEntry>>;
+}
+
+/** Sets (or clears, with `null`) the per-member monthly spend cap in cents. */
+export function setMemberSpendCap(
+	memberId: string,
+	spendCapCents: number | null
+): Promise<RpcResult<OrgMemberEntry>> {
+	return run((opts) =>
+		rpc.setMemberSpendCap({
+			identity: memberId,
+			input: { spendCapCents },
+			fields: ORG_MEMBER_FIELDS as rpc.SetMemberSpendCapFields,
+			...opts
+		})
+	) as Promise<RpcResult<OrgMemberEntry>>;
+}
+
+/** The signed-in member leaves the organization (own membership row). */
+export function leaveOrg(memberId: string): Promise<RpcResult<OrgMemberEntry>> {
+	return run((opts) =>
+		rpc.leaveOrg({
+			identity: memberId,
+			fields: ORG_MEMBER_FIELDS as rpc.LeaveOrgFields,
+			...opts
+		})
+	) as Promise<RpcResult<OrgMemberEntry>>;
+}
+
+export function createOrganization(
+	name: string,
+	slug: string
+): Promise<RpcResult<OrganizationDetail>> {
+	return run((opts) =>
+		rpc.createOrganization({
+			input: { name, slug },
+			fields: ORG_DETAIL_FIELDS,
+			...opts
+		})
+	) as Promise<RpcResult<OrganizationDetail>>;
+}
+
+/** A member's pooled-spend contribution for the org Usage tab, keyed by user. */
+export type OrgUsageMember = {
+	userId: string;
+	displayName: string | null;
+	spentCents: number;
+	capCents: number | null;
+};
+
+/** Pooled + per-member spend for the org Usage tab. */
+export type OrgUsageOverview = {
+	pooledSpentCents: number;
+	seatCount: number;
+	members: OrgUsageMember[];
+};
+
+/**
+ * Pooled + per-member spend for the org Usage tab. The generic map action scopes
+ * the visible member set server-side (owner: all; member: own) and returns
+ * untyped snake_case keys; map them to a typed shape as `billingOverview` does.
+ */
+export async function orgUsageOverview(orgId: string): Promise<RpcResult<OrgUsageOverview>> {
+	const result = await run<Record<string, unknown> | null>((opts) =>
+		rpc.orgUsageOverview({ input: { organizationId: orgId }, ...opts })
+	);
+	if (!result.success) return result;
+	const data = result.data ?? {};
+	const rows = Array.isArray(data.members) ? (data.members as Record<string, unknown>[]) : [];
+	return {
+		success: true,
+		data: {
+			pooledSpentCents: Number(data.pooled_spent_cents ?? 0),
+			seatCount: Number(data.seat_count ?? 0),
+			members: rows.map((row) => ({
+				userId: String(row.user_id ?? ''),
+				displayName: typeof row.display_name === 'string' ? row.display_name : null,
+				spentCents: Number(row.spent_cents ?? 0),
+				capCents: row.cap_cents == null ? null : Number(row.cap_cents)
+			}))
+		}
+	};
+}
+
+/** Org-level billing summary for the org Billing tab (owner-only surface). */
+export type OrgBillingOverview = {
+	billingStatus: string;
+	currentPeriodEnd: string | null;
+	seatCount: number;
+	/** Whether the org has started Stripe checkout (has a subscription). */
+	billingSetUp: boolean;
+	/** Whether the commercial billing edition is present (false = open-core self-host). */
+	billingEdition: boolean;
+};
+
+/**
+ * Org billing summary for the Billing tab. The generic map action returns
+ * untyped snake_case keys; map them to a typed shape as `billingOverview` does.
+ */
+export async function orgBillingOverview(orgId: string): Promise<RpcResult<OrgBillingOverview>> {
+	const result = await run<Record<string, unknown> | null>((opts) =>
+		rpc.orgBillingOverview({ input: { organizationId: orgId }, ...opts })
+	);
+	if (!result.success) return result;
+	const data = result.data ?? {};
+	return {
+		success: true,
+		data: {
+			billingStatus: String(data.billing_status ?? 'none'),
+			currentPeriodEnd:
+				typeof data.current_period_end === 'string' ? data.current_period_end : null,
+			seatCount: Number(data.seat_count ?? 0),
+			billingSetUp: data.billing_set_up === true,
+			billingEdition: data.billing_edition === true
+		}
+	};
+}
+
 // ─── Chat ────────────────────────────────────────────────────────────────────
 
 export type ChatMode = 'chat' | 'search' | 'reasoning' | 'image_generation' | 'video_generation';
@@ -3989,6 +4245,22 @@ export function openBillingPortal(returnTo?: string): Promise<boolean> {
 export function startBaseCheckout(returnTo?: string): Promise<boolean> {
 	return stripeRedirect('/api/stripe/base-checkout', {
 		interval: 'monthly',
+		...(returnTo ? { return_to: returnTo } : {})
+	});
+}
+
+/** Starts org billing checkout for an organization (owner-only). */
+export function startOrgCheckout(organizationId: string, returnTo?: string): Promise<boolean> {
+	return stripeRedirect('/api/stripe/org-checkout', {
+		organization_id: organizationId,
+		...(returnTo ? { return_to: returnTo } : {})
+	});
+}
+
+/** Opens the Stripe billing portal for an organization (owner-only). */
+export function openOrgBillingPortal(organizationId: string, returnTo?: string): Promise<boolean> {
+	return stripeRedirect('/api/stripe/org-portal', {
+		organization_id: organizationId,
 		...(returnTo ? { return_to: returnTo } : {})
 	});
 }

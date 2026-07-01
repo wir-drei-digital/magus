@@ -33,6 +33,7 @@ defmodule Magus.Domains do
     Magus.Notifications,
     Magus.Drafts,
     Magus.Workspaces,
+    Magus.Organizations,
     Magus.FeatureUsage,
     Magus.Plan,
     Magus.Knowledge,

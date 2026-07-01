@@ -26,6 +26,11 @@ defmodule MagusWeb.OnboardingLive.RegisterLive do
     lang = Map.get(params, "lang")
     invite_token = Map.get(params, "invite_token") || Map.get(session, "invite_token")
 
+    org_invite_token =
+      Map.get(params, "org_invite_token") || Map.get(session, "org_invite_token")
+
+    create_org = truthy?(Map.get(params, "create_org"))
+
     form =
       Form.for_create(User, :register_with_password,
         domain: Magus.Accounts,
@@ -39,6 +44,8 @@ defmodule MagusWeb.OnboardingLive.RegisterLive do
       |> assign(:selected_plan, selected_plan)
       |> assign(:lang, lang)
       |> assign(:invite_token, invite_token)
+      |> assign(:org_invite_token, org_invite_token)
+      |> assign(:create_org, create_org)
       |> assign(:form, to_form(form))
       |> assign(:trigger_action, false)
 
@@ -75,6 +82,12 @@ defmodule MagusWeb.OnboardingLive.RegisterLive do
             <input type="hidden" name="user[selected_plan_key]" value={@selected_plan} />
             <input :if={@lang} type="hidden" name="user[language]" value={@lang} />
             <input :if={@invite_token} type="hidden" name="invite_token" value={@invite_token} />
+            <input
+              :if={@org_invite_token}
+              type="hidden"
+              name="org_invite_token"
+              value={@org_invite_token}
+            />
 
             <div>
               <.input
@@ -181,6 +194,19 @@ defmodule MagusWeb.OnboardingLive.RegisterLive do
                   {gettext("I confirm that I am at least 16 years old")}
                 </span>
               </label>
+
+              <label class="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="create_org"
+                  value="1"
+                  checked={@create_org}
+                  class="checkbox checkbox-primary mt-0.5"
+                />
+                <span class="text-sm">
+                  {gettext("Create an organization to invite teammates (optional)")}
+                </span>
+              </label>
             </div>
 
             <button type="submit" class="btn btn-primary w-full">
@@ -193,7 +219,9 @@ defmodule MagusWeb.OnboardingLive.RegisterLive do
           <div class="divider">{gettext("or")}</div>
 
           <.link
-            navigate={~p"/sign-in?#{sign_in_params(@selected_plan, @lang, @invite_token)}"}
+            navigate={
+              ~p"/sign-in?#{sign_in_params(@selected_plan, @lang, @invite_token, @org_invite_token)}"
+            }
             class="btn btn-outline w-full"
           >
             {gettext("Already have an account? Sign in")}
@@ -243,7 +271,7 @@ defmodule MagusWeb.OnboardingLive.RegisterLive do
   end
 
   @impl true
-  def handle_event("validate", %{"user" => user_params}, socket) do
+  def handle_event("validate", %{"user" => user_params} = params, socket) do
     # Add the selected plan to params
     user_params = Map.put(user_params, "selected_plan_key", socket.assigns.selected_plan)
 
@@ -251,7 +279,12 @@ defmodule MagusWeb.OnboardingLive.RegisterLive do
       Form.validate(socket.assigns.form, user_params, errors: true)
       |> to_form()
 
-    {:noreply, assign(socket, :form, form)}
+    # The "create an organization" checkbox is not a user field; preserve its
+    # state across re-renders (unchecked checkboxes are not submitted).
+    {:noreply,
+     socket
+     |> assign(:form, form)
+     |> assign(:create_org, truthy?(Map.get(params, "create_org")))}
   end
 
   @impl true
@@ -289,12 +322,18 @@ defmodule MagusWeb.OnboardingLive.RegisterLive do
     if Magus.Usage.billing_edition?(), do: @valid_plans, else: ["free"]
   end
 
-  defp sign_in_params(plan, lang, invite_token) do
+  # Normalizes the optional `create_org` opt-in flag (checkbox / query param).
+  defp truthy?(value), do: value in ["1", "true", true]
+
+  defp sign_in_params(plan, lang, invite_token, org_invite_token) do
     %{}
     |> then(fn p -> if plan != "free", do: Map.put(p, "plan", plan), else: p end)
     |> then(fn p -> if lang, do: Map.put(p, "lang", lang), else: p end)
     |> then(fn p ->
       if invite_token, do: Map.put(p, "invite_token", invite_token), else: p
+    end)
+    |> then(fn p ->
+      if org_invite_token, do: Map.put(p, "org_invite_token", org_invite_token), else: p
     end)
   end
 end
