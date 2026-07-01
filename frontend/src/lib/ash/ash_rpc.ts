@@ -9735,6 +9735,82 @@ export async function getOrganizationBySlug<Fields extends GetOrganizationBySlug
 }
 
 
+export type OrgBillingOverviewInput = {
+  organizationId: UUID;
+};
+
+export type InferOrgBillingOverviewResult = Record<string, any>;
+
+export type OrgBillingOverviewResult = | { success: true; data: InferOrgBillingOverviewResult; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Organization
+ *
+ * @ashActionType :action
+ */
+export async function orgBillingOverview(
+  config: {
+  tenant?: string;
+  input: OrgBillingOverviewInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<OrgBillingOverviewResult> {
+  const payload = {
+    action: "org_billing_overview",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeActionRpcRequest<OrgBillingOverviewResult>(
+    payload,
+    config
+  );
+}
+
+
+export type OrgUsageOverviewInput = {
+  organizationId: UUID;
+};
+
+export type InferOrgUsageOverviewResult = Record<string, any>;
+
+export type OrgUsageOverviewResult = | { success: true; data: InferOrgUsageOverviewResult; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Organization
+ *
+ * @ashActionType :action
+ */
+export async function orgUsageOverview(
+  config: {
+  tenant?: string;
+  input: OrgUsageOverviewInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<OrgUsageOverviewResult> {
+  const payload = {
+    action: "org_usage_overview",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeActionRpcRequest<OrgUsageOverviewResult>(
+    payload,
+    config
+  );
+}
+
+
 export type UpdateOrganizationInput = {
   name?: string;
 };
@@ -9775,6 +9851,92 @@ export async function updateOrganization<Fields extends UpdateOrganizationFields
   };
 
   return executeActionRpcRequest<UpdateOrganizationResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
+export type AcceptOrgMemberFields = UnifiedFieldSelection<OrganizationMemberResourceSchema>[];
+
+export type InferAcceptOrgMemberResult<
+  Fields extends AcceptOrgMemberFields | undefined,
+> = InferResult<OrganizationMemberResourceSchema, Fields>;
+
+export type AcceptOrgMemberResult<Fields extends AcceptOrgMemberFields | undefined = undefined> = | { success: true; data: InferAcceptOrgMemberResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Update an existing OrganizationMember
+ *
+ * @ashActionType :update
+ */
+export async function acceptOrgMember<Fields extends AcceptOrgMemberFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: UUIDv7;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<AcceptOrgMemberResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "accept_org_member",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<AcceptOrgMemberResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
+export type ChangeOrgMemberRoleInput = {
+  role: "member" | "owner";
+};
+
+export type ChangeOrgMemberRoleFields = UnifiedFieldSelection<OrganizationMemberResourceSchema>[];
+
+export type InferChangeOrgMemberRoleResult<
+  Fields extends ChangeOrgMemberRoleFields | undefined,
+> = InferResult<OrganizationMemberResourceSchema, Fields>;
+
+export type ChangeOrgMemberRoleResult<Fields extends ChangeOrgMemberRoleFields | undefined = undefined> = | { success: true; data: InferChangeOrgMemberRoleResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Update an existing OrganizationMember
+ *
+ * @ashActionType :update
+ */
+export async function changeOrgMemberRole<Fields extends ChangeOrgMemberRoleFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: UUIDv7;
+  input: ChangeOrgMemberRoleInput;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ChangeOrgMemberRoleResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "change_org_member_role",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<ChangeOrgMemberRoleResult<Fields extends undefined ? [] : Fields>>(
     payload,
     config
   );
@@ -9869,6 +10031,46 @@ export async function inviteOrgMember<Fields extends InviteOrgMemberFields | und
 }
 
 
+export type LeaveOrgFields = UnifiedFieldSelection<OrganizationMemberResourceSchema>[];
+
+export type InferLeaveOrgResult<
+  Fields extends LeaveOrgFields | undefined,
+> = InferResult<OrganizationMemberResourceSchema, Fields>;
+
+export type LeaveOrgResult<Fields extends LeaveOrgFields | undefined = undefined> = | { success: true; data: InferLeaveOrgResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Update an existing OrganizationMember
+ *
+ * @ashActionType :update
+ */
+export async function leaveOrg<Fields extends LeaveOrgFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: UUIDv7;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<LeaveOrgResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "leave_org",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<LeaveOrgResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type ListOrgMembersInput = {
   organizationId: UUID;
 };
@@ -9910,6 +10112,213 @@ export async function listOrgMembers<Fields extends ListOrgMembersFields>(
   };
 
   return executeActionRpcRequest<ListOrgMembersResult<Fields>>(
+    payload,
+    config
+  );
+}
+
+
+export type MyOrganizationFields = UnifiedFieldSelection<OrganizationMemberResourceSchema>[];
+export type InferMyOrganizationResult<
+  Fields extends MyOrganizationFields,
+> = Array<InferResult<OrganizationMemberResourceSchema, Fields>>;
+
+export type MyOrganizationResult<Fields extends MyOrganizationFields> = | { success: true; data: InferMyOrganizationResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Read OrganizationMember records
+ *
+ * @ashActionType :read
+ */
+export async function myOrganization<Fields extends MyOrganizationFields>(
+  config: {
+  tenant?: string;
+  fields: Fields;
+  filter?: OrganizationMemberFilterInput;
+  sort?: SortString<OrganizationMemberSortField> | SortString<OrganizationMemberSortField>[];
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<MyOrganizationResult<Fields>> {
+  const payload = {
+    action: "my_organization",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    ...(config.fields !== undefined && { fields: config.fields }),
+    ...(config.filter && { filter: config.filter }),
+    ...(config.sort && { sort: Array.isArray(config.sort) ? config.sort.join(",") : config.sort })
+  };
+
+  return executeActionRpcRequest<MyOrganizationResult<Fields>>(
+    payload,
+    config
+  );
+}
+
+
+export type RemoveOrgMemberFields = UnifiedFieldSelection<OrganizationMemberResourceSchema>[];
+
+export type InferRemoveOrgMemberResult<
+  Fields extends RemoveOrgMemberFields | undefined,
+> = InferResult<OrganizationMemberResourceSchema, Fields>;
+
+export type RemoveOrgMemberResult<Fields extends RemoveOrgMemberFields | undefined = undefined> = | { success: true; data: InferRemoveOrgMemberResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Update an existing OrganizationMember
+ *
+ * @ashActionType :update
+ */
+export async function removeOrgMember<Fields extends RemoveOrgMemberFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: UUIDv7;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<RemoveOrgMemberResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "remove_org_member",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<RemoveOrgMemberResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
+export type ResendOrgInviteFields = UnifiedFieldSelection<OrganizationMemberResourceSchema>[];
+
+export type InferResendOrgInviteResult<
+  Fields extends ResendOrgInviteFields | undefined,
+> = InferResult<OrganizationMemberResourceSchema, Fields>;
+
+export type ResendOrgInviteResult<Fields extends ResendOrgInviteFields | undefined = undefined> = | { success: true; data: InferResendOrgInviteResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Update an existing OrganizationMember
+ *
+ * @ashActionType :update
+ */
+export async function resendOrgInvite<Fields extends ResendOrgInviteFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: UUIDv7;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ResendOrgInviteResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "resend_org_invite",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<ResendOrgInviteResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
+export type SetMemberSpendCapInput = {
+  spendCapCents?: number | null;
+};
+
+export type SetMemberSpendCapFields = UnifiedFieldSelection<OrganizationMemberResourceSchema>[];
+
+export type InferSetMemberSpendCapResult<
+  Fields extends SetMemberSpendCapFields | undefined,
+> = InferResult<OrganizationMemberResourceSchema, Fields>;
+
+export type SetMemberSpendCapResult<Fields extends SetMemberSpendCapFields | undefined = undefined> = | { success: true; data: InferSetMemberSpendCapResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Update an existing OrganizationMember
+ *
+ * @ashActionType :update
+ */
+export async function setMemberSpendCap<Fields extends SetMemberSpendCapFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: UUIDv7;
+  input?: SetMemberSpendCapInput;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<SetMemberSpendCapResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "set_member_spend_cap",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<SetMemberSpendCapResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
+export type TransferOrgOwnershipFields = UnifiedFieldSelection<OrganizationMemberResourceSchema>[];
+
+export type InferTransferOrgOwnershipResult<
+  Fields extends TransferOrgOwnershipFields | undefined,
+> = InferResult<OrganizationMemberResourceSchema, Fields>;
+
+export type TransferOrgOwnershipResult<Fields extends TransferOrgOwnershipFields | undefined = undefined> = | { success: true; data: InferTransferOrgOwnershipResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Update an existing OrganizationMember
+ *
+ * @ashActionType :update
+ */
+export async function transferOrgOwnership<Fields extends TransferOrgOwnershipFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: UUIDv7;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<TransferOrgOwnershipResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "transfer_org_ownership",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<TransferOrgOwnershipResult<Fields extends undefined ? [] : Fields>>(
     payload,
     config
   );
