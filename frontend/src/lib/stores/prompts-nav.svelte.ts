@@ -23,22 +23,25 @@ class PromptsNav {
 		this.#loadKey = key;
 		this.loading = true;
 
-		const [favoritesResult, listResult] = await Promise.all([
-			myFavoritePrompts(),
-			workspaceId ? workspacePrompts(workspaceId) : myPrompts()
-		]);
+		try {
+			const [favoritesResult, listResult] = await Promise.all([
+				myFavoritePrompts(),
+				workspaceId ? workspacePrompts(workspaceId) : myPrompts()
+			]);
 
-		if (this.#loadKey !== key) return;
+			if (this.#loadKey !== key) return;
 
-		this.favorites = favoritesResult.success ? favoritesResult.data : [];
-		if (listResult.success) {
-			this.shared = listResult.data.filter((prompt) => prompt.isSharedToWorkspace);
-			this.personal = listResult.data.filter((prompt) => !prompt.isSharedToWorkspace);
-		} else {
-			this.shared = [];
-			this.personal = [];
+			this.favorites = favoritesResult.success ? favoritesResult.data : [];
+			if (listResult.success) {
+				this.shared = listResult.data.filter((prompt) => prompt.isSharedToWorkspace);
+				this.personal = listResult.data.filter((prompt) => !prompt.isSharedToWorkspace);
+			} else {
+				this.shared = [];
+				this.personal = [];
+			}
+		} finally {
+			if (this.#loadKey === key) this.loading = false;
 		}
-		this.loading = false;
 	}
 
 	refresh(): void {

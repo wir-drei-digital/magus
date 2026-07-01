@@ -69,8 +69,10 @@
 		}
 		approving = { ...approving, [item.id]: true };
 		try {
-			if (item.targetConversationId) {
+			if (item.targetConversationId && phrase) {
 				await sendUserMessage(item.targetConversationId, phrase, []);
+			} else {
+				console.warn('Skill approval notification missing target conversation or phrase', item.id);
 			}
 			notificationFeed.markRead([item.id]);
 			if (item.targetConversationId) {

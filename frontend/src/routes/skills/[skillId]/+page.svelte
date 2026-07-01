@@ -497,8 +497,8 @@
 								</tr>
 							</thead>
 							<tbody>
-								{#each skill.fileManifest as rawEntry (String((rawEntry as Record<string, unknown>).path ?? ''))}
-									{@const entry = toEntry(rawEntry as Record<string, unknown>)}
+								{#each skill.fileManifest as rawEntry (String(rawEntry.path ?? ''))}
+									{@const entry = toEntry(rawEntry)}
 									<tr class="border-b last:border-0 hover:bg-muted/20">
 										<td class="py-1.5 pl-3 pr-2 font-mono">
 											{entry.path}

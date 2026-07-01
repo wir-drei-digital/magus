@@ -50,19 +50,22 @@ class SkillsNav {
 		this.#loadKey = key;
 		this.loading = true;
 
-		const result = await (workspaceId ? workspaceSkills(workspaceId) : mySkills());
+		try {
+			const result = await (workspaceId ? workspaceSkills(workspaceId) : mySkills());
 
-		if (this.#loadKey !== key) return;
+			if (this.#loadKey !== key) return;
 
-		if (result.success) {
-			const partitioned = partitionSkills(result.data, workspaceId);
-			this.personal = partitioned.personal;
-			this.workspace = partitioned.workspace;
-		} else {
-			this.personal = [];
-			this.workspace = [];
+			if (result.success) {
+				const partitioned = partitionSkills(result.data, workspaceId);
+				this.personal = partitioned.personal;
+				this.workspace = partitioned.workspace;
+			} else {
+				this.personal = [];
+				this.workspace = [];
+			}
+		} finally {
+			if (this.#loadKey === key) this.loading = false;
 		}
-		this.loading = false;
 	}
 
 	refresh(): void {
