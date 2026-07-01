@@ -6,6 +6,25 @@ defmodule Magus.Skills.Skill do
     authorizers: [Ash.Policy.Authorizer],
     notifiers: [Ash.Notifier.PubSub]
 
+  @authoring_fields [
+    :name,
+    :display_name,
+    :description,
+    :body,
+    :requested_tools,
+    :required_secrets,
+    :runtime_hints,
+    :metadata,
+    :version,
+    :license,
+    :compatibility,
+    :icon,
+    :color,
+    :source_format,
+    :source_url,
+    :workspace_id
+  ]
+
   postgres do
     table "skills"
     repo Magus.Repo
@@ -50,55 +69,21 @@ defmodule Magus.Skills.Skill do
 
     create :create do
       primary? true
-
-      accept [
-        :name,
-        :display_name,
-        :description,
-        :body,
-        :requested_tools,
-        :required_secrets,
-        :runtime_hints,
-        :metadata,
-        :version,
-        :license,
-        :compatibility,
-        :icon,
-        :color,
-        :source_format,
-        :source_url,
-        :workspace_id
-      ]
-
+      accept @authoring_fields
       change relate_actor(:user)
     end
 
     create :import do
       description "Create a skill from an imported bundle (accepts bundle fields)."
 
-      accept [
-        :name,
-        :display_name,
-        :description,
-        :body,
-        :requested_tools,
-        :required_secrets,
-        :runtime_hints,
-        :metadata,
-        :version,
-        :license,
-        :compatibility,
-        :icon,
-        :color,
-        :source_format,
-        :source_url,
-        :workspace_id,
-        :bundle_path,
-        :bundle_backend,
-        :bundle_byte_size,
-        :file_manifest,
-        :has_executable_bundle
-      ]
+      accept @authoring_fields ++
+               [
+                 :bundle_path,
+                 :bundle_backend,
+                 :bundle_byte_size,
+                 :file_manifest,
+                 :has_executable_bundle
+               ]
 
       change relate_actor(:user)
     end
@@ -246,7 +231,6 @@ defmodule Magus.Skills.Skill do
       public? true
     end
 
-    # Bundle columns: populated by the import/materialization plan (1C). Inert here.
     attribute :has_executable_bundle, :boolean do
       default false
       allow_nil? false

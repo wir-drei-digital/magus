@@ -8,7 +8,12 @@ defmodule Magus.Skills do
 
   use Ash.Domain, otp_app: :magus, extensions: [AshTypescript.Rpc]
 
-  @doc "Whether the user-managed skills feature is enabled for this instance."
+  @doc """
+  Whether the user-managed skills feature is enabled for this instance.
+
+  When false, user skills are hidden from discovery and bundle import is refused
+  (the runtime surface is disabled).
+  """
   def enabled? do
     Application.get_env(:magus, __MODULE__, [])
     |> Keyword.get(:enabled, true)

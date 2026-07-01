@@ -36,3 +36,42 @@ defmodule Magus.Skills.ImportTest do
     assert {:error, :missing_name} = Import.import_bundle(bytes, actor: owner)
   end
 end
+
+defmodule Magus.Skills.ImportKillSwitchTest do
+  # async: false because we mutate application env
+  use Magus.ResourceCase, async: false
+
+  alias Magus.Skills.Import
+
+  defp zip(entries) do
+    files = Enum.map(entries, fn {p, c} -> {String.to_charlist(p), c} end)
+    {:ok, {_n, bytes}} = :zip.create(~c"b.zip", files, [:memory])
+    bytes
+  end
+
+  setup do
+    original = Application.get_env(:magus, Magus.Skills)
+
+    on_exit(fn ->
+      case original do
+        nil -> Application.delete_env(:magus, Magus.Skills)
+        cfg -> Application.put_env(:magus, Magus.Skills, cfg)
+      end
+    end)
+
+    :ok
+  end
+
+  test "with feature disabled, import_bundle returns {:error, :skills_disabled}" do
+    owner = generate(user())
+
+    bytes =
+      zip([
+        {"SKILL.md", "---\nname: blocked\ndescription: D\n---\nbody"}
+      ])
+
+    Application.put_env(:magus, Magus.Skills, enabled: false)
+
+    assert {:error, :skills_disabled} = Import.import_bundle(bytes, actor: owner)
+  end
+end

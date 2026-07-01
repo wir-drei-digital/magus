@@ -7,6 +7,8 @@ defmodule Magus.Skills.Discovery do
   Refs: built-in -> "builtin:<name>", user skill -> "user:<id>".
   """
 
+  require Logger
+
   alias Magus.Agents.Skills.Registry
 
   @type view :: %{
@@ -25,7 +27,11 @@ defmodule Magus.Skills.Discovery do
   """
   @spec list_for_actor(struct() | nil) :: [view()]
   def list_for_actor(actor) do
-    builtin_views() ++ user_views(actor)
+    if Magus.Skills.enabled?() do
+      builtin_views() ++ user_views(actor)
+    else
+      builtin_views()
+    end
   end
 
   defp builtin_views do
@@ -58,7 +64,8 @@ defmodule Magus.Skills.Discovery do
           }
         end)
 
-      _ ->
+      {:error, err} ->
+        Logger.warning("Skills.Discovery: failed to list user skills: #{inspect(err)}")
         []
     end
   end
