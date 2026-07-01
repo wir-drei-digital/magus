@@ -57,6 +57,11 @@ defmodule Magus.Organizations do
     resource Magus.Organizations.OrganizationMember do
       define :invite_org_member, action: :invite, args: [:organization_id, :invite_email]
       define :list_org_members, action: :by_organization, args: [:organization_id]
+
+      define :list_active_org_members,
+        action: :active_with_user_by_organization,
+        args: [:organization_id]
+
       define :get_org_member_by_token, action: :by_invite_token, args: [:invite_token]
       define :change_org_member_role, action: :change_role, args: [:role]
       define :remove_org_member, action: :remove

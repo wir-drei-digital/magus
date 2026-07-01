@@ -5,8 +5,8 @@ defmodule Magus.Usage.Account do
   Step A note: this resource STILL carries the Stripe columns
   (`stripe_customer_id`, `stripe_subscription_id`, `status`,
   `last_payment_status`) and Stripe-write actions (`update_subscription_from_stripe`,
-  `update_payment_status`, `downgrade_to_free`, `by_stripe_subscription_id`).
-  Those are the cloud-write surface to be physically split out at Step B / Phase 4.
+  `update_payment_status`, `downgrade_to_free`), plus the `by_stripe_subscription_id`
+  read. Those are the cloud-write surface to be physically split out at Step B / Phase 4.
   Core governance code does not read the Stripe columns directly: it goes through
   `Magus.Usage.BillingStatusProvider`.
   """

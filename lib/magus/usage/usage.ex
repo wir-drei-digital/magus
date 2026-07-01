@@ -104,4 +104,20 @@ defmodule Magus.Usage do
   """
   @spec billing_edition?() :: boolean()
   def billing_edition?, do: Application.get_env(:magus, :billing_edition?, false)
+
+  @doc """
+  Resolve the free plan and downgrade `account` to it. Convenience over
+  `get_free_plan/1` + `downgrade_to_free/3` for billing revert/cancel paths.
+  Returns the downgrade result, or `{:error, :no_free_plan}` when no free plan
+  is configured.
+  """
+  def downgrade_to_free_plan(account, opts \\ []) do
+    case get_free_plan(opts) do
+      {:ok, free} when not is_nil(free) ->
+        downgrade_to_free(account, %{usage_plan_id: free.id}, opts)
+
+      _ ->
+        {:error, :no_free_plan}
+    end
+  end
 end
