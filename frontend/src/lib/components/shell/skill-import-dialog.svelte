@@ -11,7 +11,7 @@
 	let busy = $state(false);
 	let errors = $state<string[]>([]);
 
-	// Reset internal state whenever the dialog opens.
+	// Reset internal state when the dialog closes so the next open starts clean.
 	$effect(() => {
 		if (!skillsNav.importOpen) {
 			file = null;
@@ -70,7 +70,7 @@
 
 			{#if errors.length > 0}
 				<ul class="space-y-0.5 text-xs text-destructive">
-					{#each errors as msg (msg)}
+					{#each errors as msg, i (i)}
 						<li>{msg}</li>
 					{/each}
 				</ul>
