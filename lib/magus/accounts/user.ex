@@ -185,14 +185,24 @@ defmodule Magus.Accounts.User do
 
     update :select_model do
       accept [:selected_model_id]
+      require_atomic? false
+      validate {Magus.Chat.Model.Validations.SelectableByActor, attribute: :selected_model_id}
     end
 
     update :select_image_model do
       accept [:selected_image_model_id]
+      require_atomic? false
+
+      validate {Magus.Chat.Model.Validations.SelectableByActor,
+                attribute: :selected_image_model_id}
     end
 
     update :select_video_model do
       accept [:selected_video_model_id]
+      require_atomic? false
+
+      validate {Magus.Chat.Model.Validations.SelectableByActor,
+                attribute: :selected_video_model_id}
     end
 
     update :update_image_generation_settings do

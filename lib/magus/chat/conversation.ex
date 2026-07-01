@@ -154,14 +154,24 @@ defmodule Magus.Chat.Conversation do
 
     update :set_model do
       accept [:selected_model_id]
+      require_atomic? false
+      validate {Magus.Chat.Model.Validations.SelectableByActor, attribute: :selected_model_id}
     end
 
     update :set_image_model do
       accept [:selected_image_model_id]
+      require_atomic? false
+
+      validate {Magus.Chat.Model.Validations.SelectableByActor,
+                attribute: :selected_image_model_id}
     end
 
     update :set_video_model do
       accept [:selected_video_model_id]
+      require_atomic? false
+
+      validate {Magus.Chat.Model.Validations.SelectableByActor,
+                attribute: :selected_video_model_id}
     end
 
     update :generate_name do
