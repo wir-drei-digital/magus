@@ -77,3 +77,37 @@ defmodule Magus.Skills.DiscoveryTest do
     assert length(refs) == length(Enum.uniq(refs))
   end
 end
+
+defmodule Magus.Skills.DiscoveryKillSwitchTest do
+  # async: false because we mutate application env
+  use Magus.ResourceCase, async: false
+
+  alias Magus.Skills
+  alias Magus.Skills.Discovery
+
+  setup do
+    original = Application.get_env(:magus, Magus.Skills)
+
+    on_exit(fn ->
+      case original do
+        nil -> Application.delete_env(:magus, Magus.Skills)
+        cfg -> Application.put_env(:magus, Magus.Skills, cfg)
+      end
+    end)
+
+    :ok
+  end
+
+  test "with feature disabled, list_for_actor returns no user:-prefixed refs even when owner has a skill" do
+    owner = generate(user())
+    {:ok, skill} = Skills.create_skill(%{name: "hidden-skill", description: "d"}, actor: owner)
+
+    Application.put_env(:magus, Magus.Skills, enabled: false)
+
+    views = Discovery.list_for_actor(owner)
+    refs = Enum.map(views, & &1.ref)
+
+    refute ("user:" <> skill.id) in refs, "user skill should not appear when feature is disabled"
+    assert Enum.all?(views, &(&1.source == :builtin)), "only builtin skills should be returned"
+  end
+end

@@ -21,7 +21,9 @@ defmodule Magus.Skills.Import.Unpack do
 
   defp from_entries(entries) do
     normalized =
-      Enum.map(entries, fn {name, content} -> {strip_top_dir(to_string(name)), content} end)
+      entries
+      |> Enum.map(fn {name, content} -> {to_string(name), content} end)
+      |> maybe_strip_top_dir()
 
     cond do
       length(normalized) > @max_files ->
@@ -44,9 +46,27 @@ defmodule Magus.Skills.Import.Unpack do
     end
   end
 
-  # An archive may wrap everything in a single top-level dir (e.g. "my-skill/").
-  # Only strip it when EVERY entry shares that prefix; otherwise keep paths as-is.
-  defp strip_top_dir(path), do: path
+  # Strip a single shared top-level directory from all entries, only when every
+  # entry lives under one common prefix AND at least one entry is actually nested
+  # (so a flat bundle is untouched).
+  defp maybe_strip_top_dir(entries) do
+    top_dirs =
+      entries
+      |> Enum.map(fn {p, _} -> p |> Path.split() |> List.first() end)
+      |> Enum.uniq()
+
+    case top_dirs do
+      [prefix] when is_binary(prefix) ->
+        if Enum.any?(entries, fn {p, _} -> String.contains?(p, "/") end) do
+          Enum.map(entries, fn {p, c} -> {String.replace_prefix(p, prefix <> "/", ""), c} end)
+        else
+          entries
+        end
+
+      _ ->
+        entries
+    end
+  end
 
   defp total_bytes(entries),
     do: Enum.reduce(entries, 0, fn {_p, c}, acc -> acc + byte_size(c) end)

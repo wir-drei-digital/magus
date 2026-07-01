@@ -31,4 +31,23 @@ defmodule Magus.Skills.Import.UnpackTest do
   test "rejects invalid zip bytes" do
     assert {:error, :invalid_zip} = Unpack.unpack("not a zip")
   end
+
+  test "strips a shared top-level directory (folder-wrapped zip)" do
+    bytes =
+      zip([
+        {"my-skill/SKILL.md", "---\nname: x\n---\nbody"},
+        {"my-skill/scripts/run.py", "print(1)"}
+      ])
+
+    assert {:ok, %{skill_md: md, files: files}} = Unpack.unpack(bytes)
+    assert md =~ "name: x"
+    assert {"scripts/run.py", "print(1)"} in files
+  end
+
+  test "does not strip when entries share no single top-level directory" do
+    bytes = zip([{"SKILL.md", "---\nname: x\n---\nbody"}, {"scripts/run.py", "print(1)"}])
+    assert {:ok, %{skill_md: md, files: files}} = Unpack.unpack(bytes)
+    assert md =~ "name: x"
+    assert {"scripts/run.py", "print(1)"} in files
+  end
 end

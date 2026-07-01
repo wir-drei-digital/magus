@@ -9,13 +9,22 @@ defmodule Magus.Skills.Import do
 
   @spec import_bundle(binary, keyword) :: {:ok, struct} | {:error, term}
   def import_bundle(zip_bytes, opts) when is_binary(zip_bytes) do
+    if not Magus.Skills.enabled?() do
+      {:error, :skills_disabled}
+    else
+      do_import_bundle(zip_bytes, opts)
+    end
+  end
+
+  defp do_import_bundle(zip_bytes, opts) do
     actor = Keyword.fetch!(opts, :actor)
     workspace_id = Keyword.get(opts, :workspace_id)
 
+    sha = sha256_hex(zip_bytes)
+    bundle_path = "skills/#{actor.id}/#{sha}.zip"
+
     with {:ok, %{skill_md: md, files: files}} <- Unpack.unpack(zip_bytes),
          {:ok, manifest_attrs} <- Parser.parse(md),
-         sha <- sha256_hex(zip_bytes),
-         bundle_path <- "skills/#{actor.id}/#{sha}.zip",
          {:ok, _} <- Magus.Files.Storage.store(bundle_path, zip_bytes) do
       attrs =
         Map.merge(manifest_attrs, %{
