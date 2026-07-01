@@ -35,6 +35,7 @@ defmodule Magus.Workspaces.Workspace do
 
       change Magus.Workspaces.Workspace.Changes.CreateOwnerMember
       change Magus.Workspaces.Workspace.Changes.CreateDefaultAgent
+      change Magus.Workspaces.Workspace.Changes.TagCreatorOrg
     end
 
     update :update do
