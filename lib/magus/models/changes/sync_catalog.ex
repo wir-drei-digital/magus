@@ -10,7 +10,14 @@ defmodule Magus.Models.Changes.SyncCatalog do
   def change(changeset, _opts, _context) do
     Ash.Changeset.after_transaction(changeset, fn _changeset, result ->
       # Rolled-back writes change nothing, so no reload on error results.
-      if match?({:ok, _}, result), do: Magus.Models.CatalogSync.request_reload()
+      # Owned (BYOK) rows never enter the catalog (see CatalogSync.build_custom),
+      # so a reload for them is pure waste; skip it. Map.get returns nil for
+      # global rows and for resources without the field, preserving today's
+      # behavior for every global write.
+      with {:ok, record} <- result,
+           true <- is_nil(Map.get(record, :owner_user_id)) do
+        Magus.Models.CatalogSync.request_reload()
+      end
 
       result
     end)
