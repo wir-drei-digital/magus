@@ -53,6 +53,7 @@ defmodule Magus.Usage do
       define :downgrade_to_free, action: :downgrade_to_free
       define :update_subscription_from_stripe, action: :update_from_stripe
       define :update_payment_status, action: :update_payment_status
+      define :set_sponsor_org, action: :set_sponsor_org
 
       define :increment_storage_usage,
         action: :increment_storage,

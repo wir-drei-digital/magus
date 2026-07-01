@@ -149,7 +149,8 @@ defmodule Magus.Usage.Account do
         :current_period_start,
         :current_period_end,
         :storage_usage_bytes,
-        :sponsor_user_id
+        :sponsor_user_id,
+        :sponsor_org_id
       ]
     end
 
@@ -200,6 +201,12 @@ defmodule Magus.Usage.Account do
 
     update :update_payment_status do
       accept [:last_payment_status]
+    end
+
+    update :set_sponsor_org do
+      description "Set or clear the sponsoring organization for consolidated billing. nil clears (revert to personal)."
+      accept [:sponsor_org_id]
+      require_atomic? false
     end
 
     update :update_sponsored_plan do
@@ -383,6 +390,13 @@ defmodule Magus.Usage.Account do
       description "When set, this is a sponsored subscription paid for by the sponsor user. nil = personal subscription."
     end
 
+    attribute :sponsor_org_id, :uuid do
+      allow_nil? true
+      public? false
+
+      description "When set, this account's seat + usage bill to the given organization (org-consolidated billing). nil = personal billing."
+    end
+
     attribute :extra_seats, :integer do
       allow_nil? false
       default 0
@@ -443,6 +457,14 @@ defmodule Magus.Usage.Account do
 
     belongs_to :sponsor, Magus.Accounts.User do
       source_attribute :sponsor_user_id
+      destination_attribute :id
+      allow_nil? true
+      public? false
+      define_attribute? false
+    end
+
+    belongs_to :sponsor_org, Magus.Organizations.Organization do
+      source_attribute :sponsor_org_id
       destination_attribute :id
       allow_nil? true
       public? false
