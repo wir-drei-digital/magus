@@ -214,7 +214,7 @@ test('browse + open: skills-nav and gallery render; clicking a card loads the de
 	page
 }) => {
 	await mockRpc(page, { authenticated: true });
-	await page.goto('/next/skills');
+	await page.goto('/skills');
 
 	await expect(page.getByTestId('skills-nav')).toBeVisible();
 	await expect(page.getByTestId('skill-gallery')).toBeVisible();
@@ -235,7 +235,7 @@ test('runnable badge: bundled skill card shows sandbox chip; prompt-only does no
 	page
 }) => {
 	await mockRpc(page, { authenticated: true });
-	await page.goto('/next/skills');
+	await page.goto('/skills');
 
 	const cards = page.getByTestId('skill-card');
 	await expect(cards).toHaveCount(2);
@@ -288,7 +288,7 @@ test('import: opening dialog, setting a file, and submitting navigates to the ne
 		})
 	);
 
-	await page.goto('/next/skills');
+	await page.goto('/skills');
 
 	// Empty state is visible: click the import button to open the dialog.
 	await page.getByTestId('import-skill-empty').click();
@@ -336,7 +336,7 @@ test('create: filling the new-skill form and submitting navigates to the created
 		}
 	});
 
-	await page.goto('/next/skills/new');
+	await page.goto('/skills/new');
 
 	// The create form is immediately in edit mode for /new.
 	await expect(page.getByTestId('skill-name-input')).toBeVisible();
@@ -410,7 +410,7 @@ test('approval card: notification bell shows card; Approve sends the phrase via 
 		}
 	});
 
-	await page.goto('/next/skills');
+	await page.goto('/skills');
 
 	// The notification badge shows count 1.
 	await expect(page.getByTestId('notification-badge')).toHaveText('1');
