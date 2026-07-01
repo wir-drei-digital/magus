@@ -76,6 +76,11 @@ defmodule Magus.Workspaces.Workspace do
       change Magus.Workspaces.Workspace.Changes.RecalculateStorageUsage
     end
 
+    update :set_organization do
+      accept [:organization_id]
+      require_atomic? false
+    end
+
     read :all_workspaces do
       prepare build(sort: [inserted_at: :desc], load: [:members])
     end
@@ -102,6 +107,10 @@ defmodule Magus.Workspaces.Workspace do
              :decrement_storage,
              :recalculate_storage
            ]) do
+      authorize_if always()
+    end
+
+    bypass action(:set_organization) do
       authorize_if always()
     end
 
@@ -177,6 +186,12 @@ defmodule Magus.Workspaces.Workspace do
       description "Cached storage usage in bytes, updated on file create/delete"
     end
 
+    attribute :organization_id, :uuid do
+      allow_nil? true
+      public? true
+      description "Owning organization (nil = personal/individual workspace)."
+    end
+
     timestamps()
   end
 
@@ -187,6 +202,12 @@ defmodule Magus.Workspaces.Workspace do
     end
 
     has_many :members, Magus.Workspaces.WorkspaceMember do
+      public? true
+    end
+
+    belongs_to :organization, Magus.Organizations.Organization do
+      define_attribute? false
+      allow_nil? true
       public? true
     end
   end

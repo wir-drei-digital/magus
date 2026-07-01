@@ -1705,29 +1705,32 @@ export type JobRunAttributesOnlySchema = {
 // Workspace Schema
 export type WorkspaceResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "slug" | "allowedModelIds" | "isActive" | "storageUsageBytes" | "defaultAgentId";
+  __primitiveFields: "id" | "name" | "slug" | "allowedModelIds" | "isActive" | "storageUsageBytes" | "organizationId" | "defaultAgentId";
   id: UUIDv7;
   name: string;
   slug: string;
   allowedModelIds: Array<UUID> | null;
   isActive: boolean;
   storageUsageBytes: number;
+  organizationId: UUID | null;
   defaultAgentId: UUID | null;
   defaultAgent: { __type: "Relationship"; __resource: CustomAgentResourceSchema | null; };
   members: { __type: "Relationship"; __array: true; __resource: WorkspaceMemberResourceSchema; };
+  organization: { __type: "Relationship"; __resource: OrganizationResourceSchema | null; };
 };
 
 
 
 export type WorkspaceAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "slug" | "allowedModelIds" | "isActive" | "storageUsageBytes" | "defaultAgentId";
+  __primitiveFields: "id" | "name" | "slug" | "allowedModelIds" | "isActive" | "storageUsageBytes" | "organizationId" | "defaultAgentId";
   id: UUIDv7;
   name: string;
   slug: string;
   allowedModelIds: Array<UUID> | null;
   isActive: boolean;
   storageUsageBytes: number;
+  organizationId: UUID | null;
   defaultAgentId: UUID | null;
 };
 
@@ -5913,6 +5916,13 @@ export type WorkspaceFilterInput = {
     in?: Array<number>;
   };
 
+  organizationId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
   defaultAgentId?: {
     eq?: UUID;
     notEq?: UUID;
@@ -5924,6 +5934,8 @@ export type WorkspaceFilterInput = {
   defaultAgent?: CustomAgentFilterInput;
 
   members?: WorkspaceMemberFilterInput;
+
+  organization?: OrganizationFilterInput;
 
 };
 export type WorkspaceMemberFilterInput = {
@@ -6147,7 +6159,7 @@ export type JobFilterField = (typeof jobFilterFields)[number];
 export const jobRunFilterFields = ["id", "status", "startedAt", "completedAt", "errorMessage", "retryAttempt", "metadata"] as const;
 export type JobRunFilterField = (typeof jobRunFilterFields)[number];
 
-export const workspaceFilterFields = ["id", "name", "slug", "allowedModelIds", "isActive", "storageUsageBytes", "defaultAgentId", "defaultAgent", "members"] as const;
+export const workspaceFilterFields = ["id", "name", "slug", "allowedModelIds", "isActive", "storageUsageBytes", "organizationId", "defaultAgentId", "defaultAgent", "members", "organization"] as const;
 export type WorkspaceFilterField = (typeof workspaceFilterFields)[number];
 
 export const workspaceMemberFilterFields = ["id", "role", "status", "isActive", "invitedAt", "joinedAt", "deactivatedAt", "inviteEmail", "workspaceId", "userId", "workspace", "user"] as const;
@@ -6286,7 +6298,7 @@ export type JobSortField = (typeof jobSortFields)[number];
 export const jobRunSortFields = ["id", "status", "startedAt", "completedAt", "errorMessage", "retryAttempt", "metadata"] as const;
 export type JobRunSortField = (typeof jobRunSortFields)[number];
 
-export const workspaceSortFields = ["id", "name", "slug", "allowedModelIds", "isActive", "storageUsageBytes", "defaultAgentId"] as const;
+export const workspaceSortFields = ["id", "name", "slug", "allowedModelIds", "isActive", "storageUsageBytes", "organizationId", "defaultAgentId"] as const;
 export type WorkspaceSortField = (typeof workspaceSortFields)[number];
 
 export const workspaceMemberSortFields = ["id", "role", "status", "isActive", "invitedAt", "joinedAt", "deactivatedAt", "inviteEmail", "workspaceId", "userId"] as const;
