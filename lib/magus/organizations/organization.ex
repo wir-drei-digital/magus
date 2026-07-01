@@ -34,6 +34,7 @@ defmodule Magus.Organizations.Organization do
       accept [:name, :slug]
       change relate_actor(:owner)
       change Magus.Organizations.Organization.Changes.CreateOwnerMember
+      change Magus.Organizations.Organization.Changes.CreateSharedWorkspace
     end
 
     update :update do
