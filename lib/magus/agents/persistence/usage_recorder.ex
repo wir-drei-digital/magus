@@ -473,7 +473,7 @@ defmodule Magus.Agents.Persistence.UsageRecorder do
   end
 
   defp billing_target(sub) do
-    {Map.get(sub, :stripe_customer_id), Map.get(sub, :stripe_subscription_id)}
+    {sub.stripe_customer_id, sub.stripe_subscription_id}
   end
 
   # Tell the workbench shell to refresh its pay-as-you-go usage indicator now

@@ -206,7 +206,6 @@ defmodule Magus.Usage.Account do
     update :set_sponsor_org do
       description "Set or clear the sponsoring organization for consolidated billing. nil clears (revert to personal)."
       accept [:sponsor_org_id]
-      require_atomic? false
     end
 
     update :update_sponsored_plan do
