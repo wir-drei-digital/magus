@@ -200,6 +200,8 @@ defmodule Magus.Chat do
       define :get_model, action: :read, get_by: [:id]
       define :get_model_by_name, action: :by_name, args: [:name]
       define :get_model_by_key_with_provider, action: :by_key_with_provider, args: [:key]
+      define :create_owned_model, action: :create_owned
+      define :list_owned_models, action: :owned
     end
 
     resource Magus.Chat.RoutingSlot do

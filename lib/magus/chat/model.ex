@@ -96,6 +96,35 @@ defmodule Magus.Chat.Model do
       ]
     end
 
+    create :create_owned do
+      description "User-owned model under an owned provider (BYOK, text-only)."
+      argument :model_id, :string, allow_nil?: false
+
+      accept [
+        :name,
+        :provider,
+        :model_provider_id,
+        :context_window,
+        :input_cost_value,
+        :output_cost_value,
+        :input_cost_unit,
+        :output_cost_unit,
+        :output_modalities,
+        :input_modalities,
+        :supports_tools?,
+        :supports_reasoning?,
+        :short_description
+      ]
+
+      validate Magus.Chat.Model.Validations.WithinModelCap
+      change Magus.Chat.Model.Changes.BuildOwnedModel
+    end
+
+    read :owned do
+      description "Models owned by the actor."
+      filter expr(owner_user_id == ^actor(:id))
+    end
+
     update :update do
       primary? true
 
