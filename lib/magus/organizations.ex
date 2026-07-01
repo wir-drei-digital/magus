@@ -46,6 +46,11 @@ defmodule Magus.Organizations do
       define :create_organization, action: :create
       define :get_organization, action: :read, get_by: [:id]
       define :get_organization_by_slug, action: :read, get_by: [:slug]
+
+      define :get_organization_by_stripe_subscription_id,
+        action: :by_stripe_subscription_id,
+        args: [:stripe_subscription_id]
+
       define :update_organization, action: :update
     end
 
