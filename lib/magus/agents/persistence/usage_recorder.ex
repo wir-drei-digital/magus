@@ -451,13 +451,29 @@ defmodule Magus.Agents.Persistence.UsageRecorder do
   # guard, so a non-billable or zero-cost charge meters nothing. The core default
   # is a no-op for an unconfigured OSS instance.
   defp report_charge(sub, amount_cents, identifier) do
+    {customer_id, subscription_id} = billing_target(sub)
+
     Magus.Usage.MeteringSink.report_charge(%Magus.Usage.MeteringSink.Charge{
       user_id: sub.user_id,
       overflow_cents: amount_cents,
       identifier: identifier || "",
-      stripe_customer_id: Map.get(sub, :stripe_customer_id),
-      stripe_subscription_id: Map.get(sub, :stripe_subscription_id)
+      stripe_customer_id: customer_id,
+      stripe_subscription_id: subscription_id
     })
+  end
+
+  # When the account is org-sponsored, usage bills to the org's Stripe customer +
+  # subscription (pooled billing), not the member's own. Reading the org's opaque
+  # Stripe ids is pure core data access; in OSS they are nil and metering no-ops.
+  defp billing_target(%{sponsor_org_id: org_id}) when is_binary(org_id) do
+    case Magus.Organizations.get_organization(org_id, authorize?: false) do
+      {:ok, org} -> {org.stripe_customer_id, org.stripe_subscription_id}
+      _ -> {nil, nil}
+    end
+  end
+
+  defp billing_target(sub) do
+    {Map.get(sub, :stripe_customer_id), Map.get(sub, :stripe_subscription_id)}
   end
 
   # Tell the workbench shell to refresh its pay-as-you-go usage indicator now
