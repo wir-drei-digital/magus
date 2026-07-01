@@ -17,7 +17,9 @@ defmodule MagusWeb.OnboardingLive.CreateOrganizationLive do
   alias Magus.Organizations
   alias Magus.Organizations.Organization
 
-  on_mount {MagusWeb.LiveUserAuth, :live_user_required}
+  # Auth is required at the router level via the `:onboarding_organization`
+  # `ash_authentication_live_session` (`:live_user_required`); no module-level
+  # `on_mount` here, to avoid running the hook twice.
 
   @impl true
   def mount(_params, _session, socket) do
@@ -126,26 +128,20 @@ defmodule MagusWeb.OnboardingLive.CreateOrganizationLive do
   @impl true
   def handle_event("save", %{"organization" => params}, socket) do
     {params, auto_slug} = apply_auto_slug(params, socket)
-    user = socket.assigns.current_user
+    form = Form.validate(socket.assigns.form, params)
 
-    case Organizations.create_organization(
-           %{name: params["name"], slug: params["slug"]},
-           actor: user
-         ) do
+    case Form.submit(form, params: params) do
       {:ok, _org} ->
         {:noreply,
          socket
          |> put_flash(:info, gettext("Organization created."))
          |> push_navigate(to: ~p"/settings/organization/billing")}
 
-      {:error, _error} ->
-        # Surface validation errors (blank name, malformed/duplicate slug, ...).
-        form =
-          socket.assigns.form
-          |> Form.validate(params, errors: true)
-          |> to_form()
-
-        {:noreply, socket |> assign(:form, form) |> assign(:auto_slug, auto_slug)}
+      {:error, form} ->
+        # Thread the Ash error changeset back into the form so client-side
+        # validation errors AND server-side failures (e.g. a duplicate slug
+        # hitting the `unique_slug` identity) both render on the form.
+        {:noreply, socket |> assign(:form, to_form(form)) |> assign(:auto_slug, auto_slug)}
     end
   end
 
