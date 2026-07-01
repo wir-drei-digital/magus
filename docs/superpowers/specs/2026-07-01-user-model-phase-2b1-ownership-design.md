@@ -20,10 +20,10 @@ The goal of 2b-1 is a hardened, independently reviewable, mergeable backend keys
 - `owner_user_id` on `Magus.Models.Provider` and `Magus.Chat.Model` (first migration of this effort).
 - Server-generated unique slugs for user providers.
 - `:create_owned` actions on Provider and Model (owner-scoped, cap-enforced, SSRF-validated, text-only).
-- **Credential trust boundary**: `RequestOptions` becomes actor-aware so owned-provider credentials are returned only to the owner, closing the bearer-key hole on every path (LLM client and tools).
+- **Credential trust boundary (fail-closed)**: `RequestOptions` becomes actor-aware so owned-provider credentials are returned only to a matching owner. It defaults to no actor, so owned credentials are never handed out on any current path (LLM client or raw-string tool paths). This closes the bearer-key hole immediately; the resolver/LLM-client wiring that makes owned models actually *execute* for their owner is 2b-2.
 - **Authorization adoption on `Model`**: add `Ash.Policy.Authorizer` + policies; audit and scope every `Model` read path.
 - Atom-safety: user providers never reach `CatalogSync.slug_to_atom`, and owned writes skip catalog reloads.
-- Actor-scoped resolution with ownership facts; per-call-site actor sourcing.
+- **Actor-capable resolution**: the resolver gains an owner-scoped fetch and populates ownership facts when an actor is supplied. Its callers keep passing `nil` in 2b-1 (behavior-neutral); the live per-call-site actor sourcing is 2b-2.
 - `api_provider` handling for owned models (a neutral enum value so legacy routing is skipped).
 - Selection-write ownership validation (user and conversation selection actions, and the curation `ModelSelectable` validation).
 - Per-user caps (config-driven, universal).
@@ -34,7 +34,7 @@ The goal of 2b-1 is a hardened, independently reviewable, mergeable backend keys
 **Explicitly blocked / out of scope (2b-1):**
 - **Owned media models** (image/video). The media clients bypass `RequestOptions` (image reads `OPENROUTER_API_KEY` directly; video dispatches by key prefix), so an owned key would not be used. `:create_owned` rejects media models. Media BYOK is Phase 5.
 
-**Out of scope (2b-2):** all SPA UI, the clone/prefill affordance, the cloud paid-plan gate on provider creation, flipping degradation to a hard-stop + remediation.
+**Out of scope (2b-2):** all SPA UI, the clone/prefill affordance, the cloud paid-plan gate on provider creation, flipping degradation to a hard-stop + remediation, and **execution wiring** (threading the acting user through the resolver call sites and the LLM client so owned models actually run end to end).
 
 **Out of scope (2c):** `MessageUsage` billing attribution and the universal-vs-spend gate split. 2b-1 records `cost_source`/`credential_owner_user_id` as facts but changes no billing behavior.
 
@@ -101,35 +101,30 @@ New action `:create_owned`:
 - **Global provider** (`owner_user_id == nil`): unchanged; credentials returned as today, no actor required.
 - **Owned provider** (`owner_user_id != nil`): credentials returned only when the supplied actor id equals `owner_user_id`. On mismatch or a missing actor, return the safe env-fallback form (`{model_key, []}`), so no owned credential is ever handed out to a non-owner. A non-owner passing a foreign owned key (`"u_victim:claude"`) gets an unresolvable spec and the request fails cleanly, never billing or using the victim's key. A `[:magus, :models, :request_options, :owner_mismatch]` telemetry event is emitted for observability.
 
-The failure direction is deliberate: a path that forgets to thread the actor degrades the owner's own request (it fails) but never leaks credentials. This makes `RequestOptions` safe even for the tool paths that accept raw model strings (for example `spawn_sub_agent.ex:97`) without auditing each one for authorization.
+The failure direction is deliberate: a path that does not supply the actor gets the safe fallback (no owned credential), never a leak. `resolve/1` stays as a thin wrapper delegating to `resolve/2` with `nil`, so every current caller (llm.ex:88 and any raw-string tool path such as `spawn_sub_agent.ex:97`) keeps working unchanged and simply never receives owned credentials in 2b-1. This closes the bearer-key hole with no changes to the LLM client or the Jido strategy. Wiring the acting user into `resolve/2` so owned models execute for their owner is 2b-2 (see Execution Wiring).
 
-### LLM client threading
+### Resolver (actor-capable fetch and ownership facts)
 
-`Magus.Agents.Clients.LLM.with_provider_options/2` (llm.ex:88) calls `RequestOptions.resolve/1`. It gains the requesting user id from `opts` and passes it to `resolve/2`. The requesting user id originates at the agent boundary (see actor sourcing) and is threaded through the existing opts/context that already reach the LLM client. If absent, resolution falls back to global/env behavior (safe).
-
-### Resolver (actor-scoping and ownership facts)
-
-`Magus.Models.Resolver.resolve(actor, input)`:
-- The key lookup (`fetch_by_key`, resolver.ex:142) and the explicit-id lookup (`Magus.Chat.get_model/1`, resolver.ex:37) filter to `owner_user_id == nil OR owner_user_id == <actor id>`. Behavior-neutral for existing rows (all global).
-- No-actor (system) resolution sees global rows only.
-- Owned resolutions populate `access_source: :owned`, `credential_owner_user_id`, `cost_source: :byok`.
+`Magus.Models.Resolver.resolve(actor, input)` gains ownership awareness while its callers keep passing `nil`:
+- The key lookup (`fetch_by_key`, resolver.ex:142) and the explicit-id lookup (`Magus.Chat.get_model/1`, resolver.ex:37) filter to `owner_user_id == nil OR owner_user_id == <actor id>` when an actor id is present; with a `nil` actor they see global rows only. Behavior-neutral for existing rows and existing callers (all global, all `nil`).
+- Owned resolutions (reached in tests by passing a real actor) populate `access_source: :owned`, `credential_owner_user_id`, `cost_source: :byok`.
 - Guard `provider_id/1` (resolver.ex:159) with `when is_binary(id)` (2a carryover).
 - Degradation stays soft.
 
-### Actor sourcing per call site
+The new owner-scoping and fact population are unit-tested by calling `resolve(actor, ...)` with a real actor. The 2b-1 call sites (preflight.ex:78/175/247/286, media_bypass.ex:35) are left passing `nil` and are unchanged.
 
-All resolver call sites pass `nil` today (preflight.ex:78, 175, 247, 286; media_bypass.ex:35). The rule: the actor is the **acting user**, obtained via `Magus.Agents.Plugins.Support.Helpers.acting_user_id/2` (helpers.ex:65), which resolves the requesting message's sender and falls back to the agent/conversation owner. It must never be assumed to be the conversation owner in multiplayer. The same acting-user id is threaded to the LLM client so `RequestOptions` receives it.
+### Execution Wiring (deferred to 2b-2)
 
-| Call site | Actor source |
+Making owned models run end to end requires supplying the acting user to `resolve/2` at the resolver call sites and, through `opts`, to the LLM client. That is 2b-2 work. The rule it must follow, recorded here so it is not lost: the actor is the **acting user**, obtained via `Magus.Agents.Plugins.Support.Helpers.acting_user_id/2` (helpers.ex:65), which resolves the requesting message's sender and falls back to the agent/conversation owner. It must never be assumed to be the conversation owner in multiplayer.
+
+| Call site (2b-2) | Actor source |
 |---|---|
 | Preflight main (preflight.ex:78) | `acting_user_id(agent, message_id)` |
 | Preflight resume (preflight.ex:175) | `acting_user_id/2` for the resumed message; fall back to agent owner |
 | Preflight debug/assembly (preflight.ex:247) | agent owner (`agent.state.user_id`) when no message is in scope |
-| Preflight (preflight.ex:286) | `acting_user_id/2` (plan verifies the exact context) |
+| Preflight (preflight.ex:286) | `acting_user_id/2` (verify the exact context) |
 | MediaBypass (media_bypass.ex:35) | `acting_user_id/2` |
-| LLM client -> RequestOptions | the same acting-user id, via opts |
-
-The plan maps each site precisely and adds a regression test that a multiplayer request resolves against the sender, not the owner.
+| LLM client -> RequestOptions | the same acting-user id, via `opts` (pop it before the ReqLLM call) |
 
 ## Authorization
 
@@ -211,8 +206,7 @@ Adding `owner_user_id` FKs must not block user deletion, and `Model` deletion is
 - Model `:create_owned`: actor-owned provider required, owner mirrored, `api_provider: :byok`, unique slug-prefixed key, media rejected, model cap.
 - Slug generation: format, uniqueness, collision retry.
 - **Credential trust boundary**: `RequestOptions.resolve/2` returns owned credentials only to the owner; a non-owner (and a nil actor) get the safe env fallback for a foreign owned key; global rows unchanged; `owner_mismatch` telemetry fires.
-- Resolver actor-scoping: user B cannot resolve or read user A's private model by key or id; the owner can; ownership facts populated; global defaults preserved.
-- Actor sourcing: a multiplayer request resolves against the message sender, not the conversation owner.
+- Resolver actor-capability: calling `resolve/2` with user B's actor cannot resolve user A's private model by key or id; calling it with the owner's actor resolves it and populates ownership facts; a `nil` actor (the 2b-1 caller default) sees global rows only and preserves global defaults.
 - Authorization: Model read policy (global-or-owned); `list_active_models` actor-scoped; owner-scoped update/destroy; admin retains global control; internal `authorize?: false` reads still see everything.
 - Selection-write validation: selecting a foreign/unusable model id is rejected on `User` and `Conversation` selection actions; `ModelSelectable` uses the actor.
 - `CatalogSync`: owned rows excluded from `build_custom`; no atom minted for a user slug; owned writes do not request a reload.
@@ -239,9 +233,9 @@ Adding `owner_user_id` FKs must not block user deletion, and `Model` deletion is
 
 | Finding | Resolution |
 |---|---|
-| P1 Private keys as bearer credentials | Credential trust boundary in `RequestOptions.resolve/2`: owned credentials only to the matching owner; safe env fallback otherwise. |
+| P1 Private keys as bearer credentials | Fail-closed credential boundary in `RequestOptions.resolve/2` (default `nil` actor -> owned credentials never returned); safe env fallback otherwise. Closed in 2b-1 without touching the LLM client. |
 | P1 Model has no authorizer | Adopt `Ash.Policy.Authorizer` + policies; audit every reader; scope `list_active_models`. |
-| P1 Actor threading underspecified | Per-call-site actor sourcing table using `acting_user_id/2`; multiplayer resolves against the sender; same id threaded to `RequestOptions`. |
+| P1 Actor threading underspecified | 2b-1 makes the resolver + `RequestOptions` actor-capable and fail-closed. The live per-call-site sourcing (via `acting_user_id/2`, multiplayer-correct) is specified for 2b-2 in Execution Wiring; 2b-1 callers stay `nil`. |
 | P1 Allowlist vs `api_provider` enum | Add neutral `:byok` enum value; owned models set it; legacy OpenRouter routing is skipped; audit `api_provider` readers. |
 | P1 Media BYOK unsupported | Block owned media models in `:create_owned`; media BYOK is Phase 5. |
 | P2 Selection writes unvalidated | Add ownership/usability validation to `User`/`Conversation` selection actions; fix `ModelSelectable` to use the actor. |
