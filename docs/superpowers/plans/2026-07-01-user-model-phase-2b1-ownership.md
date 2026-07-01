@@ -4,7 +4,7 @@
 
 **Goal:** Let regular users own LLM providers and models through Ash actions, safely, with the credential trust boundary, authorization, atom-safety, and lifecycle complete, but no UI and no live execution wiring.
 
-**Architecture:** Extend the existing `Magus.Models.Provider` and `Magus.Chat.Model` resources with a nullable `owner_user_id` and `:create_owned` actions. User providers get server-generated unique slugs and never mint atoms (excluded from `CatalogSync`); they resolve through `RequestOptions`. `RequestOptions` and `Magus.Models.Resolver` become actor-capable and fail-closed: owned credentials are returned only to a matching owner, and the default `nil` actor never leaks them. `Model` adopts an Ash policy authorizer.
+**Architecture:** Extend the existing `Magus.Models.Provider` and `Magus.Chat.Model` resources with a nullable `owner_user_id` and `:create_owned` actions. User providers get server-generated unique slugs and never mint atoms (excluded from `CatalogSync`); they resolve through `RequestOptions`. `RequestOptions` and `Magus.Models.Resolver` become actor-capable and fail-closed: owned credentials are returned only to a matching owner, and the default `nil` actor never leaks them. `Model` owned-row visibility is scoped by the `list_active` filter and selection validation; a global `Model` authorizer is deferred to 2b-2.
 
 **Tech Stack:** Elixir, Ash 3.x + AshPostgres, Oban (via direct insert for validation), ReqLLM, Cloak (encrypted api_key), ExUnit with `Magus.ResourceCase` / `Magus.DataCase`.
 
@@ -45,7 +45,7 @@ Every task's requirements implicitly include this section.
 
 **Modified files:**
 - `lib/magus/models/provider.ex` — attrs, `:create_owned`/`:update_owned` actions, policies, domain wiring.
-- `lib/magus/chat/model.ex` — attrs, `:byok` enum, authorizer + policies, `:create_owned`, `list_active` scoping.
+- `lib/magus/chat/model.ex` — attrs, `:byok` enum, `:create_owned`, `list_active` filter scoping (no authorizer in 2b-1).
 - `lib/magus/models.ex` — Provider owned code interfaces.
 - `lib/magus/chat/chat.ex` — Model owned code interfaces.
 - `lib/magus/models/request_options.ex` — `resolve/2` actor-capable, owned rewrite.
@@ -612,33 +612,36 @@ git commit -m "feat(models): user-owned providers via :create_owned with slug/SS
 
 ---
 
-### Task 3: Model authorizer + ownership schema + read scoping
+### Task 3: Model ownership schema + list_active scoping (no authorizer)
+
+**Decision (revised 2026-07-01):** `Model` does NOT adopt `Ash.Policy.Authorizer` in 2b-1. A global authorizer breaks ~30 actor-less internal/test/seed `Model` creates and reads; that codebase-wide audit is deferred to 2b-2. Owned-model visibility is scoped by the `list_active` FILTER (here) plus owner-scoped selection validation (Task 8); the runtime paths are fail-closed independently (Tasks 6, 7). Do NOT add an authorizer or a `policies` block to `Model`.
 
 **Files:**
 - Modify: `lib/magus/chat/model.ex`
-- Test: `test/magus/chat/model_authz_test.exs`
+- Test: `test/magus/chat/model_ownership_test.exs`
 
 **Interfaces:**
-- Produces: `Magus.Chat.Model` with `authorizers: [Ash.Policy.Authorizer]`, new attr `owner_user_id`, `:byok` in the `api_provider` enum, and `list_active` actor-scoped (global + owned).
+- Produces: `Magus.Chat.Model` with new attr `owner_user_id`, `:byok` in the `api_provider` enum, and `list_active` actor-scoped by filter (global + owned).
 
 - [ ] **Step 1: Write the failing test**
 
 ```elixir
-# test/magus/chat/model_authz_test.exs
-defmodule Magus.Chat.ModelAuthzTest do
+# test/magus/chat/model_ownership_test.exs
+defmodule Magus.Chat.ModelOwnershipTest do
   use Magus.DataCase, async: false
+  import Magus.Generators
 
   setup do
     Magus.DataCase.clear_catalog!()
-    {:ok, user} = Magus.Test.Generators.create_user()
-    {:ok, other} = Magus.Test.Generators.create_user()
-    %{user: user, other: other}
+    %{user: generate(user()), other: generate(user())}
   end
 
-  defp owned_model!(user, key) do
+  # Seed owned/global rows directly (create_owned is Task 4). authorize?: false
+  # because there is no Model authorizer in 2b-1; scoping is via the read filter.
+  defp owned_model!(owner, key) do
     Magus.Chat.Model
     |> Ash.Changeset.for_create(:create, %{name: key, key: key, context_window: 1000})
-    |> Ash.Changeset.force_change_attribute(:owner_user_id, user.id)
+    |> Ash.Changeset.force_change_attribute(:owner_user_id, owner.id)
     |> Ash.Changeset.force_change_attribute(:api_provider, :byok)
     |> Ash.create!(authorize?: false)
   end
@@ -649,15 +652,10 @@ defmodule Magus.Chat.ModelAuthzTest do
     |> Ash.create!(authorize?: false)
   end
 
-  test "owner can read their model, others cannot", %{user: user, other: other} do
+  test "api_provider accepts :byok", %{user: user} do
     m = owned_model!(user, "u_a:x")
-    assert {:ok, _} = Ash.get(Magus.Chat.Model, m.id, actor: user)
-    assert {:error, _} = Ash.get(Magus.Chat.Model, m.id, actor: other)
-  end
-
-  test "global models are readable by any actor", %{user: user} do
-    m = global_model!("openrouter:foo/x")
-    assert {:ok, _} = Ash.get(Magus.Chat.Model, m.id, actor: user)
+    assert m.api_provider == :byok
+    assert m.owner_user_id == user.id
   end
 
   test "list_active returns global plus own, never others' owned", %{user: user, other: other} do
@@ -665,19 +663,16 @@ defmodule Magus.Chat.ModelAuthzTest do
     owned_model!(user, "u_b:mine")
     owned_model!(other, "u_c:theirs")
 
-    keys =
-      Magus.Chat.list_active_models!(actor: user)
-      |> Enum.map(& &1.key)
+    keys = Magus.Chat.list_active_models!(actor: user) |> Enum.map(& &1.key)
 
     assert "openrouter:g/1" in keys
     assert "u_b:mine" in keys
     refute "u_c:theirs" in keys
   end
 
-  test "list_active with authorize?: false + no actor returns global only" do
+  test "list_active with no actor returns global only", %{user: user} do
     global_model!("openrouter:g/2")
-    {:ok, u} = Magus.Test.Generators.create_user()
-    owned_model!(u, "u_d:priv")
+    owned_model!(user, "u_d:priv")
 
     keys = Magus.Chat.list_active_models!(authorize?: false) |> Enum.map(& &1.key)
     assert "openrouter:g/2" in keys
@@ -688,23 +683,12 @@ end
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `set -a && source .env && set +a && MIX_ENV=test mix test test/magus/chat/model_authz_test.exs`
-Expected: FAIL (owner_user_id/:byok/authorizer absent; others can read owned).
+Run: `set -a && source .env && set +a && MIX_ENV=test mix test test/magus/chat/model_ownership_test.exs`
+Expected: FAIL (`owner_user_id`/`:byok` absent; `list_active` returns others' owned rows).
 
-- [ ] **Step 3: Add authorizer + owner attr + :byok enum**
+- [ ] **Step 3: Add owner attr + :byok enum (NO authorizer)**
 
-In `lib/magus/chat/model.ex`, change the `use Ash.Resource` block to add the authorizer:
-
-```elixir
-use Ash.Resource,
-  otp_app: :magus,
-  domain: Magus.Chat,
-  data_layer: AshPostgres.DataLayer,
-  authorizers: [Ash.Policy.Authorizer],
-  extensions: [AshTypescript.Resource]
-```
-
-Add to the `attributes do` block:
+In `lib/magus/chat/model.ex`, leave the `use Ash.Resource` block unchanged (no `authorizers:`). Add to the `attributes do` block:
 
 ```elixir
 attribute :owner_user_id, :uuid, allow_nil?: true, public?: false
@@ -716,9 +700,9 @@ Extend the `api_provider` constraint (currently `one_of: [:openrouter, :xai, :pu
 constraints one_of: [:openrouter, :xai, :publicai, :aimlapi, :fal, :byok]
 ```
 
-- [ ] **Step 4: Scope list_active + add policies**
+- [ ] **Step 4: Scope list_active by filter**
 
-Replace the `list_active` read action filter so it includes owned rows for the actor and stays global-only when no actor is present:
+Replace the `list_active` read action filter so it includes owned rows for the actor and stays global-only when no actor is present. This works without an authorizer because it is an action filter; `actor(:id)` resolves to `nil` when no actor is supplied, so only the `is_nil(owner_user_id)` (global) branch matches:
 
 ```elixir
 read :list_active do
@@ -733,64 +717,31 @@ read :list_active do
 end
 ```
 
-Add a `policies do` block (place it after the `actions do` block, before `changes do`):
+Do NOT add a `policies do` block. `:create_owned` (Task 4) is gated by its `BuildOwnedModel` change (requires an actor, verifies provider ownership), not by a policy.
 
-```elixir
-policies do
-  # Internal readers (CatalogSync, RequestOptions, Resolver, list_models tool)
-  # pass authorize?: false and bypass these policies.
-  policy action_type(:read) do
-    authorize_if expr(is_nil(owner_user_id))
-    authorize_if expr(owner_user_id == ^actor(:id))
-    authorize_if Magus.Checks.IsAdmin
-  end
-
-  # action(:create) not action_type(:create): :create_owned (Task 4) gets its
-  # own policy so it is not also gated by an ownership expr at create time.
-  policy action(:create) do
-    authorize_if Magus.Checks.IsAdmin
-  end
-
-  policy action_type([:update, :destroy]) do
-    authorize_if expr(not is_nil(owner_user_id) and owner_user_id == ^actor(:id))
-    authorize_if Magus.Checks.IsAdmin
-  end
-end
-```
-
-- [ ] **Step 5: Call-site audit**
-
-Confirm every actor-less `Model` read passes `authorize?: false`. Run:
-
-```bash
-rg -n "list_active_models|get_model|get_model_by_key_with_provider|Magus.Chat.Model" lib | rg -v "authorize\?: false" | rg -v "_test"
-```
-
-For each hit, verify it is either (a) an actor-context read (SPA/user path, correct to scope), or (b) internal, in which case add `authorize?: false`. Known safe internal readers: `list_models.ex:74` (already `authorize?: false`), `RequestOptions` (`get_model_by_key_with_provider`), `Resolver`, `CatalogSync`. Do not change behavior of internal readers; only make the bypass explicit if missing.
-
-Also audit Model **write** call sites (`for_create(:create` / `for_update(:update` / `:destroy`), for example catalog seeding in `Magus.Models.Catalog` and any admin model management): internal/seed writes must pass `authorize?: false`; admin writes must run with an admin actor (satisfying `IsAdmin`). A non-admin, non-owner actor writing a global model is now correctly forbidden.
-
-- [ ] **Step 6: Migrate + test**
+- [ ] **Step 5: Migrate + test**
 
 ```bash
 set -a && source .env && set +a
 MIX_ENV=test mix ash.codegen add_model_ownership
 MIX_ENV=test mix ash.migrate
-MIX_ENV=test mix test test/magus/chat/model_authz_test.exs
+MIX_ENV=test mix test test/magus/chat/model_ownership_test.exs
 ```
-Expected: PASS.
+Expected: PASS. If `ash.codegen` tries to DROP unrelated tables from the shared test DB (platform_pricing/pricing_tiers/seat_grants, from another branch), keep the migration scoped to the `models.owner_user_id` column only and revert any unrelated snapshot deletions so `git status` is clean. Confirm the committed migration only alters `models`.
 
-- [ ] **Step 7: Run the broader model/agent suites to catch authorizer blast radius**
+- [ ] **Step 6: Confirm no blast radius (there should be none)**
 
-Run: `set -a && source .env && set +a && MIX_ENV=test mix test test/magus/models test/magus/chat`
-Expected: PASS (investigate any newly-forbidden read; add explicit `authorize?: false` where the caller is internal). Note any pre-existing failures separately.
+Because no authorizer was added, existing `Model` reads/writes are unaffected. Sanity-run the neighbors:
 
-- [ ] **Step 8: Compile clean + commit**
+Run: `set -a && source .env && set +a && MIX_ENV=test mix test test/magus/models/catalog_sync_test.exs test/magus/models/request_options_test.exs`
+Expected: PASS. (Pre-existing failures unrelated to this task may exist in role_assignment/roles_explain/default_flags_backfill; those are not in these files.)
+
+- [ ] **Step 7: Compile clean + commit**
 
 ```bash
 MIX_ENV=test mix compile --warnings-as-errors
-git add lib/magus/chat/model.ex priv/repo/migrations test/magus/chat/model_authz_test.exs
-git commit -m "feat(chat): adopt Model authorizer + owner_user_id + :byok, scope list_active (phase 2b-1)"
+git add lib/magus/chat/model.ex priv/repo/migrations priv/resource_snapshots test/magus/chat/model_ownership_test.exs
+git commit -m "feat(chat): add Model owner_user_id + :byok, scope list_active by filter (phase 2b-1)"
 ```
 
 ---
@@ -1007,13 +958,7 @@ read :owned do
 end
 ```
 
-Add a policy for `:create_owned` inside the existing `policies do` block:
-
-```elixir
-policy action(:create_owned) do
-  authorize_if actor_present()
-end
-```
+Do NOT add a `policies do` block or any policy to `Model` (there is no authorizer in 2b-1, per Task 3). Authorization for `:create_owned` is enforced by the `BuildOwnedModel` change, which requires an actor and rejects a provider the actor does not own. A caller with no actor gets an error from the change; a caller cannot target another user's provider.
 
 In `lib/magus/chat/chat.ex`, inside `resource Magus.Chat.Model do`, add:
 
@@ -1954,4 +1899,4 @@ git commit -m "feat(accounts): clean up owned models/providers on account deleti
 - [ ] Warnings-as-errors: `MIX_ENV=test mix compile --warnings-as-errors`
 - [ ] `mix precommit` if available (format + deps.unlock --unused + test excludes e2e).
 - [ ] Confirm no migration used `ash.reset`; migrations are additive and nullable.
-- [ ] Spec cross-check: every row in the spec's Review Traceability table maps to a task (1: helpers; 2: provider owned + SSRF + cap; 3: Model authorizer + api_provider :byok scoping; 4: create_owned + media block; 5: atom-safety + SyncCatalog skip; 6: RequestOptions fail-closed; 7: resolver facts + carryover; 8: selection validation; 9: validation enqueue guard; 10: deletion cleanup).
+- [ ] Spec cross-check: every row in the spec's Review Traceability table maps to a task (1: helpers; 2: provider owned + SSRF + cap; 3: Model owner_user_id + :byok + list_active filter scoping (no authorizer); 4: create_owned + media block; 5: atom-safety + SyncCatalog skip; 6: RequestOptions fail-closed; 7: resolver facts + carryover; 8: selection validation; 9: validation enqueue guard; 10: deletion cleanup).

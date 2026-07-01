@@ -21,7 +21,7 @@ The goal of 2b-1 is a hardened, independently reviewable, mergeable backend keys
 - Server-generated unique slugs for user providers.
 - `:create_owned` actions on Provider and Model (owner-scoped, cap-enforced, SSRF-validated, text-only).
 - **Credential trust boundary (fail-closed)**: `RequestOptions` becomes actor-aware so owned-provider credentials are returned only to a matching owner. It defaults to no actor, so owned credentials are never handed out on any current path (LLM client or raw-string tool paths). This closes the bearer-key hole immediately; the resolver/LLM-client wiring that makes owned models actually *execute* for their owner is 2b-2.
-- **Authorization adoption on `Model`**: add `Ash.Policy.Authorizer` + policies; audit and scope every `Model` read path.
+- **Owned-model read scoping (no global authorizer)**: actor-filter the `list_active` read and owner-scope the selection validation, so owned models never leak through the picker or selection. The codebase-wide `Model` authorizer adoption is deferred to 2b-2 (it breaks ~30 actor-less call sites).
 - Atom-safety: user providers never reach `CatalogSync.slug_to_atom`, and owned writes skip catalog reloads.
 - **Actor-capable resolution**: the resolver gains an owner-scoped fetch and populates ownership facts when an actor is supplied. Its callers keep passing `nil` in 2b-1 (behavior-neutral); the live per-call-site actor sourcing is 2b-2.
 - `api_provider` handling for owned models (a neutral enum value so legacy routing is skipped).
@@ -34,7 +34,7 @@ The goal of 2b-1 is a hardened, independently reviewable, mergeable backend keys
 **Explicitly blocked / out of scope (2b-1):**
 - **Owned media models** (image/video). The media clients bypass `RequestOptions` (image reads `OPENROUTER_API_KEY` directly; video dispatches by key prefix), so an owned key would not be used. `:create_owned` rejects media models. Media BYOK is Phase 5.
 
-**Out of scope (2b-2):** all SPA UI, the clone/prefill affordance, the cloud paid-plan gate on provider creation, flipping degradation to a hard-stop + remediation, and **execution wiring** (threading the acting user through the resolver call sites and the LLM client so owned models actually run end to end).
+**Out of scope (2b-2):** all SPA UI, the clone/prefill affordance, the cloud paid-plan gate on provider creation, flipping degradation to a hard-stop + remediation, **execution wiring** (threading the acting user through the resolver call sites and the LLM client so owned models actually run end to end), and **full `Model` `Ash.Policy.Authorizer` adoption** with the codebase-wide read-path audit.
 
 **Out of scope (2c):** `MessageUsage` billing attribution and the universal-vs-spend gate split. 2b-1 records `cost_source`/`credential_owner_user_id` as facts but changes no billing behavior.
 
@@ -45,7 +45,7 @@ The goal of 2b-1 is a hardened, independently reviewable, mergeable backend keys
 3. **Keep global-unique keys, no id-migration** (carried from 2a). Server-generated unique slugs keep `Model.key = "<slug>:<model_id>"` globally unique; the `unique_key` identity holds untouched.
 4. **Atom-safety by exclusion.** User providers never mint atoms (excluded from `CatalogSync.build_custom`) and their writes skip catalog reloads. They resolve through `RequestOptions` (a DB lookup) instead.
 5. **The credential trust boundary is `RequestOptions`, not just the Resolver.** Owned-provider credentials are returned only when an actor id is supplied and equals `owner_user_id`. This is the load-bearing security guarantee and holds regardless of which path reaches the LLM client.
-6. **`Model` gets an authorizer.** It has none today, so owned rows would leak through existing unscoped reads. Adding `Ash.Policy.Authorizer` and auditing call sites is part of this phase.
+6. **No global `Model` authorizer in 2b-1 (revised 2026-07-01).** `Model` has no authorizer today. Adopting `Ash.Policy.Authorizer` breaks roughly 30 internal/test/seed call sites (every `Model` create/read that runs without an actor), a codebase-wide audit that belongs with the 2b-2 UI where it can be validated end to end. For 2b-1 the actual owned-model leak vectors are narrow and closed directly: the `list_active` read is actor-filtered (global plus own), Task 8's selection validation is owner-scoped, and the runtime paths (`Resolver`/`RequestOptions`) are independently fail-closed. Full authorizer adoption is deferred to 2b-2.
 7. **Facts, not policy** (carried from 2a). The resolver populates ownership facts; billability derivation stays downstream and is untouched.
 8. **Soft degradation stays soft.** The hard-stop is 2b-2.
 9. **Caps are universal, the paid-plan gate is not.** Per-user count caps ship here (open-core and cloud). The cloud-only paid-plan gate is 2b-2.
@@ -128,16 +128,14 @@ Making owned models run end to end requires supplying the acting user to `resolv
 
 ## Authorization
 
-### Model authorizer adoption
+### Model read scoping (no authorizer in 2b-1)
 
-`Magus.Chat.Model` gains `authorizers: [Ash.Policy.Authorizer]` and a `policies` block:
-- **Read**: `authorize_if expr(owner_user_id == nil) or expr(owner_user_id == ^actor(:id))` plus `IsAdmin`. Global catalog stays visible to all authenticated actors; owned rows are private to their owner. Internal/system reads continue to pass `authorize?: false` and are unaffected.
-- **`:create`** (admin): `IsAdmin`. **`:create_owned`**: authenticated user. **Update/destroy**: owner (`owner_user_id == actor(:id)`) or `IsAdmin`.
+`Magus.Chat.Model` does NOT adopt `Ash.Policy.Authorizer` in this phase (see Locked Decision 6). Instead, owned-model visibility is scoped at the specific paths that could leak it:
+- **`list_active`** (the SPA curation catalog and picker) becomes actor-scoped by FILTER: `active? == true and internal? == false and (is_nil(owner_user_id) or owner_user_id == ^actor(:id))`. Called with an actor it returns global rows plus the actor's owned rows; called with no actor (or `authorize?: false` internal use) it returns global rows only. This holds without an authorizer because it is an action filter, not a policy.
+- **Selection validation** (Section below and Task 8) queries with the same owner filter, so a foreign owned id is rejected.
+- **Runtime paths** (`Resolver`, `RequestOptions`) are fail-closed independently via explicit owner filters plus `authorize?: false` (Tasks 6 and 7). They do not rely on a Model policy.
 
-Call-site audit (blast radius of adopting an authorizer where there was none):
-- `list_models` tool (list_models.ex:74) and other internal readers already use `authorize?: false`; confirm each is genuinely system context and keep it explicit.
-- `list_active_models` (the SPA curation catalog) becomes actor-scoped so it returns global rows plus the actor's owned rows and never another user's private models. This is the picker's desired behavior anyway.
-- `RequestOptions`, `Resolver`, `CatalogSync` internal reads remain `authorize?: false` by design (the trust boundary is enforced in `RequestOptions`, not by Model read policy).
+`:create_owned` needs no policy: its `BuildOwnedModel` change requires an actor and verifies the target provider is owned by that actor, so a user can only create models under providers they own. The admin `:create` keeps its pre-2b-1 behavior (no authorizer, no new gate). Full policy adoption and the codebase-wide reader audit move to 2b-2.
 
 ### Provider read tightening
 
@@ -207,7 +205,7 @@ Adding `owner_user_id` FKs must not block user deletion, and `Model` deletion is
 - Slug generation: format, uniqueness, collision retry.
 - **Credential trust boundary**: `RequestOptions.resolve/2` returns owned credentials only to the owner; a non-owner (and a nil actor) get the safe env fallback for a foreign owned key; global rows unchanged; `owner_mismatch` telemetry fires.
 - Resolver actor-capability: calling `resolve/2` with user B's actor cannot resolve user A's private model by key or id; calling it with the owner's actor resolves it and populates ownership facts; a `nil` actor (the 2b-1 caller default) sees global rows only and preserves global defaults.
-- Authorization: Model read policy (global-or-owned); `list_active_models` actor-scoped; owner-scoped update/destroy; admin retains global control; internal `authorize?: false` reads still see everything.
+- Model read scoping: `list_active_models` returns global plus the actor's owned rows with an actor, and global only with no actor (or `authorize?: false`); it never returns another user's owned rows. (No Model authorizer in 2b-1.)
 - Selection-write validation: selecting a foreign/unusable model id is rejected on `User` and `Conversation` selection actions; `ModelSelectable` uses the actor.
 - `CatalogSync`: owned rows excluded from `build_custom`; no atom minted for a user slug; owned writes do not request a reload.
 - `RequestOptions`: known-provider rewrite (`u_...:model` -> `req_llm_id:model` + key) and `openai_compatible` inline form for owned rows; admin rows unchanged.
@@ -234,7 +232,7 @@ Adding `owner_user_id` FKs must not block user deletion, and `Model` deletion is
 | Finding | Resolution |
 |---|---|
 | P1 Private keys as bearer credentials | Fail-closed credential boundary in `RequestOptions.resolve/2` (default `nil` actor -> owned credentials never returned); safe env fallback otherwise. Closed in 2b-1 without touching the LLM client. |
-| P1 Model has no authorizer | Adopt `Ash.Policy.Authorizer` + policies; audit every reader; scope `list_active_models`. |
+| P1 Model has no authorizer | 2b-1 closes the actual leak vectors without a global authorizer: actor-filtered `list_active` + owner-scoped selection validation + fail-closed Resolver/RequestOptions. Full `Ash.Policy.Authorizer` adoption (breaks ~30 actor-less call sites) deferred to 2b-2. |
 | P1 Actor threading underspecified | 2b-1 makes the resolver + `RequestOptions` actor-capable and fail-closed. The live per-call-site sourcing (via `acting_user_id/2`, multiplayer-correct) is specified for 2b-2 in Execution Wiring; 2b-1 callers stay `nil`. |
 | P1 Allowlist vs `api_provider` enum | Add neutral `:byok` enum value; owned models set it; legacy OpenRouter routing is skipped; audit `api_provider` readers. |
 | P1 Media BYOK unsupported | Block owned media models in `:create_owned`; media BYOK is Phase 5. |
