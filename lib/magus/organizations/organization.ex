@@ -62,6 +62,12 @@ defmodule Magus.Organizations.Organization do
 
       require_atomic? false
     end
+
+    read :by_stripe_subscription_id do
+      argument :stripe_subscription_id, :string, allow_nil?: false
+      filter expr(stripe_subscription_id == ^arg(:stripe_subscription_id))
+      get? true
+    end
   end
 
   policies do
