@@ -1447,6 +1447,37 @@ export type NotificationAttributesOnlySchema = {
 };
 
 
+// Organization Schema
+export type OrganizationResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "name" | "slug" | "billingInterval" | "billingStatus" | "currentPeriodStart" | "currentPeriodEnd" | "ownerId";
+  id: UUIDv7;
+  name: string;
+  slug: string;
+  billingInterval: "annual" | "monthly";
+  billingStatus: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
+  currentPeriodStart: UtcDateTimeUsec | null;
+  currentPeriodEnd: UtcDateTimeUsec | null;
+  ownerId: UUID;
+  owner: { __type: "Relationship"; __resource: UserResourceSchema; };
+};
+
+
+
+export type OrganizationAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "name" | "slug" | "billingInterval" | "billingStatus" | "currentPeriodStart" | "currentPeriodEnd" | "ownerId";
+  id: UUIDv7;
+  name: string;
+  slug: string;
+  billingInterval: "annual" | "monthly";
+  billingStatus: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
+  currentPeriodStart: UtcDateTimeUsec | null;
+  currentPeriodEnd: UtcDateTimeUsec | null;
+  ownerId: UUID;
+};
+
+
 // Task Schema
 export type TaskResourceSchema = {
   __type: "Resource";
@@ -5164,6 +5195,73 @@ export type NotificationFilterInput = {
   user?: UserFilterInput;
 
 };
+export type OrganizationFilterInput = {
+  and?: Array<OrganizationFilterInput>;
+  or?: Array<OrganizationFilterInput>;
+  not?: Array<OrganizationFilterInput>;
+
+  id?: {
+    eq?: UUIDv7;
+    notEq?: UUIDv7;
+    in?: Array<UUIDv7>;
+  };
+
+  name?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  slug?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  billingInterval?: {
+    eq?: "annual" | "monthly";
+    notEq?: "annual" | "monthly";
+    in?: Array<"annual" | "monthly">;
+  };
+
+  billingStatus?: {
+    eq?: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
+    notEq?: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
+    in?: Array<"active" | "canceled" | "incomplete" | "past_due" | "trialing">;
+  };
+
+  currentPeriodStart?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
+  currentPeriodEnd?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
+  ownerId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+
+  owner?: UserFilterInput;
+
+};
 export type TaskFilterInput = {
   and?: Array<TaskFilterInput>;
   or?: Array<TaskFilterInput>;
@@ -5896,6 +5994,9 @@ export type MCPServerCredentialFilterField = (typeof mCPServerCredentialFilterFi
 export const notificationFilterFields = ["id", "title", "body", "notificationType", "readAt", "metadata", "targetConversationId", "insertedAt", "updatedAt", "userId", "user"] as const;
 export type NotificationFilterField = (typeof notificationFilterFields)[number];
 
+export const organizationFilterFields = ["id", "name", "slug", "billingInterval", "billingStatus", "currentPeriodStart", "currentPeriodEnd", "ownerId", "owner"] as const;
+export type OrganizationFilterField = (typeof organizationFilterFields)[number];
+
 export const taskFilterFields = ["id", "title", "description", "status", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "dismissedAt", "recurrence", "conversationId", "parentId", "assignedToUserId", "conversation", "parent", "subtasks", "assignedToUser"] as const;
 export type TaskFilterField = (typeof taskFilterFields)[number];
 
@@ -6028,6 +6129,9 @@ export type MCPServerCredentialSortField = (typeof mCPServerCredentialSortFields
 
 export const notificationSortFields = ["id", "title", "body", "notificationType", "readAt", "metadata", "targetConversationId", "insertedAt", "updatedAt", "userId"] as const;
 export type NotificationSortField = (typeof notificationSortFields)[number];
+
+export const organizationSortFields = ["id", "name", "slug", "billingInterval", "billingStatus", "currentPeriodStart", "currentPeriodEnd", "ownerId"] as const;
+export type OrganizationSortField = (typeof organizationSortFields)[number];
 
 export const taskSortFields = ["id", "title", "description", "status", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "dismissedAt", "recurrence", "conversationId", "parentId", "assignedToUserId"] as const;
 export type TaskSortField = (typeof taskSortFields)[number];
