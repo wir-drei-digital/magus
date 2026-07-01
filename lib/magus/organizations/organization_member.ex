@@ -12,6 +12,8 @@ defmodule Magus.Organizations.OrganizationMember do
     authorizers: [Ash.Policy.Authorizer],
     extensions: [AshPaperTrail.Resource, AshTypescript.Resource]
 
+  require Ash.Query
+
   postgres do
     table "organization_members"
     repo Magus.Repo
@@ -102,6 +104,67 @@ defmodule Magus.Organizations.OrganizationMember do
       change relate_actor(:user)
     end
 
+    update :change_role do
+      accept []
+      require_atomic? false
+
+      argument :role, :atom do
+        allow_nil? false
+        constraints one_of: [:owner, :member]
+      end
+
+      change set_attribute(:role, arg(:role))
+      validate {Magus.Organizations.OrganizationMember.Validations.NotLastOwner, []}
+    end
+
+    update :remove do
+      accept []
+      require_atomic? false
+      change set_attribute(:status, :removed)
+      change set_attribute(:removed_at, &DateTime.utc_now/0)
+      validate {Magus.Organizations.OrganizationMember.Validations.NotLastOwner, []}
+    end
+
+    update :transfer_ownership do
+      accept []
+      require_atomic? false
+      transaction? true
+      description "Promotes this member to :owner and demotes the acting owner to :member."
+
+      change fn changeset, context ->
+        Ash.Changeset.after_action(changeset, fn _cs, target ->
+          actor = context.actor
+
+          # Demote the acting owner
+          Magus.Organizations.OrganizationMember
+          |> Ash.Query.filter(
+            organization_id == ^target.organization_id and
+              user_id == ^actor.id and
+              role == :owner and
+              status == :active
+          )
+          |> Ash.read!(authorize?: false)
+          |> Enum.each(fn m ->
+            m
+            |> Ash.Changeset.for_update(:change_role, %{role: :member}, authorize?: false)
+            |> Ash.update!()
+          end)
+
+          # Point the org's denormalized owner_id at the new owner
+          Magus.Organizations.Organization
+          |> Ash.get!(target.organization_id, authorize?: false)
+          |> Ash.Changeset.for_update(:update_owner, %{owner_id: target.user_id},
+            authorize?: false
+          )
+          |> Ash.update!()
+
+          {:ok, %{target | role: :owner}}
+        end)
+      end
+
+      change set_attribute(:role, :owner)
+    end
+
     read :by_organization do
       argument :organization_id, :uuid, allow_nil?: false
       filter expr(organization_id == ^arg(:organization_id))
@@ -119,8 +182,8 @@ defmodule Magus.Organizations.OrganizationMember do
       authorize_if always()
     end
 
-    policy action(:invite) do
-      authorize_if expr(organization.owner_id == ^actor(:id))
+    policy action([:invite, :change_role, :remove, :transfer_ownership]) do
+      authorize_if {Magus.Organizations.OrganizationMember.Checks.ActorIsOrgOwner, []}
     end
 
     policy action(:accept) do
