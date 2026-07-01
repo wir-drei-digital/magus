@@ -56,6 +56,8 @@ defmodule Magus.Organizations.OrganizationMember do
       change fn changeset, _context ->
         Ash.Changeset.force_change_attribute(changeset, :invite_token, generate_token())
       end
+
+      change {Magus.Organizations.OrganizationMember.Changes.FireSeatSync, event: :activated}
     end
 
     create :create_member do
@@ -77,6 +79,8 @@ defmodule Magus.Organizations.OrganizationMember do
       change fn changeset, _context ->
         Ash.Changeset.force_change_attribute(changeset, :invite_token, generate_token())
       end
+
+      change {Magus.Organizations.OrganizationMember.Changes.FireSeatSync, event: :activated}
     end
 
     create :invite do
@@ -107,6 +111,7 @@ defmodule Magus.Organizations.OrganizationMember do
       change set_attribute(:status, :active)
       change set_attribute(:joined_at, &DateTime.utc_now/0)
       change relate_actor(:user)
+      change {Magus.Organizations.OrganizationMember.Changes.FireSeatSync, event: :activated}
     end
 
     update :change_role do
@@ -128,6 +133,7 @@ defmodule Magus.Organizations.OrganizationMember do
       change set_attribute(:status, :removed)
       change set_attribute(:removed_at, &DateTime.utc_now/0)
       validate {Magus.Organizations.OrganizationMember.Validations.NotLastOwner, []}
+      change {Magus.Organizations.OrganizationMember.Changes.FireSeatSync, event: :removed}
     end
 
     update :transfer_ownership do
