@@ -29,6 +29,8 @@ defmodule MagusWeb.OnboardingLive.RegisterLive do
     org_invite_token =
       Map.get(params, "org_invite_token") || Map.get(session, "org_invite_token")
 
+    create_org = truthy?(Map.get(params, "create_org"))
+
     form =
       Form.for_create(User, :register_with_password,
         domain: Magus.Accounts,
@@ -43,6 +45,7 @@ defmodule MagusWeb.OnboardingLive.RegisterLive do
       |> assign(:lang, lang)
       |> assign(:invite_token, invite_token)
       |> assign(:org_invite_token, org_invite_token)
+      |> assign(:create_org, create_org)
       |> assign(:form, to_form(form))
       |> assign(:trigger_action, false)
 
@@ -191,6 +194,19 @@ defmodule MagusWeb.OnboardingLive.RegisterLive do
                   {gettext("I confirm that I am at least 16 years old")}
                 </span>
               </label>
+
+              <label class="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="create_org"
+                  value="1"
+                  checked={@create_org}
+                  class="checkbox checkbox-primary mt-0.5"
+                />
+                <span class="text-sm">
+                  {gettext("Create an organization to invite teammates (optional)")}
+                </span>
+              </label>
             </div>
 
             <button type="submit" class="btn btn-primary w-full">
@@ -255,7 +271,7 @@ defmodule MagusWeb.OnboardingLive.RegisterLive do
   end
 
   @impl true
-  def handle_event("validate", %{"user" => user_params}, socket) do
+  def handle_event("validate", %{"user" => user_params} = params, socket) do
     # Add the selected plan to params
     user_params = Map.put(user_params, "selected_plan_key", socket.assigns.selected_plan)
 
@@ -263,7 +279,12 @@ defmodule MagusWeb.OnboardingLive.RegisterLive do
       Form.validate(socket.assigns.form, user_params, errors: true)
       |> to_form()
 
-    {:noreply, assign(socket, :form, form)}
+    # The "create an organization" checkbox is not a user field; preserve its
+    # state across re-renders (unchecked checkboxes are not submitted).
+    {:noreply,
+     socket
+     |> assign(:form, form)
+     |> assign(:create_org, truthy?(Map.get(params, "create_org")))}
   end
 
   @impl true
@@ -300,6 +321,9 @@ defmodule MagusWeb.OnboardingLive.RegisterLive do
   defp valid_plans do
     if Magus.Usage.billing_edition?(), do: @valid_plans, else: ["free"]
   end
+
+  # Normalizes the optional `create_org` opt-in flag (checkbox / query param).
+  defp truthy?(value), do: value in ["1", "true", true]
 
   defp sign_in_params(plan, lang, invite_token, org_invite_token) do
     %{}

@@ -47,8 +47,8 @@ defmodule MagusWeb.CoreRouter do
         end
       end
 
-      # Plug to capture invite_token / org_invite_token from params into session
-      # for post-auth acceptance
+      # Plug to capture invite_token / org_invite_token / create_org intent from
+      # params into session for post-auth handling
       defp capture_invite_token(conn, _opts) do
         conn =
           case conn.params["invite_token"] do
@@ -59,9 +59,21 @@ defmodule MagusWeb.CoreRouter do
               conn
           end
 
-        case conn.params["org_invite_token"] do
-          token when is_binary(token) and token != "" ->
-            Plug.Conn.put_session(conn, :org_invite_token, token)
+        conn =
+          case conn.params["org_invite_token"] do
+            token when is_binary(token) and token != "" ->
+              Plug.Conn.put_session(conn, :org_invite_token, token)
+
+            _ ->
+              conn
+          end
+
+        # Optional "create an organization" onboarding opt-in carried from the
+        # register page checkbox. Only a truthy flag stashes the session key, so
+        # the default signup path is unaffected.
+        case conn.params["create_org"] do
+          flag when flag in ["1", "true", true] ->
+            Plug.Conn.put_session(conn, :create_org, true)
 
           _ ->
             conn
@@ -414,6 +426,18 @@ defmodule MagusWeb.CoreRouter do
         ash_authentication_live_session :complete_profile,
           on_mount: [{MagusWeb.LiveUserAuth, :live_user_required_no_profile_check}] do
           live "/complete-profile", OnboardingLive.CompleteProfileLive, :complete_profile
+        end
+      end
+
+      # Optional post-registration step: create an organization. Authenticated,
+      # only reached when a brand-new user opted in on the register page
+      # (`create_org` intent flag) — the default signup path never lands here.
+      scope "/", MagusWeb do
+        pipe_through :browser
+
+        ash_authentication_live_session :onboarding_organization,
+          on_mount: [{MagusWeb.LiveUserAuth, :live_user_required}] do
+          live "/onboarding/organization", OnboardingLive.CreateOrganizationLive, :create
         end
       end
 
