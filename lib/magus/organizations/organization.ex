@@ -33,6 +33,7 @@ defmodule Magus.Organizations.Organization do
     create :create do
       accept [:name, :slug]
       change relate_actor(:owner)
+      change Magus.Organizations.Organization.Changes.CreateOwnerMember
     end
 
     update :update do
