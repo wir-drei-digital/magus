@@ -102,6 +102,27 @@ defmodule Magus.Organizations.OrganizationMember do
           DateTime.add(DateTime.utc_now(), 7, :day)
         )
       end
+
+      change Magus.Organizations.OrganizationMember.Changes.SendInviteEmail
+    end
+
+    update :resend_invite do
+      accept []
+      require_atomic? false
+      description "Regenerate invite_token, reset expiry, re-send invite email"
+
+      validate attribute_equals(:status, :invited)
+
+      change fn changeset, _context ->
+        changeset
+        |> Ash.Changeset.force_change_attribute(:invite_token, generate_token())
+        |> Ash.Changeset.force_change_attribute(
+          :invite_expires_at,
+          DateTime.add(DateTime.utc_now(), 7, :day)
+        )
+      end
+
+      change Magus.Organizations.OrganizationMember.Changes.SendInviteEmail
     end
 
     update :accept do
@@ -193,7 +214,7 @@ defmodule Magus.Organizations.OrganizationMember do
       authorize_if always()
     end
 
-    policy action([:invite, :change_role, :remove, :transfer_ownership]) do
+    policy action([:invite, :resend_invite, :change_role, :remove, :transfer_ownership]) do
       authorize_if {Magus.Organizations.OrganizationMember.Checks.ActorIsOrgOwner, []}
     end
 

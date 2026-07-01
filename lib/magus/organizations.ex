@@ -56,6 +56,7 @@ defmodule Magus.Organizations do
       define :change_org_member_role, action: :change_role, args: [:role]
       define :remove_org_member, action: :remove
       define :transfer_org_ownership, action: :transfer_ownership
+      define :resend_org_invite, action: :resend_invite
     end
   end
 
