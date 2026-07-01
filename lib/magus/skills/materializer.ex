@@ -46,8 +46,11 @@ defmodule Magus.Skills.Materializer do
   # Ensure the agent's :sandbox_env secrets are available as /workspace/.env so
   # the skill's scripts can `source` them. Mirrors ExecCommand's injection; a
   # conversation without a custom agent simply gets no env file.
+  # authorize?: false on both calls: internal materialization step, runs deep in
+  # the agent pipeline with no acting user.
   defp ensure_env(conversation_id, user_id) do
-    with {:ok, conversation} <- Magus.Chat.get_conversation(conversation_id, authorize?: false),
+    with {:ok, conversation} <-
+           Magus.Chat.get_conversation(conversation_id, authorize?: false),
          agent_id when not is_nil(agent_id) <- conversation.custom_agent_id,
          {:ok, env_map} when map_size(env_map) > 0 <-
            Magus.Agents.sandbox_env_map_for_agent(agent_id, authorize?: false) do
