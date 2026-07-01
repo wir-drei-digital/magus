@@ -19,6 +19,9 @@ defmodule Magus.Models do
       define :list_providers, action: :read
       define :list_enabled_providers, action: :enabled
       define :get_provider_by_slug, action: :by_slug, args: [:slug]
+      define :create_owned_provider, action: :create_owned
+      define :update_owned_provider, action: :update_owned
+      define :list_owned_providers, action: :owned
     end
 
     resource Magus.Models.RoleAssignment do

@@ -349,6 +349,16 @@ config :magus, :super_brain_extraction_embedder, Magus.Embeddings.OpenAIBatchEmb
 # TEST_ACCOUNT_EMAIL_DOMAIN env var (see runtime.exs).
 config :magus, :test_accounts, email_domain: "magus.digital"
 
+# Per-user caps for the user-owned model catalog (BYOK). A user may own at most
+# max_providers providers and max_models models.
+config :magus, :user_model_limits, max_providers: 10, max_models: 50
+
+# ReqLLM provider ids a user-owned provider may target. Keeps BYOK on
+# vetted, well-behaved provider modules; "openai_compatible" covers custom
+# OpenAI-compatible endpoints (which additionally require a safe base_url).
+config :magus, :user_provider_req_llm_allowlist,
+  ~w(anthropic openai openrouter xai google openai_compatible)
+
 # Chat domain configuration
 config :magus, Magus.Chat, unfiled_conversations_limit: 20
 
