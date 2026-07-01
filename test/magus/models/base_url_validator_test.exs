@@ -3,12 +3,11 @@ defmodule Magus.Models.BaseUrlValidatorTest do
   alias Magus.Models.BaseUrlValidator
 
   test "accepts a public https url" do
-    # NOTE: deviates from the brief's `api.example.com`, which is a non-existent
-    # subdomain of the IANA documentation domain and returns NXDOMAIN. The
-    # validator resolves the host at validation time (a deliberate SSRF guard),
-    # so the positive case must use a host that actually resolves to a public
-    # IP. `example.com` is IANA-reserved for docs and resolves to public IPs.
-    assert :ok = BaseUrlValidator.validate("https://example.com/v1")
+    # Offline-deterministic: a dotted-quad literal is resolved locally by
+    # :inet.getaddr without a network DNS lookup. 8.8.8.8 is a public IP that
+    # is not in any blocked range, so this positive case never depends on live
+    # DNS.
+    assert :ok = BaseUrlValidator.validate("https://8.8.8.8/v1")
   end
 
   test "rejects non-https" do
@@ -24,6 +23,18 @@ defmodule Magus.Models.BaseUrlValidatorTest do
     for host <- ["10.0.0.1", "172.16.0.1", "192.168.1.1", "169.254.169.254"] do
       assert {:error, _} = BaseUrlValidator.validate("https://#{host}/v1")
     end
+  end
+
+  test "rejects IPv4-mapped IPv6 pointing at a blocked range" do
+    # Regression: these previously returned :ok because the hand-rolled
+    # blocklist did not decode ::ffff:x IPv4-mapped IPv6 addresses.
+    assert {:error, _} = BaseUrlValidator.validate("https://[::ffff:169.254.169.254]/v1")
+    assert {:error, _} = BaseUrlValidator.validate("https://[::ffff:127.0.0.1]/v1")
+  end
+
+  test "rejects IPv6 link-local" do
+    # Regression: fe80::/10 link-local was not covered by the old blocklist.
+    assert {:error, _} = BaseUrlValidator.validate("https://[fe80::1]/v1")
   end
 
   test "rejects embedded credentials" do
