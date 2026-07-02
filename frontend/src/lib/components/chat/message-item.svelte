@@ -98,7 +98,7 @@
 	const isEvent = $derived(message.messageType !== 'message');
 	const toolData = $derived(message.toolCallData);
 	// A degraded-model hard-stop event (Task 1): its tool_call_data is the
-	// broken_model_selection payload, not a tool result — render remediation.
+	// broken_model_selection payload, not a tool result; render remediation.
 	const brokenSelection = $derived(isEvent && isBrokenSelection(toolData));
 	const canBranch = $derived(
 		message.status === 'complete' && (onStartThread !== undefined || thread !== null)
