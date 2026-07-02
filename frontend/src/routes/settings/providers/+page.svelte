@@ -26,7 +26,9 @@
 	} from '$lib/ash/api';
 	import {
 		PROVIDER_TYPES,
+		SUBSCRIPTION_SETTINGS_PATH,
 		badgeKind,
+		isPaidPlanRequired,
 		requiresBaseUrl,
 		type ProviderType
 	} from '$lib/components/settings/providers/provider-form';
@@ -113,6 +115,9 @@
 	let saveError = $state<string | null>(null);
 	let baseUrlError = $state<string | null>(null);
 	let typeError = $state<string | null>(null);
+	// Set when the cloud ProviderGate rejects the save for lack of a paid plan;
+	// swaps the generic form error for an upgrade CTA linking to subscriptions.
+	let gateUpgrade = $state(false);
 
 	let name = $state('');
 	let providerType = $state<ProviderType>('anthropic');
@@ -192,11 +197,18 @@
 		saveError = null;
 		baseUrlError = null;
 		typeError = null;
+		gateUpgrade = false;
 	}
 
 	/** Route Ash field errors onto their control; keep the rest as a form error. */
 	function applyErrors(errors: RpcError[]) {
 		clearErrors();
+		// A paid-plan gate rejection short-circuits field routing: it is not a
+		// fixable input error, so show the upgrade CTA instead of a form message.
+		if (isPaidPlanRequired(errors)) {
+			gateUpgrade = true;
+			return;
+		}
 		const leftover: RpcError[] = [];
 		for (const err of errors) {
 			const fields = err.fields ?? [];
@@ -646,7 +658,21 @@
 				/>
 			</Field>
 
-			{#if saveError}
+			{#if gateUpgrade}
+				<div class="rounded-lg border border-dashed p-3 text-xs" data-testid="provider-gate-cta">
+					<p class="font-medium">Bring-your-own keys need a paid plan.</p>
+					<p class="mt-1 text-muted-foreground">
+						Upgrade your subscription to add your own provider keys.
+					</p>
+					<a
+						href={SUBSCRIPTION_SETTINGS_PATH}
+						class="mt-2 inline-block underline underline-offset-2 hover:text-foreground"
+						data-testid="provider-gate-cta-link"
+					>
+						View plans
+					</a>
+				</div>
+			{:else if saveError}
 				<p class="text-xs text-destructive" data-testid="provider-save-error">{saveError}</p>
 			{/if}
 

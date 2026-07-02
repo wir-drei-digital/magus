@@ -80,6 +80,7 @@ defmodule Magus.Models.Provider do
 
       validate Magus.Models.Validations.SafeBaseUrl
       validate Magus.Models.Validations.WithinProviderCap
+      validate Magus.Models.Validations.ProviderGateAllows
 
       change Magus.Models.Provider.Changes.SetOwnerFromActor
       change Magus.Models.Provider.Changes.GenerateUniqueSlug
@@ -91,6 +92,7 @@ defmodule Magus.Models.Provider do
       accept [:name, :base_url, :api_key, :enabled?]
       require_atomic? false
       validate Magus.Models.Validations.SafeBaseUrl
+      validate Magus.Models.Validations.ProviderGateAllows
       change Magus.Models.Provider.Changes.EnqueueCredentialValidation
     end
 

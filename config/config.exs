@@ -361,6 +361,11 @@ config :magus,
        :user_provider_req_llm_allowlist,
        ~w(anthropic openai openrouter xai google openai_compatible)
 
+# Deployment seam gating BYOK provider creation and credential updates. The
+# open-core default allows everything; the cloud edition swaps this to require
+# a paid or trialing subscription. Never consulted on the resolution hot path.
+config :magus, :provider_gate, Magus.Models.ProviderGate.Open
+
 # Chat domain configuration
 config :magus, Magus.Chat, unfiled_conversations_limit: 20
 
