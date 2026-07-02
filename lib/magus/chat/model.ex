@@ -31,6 +31,7 @@ defmodule Magus.Chat.Model do
     otp_app: :magus,
     domain: Magus.Chat,
     data_layer: AshPostgres.DataLayer,
+    authorizers: [Ash.Policy.Authorizer],
     extensions: [AshTypescript.Resource]
 
   # Modality strings the catalog/admin form may set. Superset of every value
@@ -246,6 +247,25 @@ defmodule Magus.Chat.Model do
              )
 
       prepare build(sort: [name: :asc])
+    end
+  end
+
+  policies do
+    # Reads stay open: owned-row scoping lives in the list_active prepare, the
+    # :owned action filter, and the selection validations. Full read policies
+    # arrive with workspace sharing (Phase 3).
+    policy action_type(:read) do
+      authorize_if always()
+    end
+
+    # Owned actions: ownership is enforced fail-closed inside their changes
+    # (BuildOwnedModel / RequireOwner). Exactly one policy matches each.
+    policy action([:create_owned, :destroy_owned]) do
+      authorize_if always()
+    end
+
+    policy action([:create, :update, :destroy]) do
+      authorize_if Magus.Checks.IsAdmin
     end
   end
 

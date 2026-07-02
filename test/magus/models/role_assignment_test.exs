@@ -9,7 +9,7 @@ defmodule Magus.Models.RoleAssignmentTest do
       provider: "Test",
       context_window: 1_000
     })
-    |> Ash.create!()
+    |> Ash.create!(authorize?: false)
   end
 
   test "upsert assignment by role" do
