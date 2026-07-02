@@ -42,7 +42,9 @@
 		files: '/files',
 		prompts: '/prompts',
 		agents: '/agents',
-		skills: '/skills'
+		skills: '/skills',
+		// Bridge until Task 11 rewrites this block (prompts/skills -> /library).
+		library: '/library'
 	};
 
 	// Inside a mode view (/chat/*, /files/*, …) a mode click only swaps the nav

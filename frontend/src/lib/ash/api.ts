@@ -548,7 +548,7 @@ export type WorkbenchTab = {
 
 export type TabSession = {
 	id: string;
-	mode: 'chat' | 'brain' | 'agents' | 'prompts' | 'files' | 'skills';
+	mode: 'chat' | 'brain' | 'agents' | 'prompts' | 'files' | 'skills' | 'library';
 	navFilter: 'all' | 'shared' | 'personal';
 	tabs: WorkbenchTab[];
 	activeTabId: string | null;
