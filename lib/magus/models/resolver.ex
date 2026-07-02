@@ -32,8 +32,10 @@ defmodule Magus.Models.Resolver do
   end
 
   # An actor scopes owned-model visibility. A nil actor sees global rows only
-  # (owned rows are excluded, fail-closed).
+  # (owned rows are excluded, fail-closed). Accepts a user struct/map with a
+  # binary :id, or a bare binary id (the form Preflight/MediaBypass thread).
   defp actor_id(%{id: id}) when is_binary(id), do: id
+  defp actor_id(id) when is_binary(id), do: id
   defp actor_id(_), do: nil
 
   # Explicit by id: found -> :explicit. Miss -> fall through to the keys map,

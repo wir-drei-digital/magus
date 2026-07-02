@@ -209,4 +209,29 @@ defmodule Magus.Models.ResolverTest do
       refute Magus.Models.Resolution.degraded?(res)
     end
   end
+
+  describe "bare binary actor id" do
+    test "a binary actor id scopes exactly like %{id: id}" do
+      Magus.DataCase.clear_catalog!()
+      user = generate(user())
+
+      {:ok, provider} =
+        Magus.Models.create_owned_provider(
+          %{name: "Mine", req_llm_id: "anthropic", api_key: "sk"},
+          actor: user
+        )
+
+      {:ok, model} =
+        Magus.Chat.create_owned_model(
+          %{name: "C", model_id: "claude-x", model_provider_id: provider.id},
+          actor: user
+        )
+
+      {:ok, res} =
+        Magus.Models.Resolver.resolve(user.id, %{model_keys: %{chat: model.key}, mode: :chat})
+
+      assert res.model.key == model.key
+      assert res.cost_source == :byok
+    end
+  end
 end
