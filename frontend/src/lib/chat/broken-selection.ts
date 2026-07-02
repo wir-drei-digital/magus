@@ -6,11 +6,11 @@
  * carries STRING keys, delivered verbatim over the ["messages", conversation_id]
  * PubSub topic and message fetches:
  *
- *   kind          — always "broken_model_selection"
- *   requested_by  — "id" | "key" (how the stale selection was expressed)
- *   requested_value — the stale ask
- *   fallback_key  — the model actually resolved (may rarely be null)
- *   scope         — "conversation" | "user" (which selection to reset)
+ *   kind: always "broken_model_selection"
+ *   requested_by: "id" | "key" (how the stale selection was expressed)
+ *   requested_value: the stale ask
+ *   fallback_key: the model actually resolved (may rarely be null)
+ *   scope: "conversation" | "user" (which selection to reset)
  *
  * The blocked user message produced no agent response, so remediation clears the
  * scoped selection and re-sends the original text through the normal send path.
