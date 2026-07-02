@@ -13,6 +13,7 @@
 	import ChatNav from './chat-nav.svelte';
 	import FilesNav from './files-nav.svelte';
 	import NewResourceDialog, { type NewResourceKind } from './new-resource-dialog.svelte';
+	import PromptFormDialog from './prompt-form-dialog.svelte';
 	import PromptsNav from './prompts-nav.svelte';
 	import SkillsNav from './skills-nav.svelte';
 	import SettingsNav from './settings-nav.svelte';
@@ -25,9 +26,11 @@
 
 	let fileInput = $state<HTMLInputElement | null>(null);
 
-	// Prompt/agent/brain creation share one shadcn dialog, keyed by kind.
-	let createKind = $state<NewResourceKind>('prompt');
+	// Agent/brain creation share one shadcn dialog, keyed by kind.
+	let createKind = $state<NewResourceKind>('brain');
 	let createOpen = $state(false);
+	// Prompt creation uses its own dialog (create + edit, type dropdown).
+	let promptFormOpen = $state(false);
 
 	function openCreate(kind: NewResourceKind) {
 		createKind = kind;
@@ -154,7 +157,10 @@
 									}}
 								/>
 							{:else if workbench.mode === 'prompts'}
-								<Sidebar.MenuButton onclick={() => openCreate('prompt')} data-testid="new-prompt">
+								<Sidebar.MenuButton
+									onclick={() => (promptFormOpen = true)}
+									data-testid="new-prompt"
+								>
 									<Plus class="text-muted-foreground" />
 									<span>New prompt</span>
 								</Sidebar.MenuButton>
@@ -228,4 +234,5 @@
 	</Sidebar.Root>
 </Sidebar.Provider>
 <NewResourceDialog kind={createKind} bind:open={createOpen} />
+<PromptFormDialog bind:open={promptFormOpen} />
 <SkillImportDialog />

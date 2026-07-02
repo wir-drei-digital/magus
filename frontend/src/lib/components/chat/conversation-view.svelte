@@ -15,7 +15,7 @@
 	import { buildChatStream, toolViewFromLive } from '$lib/chat/events';
 	import { readThreads, writeThreads } from '$lib/chat/threads-cache';
 	import { workbench } from '$lib/stores/workbench.svelte';
-	import NewResourceDialog from '$lib/components/shell/new-resource-dialog.svelte';
+	import PromptFormDialog from '$lib/components/shell/prompt-form-dialog.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import Composer from './composer.svelte';
@@ -484,7 +484,7 @@
 	</div>
 </div>
 
-<NewResourceDialog kind="prompt" bind:open={promptDialogOpen} initialBody={promptFromMessage} />
+<PromptFormDialog bind:open={promptDialogOpen} initialBody={promptFromMessage} />
 
 <!-- Classic LimitExceededModal: plan-limit denials get a dialog with the
      upgrade path, not just an inline error row. -->

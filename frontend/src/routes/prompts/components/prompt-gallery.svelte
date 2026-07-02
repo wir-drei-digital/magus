@@ -12,7 +12,7 @@
 	import { session } from '$lib/stores/session.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { EmptyState } from '$lib/components/ui/empty-state';
-	import NewResourceDialog from '$lib/components/shell/new-resource-dialog.svelte';
+	import PromptFormDialog from '$lib/components/shell/prompt-form-dialog.svelte';
 	import PromptCard from './prompt-card.svelte';
 
 	let { selectedId = null, compact = false }: { selectedId?: string | null; compact?: boolean } =
@@ -212,4 +212,4 @@
 	</div>
 </div>
 
-<NewResourceDialog kind="prompt" bind:open={createOpen} />
+<PromptFormDialog bind:open={createOpen} />
