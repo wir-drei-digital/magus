@@ -30,7 +30,7 @@ defmodule Magus.Models.RequestOptionsTest do
       context_window: 1_000,
       model_provider_id: provider.id
     })
-    |> Ash.create!()
+    |> Ash.create!(authorize?: false)
 
     assert {"openrouter:foo/m", [api_key: "sk-from-db"]} =
              RequestOptions.resolve("openrouter:foo/m")
@@ -57,7 +57,7 @@ defmodule Magus.Models.RequestOptionsTest do
       context_window: 8_000,
       model_provider_id: provider.id
     })
-    |> Ash.create!()
+    |> Ash.create!(authorize?: false)
 
     assert {%{provider: :openai_compatible, id: "llama-3"}, opts} =
              RequestOptions.resolve("local_vllm:llama-3")
@@ -91,7 +91,7 @@ defmodule Magus.Models.RequestOptionsTest do
       context_window: 1_000,
       model_provider_id: provider.id
     })
-    |> Ash.create!()
+    |> Ash.create!(authorize?: false)
 
     assert {"off_provider:foo", []} = RequestOptions.resolve("off_provider:foo")
   end

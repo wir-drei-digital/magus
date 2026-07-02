@@ -25,7 +25,7 @@ defmodule Magus.Chat.ModelProviderLinkTest do
                model_provider_id: provider.id,
                llm_metadata: %{"output_limit" => 16_000, "cache_read" => 0.5}
              })
-             |> Ash.create()
+             |> Ash.create(authorize?: false)
 
     assert model.model_provider_id == provider.id
     assert model.llm_metadata["output_limit"] == 16_000
@@ -40,7 +40,7 @@ defmodule Magus.Chat.ModelProviderLinkTest do
                provider: "TestCorp",
                context_window: 1_000
              })
-             |> Ash.create()
+             |> Ash.create(authorize?: false)
 
     assert model.llm_metadata == %{}
   end
