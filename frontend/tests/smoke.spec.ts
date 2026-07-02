@@ -242,6 +242,9 @@ async function mockRpc(
 				case 'my_prompts':
 				case 'my_favorite_prompts':
 				case 'my_prompt_favorites':
+				case 'my_skills':
+				case 'my_favorite_skills':
+				case 'my_skill_favorites':
 				case 'list_tags':
 				case 'workspace_agents':
 				case 'agent_activity':
@@ -1164,36 +1167,43 @@ const libraryPrompt = {
 	type: 'user',
 	isFavorited: false,
 	isSharedToWorkspace: false,
-	workspaceId: null
+	workspaceId: null,
+	content: 'Check tests. Check naming.',
+	useCount: 0,
+	tags: [{ id: 'tag-1', name: 'review' }]
 };
 
-test('prompts mode lists the library and opens a prompt', async ({ page }) => {
+test('library lists prompts and opens the reader', async ({ page }) => {
 	await mockRpc(page, {
 		authenticated: true,
 		respond: {
 			my_prompts: () => [libraryPrompt],
 			get_prompt: () => ({
 				...libraryPrompt,
-				content: 'Check tests. Check naming.',
 				chatMode: null,
 				additionalInformation: null,
-				isPublic: false,
-				tags: [{ id: 'tag-1', name: 'review' }]
+				isPublic: false
 			})
 		}
 	});
 
+	// The legacy /prompts URL redirects into the merged library view.
 	await page.goto('/prompts');
-	await expect(page.getByTestId('prompts-nav')).toBeVisible();
-	await expect(page.getByText('Code review checklist')).toBeVisible();
+	await expect(page).toHaveURL(/\/library\?type=prompts$/);
+	await expect(page.getByTestId('library-nav')).toBeVisible();
 
-	await page.getByText('Code review checklist').click();
+	const cards = page.locator('[data-testid="library-card"][data-kind="prompt"]');
+	await expect(cards).toHaveCount(1);
+
+	await cards.first().click();
 	await expect(page.getByTestId('prompt-title')).toHaveText('Code review checklist');
 	await expect(page.getByTestId('prompt-content')).toContainText('Check tests.');
-	await expect(page.getByText('#review ×')).toBeVisible();
+	await expect(page.getByLabel('Remove tag review')).toBeVisible();
 
+	// Edit opens the shared prompt form dialog seeded with the prompt.
 	await page.getByTestId('prompt-edit').click();
-	await expect(page.getByTestId('prompt-name-input')).toHaveValue('Code review checklist');
+	await expect(page.getByTestId('prompt-form-dialog')).toBeVisible();
+	await expect(page.getByTestId('prompt-form-name')).toHaveValue('Code review checklist');
 });
 
 const agentDetail = {
