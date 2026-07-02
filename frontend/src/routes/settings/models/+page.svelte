@@ -1,14 +1,26 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Star, EyeOff, Eye, ArrowUp, ArrowDown } from '@lucide/svelte';
+	import { base } from '$app/paths';
+	import { Star, EyeOff, Eye, ArrowUp, ArrowDown, Copy } from '@lucide/svelte';
 	import { Section as SettingsSection } from '$lib/components/crud';
-	import { listActiveModels, type ModelPreference, type ModelSummary } from '$lib/ash/api';
+	import {
+		listActiveModels,
+		listOwnedModels,
+		type ModelPreference,
+		type ModelSummary
+	} from '$lib/ash/api';
 	import { cachedModelPreferences } from '$lib/chat/catalog';
 	import { prefsById } from '$lib/chat/model-grouping';
 	import { toggleFavorite, toggleHidden, moveModel } from '$lib/chat/model-preferences';
+	import { toTemplate, templateHref } from '$lib/components/settings/providers/model-template';
 
 	let models = $state<ModelSummary[]>([]);
 	let prefs = $state<ModelPreference[]>([]);
+	// Ids of the actor's own BYOK models. `list_active` mixes global catalog rows
+	// with the actor's owned rows, and `ModelSummary` carries no ownership flag, so
+	// we cross-reference the owned list to gate the "use as template" action to
+	// catalog (non-owned) rows only.
+	let ownedIds = $state<Set<string>>(new Set());
 	let loading = $state(true);
 	let busy = $state(false);
 
@@ -29,9 +41,16 @@
 	onMount(() => void load());
 
 	async function load() {
-		const [m, p] = await Promise.all([listActiveModels(), cachedModelPreferences()]);
+		const [m, p, owned] = await Promise.all([
+			listActiveModels(),
+			cachedModelPreferences(),
+			listOwnedModels()
+		]);
 		if (m.success) models = m.data;
 		if (p.success) prefs = p.data;
+		// A failure here degrades softly: no ids means every row is treated as
+		// catalog, which only over-offers the template action (never a data write).
+		if (owned.success) ownedIds = new Set(owned.data.map((o) => o.id));
 		loading = false;
 	}
 
@@ -149,6 +168,17 @@
 							<span class="shrink-0 font-mono text-[10px] text-muted-foreground uppercase">
 								{model.provider}
 							</span>
+						{/if}
+						{#if !ownedIds.has(model.id)}
+							<a
+								href={templateHref(base, toTemplate(model))}
+								data-testid="model-template-button"
+								aria-label="Use as template"
+								title="Use as template for your own provider"
+								class="rounded p-1 text-muted-foreground hover:bg-accent/60"
+							>
+								<Copy class="size-4" />
+							</a>
 						{/if}
 						<button
 							type="button"
