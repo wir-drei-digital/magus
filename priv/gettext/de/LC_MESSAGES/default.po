@@ -6064,11 +6064,12 @@ msgstr "Zugriff konnte nicht widerrufen werden"
 msgid "Insight"
 msgstr ""
 
+#: lib/magus_web/organizations/accept_invite.ex:65
 #: lib/magus_web/workspaces/accept_invite.ex:65
 #: lib/magus_web/workspaces/accept_seat_invite.ex:70
 #, elixir-autogen, elixir-format
 msgid "Invitation not found. It may have already been used or revoked."
-msgstr ""
+msgstr "Einladung nicht gefunden. Sie wurde möglicherweise bereits verwendet oder zurückgezogen."
 
 #: lib/magus_web/legacy/workspace_live/members.ex:386
 #, elixir-autogen, elixir-format, fuzzy
@@ -8013,3 +8014,63 @@ msgstr "Ältere Nachrichten zusammengefasst"
 #, elixir-autogen, elixir-format
 msgid "via"
 msgstr "via"
+
+#: lib/magus_web/organizations/accept_invite.ex:26
+#, elixir-autogen, elixir-format
+msgid "Organization Invitation"
+msgstr "Einladung zur Organisation"
+
+#: lib/magus_web/organizations/accept_invite.ex:56
+#, elixir-autogen, elixir-format
+msgid "This invitation has expired. Ask the organization owner to resend it."
+msgstr "Diese Einladung ist abgelaufen. Bitte den Inhaber der Organisation, sie erneut zu senden."
+
+#: lib/magus_web/organizations/accept_invite.ex:99
+#, elixir-autogen, elixir-format
+msgid "Go to App"
+msgstr "Zur App"
+
+#: lib/magus_web/onboarding/create_organization_live.ex:36
+#, elixir-autogen, elixir-format
+msgid "Create an Organization"
+msgstr "Organisation erstellen"
+
+#: lib/magus_web/onboarding/create_organization_live.ex:64
+#, elixir-autogen, elixir-format
+msgid "Create your organization"
+msgstr "Erstelle deine Organisation"
+
+#: lib/magus_web/onboarding/create_organization_live.ex:67
+#, elixir-autogen, elixir-format
+msgid "Set up a shared organization to invite teammates and pool billing."
+msgstr "Richte eine gemeinsame Organisation ein, um Teammitglieder einzuladen und die Abrechnung zu bündeln."
+
+#: lib/magus_web/onboarding/create_organization_live.ex:81
+#, elixir-autogen, elixir-format
+msgid "Organization name"
+msgstr "Organisationsname"
+
+#: lib/magus_web/onboarding/create_organization_live.ex:91
+#, elixir-autogen, elixir-format
+msgid "URL slug"
+msgstr "URL-Slug"
+
+#: lib/magus_web/onboarding/create_organization_live.ex:96
+#, elixir-autogen, elixir-format
+msgid "Lowercase letters, numbers and dashes. Auto-filled from the name."
+msgstr "Kleinbuchstaben, Zahlen und Bindestriche. Wird automatisch aus dem Namen ausgefüllt."
+
+#: lib/magus_web/onboarding/create_organization_live.ex:101
+#, elixir-autogen, elixir-format
+msgid "Create organization"
+msgstr "Organisation erstellen"
+
+#: lib/magus_web/onboarding/create_organization_live.ex:108
+#, elixir-autogen, elixir-format
+msgid "Skip for now"
+msgstr "Vorerst überspringen"
+
+#: lib/magus_web/onboarding/create_organization_live.ex:137
+#, elixir-autogen, elixir-format
+msgid "Organization created."
+msgstr "Organisation erstellt."

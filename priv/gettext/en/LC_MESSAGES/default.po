@@ -8013,3 +8013,63 @@ msgstr ""
 #, elixir-autogen, elixir-format
 msgid "via"
 msgstr ""
+
+#: lib/magus_web/organizations/accept_invite.ex:26
+#, elixir-autogen, elixir-format
+msgid "Organization Invitation"
+msgstr ""
+
+#: lib/magus_web/organizations/accept_invite.ex:56
+#, elixir-autogen, elixir-format
+msgid "This invitation has expired. Ask the organization owner to resend it."
+msgstr ""
+
+#: lib/magus_web/organizations/accept_invite.ex:99
+#, elixir-autogen, elixir-format
+msgid "Go to App"
+msgstr ""
+
+#: lib/magus_web/onboarding/create_organization_live.ex:36
+#, elixir-autogen, elixir-format
+msgid "Create an Organization"
+msgstr ""
+
+#: lib/magus_web/onboarding/create_organization_live.ex:64
+#, elixir-autogen, elixir-format
+msgid "Create your organization"
+msgstr ""
+
+#: lib/magus_web/onboarding/create_organization_live.ex:67
+#, elixir-autogen, elixir-format
+msgid "Set up a shared organization to invite teammates and pool billing."
+msgstr ""
+
+#: lib/magus_web/onboarding/create_organization_live.ex:81
+#, elixir-autogen, elixir-format
+msgid "Organization name"
+msgstr ""
+
+#: lib/magus_web/onboarding/create_organization_live.ex:91
+#, elixir-autogen, elixir-format
+msgid "URL slug"
+msgstr ""
+
+#: lib/magus_web/onboarding/create_organization_live.ex:96
+#, elixir-autogen, elixir-format
+msgid "Lowercase letters, numbers and dashes. Auto-filled from the name."
+msgstr ""
+
+#: lib/magus_web/onboarding/create_organization_live.ex:101
+#, elixir-autogen, elixir-format
+msgid "Create organization"
+msgstr ""
+
+#: lib/magus_web/onboarding/create_organization_live.ex:108
+#, elixir-autogen, elixir-format
+msgid "Skip for now"
+msgstr ""
+
+#: lib/magus_web/onboarding/create_organization_live.ex:137
+#, elixir-autogen, elixir-format
+msgid "Organization created."
+msgstr ""
