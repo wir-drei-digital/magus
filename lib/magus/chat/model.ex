@@ -46,6 +46,10 @@ defmodule Magus.Chat.Model do
     repo Magus.Repo
 
     migration_defaults input_modalities: "\"nil\"", output_modalities: "\"nil\""
+
+    custom_indexes do
+      index [:owner_user_id]
+    end
   end
 
   typescript do

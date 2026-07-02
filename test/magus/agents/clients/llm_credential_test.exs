@@ -61,12 +61,13 @@ defmodule Magus.Agents.Clients.LLMCredentialTest do
   # injects `credential_actor_id`) forward into every turn's stream/generate
   # call via `Config.llm_opts/1`. This test pins that transport end to end.
   # ==========================================================================
-  test "react runtime Config carries credential_actor_id from llm_opts into Config.llm_opts/1" do
+  test "react runtime Config carries credential_actor_id from llm_opts into Config.llm_opts/1",
+       %{model: model} do
     alias Jido.AI.Reasoning.ReAct.Config
 
     config =
       Config.new(%{
-        model: "anthropic:claude-3-5-sonnet",
+        model: model.key,
         llm_opts: [credential_actor_id: "owner-123"]
       })
 

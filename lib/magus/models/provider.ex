@@ -23,6 +23,10 @@ defmodule Magus.Models.Provider do
   postgres do
     table "model_providers"
     repo Magus.Repo
+
+    custom_indexes do
+      index [:owner_user_id]
+    end
   end
 
   # ReqLLM provider ids a user-owned provider (:create_owned) may target.
@@ -151,7 +155,10 @@ defmodule Magus.Models.Provider do
     end
 
     policy action(:stamp_validation) do
-      authorize_if always()
+      # Only the credential-validation Oban worker writes these fields, and it
+      # uses authorize?: false. No end-user path reaches this action, so require
+      # admin rather than authorizing everyone.
+      authorize_if Magus.Checks.IsAdmin
     end
 
     policy action(:create) do

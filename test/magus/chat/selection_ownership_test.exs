@@ -30,4 +30,38 @@ defmodule Magus.Chat.SelectionOwnershipTest do
              |> Ash.Changeset.for_update(:select_model, %{selected_model_id: m.id}, actor: user)
              |> Ash.update()
   end
+
+  test "conversation set_model rejects another user's owned model", %{
+    user: user,
+    others_model: m
+  } do
+    conversation = generate(conversation(actor: user))
+
+    assert {:error, _} =
+             conversation
+             |> Ash.Changeset.for_update(:set_model, %{selected_model_id: m.id}, actor: user)
+             |> Ash.update()
+  end
+
+  test "selecting nil clears the selection", %{user: user} do
+    assert {:ok, updated} =
+             user
+             |> Ash.Changeset.for_update(:select_model, %{selected_model_id: nil}, actor: user)
+             |> Ash.update()
+
+    assert is_nil(updated.selected_model_id)
+  end
+
+  test "selecting a global active model succeeds", %{user: user} do
+    global = generate(model())
+
+    assert {:ok, updated} =
+             user
+             |> Ash.Changeset.for_update(:select_model, %{selected_model_id: global.id},
+               actor: user
+             )
+             |> Ash.update()
+
+    assert updated.selected_model_id == global.id
+  end
 end
