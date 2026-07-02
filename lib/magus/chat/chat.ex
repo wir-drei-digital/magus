@@ -88,6 +88,9 @@ defmodule Magus.Chat do
       rpc_action :list_active_models, :list_active
       rpc_action :list_image_generation_models, :list_image_generation
       rpc_action :list_video_generation_models, :list_video_generation
+      rpc_action :create_owned_model, :create_owned
+      rpc_action :list_owned_models, :owned
+      rpc_action :destroy_owned_model, :destroy_owned
     end
 
     resource Magus.Chat.ConversationFavorite do
@@ -202,6 +205,7 @@ defmodule Magus.Chat do
       define :get_model_by_key_with_provider, action: :by_key_with_provider, args: [:key]
       define :create_owned_model, action: :create_owned
       define :list_owned_models, action: :owned
+      define :destroy_owned_model, action: :destroy_owned
     end
 
     resource Magus.Chat.RoutingSlot do
