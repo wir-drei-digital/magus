@@ -1508,7 +1508,7 @@ export type TaskAttributesOnlySchema = {
 // Skill Schema
 export type SkillResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "displayName" | "description" | "body" | "requestedTools" | "requiredSecrets" | "version" | "license" | "compatibility" | "icon" | "color" | "sourceFormat" | "sourceUrl" | "hasExecutableBundle" | "fileManifest" | "workspaceId" | "isSharedToWorkspace";
+  __primitiveFields: "id" | "name" | "displayName" | "description" | "body" | "requestedTools" | "requiredSecrets" | "version" | "license" | "compatibility" | "icon" | "color" | "sourceFormat" | "sourceUrl" | "hasExecutableBundle" | "fileManifest" | "workspaceId" | "isSharedToWorkspace" | "isFavorited";
   id: UUID;
   name: string;
   displayName: string | null;
@@ -1527,6 +1527,7 @@ export type SkillResourceSchema = {
   fileManifest: Array<Record<string, any>> | null;
   workspaceId: UUID | null;
   isSharedToWorkspace: boolean | null;
+  isFavorited: boolean | null;
   workspace: { __type: "Relationship"; __resource: WorkspaceResourceSchema | null; };
 };
 
@@ -1552,6 +1553,25 @@ export type SkillAttributesOnlySchema = {
   hasExecutableBundle: boolean;
   fileManifest: Array<Record<string, any>> | null;
   workspaceId: UUID | null;
+};
+
+
+// SkillFavorite Schema
+export type SkillFavoriteResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "skillId";
+  id: UUID;
+  skillId: UUID;
+  skill: { __type: "Relationship"; __resource: SkillResourceSchema; };
+};
+
+
+
+export type SkillFavoriteAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "skillId";
+  id: UUID;
+  skillId: UUID;
 };
 
 
@@ -1592,7 +1612,7 @@ export type TabSessionResourceSchema = {
   __type: "Resource";
   __primitiveFields: "id" | "mode" | "navFilter" | "tabs" | "activeTabId";
   id: UUID;
-  mode: "agents" | "brain" | "chat" | "files" | "prompts" | "skills";
+  mode: "agents" | "brain" | "chat" | "files" | "library" | "prompts" | "skills";
   navFilter: "all" | "personal" | "shared";
   tabs: Array<Record<string, any>>;
   activeTabId: string | null;
@@ -1604,7 +1624,7 @@ export type TabSessionAttributesOnlySchema = {
   __type: "Resource";
   __primitiveFields: "id" | "mode" | "navFilter" | "tabs" | "activeTabId";
   id: UUID;
-  mode: "agents" | "brain" | "chat" | "files" | "prompts" | "skills";
+  mode: "agents" | "brain" | "chat" | "files" | "library" | "prompts" | "skills";
   navFilter: "all" | "personal" | "shared";
   tabs: Array<Record<string, any>>;
   activeTabId: string | null;
@@ -5502,8 +5522,35 @@ export type SkillFilterInput = {
     isNil?: boolean;
   };
 
+  isFavorited?: {
+    eq?: boolean;
+    notEq?: boolean;
+    isNil?: boolean;
+  };
+
 
   workspace?: WorkspaceFilterInput;
+
+};
+export type SkillFavoriteFilterInput = {
+  and?: Array<SkillFavoriteFilterInput>;
+  or?: Array<SkillFavoriteFilterInput>;
+  not?: Array<SkillFavoriteFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  skillId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+
+  skill?: SkillFilterInput;
 
 };
 export type UserSubscriptionFilterInput = {
@@ -5597,9 +5644,9 @@ export type TabSessionFilterInput = {
   };
 
   mode?: {
-    eq?: "agents" | "brain" | "chat" | "files" | "prompts" | "skills";
-    notEq?: "agents" | "brain" | "chat" | "files" | "prompts" | "skills";
-    in?: Array<"agents" | "brain" | "chat" | "files" | "prompts" | "skills">;
+    eq?: "agents" | "brain" | "chat" | "files" | "library" | "prompts" | "skills";
+    notEq?: "agents" | "brain" | "chat" | "files" | "library" | "prompts" | "skills";
+    in?: Array<"agents" | "brain" | "chat" | "files" | "library" | "prompts" | "skills">;
   };
 
   navFilter?: {
@@ -6086,8 +6133,11 @@ export type NotificationFilterField = (typeof notificationFilterFields)[number];
 export const taskFilterFields = ["id", "title", "description", "status", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "dismissedAt", "recurrence", "conversationId", "parentId", "assignedToUserId", "conversation", "parent", "subtasks", "assignedToUser"] as const;
 export type TaskFilterField = (typeof taskFilterFields)[number];
 
-export const skillFilterFields = ["id", "name", "displayName", "description", "body", "requestedTools", "requiredSecrets", "version", "license", "compatibility", "icon", "color", "sourceFormat", "sourceUrl", "hasExecutableBundle", "fileManifest", "workspaceId", "isSharedToWorkspace", "workspace"] as const;
+export const skillFilterFields = ["id", "name", "displayName", "description", "body", "requestedTools", "requiredSecrets", "version", "license", "compatibility", "icon", "color", "sourceFormat", "sourceUrl", "hasExecutableBundle", "fileManifest", "workspaceId", "isSharedToWorkspace", "isFavorited", "workspace"] as const;
 export type SkillFilterField = (typeof skillFilterFields)[number];
+
+export const skillFavoriteFilterFields = ["id", "skillId", "skill"] as const;
+export type SkillFavoriteFilterField = (typeof skillFavoriteFilterFields)[number];
 
 export const userSubscriptionFilterFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "extraSeats", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
 export type UserSubscriptionFilterField = (typeof userSubscriptionFilterFields)[number];
@@ -6222,8 +6272,11 @@ export type NotificationSortField = (typeof notificationSortFields)[number];
 export const taskSortFields = ["id", "title", "description", "status", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "dismissedAt", "recurrence", "conversationId", "parentId", "assignedToUserId"] as const;
 export type TaskSortField = (typeof taskSortFields)[number];
 
-export const skillSortFields = ["id", "name", "displayName", "description", "body", "requestedTools", "requiredSecrets", "version", "license", "compatibility", "icon", "color", "sourceFormat", "sourceUrl", "hasExecutableBundle", "fileManifest", "workspaceId", "isSharedToWorkspace"] as const;
+export const skillSortFields = ["id", "name", "displayName", "description", "body", "requestedTools", "requiredSecrets", "version", "license", "compatibility", "icon", "color", "sourceFormat", "sourceUrl", "hasExecutableBundle", "fileManifest", "workspaceId", "isSharedToWorkspace", "isFavorited"] as const;
 export type SkillSortField = (typeof skillSortFields)[number];
+
+export const skillFavoriteSortFields = ["id", "skillId"] as const;
+export type SkillFavoriteSortField = (typeof skillFavoriteSortFields)[number];
 
 export const userSubscriptionSortFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "extraSeats", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
 export type UserSubscriptionSortField = (typeof userSubscriptionSortFields)[number];

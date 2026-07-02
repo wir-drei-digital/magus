@@ -75,6 +75,11 @@ defmodule Magus.Workbench.TabSessionTest do
       assert updated.mode == :brain
     end
 
+    test "accepts :library", %{user: user, session: session} do
+      {:ok, updated} = Workbench.set_tab_session_mode(session, :library, actor: user)
+      assert updated.mode == :library
+    end
+
     test "rejects unknown modes", %{user: user, session: session} do
       assert {:error, _} = Workbench.set_tab_session_mode(session, :bogus, actor: user)
     end
