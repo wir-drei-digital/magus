@@ -484,7 +484,13 @@ export function deleteAccount(confirmEmail: string): Promise<RpcResult<{ deleted
 
 // ─── Search (full results route) ─────────────────────────────────────────────
 
-export type SearchResultType = 'message' | 'conversation' | 'prompt' | 'skill' | 'resource' | 'chunk';
+export type SearchResultType =
+	| 'message'
+	| 'conversation'
+	| 'prompt'
+	| 'skill'
+	| 'resource'
+	| 'chunk';
 
 /**
  * A unified search hit. `snippet` is server-escaped HTML with `<mark>`
@@ -4660,10 +4666,10 @@ export type SkillSummary = {
 	isSharedToWorkspace: boolean | null;
 	workspaceId: string | null;
 	isFavorited: boolean;
+	body: string | null;
 };
 
 export type SkillDetail = SkillSummary & {
-	body: string | null;
 	requiredSecrets: Record<string, unknown>[] | null;
 	compatibility: string | null;
 	icon: string | null;
@@ -4687,12 +4693,14 @@ const SKILL_SUMMARY_FIELDS: rpc.MySkillsFields = [
 	'hasExecutableBundle',
 	'isSharedToWorkspace',
 	'workspaceId',
-	'isFavorited'
+	'isFavorited',
+	// body rides on the summary so the Library gallery's client-side search
+	// can match skill instructions (content for prompts, body for skills).
+	'body'
 ];
 
 const SKILL_DETAIL_FIELDS: rpc.GetSkillFields = [
 	...SKILL_SUMMARY_FIELDS,
-	'body',
 	'requiredSecrets',
 	'compatibility',
 	'icon',

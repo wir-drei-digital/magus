@@ -2,12 +2,15 @@
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
-	import { ArrowLeft, Box, FileCode, Package, Wrench } from '@lucide/svelte';
+	import { ArrowLeft, Box, FileCode, Package, Star, Wrench } from '@lucide/svelte';
 	import {
 		destroySkill,
+		favoriteSkill,
 		getSkill,
+		mySkillFavorites,
 		shareSkillToTeam,
 		skillDownloadUrl,
+		unfavoriteSkill,
 		unshareSkillFromTeam,
 		type SkillDetail
 	} from '$lib/ash/api';
@@ -79,6 +82,24 @@
 		} else {
 			saveError = result.errors[0]?.message ?? 'Skill could not be deleted';
 		}
+	}
+
+	async function toggleFavorite() {
+		if (!skill) return;
+		const id = skillId;
+		if (skill.isFavorited) {
+			// The favorite row id comes from the favorites listing.
+			const favorites = await mySkillFavorites();
+			if (!favorites.success) return;
+			const favorite = favorites.data.find((entry) => entry.skillId === skill!.id);
+			if (favorite) await unfavoriteSkill(favorite.id);
+		} else {
+			await favoriteSkill(skill.id);
+		}
+		const refreshed = await getSkill(id);
+		// Drop stale responses after navigating to another skill mid-flight.
+		if (id === skillId && refreshed.success) skill = refreshed.data;
+		libraryNav.refresh();
 	}
 
 	async function toggleShare() {
@@ -162,15 +183,25 @@
 				{/if}
 			</span>
 			<div class="min-w-0 flex-1">
-				<h1
-					class="truncate text-base font-semibold"
-					data-testid="skill-title"
-				>{skill.displayName ?? skill.name}</h1>
+				<h1 class="truncate text-base font-semibold" data-testid="skill-title">
+					{skill.displayName ?? skill.name}
+				</h1>
 				{#if skill.description}
 					<p class="truncate text-xs text-muted-foreground">{skill.description}</p>
 				{/if}
 			</div>
 			<div class="flex shrink-0 items-center gap-1.5">
+				<button
+					type="button"
+					class="wb-pill-btn wb-pill-btn-square shrink-0 {skill.isFavorited
+						? '!text-favorite'
+						: ''}"
+					aria-label={skill.isFavorited ? 'Unfavorite' : 'Favorite'}
+					data-testid="skill-favorite"
+					onclick={() => void toggleFavorite()}
+				>
+					<Star class="size-3.5 {skill.isFavorited ? 'fill-favorite' : ''}" />
+				</button>
 				<button
 					type="button"
 					class="wb-pill-btn shrink-0"
@@ -188,10 +219,7 @@
 					</DropdownMenu.Trigger>
 					<DropdownMenu.Content align="end">
 						{#if session.user?.currentWorkspaceId}
-							<DropdownMenu.Item
-								data-testid="skill-share"
-								onSelect={() => void toggleShare()}
-							>
+							<DropdownMenu.Item data-testid="skill-share" onSelect={() => void toggleShare()}>
 								{skill.isSharedToWorkspace ? 'Unshare from workspace' : 'Share to workspace'}
 							</DropdownMenu.Item>
 							<DropdownMenu.Separator />
@@ -315,7 +343,8 @@
 											{#if isExecutable(entry)}
 												<span
 													class="ml-1 rounded bg-amber-100 px-1 py-px text-[9px] font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-400"
-												>exec</span>
+													>exec</span
+												>
 											{/if}
 										</td>
 										<td class="py-1.5 pr-3 text-right tabular-nums text-muted-foreground">
@@ -356,4 +385,4 @@
 	{/if}
 </div>
 
-<SkillFormDialog bind:open={editOpen} skill={skill} onSaved={(updated) => (skill = updated)} />
+<SkillFormDialog bind:open={editOpen} {skill} onSaved={(updated) => (skill = updated)} />

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
 	import { Download, LibraryBig, Plus, Search } from '@lucide/svelte';
@@ -33,11 +34,25 @@
 		['skills', 'Skills']
 	] as const;
 
-	// ?type= comes from the legacy /prompts and /skills redirects; read once.
-	const urlType = page.url.searchParams.get('type');
-	let typeFilter = $state<'all' | 'prompts' | 'skills'>(
-		urlType === 'prompts' || urlType === 'skills' ? urlType : 'all'
-	);
+	// ?type= lives in the URL (like the rail's ?scope=/?tag=) so the filter
+	// survives deep links, the back button, and the legacy /prompts and
+	// /skills redirects that seed it.
+	const typeFilter = $derived.by(() => {
+		const value = page.url.searchParams.get('type');
+		return value === 'prompts' || value === 'skills' ? value : 'all';
+	});
+
+	function setTypeFilter(value: 'all' | 'prompts' | 'skills') {
+		const url = new URL(page.url);
+		if (value === 'all') url.searchParams.delete('type');
+		else url.searchParams.set('type', value);
+		void goto(`${url.pathname}${url.search}`, {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true
+		});
+	}
+
 	let query = $state('');
 	let sort = $state<'used' | 'name'>('used');
 
@@ -69,9 +84,7 @@
 			return itemMatches(item, query);
 		});
 		return [...filtered].sort((a, b) =>
-			sort === 'name'
-				? itemName(a).localeCompare(itemName(b))
-				: itemUseCount(b) - itemUseCount(a)
+			sort === 'name' ? itemName(a).localeCompare(itemName(b)) : itemUseCount(b) - itemUseCount(a)
 		);
 	});
 
@@ -170,7 +183,7 @@
 					class="rounded px-2 py-1 transition-colors {typeFilter === value
 						? 'bg-secondary font-medium text-foreground'
 						: 'text-muted-foreground hover:text-foreground'}"
-					onclick={() => (typeFilter = value)}
+					onclick={() => setTypeFilter(value)}
 				>
 					{label}
 				</button>
@@ -210,11 +223,7 @@
 						<Button size="sm" onclick={() => (libraryNav.createPromptOpen = true)}>
 							<Plus class="size-3.5" /> New prompt
 						</Button>
-						<Button
-							size="sm"
-							variant="outline"
-							onclick={() => (libraryNav.createSkillOpen = true)}
-						>
+						<Button size="sm" variant="outline" onclick={() => (libraryNav.createSkillOpen = true)}>
 							<Plus class="size-3.5" /> New skill
 						</Button>
 						<Button size="sm" variant="outline" onclick={() => (libraryNav.importOpen = true)}>

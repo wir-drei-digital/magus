@@ -42,7 +42,12 @@ export function itemMatches(item: LibraryItem, query: string): boolean {
 	const haystack =
 		item.kind === 'prompt'
 			? [item.prompt.name, item.prompt.description ?? '', item.prompt.content]
-			: [item.skill.name, item.skill.displayName ?? '', item.skill.description ?? ''];
+			: [
+					item.skill.name,
+					item.skill.displayName ?? '',
+					item.skill.description ?? '',
+					item.skill.body ?? ''
+				];
 	return haystack.some((text) => text.toLowerCase().includes(q));
 }
 

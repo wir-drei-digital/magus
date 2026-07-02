@@ -38,6 +38,7 @@ function skill(overrides: Partial<SkillSummary> = {}): SkillSummary {
 		hasExecutableBundle: false,
 		requestedTools: [],
 		version: null,
+		body: null,
 		...overrides
 	} as SkillSummary;
 }
@@ -60,9 +61,12 @@ describe('item accessors', () => {
 		expect(itemIsFavorited(skillItem(skill()))).toBe(false);
 	});
 
-	it('itemMatches searches prompt content and skill body-less fields', () => {
+	it('itemMatches searches prompt content and skill body', () => {
 		expect(itemMatches(promptItem(prompt()), 'summarize this')).toBe(true);
 		expect(itemMatches(skillItem(skill()), 'pdfs')).toBe(true);
+		expect(itemMatches(skillItem(skill({ body: 'Run scripts/fill.py first' })), 'fill.py')).toBe(
+			true
+		);
 		expect(itemMatches(skillItem(skill()), 'zzz')).toBe(false);
 		expect(itemMatches(promptItem(prompt()), '')).toBe(true);
 	});
