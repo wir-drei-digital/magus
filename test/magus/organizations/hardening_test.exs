@@ -34,12 +34,41 @@ defmodule Magus.Organizations.HardeningTest do
     |> Ash.create!(authorize?: false)
   end
 
-  # `set_billing` / `update_owner` are update-typed actions, so the resource's
-  # `policy action_type(:update)` (owner_id == actor.id) still applies to them.
-  # Changing the bypass from `always()` to ActorIsSystem means: the system actor
-  # short-circuits every check, the org owner is still authorized via the normal
-  # update policy, and any OTHER user (a plain member) is forbidden.
+  # The owner-authorized policy is narrowed to `action(:update)`, so once the
+  # system-actor bypasses fall through, set_billing / update_owner match no
+  # policy and default-deny. Effective authorization: ONLY %Magus.SystemActor{}
+  # may write billing/owner fields with authorize?: true.
   describe "system actor bypasses (set_billing / update_owner)" do
+    test "even the org owner cannot set billing or repoint owner_id" do
+      owner = generate(user())
+      org = make_org(owner)
+      new_owner = generate(user())
+
+      assert {:error, %Ash.Error.Forbidden{}} =
+               org
+               |> Ash.Changeset.for_update(:set_billing, %{billing_status: :past_due},
+                 actor: owner
+               )
+               |> Ash.update(authorize?: true)
+
+      assert {:error, %Ash.Error.Forbidden{}} =
+               org
+               |> Ash.Changeset.for_update(:update_owner, %{owner_id: new_owner.id}, actor: owner)
+               |> Ash.update(authorize?: true)
+    end
+
+    test "the org owner can still rename via the plain :update action" do
+      owner = generate(user())
+      org = make_org(owner)
+
+      assert {:ok, renamed} =
+               org
+               |> Ash.Changeset.for_update(:update, %{name: "Renamed Org"}, actor: owner)
+               |> Ash.update(authorize?: true)
+
+      assert renamed.name == "Renamed Org"
+    end
+
     test "a plain member cannot set billing, but the system actor can" do
       owner = generate(user())
       org = make_org(owner)
