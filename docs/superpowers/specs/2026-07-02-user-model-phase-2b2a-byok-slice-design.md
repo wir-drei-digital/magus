@@ -23,6 +23,8 @@ Phase 2b-1 shipped the security-complete ownership backend: users can own provid
 
 **Out of scope (2b-2b):** hard-stop on degradation + one-click remediation, cloud paid-plan gate on provider creation, clone/prefill affordance, global `Model` authorizer adoption + reader audit, media BYOK (Phase 5), workspace sharing (Phase 3), billing attribution (2c), and the 2b-1 deferred-Minors list (stamp_validation policy tightening, owner_user_id index/FK, selection-test breadth, doc comment fixes).
 
+**Out of scope (explicitly decided 2026-07-02): background/system LLM operations stay on platform role models.** Conversation naming, memory extraction, Super Brain extraction, and other role-driven workers run actor-less through `RoleAssignment` utility models on platform keys, admin-configured only. BYOK covers explicit chat resolution in this slice. This is safe by construction: actor-less resolution is global-only and fail-closed, so a background job can never silently spend a user's key. The two follow-ups live where they belong on the roadmap: a per-user "use my key for background tasks" preference is Phase 4 (user defaults + router slots, which would also require actor threading through the Oban workers), and how platform-paid background ops for BYOK users are metered or absorbed is Phase 2c (billing attribution) policy.
+
 ## Locked Decisions
 
 1. **Vertical slice.** UI and execution wiring ship together so the SPA never displays models that cannot run.
