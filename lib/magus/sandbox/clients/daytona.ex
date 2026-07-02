@@ -62,12 +62,14 @@ defmodule Magus.Sandbox.Clients.Daytona do
 
   defp control_client do
     Req.new(
-      base_url: control_base_url(),
-      headers: [
-        {"authorization", "Bearer #{api_key()}"},
-        {"content-type", "application/json"}
-      ],
-      receive_timeout: 30_000
+      [
+        base_url: control_base_url(),
+        headers: [
+          {"authorization", "Bearer #{api_key()}"},
+          {"content-type", "application/json"}
+        ],
+        receive_timeout: 30_000
+      ] ++ (config()[:req_options] || [])
     )
   end
 
@@ -649,8 +651,35 @@ defmodule Magus.Sandbox.Clients.Daytona do
         # Wait for sandbox to actually reach stopped state
         poll_until_stopped(sandbox_id)
 
+      {:ok, %{status: 400, body: body}} ->
+        # Daytona only accepts /stop for started sandboxes and auto-stops idle
+        # ones itself, so our suspend routinely loses that race ("Sandbox is
+        # not in a stoppable state"). Resolve from the actual state instead of
+        # matching error-message strings.
+        resolve_unstoppable(sandbox_id, body)
+
       {:ok, %{status: status, body: body}} ->
         {:error, {:api_error, status, body}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  # A 400 from /stop means the sandbox wasn't in a stoppable (started) state.
+  # Already stopped/archived is the outcome suspend wants; mid-transition
+  # states just need the same polling as a successful stop. Anything else
+  # (e.g. "error", "started") keeps the original API error.
+  defp resolve_unstoppable(sandbox_id, body) do
+    case get_sandbox(sandbox_id) do
+      {:ok, %{"state" => state}} when state in ~w(stopped archived) ->
+        :ok
+
+      {:ok, %{"state" => state}} when state in ~w(stopping archiving) ->
+        poll_until_stopped(sandbox_id)
+
+      {:ok, _} ->
+        {:error, {:api_error, 400, body}}
 
       {:error, reason} ->
         {:error, reason}
@@ -832,7 +861,7 @@ defmodule Magus.Sandbox.Clients.Daytona do
       {:error, :stop_timeout}
     else
       case get_sandbox(sandbox_id) do
-        {:ok, %{"state" => "stopped"}} ->
+        {:ok, %{"state" => state}} when state in ~w(stopped archived) ->
           :ok
 
         {:ok, %{"state" => "started"}} ->

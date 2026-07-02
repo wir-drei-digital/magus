@@ -92,6 +92,12 @@ config :magus, :super_brain_extraction_embedder, Magus.Embeddings.BatchEmbedderM
 # Use test sandbox provider to prevent provisioning real services
 config :magus, Magus.Sandbox, provider: :test
 
+# Req.Test plug so the Daytona control-plane client can be HTTP-stubbed in its
+# own unit test (all other tests dispatch to the :test provider above).
+config :magus, Magus.Sandbox.Clients.Daytona,
+  control_base_url: "http://daytona.invalid/api",
+  req_options: [plug: {Req.Test, Magus.Sandbox.Clients.Daytona}]
+
 # Use Req.Test plug for Spider API in tests
 config :magus, :spider_req_options, plug: {Req.Test, Magus.Agents.Tools.Web.WebFetch}
 
