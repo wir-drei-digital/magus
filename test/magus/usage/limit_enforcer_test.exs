@@ -517,7 +517,7 @@ defmodule Magus.Usage.LimitEnforcerTest do
   # deduct_usage / Stripe in later PRs), so tests poke them via the repo.
   defp set_sub_fields(user_id, fields) do
     Usage.Account
-    |> where([s], s.user_id == ^user_id and is_nil(s.sponsor_user_id))
+    |> where([s], s.user_id == ^user_id and is_nil(s.sponsor_org_id))
     |> Magus.Repo.update_all(set: fields)
   end
 

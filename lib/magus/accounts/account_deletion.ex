@@ -103,7 +103,7 @@ defmodule Magus.Accounts.AccountDeletion do
 
   defp load_active_subscription(user_id) do
     Magus.Usage.Account
-    |> Ash.Query.filter(user_id == ^user_id and is_nil(sponsor_user_id) and status == :active)
+    |> Ash.Query.filter(user_id == ^user_id and is_nil(sponsor_org_id) and status == :active)
     |> Ash.read_one(authorize?: false)
     |> case do
       {:ok, %{} = sub} ->

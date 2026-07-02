@@ -86,124 +86,6 @@ defmodule Magus.Usage.UsageCalculatorTest do
       # Should not include the expired bonus
       assert limits.storage_bytes == plan.storage_bytes
     end
-
-    test "prefers sponsored subscription over personal when one exists",
-         %{user: user, free_plan: free_plan} do
-      # User starts on free plan
-      personal_limits = Calculator.get_effective_limits(user.id)
-      assert personal_limits.storage_bytes == free_plan.storage_bytes
-
-      # Create an enterprise plan with much higher limits
-      {:ok, enterprise_plan} =
-        Magus.Usage.Policy
-        |> Ash.Changeset.for_create(
-          :create,
-          %{
-            key: "enterprise-#{System.unique_integer([:positive])}",
-            name: "Enterprise",
-            storage_bytes: 50_000_000_000,
-            max_upload_bytes: 1_000_000_000,
-            max_routing_tier: :complex,
-            image_generation_enabled: true,
-            video_generation_enabled: true,
-            sponsorable_seats: 10,
-            is_active: true,
-            sort_order: 99
-          },
-          authorize?: false
-        )
-        |> Ash.create(authorize?: false)
-
-      sponsor = create_actor()
-
-      # Create a sponsored subscription for the original user
-      Magus.Usage.Account
-      |> Ash.Changeset.for_create(
-        :create,
-        %{
-          user_id: user.id,
-          usage_plan_id: enterprise_plan.id,
-          sponsor_user_id: sponsor.id,
-          status: :active
-        },
-        authorize?: false
-      )
-      |> Ash.create!(authorize?: false)
-
-      # Now effective limits should reflect the enterprise plan, not the free plan
-      limits = Calculator.get_effective_limits(user.id)
-
-      assert limits.storage_bytes == 50_000_000_000
-      assert limits.max_upload_bytes == 1_000_000_000
-    end
-
-    test "picks highest-tier sponsored sub when user has multiple sponsored subscriptions",
-         %{user: user} do
-      # Create two plans: a lower-tier and higher-tier entitlement plan.
-      {:ok, lower_plan} =
-        Magus.Usage.Policy
-        |> Ash.Changeset.for_create(
-          :create,
-          %{
-            key: "managed-lower-#{System.unique_integer([:positive])}",
-            name: "Managed Lower",
-            storage_bytes: 1_000_000_000,
-            max_upload_bytes: 10_000_000,
-            max_routing_tier: :simple,
-            image_generation_enabled: false,
-            video_generation_enabled: false,
-            sponsorable_seats: 5,
-            is_active: true,
-            sort_order: 10
-          },
-          authorize?: false
-        )
-        |> Ash.create(authorize?: false)
-
-      {:ok, higher_plan} =
-        Magus.Usage.Policy
-        |> Ash.Changeset.for_create(
-          :create,
-          %{
-            key: "managed-higher-#{System.unique_integer([:positive])}",
-            name: "Managed Higher",
-            storage_bytes: 50_000_000_000,
-            max_upload_bytes: 1_000_000_000,
-            max_routing_tier: :complex,
-            image_generation_enabled: true,
-            video_generation_enabled: true,
-            sponsorable_seats: 10,
-            is_active: true,
-            sort_order: 20
-          },
-          authorize?: false
-        )
-        |> Ash.create(authorize?: false)
-
-      # Create sponsored subs from two different sponsors
-      for plan <- [lower_plan, higher_plan] do
-        sponsor = create_actor()
-
-        Magus.Usage.Account
-        |> Ash.Changeset.for_create(
-          :create,
-          %{
-            user_id: user.id,
-            usage_plan_id: plan.id,
-            sponsor_user_id: sponsor.id,
-            status: :active
-          },
-          authorize?: false
-        )
-        |> Ash.create!(authorize?: false)
-      end
-
-      # Should return the higher-tier plan's limits
-      limits = Calculator.get_effective_limits(user.id)
-
-      assert limits.storage_bytes == 50_000_000_000
-      assert limits.max_upload_bytes == 1_000_000_000
-    end
   end
 
   describe "get_storage_used/1" do
@@ -402,7 +284,7 @@ defmodule Magus.Usage.UsageCalculatorTest do
   # LimitEnforcerTest for the rationale).
   defp set_sub_fields(user_id, fields) do
     Usage.Account
-    |> where([s], s.user_id == ^user_id and is_nil(s.sponsor_user_id))
+    |> where([s], s.user_id == ^user_id and is_nil(s.sponsor_org_id))
     |> Magus.Repo.update_all(set: fields)
   end
 

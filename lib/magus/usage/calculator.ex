@@ -15,7 +15,6 @@ defmodule Magus.Usage.Calculator do
     max_upload_bytes: 0,
     image_generation_enabled: false,
     video_generation_enabled: false,
-    sponsorable_seats: nil,
     exempt: false
   }
 
@@ -82,19 +81,7 @@ defmodule Magus.Usage.Calculator do
         @no_subscription_limits
 
       {:ok, subscriptions} ->
-        sponsored = Enum.filter(subscriptions, &(not is_nil(&1.sponsor_user_id)))
-
-        subscription =
-          if sponsored != [] do
-            Enum.max_by(sponsored, fn sub ->
-              routing_tier_rank(sub.usage_plan.max_routing_tier)
-            end)
-          else
-            Enum.find(subscriptions, fn sub -> is_nil(sub.sponsor_user_id) end) ||
-              hd(subscriptions)
-          end
-
-        calculate_limits(subscription)
+        calculate_limits(hd(subscriptions))
 
       {:error, reason} ->
         require Logger
@@ -130,7 +117,6 @@ defmodule Magus.Usage.Calculator do
         max_upload_bytes: plan.max_upload_bytes,
         image_generation_enabled: plan.image_generation_enabled,
         video_generation_enabled: plan.video_generation_enabled,
-        sponsorable_seats: plan.sponsorable_seats,
         exempt: false
       }
     end
@@ -141,11 +127,6 @@ defmodule Magus.Usage.Calculator do
     |> Enum.map(&(Map.get(&1, field) || 0))
     |> Enum.sum()
   end
-
-  defp routing_tier_rank(:complex), do: 3
-  defp routing_tier_rank(:standard), do: 2
-  defp routing_tier_rank(:simple), do: 1
-  defp routing_tier_rank(_), do: 0
 
   @doc """
   Returns the pay-per-use spend state for a user, used by the money-based

@@ -66,7 +66,6 @@ defmodule Magus.Usage do
         get_by: [:user_id]
 
       define :recalculate_storage, action: :recalculate_storage
-      define :set_extra_seats, action: :set_extra_seats
 
       define :deduct_usage,
         action: :deduct_usage,
