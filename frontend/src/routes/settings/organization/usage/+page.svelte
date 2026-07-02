@@ -2,22 +2,27 @@
 	import { Section } from '$lib/components/crud';
 	import { getOrgAdmin } from '$lib/components/organizations/context';
 	import { orgUsageOverview, type OrgUsageOverview } from '$lib/ash/api';
-	import { formatCents } from '$lib/billing/format';
-	import { formatCap, seatLabel, usageRows } from '$lib/organizations/usage';
+	import { formatCents, formatTokens, formatCap } from '$lib/billing/format';
+	import { usageRows } from '$lib/organizations/usage';
 
 	const ctx = getOrgAdmin();
 
 	let overview = $state<OrgUsageOverview | null>(null);
 	let loaded = $state(false);
 
-	// Load once the layout has resolved the org id. The action scopes the visible
-	// member set server-side (owner: all rows; a member: only their own), so the
-	// view renders whatever it returns without re-filtering.
+	// Load once the layout has resolved the org id, and reload when it changes
+	// (leave/transfer/archive can swap the resolved org without a remount). The
+	// action scopes the visible member set server-side (owner: all rows; a member:
+	// only their own), so the view renders whatever it returns without re-filtering.
 	let loadedFor: string | null = null;
 	$effect(() => {
 		const id = ctx.org?.id;
 		if (!id || loadedFor === id) return;
 		loadedFor = id;
+		// Clear the previous org's rows before refetching so a switch shows the
+		// loading skeleton instead of stale numbers from the old organization.
+		overview = null;
+		loaded = false;
 		void orgUsageOverview(id).then((result) => {
 			if (result.success) overview = result.data;
 			loaded = true;
@@ -25,6 +30,7 @@
 	});
 
 	const rows = $derived(overview ? usageRows(overview) : []);
+	const seatCount = $derived(overview?.seatCount ?? 0);
 </script>
 
 <div class="flex flex-col gap-5">
@@ -33,7 +39,7 @@
 		description="Combined credit spend across everyone in this organization."
 		testid="org-usage-pooled"
 	>
-		<div class="grid grid-cols-2 gap-6">
+		<div class="grid grid-cols-3 gap-6">
 			<div>
 				<p class="text-2xl font-bold tabular-nums">
 					{formatCents(overview?.pooledSpentCents ?? 0)}
@@ -41,8 +47,14 @@
 				<p class="text-xs text-muted-foreground">Spent this period</p>
 			</div>
 			<div>
-				<p class="text-2xl font-bold tabular-nums">{overview?.seatCount ?? 0}</p>
-				<p class="text-xs text-muted-foreground">{seatLabel(overview?.seatCount ?? 0)}</p>
+				<p class="text-2xl font-bold tabular-nums" data-testid="org-usage-pooled-tokens">
+					{formatTokens(overview?.pooledTokens ?? 0)}
+				</p>
+				<p class="text-xs text-muted-foreground">Tokens this period</p>
+			</div>
+			<div>
+				<p class="text-2xl font-bold tabular-nums">{seatCount}</p>
+				<p class="text-xs text-muted-foreground">{seatCount === 1 ? 'seat' : 'seats'}</p>
 			</div>
 		</div>
 	</Section>
@@ -67,6 +79,7 @@
 						<tr class="border-b text-left text-xs text-muted-foreground">
 							<th class="py-2 pr-4 font-medium">Member</th>
 							<th class="py-2 pr-4 text-right font-medium">Spent</th>
+							<th class="py-2 pr-4 text-right font-medium">Tokens</th>
 							<th class="py-2 text-right font-medium">Monthly cap</th>
 						</tr>
 					</thead>
@@ -75,6 +88,7 @@
 							<tr class="border-b last:border-0" data-testid="org-usage-row">
 								<td class="truncate py-2 pr-4">{row.name}</td>
 								<td class="py-2 pr-4 text-right tabular-nums">{formatCents(row.spentCents)}</td>
+								<td class="py-2 pr-4 text-right tabular-nums">{formatTokens(row.tokens)}</td>
 								<td class="py-2 text-right tabular-nums">{formatCap(row.capCents)}</td>
 							</tr>
 						{/each}

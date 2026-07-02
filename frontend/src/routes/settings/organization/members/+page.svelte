@@ -13,7 +13,7 @@
 		type OrgMemberRole,
 		type RpcResult
 	} from '$lib/ash/api';
-	import { formatCents } from '$lib/billing/format';
+	import { formatCap } from '$lib/billing/format';
 	import { Button, Section, confirmAction, CONTROL_CLASS } from '$lib/components/crud';
 	import { getOrgAdmin } from '$lib/components/organizations/context';
 	import {
@@ -36,13 +36,6 @@
 
 	function memberInitial(member: OrgMemberEntry): string {
 		return memberDisplayName(member).slice(0, 1).toUpperCase();
-	}
-
-	// Reuse the shared CHF formatter so Members and the Usage tab render caps the
-	// same way for a given `spend_cap_cents`; show "No cap" when unset.
-	function formatCap(cents: number | null): string {
-		if (cents === null) return 'No cap';
-		return formatCents(cents);
 	}
 
 	// ── Invite (owner only) ──

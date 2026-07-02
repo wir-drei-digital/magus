@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { CreditCard, ExternalLink } from '@lucide/svelte';
+	import { page } from '$app/state';
 	import { Button, Section } from '$lib/components/crud';
 	import { getOrgAdmin } from '$lib/components/organizations/context';
 	import {
@@ -33,7 +34,10 @@
 
 	const action = $derived(overview ? billingAction(overview) : null);
 
-	const returnTo = $derived(typeof window !== 'undefined' ? window.location.href : undefined);
+	// Track the live URL so Stripe returns the user to whatever org/billing view
+	// they launched checkout from, even after client-side navigation. `page.url`
+	// is reactive (unlike a one-shot `window.location.href` read).
+	const returnTo = $derived(page.url.href);
 
 	async function setup() {
 		if (!ctx.org) return;
