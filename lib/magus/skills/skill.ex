@@ -60,6 +60,29 @@ defmodule Magus.Skills.Skill do
       end
     end
 
+    read :fulltext_search do
+      description "Search skills by name/display name/description/body (pg_trgm + substring)"
+      argument :query, :string, allow_nil?: false
+      pagination offset?: true, default_limit: 20, countable: false
+
+      prepare fn query, _context ->
+        require Ash.Query
+
+        search_term = Ash.Query.get_argument(query, :query)
+
+        Ash.Query.filter(
+          query,
+          fragment(
+            "similarity(name, ?) > 0.25 OR similarity(coalesce(display_name, ''), ?) > 0.25 OR similarity(coalesce(description, ''), ?) > 0.2 OR coalesce(body, '') ILIKE '%' || ? || '%'",
+            ^search_term,
+            ^search_term,
+            ^search_term,
+            ^search_term
+          )
+        )
+      end
+    end
+
     update :share_to_team do
       accept []
       require_atomic? false

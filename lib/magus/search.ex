@@ -2,13 +2,13 @@ defmodule Magus.Search do
   @moduledoc """
   Unified parallel search across all searchable resources.
 
-  Searches messages, conversations, prompts, and memory resources
+  Searches messages, conversations, prompts, skills, and memory resources
   concurrently using PostgreSQL full-text search with trigram fuzzy matching.
   """
 
   require Logger
 
-  @type result_type :: :message | :conversation | :prompt | :resource | :chunk
+  @type result_type :: :message | :conversation | :prompt | :skill | :resource | :chunk
 
   @type search_result :: %{
           type: result_type(),
@@ -26,7 +26,7 @@ defmodule Magus.Search do
           timeout: pos_integer()
         ]
 
-  @default_types [:message, :conversation, :prompt, :resource, :chunk]
+  @default_types [:message, :conversation, :prompt, :skill, :resource, :chunk]
   @default_limit 20
   @default_timeout 5_000
 
@@ -152,6 +152,31 @@ defmodule Magus.Search do
   rescue
     e ->
       Logger.warning("Prompt search failed: #{inspect(e)}")
+      {:ok, []}
+  end
+
+  defp search_type(:skill, query, limit, actor) do
+    Magus.Skills.fulltext_search_skill!(query, page: [limit: limit], actor: actor)
+    |> extract_paginated_results()
+    |> transform_results(:skill, fn skill ->
+      text = Enum.join([skill.name, skill.display_name || "", skill.description || ""], " ")
+
+      %{
+        type: :skill,
+        id: skill.id,
+        title: skill.display_name || skill.name,
+        snippet: highlight_snippet(skill.description || skill.body || "", query),
+        score: calculate_score(text, query),
+        metadata: %{
+          has_executable_bundle: skill.has_executable_bundle,
+          workspace_id: skill.workspace_id,
+          created_at: skill.inserted_at
+        }
+      }
+    end)
+  rescue
+    e ->
+      Logger.warning("Skill search failed: #{inspect(e)}")
       {:ok, []}
   end
 

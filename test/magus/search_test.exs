@@ -135,6 +135,37 @@ defmodule Magus.SearchTest do
     end
   end
 
+  describe "skill search" do
+    test "finds an accessible skill by name and description" do
+      owner = generate(user())
+
+      {:ok, _} =
+        Magus.Skills.create_skill(
+          %{name: "pdf-form-filler", description: "Fill PDF forms automatically"},
+          actor: owner
+        )
+
+      {:ok, results} = Magus.Search.search("pdf-form-filler", actor: owner, types: [:skill])
+
+      assert [%{type: :skill, title: "pdf-form-filler"} | _] = results
+    end
+
+    test "does not surface another user's personal skill" do
+      owner = generate(user())
+      stranger = generate(user())
+
+      {:ok, _} =
+        Magus.Skills.create_skill(
+          %{name: "secret-pdf-tool", description: "hidden"},
+          actor: owner
+        )
+
+      {:ok, results} = Magus.Search.search("secret-pdf-tool", actor: stranger, types: [:skill])
+
+      assert results == []
+    end
+  end
+
   describe "calculate_score/2" do
     test "returns higher score for exact matches" do
       exact_score = Search.calculate_score("hello world", "hello")

@@ -53,6 +53,7 @@ defmodule Magus.Skills do
       define :my_skills, action: :my_skills
       define :workspace_skills, action: :workspace_skills, args: [:workspace_id]
       define :my_favorite_skills, action: :my_favorite_skills
+      define :fulltext_search_skill, action: :fulltext_search, args: [:query]
       define :share_skill_to_team, action: :share_to_team
       define :unshare_skill_from_team, action: :unshare_from_team
     end
