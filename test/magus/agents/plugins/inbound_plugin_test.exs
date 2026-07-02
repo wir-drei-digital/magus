@@ -53,6 +53,15 @@ defmodule Magus.Agents.Plugins.InboundPluginTest do
     :ok
   end
 
+  # Seed the catalog model that the chat-path tests reference by key, so the
+  # phase 2b-2b hard-stop (which blocks an explicit selection that resolves to
+  # something else) does not fire — these tests exercise the transform/limit/
+  # slash behavior, not model degradation.
+  defp seed_chat_model do
+    _ = generate(model(key: "test-model"))
+    :ok
+  end
+
   # ============================================================================
   # Plugin Metadata
   # ============================================================================
@@ -131,6 +140,7 @@ defmodule Magus.Agents.Plugins.InboundPluginTest do
     test "transforms message.user to ai.react.query when user has spend budget" do
       user = generate(user())
       ensure_active_subscription(user)
+      seed_chat_model()
 
       conversation = generate(conversation(actor: user))
 
@@ -165,6 +175,7 @@ defmodule Magus.Agents.Plugins.InboundPluginTest do
 
     test "returns override noop when user has no spend budget" do
       user = generate(user())
+      seed_chat_model()
       conversation = generate(conversation(actor: user))
       MagusWeb.Endpoint.subscribe("agents:#{conversation.id}")
 
@@ -433,6 +444,7 @@ defmodule Magus.Agents.Plugins.InboundPluginTest do
     test "parses /reminder command and injects instruction into query" do
       user = generate(user())
       ensure_active_subscription(user)
+      seed_chat_model()
       conversation = generate(conversation(actor: user))
 
       agent =
@@ -463,6 +475,7 @@ defmodule Magus.Agents.Plugins.InboundPluginTest do
     test "passes through unknown slash commands unchanged" do
       user = generate(user())
       ensure_active_subscription(user)
+      seed_chat_model()
       conversation = generate(conversation(actor: user))
 
       agent =
@@ -491,6 +504,7 @@ defmodule Magus.Agents.Plugins.InboundPluginTest do
     test "regular messages pass through without modification" do
       user = generate(user())
       ensure_active_subscription(user)
+      seed_chat_model()
       conversation = generate(conversation(actor: user))
 
       agent =

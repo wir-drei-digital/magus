@@ -9,7 +9,7 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
   alias Magus.Agents.Routing.AutoRouteResolver
   alias Magus.Agents.Tools.ToolBuilder
   alias Magus.Agents.Plugins.Support.{ErrorMessages, Helpers}
-  alias Magus.Models.Resolver
+  alias Magus.Models.{Resolution, Resolver}
   alias Magus.Agents.Signals
   alias Magus.Agents.SlashCommands
 
@@ -90,11 +90,55 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
 
     model = resolution.model
 
-    # Enforce the spend gate against the member who sent the triggering message,
-    # not the conversation owner (magus-k3at); owner fallback for autonomous turns.
-    user = load_user_for_limits(acting_user_id)
-    workspace = resolve_workspace(conversation, conversation_id)
+    # Hard-stop (phase 2b-2b): a broken EXPLICIT selection (one that resolved to
+    # something other than what was asked) blocks the turn before any LLM call,
+    # on the same error/event rails as the region/limit blocks below. :auto and
+    # unselected paths carry no requested_selection and never degrade, so they
+    # are behavior-neutral here.
+    if Resolution.degraded?(resolution) do
+      handle_broken_selection(
+        conversation_id,
+        message_id,
+        resolution,
+        broken_selection_scope(resolution, conversation, mode)
+      )
 
+      {:ok, {:override, Jido.Actions.Control.Noop}}
+    else
+      # Enforce the spend gate against the member who sent the triggering message,
+      # not the conversation owner (magus-k3at); owner fallback for autonomous turns.
+      user = load_user_for_limits(acting_user_id)
+      workspace = resolve_workspace(conversation, conversation_id)
+
+      build_react_signal_after_gates(
+        user,
+        mode,
+        model,
+        workspace,
+        conversation_id,
+        message_id,
+        state,
+        data,
+        conversation,
+        model_keys,
+        text
+      )
+    end
+  end
+
+  defp build_react_signal_after_gates(
+         user,
+         mode,
+         model,
+         workspace,
+         conversation_id,
+         message_id,
+         state,
+         data,
+         conversation,
+         model_keys,
+         text
+       ) do
     case check_usage_limit(user, mode, model, workspace) do
       {:ok, :allowed} ->
         # Check region availability: block if model not in user's allowed regions
@@ -191,6 +235,40 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
 
     model = resolution.model
 
+    if Resolution.degraded?(resolution) do
+      # Same hard-stop on the resume path: a broken pinned selection blocks the
+      # synthetic continuation before any LLM call. No triggering user message
+      # exists here, so the error event is not attached to one.
+      handle_broken_selection(
+        conversation_id,
+        nil,
+        resolution,
+        broken_selection_scope(resolution, conversation, mode)
+      )
+
+      {:ok, {:override, Jido.Actions.Control.Noop}}
+    else
+      build_resume_react_signal_after_check(
+        query,
+        conversation_id,
+        state,
+        mode,
+        model,
+        conversation,
+        raw_model_keys
+      )
+    end
+  end
+
+  defp build_resume_react_signal_after_check(
+         query,
+         conversation_id,
+         state,
+         mode,
+         model,
+         conversation,
+         raw_model_keys
+       ) do
     # CRITICAL: pass a synthetic message_id in data so build_request_context
     # does not drop initial_messages. The id is a fresh UUID that exists in
     # nobody's DB, so the BuildMessageHistory query's exclude_id filter will
@@ -326,6 +404,133 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
 
     ErrorMessages.create_error_event(conversation_id, :limit_exceeded, error)
   end
+
+  @doc """
+  Block a turn whose explicit model selection is broken (degraded).
+
+  Mirrors the region/limit block: broadcasts the ephemeral error signal, resets
+  the conversation to idle, and persists a durable `:event` message. The event's
+  `tool_call_data` carries the STRING-keyed machine-readable payload the SPA
+  consumes verbatim: `kind`, `requested_by`, `requested_value`, `fallback_key`,
+  `scope`.
+  """
+  def handle_broken_selection(conversation_id, message_id, %Resolution{} = resolution, scope) do
+    payload = broken_selection_payload(resolution, scope)
+    error_message = broken_selection_message()
+
+    Logger.info(
+      "Broken model selection for conversation #{conversation_id}: " <>
+        "requested_by=#{payload["requested_by"]} scope=#{payload["scope"]}"
+    )
+
+    Signals.error(conversation_id, message_id, :broken_model_selection, error_message)
+    Signals.state_change(conversation_id, :idle)
+    Signals.response_complete(conversation_id, %{})
+
+    persist_broken_selection_event(conversation_id, error_message, payload)
+  end
+
+  # STRING keys exactly (the SPA consumes these verbatim). `requested_by` is
+  # "id" | "key"; `requested_value` is the stale ask; `fallback_key` is the
+  # model actually resolved; `scope` is "conversation" | "user".
+  defp broken_selection_payload(
+         %Resolution{requested_selection: %{by: by, value: value}} = res,
+         scope
+       ) do
+    %{
+      "kind" => "broken_model_selection",
+      "requested_by" => Atom.to_string(by),
+      "requested_value" => value,
+      "fallback_key" => fallback_key(res.model),
+      "scope" => scope
+    }
+  end
+
+  defp fallback_key(%{key: key}) when is_binary(key), do: key
+  defp fallback_key(_), do: nil
+
+  defp broken_selection_message do
+    ErrorMessages.format_user_friendly_error(
+      :broken_model_selection,
+      "The model you selected is no longer available. Reset to the default and retry, or pick another model."
+    )
+  end
+
+  defp persist_broken_selection_event(conversation_id, text, payload) do
+    Magus.Chat.upsert_event_message!(
+      Ash.UUID.generate(),
+      text,
+      conversation_id,
+      payload,
+      true,
+      authorize?: false
+    )
+
+    nil
+  rescue
+    exception ->
+      Logger.warning(
+        "Failed to persist broken-selection event for conversation #{conversation_id}: " <>
+          Exception.message(exception)
+      )
+
+      nil
+  end
+
+  @doc """
+  Derive the block scope from the same precedence `ModelKeyResolver` used
+  (conversation > custom_agent > user).
+
+  An id-based ask always came from the conversation's `selected_model_id` pin. A
+  key-based ask is conversation-scoped when the stale key matches the
+  conversation's (or its custom agent's) own selection for the mode; otherwise it
+  inherited from the user default. Public so `MediaBypass` can reuse it.
+  """
+  def broken_selection_scope(%Resolution{requested_selection: %{by: :id}}, _conversation, _mode),
+    do: "conversation"
+
+  def broken_selection_scope(
+        %Resolution{requested_selection: %{by: :key, value: key}},
+        conversation,
+        mode
+      ) do
+    if key in conversation_level_keys(conversation, mode), do: "conversation", else: "user"
+  end
+
+  def broken_selection_scope(_resolution, _conversation, _mode), do: "user"
+
+  defp conversation_level_keys(conversation, mode) when is_map(conversation) do
+    custom_agent =
+      case Map.get(conversation, :custom_agent) do
+        %Ash.NotLoaded{} -> nil
+        value -> value
+      end
+
+    [
+      model_key(conversation_selected_model(conversation, mode)),
+      model_key(custom_agent_model(custom_agent, mode))
+    ]
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp conversation_level_keys(_conversation, _mode), do: []
+
+  defp conversation_selected_model(conversation, :image_generation),
+    do: Map.get(conversation, :selected_image_model)
+
+  defp conversation_selected_model(conversation, :video_generation),
+    do: Map.get(conversation, :selected_video_model)
+
+  defp conversation_selected_model(conversation, _mode),
+    do: Map.get(conversation, :selected_model)
+
+  defp custom_agent_model(nil, _mode), do: nil
+  defp custom_agent_model(agent, :image_generation), do: Map.get(agent, :image_model)
+  defp custom_agent_model(agent, :video_generation), do: Map.get(agent, :video_model)
+  defp custom_agent_model(agent, _mode), do: Map.get(agent, :model)
+
+  defp model_key(%{key: key}) when is_binary(key), do: key
+  defp model_key(_), do: nil
 
   def load_user_for_limits(user_id) do
     case Magus.Accounts.get_user(user_id, authorize?: false) do

@@ -26,14 +26,17 @@ defmodule Magus.Agents.Plugins.Support.PreflightTest do
     :ok
   end
 
-  defp build_agent(conversation, user) do
+  # Use a resolvable catalog key so the phase 2b-2b hard-stop (which blocks an
+  # explicit selection that resolves to something else) does not fire — these
+  # tests exercise run_source threading, not model degradation.
+  defp build_agent(conversation, user, model_key) do
     %{
       id: "conv:#{conversation.id}",
       state: %{
         conversation_id: conversation.id,
         user_id: user.id,
         mode: :chat,
-        model_keys: %{chat: "openrouter:x-ai/grok-4.1-fast"},
+        model_keys: %{chat: model_key},
         __strategy__: %{}
       }
     }
@@ -49,15 +52,17 @@ defmodule Magus.Agents.Plugins.Support.PreflightTest do
       :ok = ensure_active_subscription(user)
       agent = custom_agent(user, %{heartbeat_default_interval_minutes: 60})
       conversation = generate(conversation(actor: user, custom_agent_id: agent.id))
+      model = generate(model())
 
-      %{user: user, agent: agent, conversation: conversation}
+      %{user: user, agent: agent, conversation: conversation, model_key: model.key}
     end
 
     test "heartbeat run_source string produces a system_prompt with the wakeup preamble", %{
       user: user,
-      conversation: conversation
+      conversation: conversation,
+      model_key: model_key
     } do
-      jido_agent = build_agent(conversation, user)
+      jido_agent = build_agent(conversation, user, model_key)
 
       signal =
         make_signal(%{
@@ -74,8 +79,8 @@ defmodule Magus.Agents.Plugins.Support.PreflightTest do
     end
 
     test "manual_trigger run_source string produces a system_prompt with the wakeup preamble",
-         %{user: user, conversation: conversation} do
-      jido_agent = build_agent(conversation, user)
+         %{user: user, conversation: conversation, model_key: model_key} do
+      jido_agent = build_agent(conversation, user, model_key)
 
       signal =
         make_signal(%{
@@ -93,9 +98,10 @@ defmodule Magus.Agents.Plugins.Support.PreflightTest do
 
     test "absent run_source does not inject the wakeup preamble", %{
       user: user,
-      conversation: conversation
+      conversation: conversation,
+      model_key: model_key
     } do
-      jido_agent = build_agent(conversation, user)
+      jido_agent = build_agent(conversation, user, model_key)
 
       signal =
         make_signal(%{
@@ -112,9 +118,10 @@ defmodule Magus.Agents.Plugins.Support.PreflightTest do
 
     test "unknown run_source string falls back to no preamble (no atom blowup)", %{
       user: user,
-      conversation: conversation
+      conversation: conversation,
+      model_key: model_key
     } do
-      jido_agent = build_agent(conversation, user)
+      jido_agent = build_agent(conversation, user, model_key)
 
       signal =
         make_signal(%{
