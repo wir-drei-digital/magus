@@ -36,13 +36,19 @@
 	// Share / publish / delete failures surface in this banner.
 	let saveError = $state<string | null>(null);
 
-	// ?edit=true deep links open straight into the edit dialog (classic parity).
+	// ?edit=true deep links open straight into the edit dialog (classic parity),
+	// then strip the param so it doesn't leak back into the gallery hrefs.
 	let editOpen = $state(false);
 	let editParamApplied = false;
 	$effect(() => {
 		if (editParamApplied || !prompt) return;
 		editParamApplied = true;
-		if (page.url.searchParams.get('edit') === 'true') editOpen = true;
+		if (page.url.searchParams.get('edit') === 'true') {
+			editOpen = true;
+			const url = new URL(page.url);
+			url.searchParams.delete('edit');
+			void goto(`${url.pathname}${url.search}`, { replaceState: true });
+		}
 	});
 
 	let tags = $state<TagEntry[]>([]);

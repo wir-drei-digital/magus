@@ -24,8 +24,9 @@
 		if (workbench.mode !== 'library') void workbench.setMode('library');
 	});
 
-	// ?new=prompt|skill (from the legacy /prompts/new and /skills/new redirects)
-	// opens the matching create dialog once, then strips the param.
+	// ?new=skill comes from the /skills/new redirect; ?new=prompt is supported
+	// symmetrically (the /prompts/new route resolves via [promptId] to plain
+	// /library). Either opens the matching create dialog once, then strips the param.
 	let newParamApplied = false;
 	$effect(() => {
 		if (newParamApplied) return;
