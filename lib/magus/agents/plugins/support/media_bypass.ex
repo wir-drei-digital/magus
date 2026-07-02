@@ -31,8 +31,11 @@ defmodule Magus.Agents.Plugins.Support.MediaBypass do
 
     selected_model_id = data[:selected_model_id] || data["selected_model_id"]
 
+    # Scope owned-model visibility to the agent owner. Owned media models are
+    # blocked in 2b-1, so this is consistency with the other call sites rather
+    # than a leak vector.
     {:ok, resolution} =
-      Resolver.resolve(nil, %{
+      Resolver.resolve(state[:user_id], %{
         model_keys: model_keys,
         mode: mode,
         selected_model_id: selected_model_id
