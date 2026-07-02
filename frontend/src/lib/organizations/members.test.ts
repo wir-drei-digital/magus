@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { memberDisplayName, sortMembers, isValidInviteEmail } from './members';
+import {
+	memberDisplayName,
+	sortMembers,
+	isValidInviteEmail,
+	canConfirmArchive
+} from './members';
 
 describe('members helpers', () => {
 	it('renders a display name', () => {
@@ -42,5 +47,30 @@ describe('members helpers', () => {
 		expect(isValidInviteEmail('')).toBe(false);
 		expect(isValidInviteEmail('  spaced@ok.com  ')).toBe(true);
 		expect(isValidInviteEmail('a@b')).toBe(false);
+	});
+
+	describe('canConfirmArchive', () => {
+		it('confirms on an exact match', () => {
+			expect(canConfirmArchive('Acme Inc', 'Acme Inc')).toBe(true);
+		});
+
+		it('confirms after trimming surrounding whitespace on the typed value', () => {
+			expect(canConfirmArchive('  Acme Inc  ', 'Acme Inc')).toBe(true);
+		});
+
+		it('rejects a mismatch', () => {
+			expect(canConfirmArchive('acme inc', 'Acme Inc')).toBe(false);
+			expect(canConfirmArchive('Acme', 'Acme Inc')).toBe(false);
+		});
+
+		it('rejects an empty typed value', () => {
+			expect(canConfirmArchive('', 'Acme Inc')).toBe(false);
+			expect(canConfirmArchive('   ', 'Acme Inc')).toBe(false);
+		});
+
+		it('rejects when the org name is empty (never auto-confirms)', () => {
+			expect(canConfirmArchive('', '')).toBe(false);
+			expect(canConfirmArchive('   ', '   ')).toBe(false);
+		});
 	});
 });

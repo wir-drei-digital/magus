@@ -9608,6 +9608,46 @@ export async function unreadNotifications<Fields extends UnreadNotificationsFiel
 }
 
 
+export type ArchiveOrganizationFields = UnifiedFieldSelection<OrganizationResourceSchema>[];
+
+export type InferArchiveOrganizationResult<
+  Fields extends ArchiveOrganizationFields | undefined,
+> = InferResult<OrganizationResourceSchema, Fields>;
+
+export type ArchiveOrganizationResult<Fields extends ArchiveOrganizationFields | undefined = undefined> = | { success: true; data: InferArchiveOrganizationResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Update an existing Organization
+ *
+ * @ashActionType :update
+ */
+export async function archiveOrganization<Fields extends ArchiveOrganizationFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: UUIDv7;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ArchiveOrganizationResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "archive_organization",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<ArchiveOrganizationResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type CreateOrganizationInput = {
   name: string;
   slug: string;

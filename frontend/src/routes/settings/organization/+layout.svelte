@@ -38,7 +38,12 @@
 		admin.error = null;
 	}
 
+	// Re-resolve membership first, then refetch the roster. Doing the membership
+	// pass here means leave/transfer/archive all land correctly: a departed or
+	// archived owner resolves to no org (Create-org card), and a demoted owner
+	// loses owner controls, without a remount.
 	async function reload() {
+		await loadOrg();
 		if (!admin.org) {
 			admin.members = [];
 			return;
@@ -61,7 +66,6 @@
 		admin.currentUserId = uid;
 		admin.loading = true;
 		void (async () => {
-			await loadOrg();
 			await reload();
 			admin.loading = false;
 		})();
@@ -102,7 +106,6 @@
 		slug = '';
 		slugEdited = false;
 		admin.loading = true;
-		await loadOrg();
 		await reload();
 		admin.loading = false;
 	}

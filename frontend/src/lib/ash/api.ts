@@ -1080,6 +1080,21 @@ export function createOrganization(
 	) as Promise<RpcResult<OrganizationDetail>>;
 }
 
+/**
+ * Archives (soft-deletes) the organization: offboards every member, deactivates
+ * its workspaces, and cancels billing server-side. Owner-only and irreversible.
+ * Takes the organization's primary key as `identity`.
+ */
+export function archiveOrganization(orgId: string): Promise<RpcResult<OrganizationDetail>> {
+	return run((opts) =>
+		rpc.archiveOrganization({
+			identity: orgId,
+			fields: ORG_DETAIL_FIELDS as rpc.ArchiveOrganizationFields,
+			...opts
+		})
+	) as Promise<RpcResult<OrganizationDetail>>;
+}
+
 /** A member's pooled-spend contribution for the org Usage tab, keyed by user. */
 export type OrgUsageMember = {
 	userId: string;

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Crown, Send, UserMinus, Wallet } from '@lucide/svelte';
 	import {
+		archiveOrganization,
 		changeOrgMemberRole,
 		inviteOrgMember,
 		leaveOrg,
@@ -15,7 +16,12 @@
 	import { formatCents } from '$lib/billing/format';
 	import { Button, Section, confirmAction, CONTROL_CLASS } from '$lib/components/crud';
 	import { getOrgAdmin } from '$lib/components/organizations/context';
-	import { isValidInviteEmail, memberDisplayName, sortMembers } from '$lib/organizations/members';
+	import {
+		canConfirmArchive,
+		isValidInviteEmail,
+		memberDisplayName,
+		sortMembers
+	} from '$lib/organizations/members';
 
 	const ctx = getOrgAdmin();
 
@@ -131,6 +137,46 @@
 			cents = Math.round(amount * 100);
 		}
 		void run(member.id, () => setMemberSpendCap(member.id, cents));
+	}
+
+	// ── Delete organization (owner only) ──
+	// A typed-name confirm gates the irreversible archive. On success we reload,
+	// which now re-resolves membership: the ex-owner's org resolves to none and the
+	// layout falls back to the Create-org card.
+	let archiveConfirming = $state(false);
+	let archiveTyped = $state('');
+	let archiving = $state(false);
+	let archiveError = $state<string | null>(null);
+
+	const canArchive = $derived(
+		!!ctx.org && canConfirmArchive(archiveTyped, ctx.org.name) && !archiving
+	);
+
+	function openArchive() {
+		archiveConfirming = true;
+		archiveTyped = '';
+		archiveError = null;
+	}
+
+	function cancelArchive() {
+		archiveConfirming = false;
+		archiveTyped = '';
+		archiveError = null;
+	}
+
+	async function archive() {
+		if (!ctx.org || !canArchive) return;
+		archiving = true;
+		archiveError = null;
+		const result = await archiveOrganization(ctx.org.id);
+		archiving = false;
+		if (result.success) {
+			archiveConfirming = false;
+			archiveTyped = '';
+			await ctx.reload();
+		} else {
+			archiveError = result.errors[0]?.message ?? 'Could not delete the organization.';
+		}
 	}
 
 	// ── Leave (member view) ──
@@ -350,6 +396,59 @@
 			<Button variant="destructive" onclick={() => void leave()} data-testid="org-leave-submit">
 				Leave organization
 			</Button>
+		</Section>
+	{/if}
+
+	{#if ctx.isOwner && ctx.org}
+		{@const org = ctx.org}
+		<Section
+			title="Danger zone"
+			description="Deleting the organization removes all members, deactivates its workspaces, and cancels billing. This cannot be undone."
+			variant="danger"
+			testid="org-danger-zone"
+		>
+			{#if !archiveConfirming}
+				<Button variant="destructive" onclick={openArchive} data-testid="org-archive-open">
+					Delete organization
+				</Button>
+			{:else}
+				<form
+					class="flex flex-col gap-3"
+					onsubmit={(event) => {
+						event.preventDefault();
+						void archive();
+					}}
+				>
+					<label class="text-xs text-muted-foreground" for="org-archive-confirm-input">
+						Type <span class="font-medium text-foreground">{org.name}</span> to confirm.
+					</label>
+					<input
+						id="org-archive-confirm-input"
+						type="text"
+						bind:value={archiveTyped}
+						autocomplete="off"
+						autocapitalize="off"
+						spellcheck="false"
+						placeholder={org.name}
+						class={CONTROL_CLASS}
+						data-testid="org-archive-confirm-input"
+					/>
+					{#if archiveError}
+						<p class="text-xs text-destructive" data-testid="org-archive-error">{archiveError}</p>
+					{/if}
+					<div class="flex items-center gap-2">
+						<Button
+							type="submit"
+							variant="destructive"
+							disabled={!canArchive}
+							data-testid="org-archive-submit"
+						>
+							{archiving ? 'Deleting…' : 'Delete organization'}
+						</Button>
+						<Button type="button" variant="ghost" onclick={cancelArchive}>Cancel</Button>
+					</div>
+				</form>
+			{/if}
 		</Section>
 	{/if}
 </div>
