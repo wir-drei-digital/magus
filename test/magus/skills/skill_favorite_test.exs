@@ -70,6 +70,16 @@ defmodule Magus.Skills.SkillFavoriteTest do
       assert {:ok, []} = Skills.my_favorite_skills(actor: owner)
     end
 
+    test "destroying a favorited skill cascades the favorite row" do
+      owner = generate(user())
+      skill = create_skill!(owner, %{name: "cascade-target"})
+
+      {:ok, _favorite} = Skills.favorite_skill(%{skill_id: skill.id}, actor: owner)
+
+      assert :ok = Skills.destroy_skill(skill, actor: owner)
+      assert {:ok, []} = Skills.my_skill_favorites(actor: owner)
+    end
+
     test "is_favorited calculation reflects the actor" do
       owner = generate(user())
       other = generate(user())

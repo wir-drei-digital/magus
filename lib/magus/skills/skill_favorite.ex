@@ -11,6 +11,11 @@ defmodule Magus.Skills.SkillFavorite do
   postgres do
     table "skill_favorites"
     repo Magus.Repo
+
+    references do
+      reference :user, on_delete: :delete
+      reference :skill, on_delete: :delete
+    end
   end
 
   typescript do
