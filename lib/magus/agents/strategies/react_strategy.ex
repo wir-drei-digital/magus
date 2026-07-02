@@ -559,7 +559,11 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
       run_llm_opts = Map.get(state, :run_llm_opts, [])
       provider_opt_keys_by_string = provider_opt_keys_by_string(run_model || config[:model])
       base_llm_opts = normalize_llm_opts(config[:base_llm_opts], provider_opt_keys_by_string)
-      effective_llm_opts = Keyword.merge(base_llm_opts, run_llm_opts)
+
+      effective_llm_opts =
+        base_llm_opts
+        |> Keyword.merge(run_llm_opts)
+        |> maybe_put_credential_actor_id(effective_tool_context[:acting_user_id])
 
       effective_tools = run_tools || config[:tools] || []
       effective_actions_by_name = Map.new(effective_tools, &{&1.name(), &1})
@@ -1450,6 +1454,17 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
     state = StratState.get(agent, %{})
     put_strategy_state(agent, Map.put(state, :run_req_http_options, req_http_options))
   end
+
+  # Carry the acting user's id as `:credential_actor_id` in the per-turn
+  # llm_opts so `Magus.Agents.Clients.LLM.provider_options/2` can release an
+  # owned provider's credentials to their owner at request time. The opt is
+  # popped there before reaching ReqLLM. Absent an acting user, the opt is
+  # simply omitted (fail-closed: the safe global-only fallback applies).
+  defp maybe_put_credential_actor_id(llm_opts, actor_id) when is_binary(actor_id) do
+    Keyword.put(llm_opts, :credential_actor_id, actor_id)
+  end
+
+  defp maybe_put_credential_actor_id(llm_opts, _actor_id), do: llm_opts
 
   defp set_run_llm_opts(agent, llm_opts) when is_list(llm_opts) do
     state = StratState.get(agent, %{})
