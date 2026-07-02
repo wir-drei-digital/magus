@@ -134,7 +134,10 @@ defmodule Magus.Organizations.Organization do
       authorize_if Magus.Organizations.Organization.Checks.ActorIsOwner
     end
 
-    policy action_type(:update) do
+    # Only the plain :update (name) action is owner-authorized. set_billing /
+    # update_owner intentionally match no policy once their system-actor
+    # bypasses fall through, so they default-deny for every human actor.
+    policy action(:update) do
       authorize_if expr(owner_id == ^actor(:id))
     end
   end
