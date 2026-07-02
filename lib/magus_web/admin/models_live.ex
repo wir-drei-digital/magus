@@ -4,6 +4,7 @@ defmodule MagusWeb.Admin.ModelsLive do
   """
   use MagusWeb, :live_view
 
+  alias MagusWeb.Formatters
   alias MagusWeb.Layouts
   alias MagusWeb.Admin.ModelsLive.Listing
   alias Magus.Chat.Model
@@ -884,7 +885,7 @@ defmodule MagusWeb.Admin.ModelsLive do
                       <td class="text-right">
                         <div class="text-sm">{Listing.usage_count(model)} requests</div>
                         <div class="text-xs text-base-content/50">
-                          {format_cost(Listing.spend(model))}
+                          {Formatters.format_cost(Listing.spend(model), 2)}
                         </div>
                       </td>
                       <td>
@@ -1403,10 +1404,6 @@ defmodule MagusWeb.Admin.ModelsLive do
       </div>
     </fieldset>
     """
-  end
-
-  defp format_cost(decimal) do
-    "$" <> (decimal |> Decimal.round(2) |> Decimal.to_string())
   end
 
   # ============================================================================

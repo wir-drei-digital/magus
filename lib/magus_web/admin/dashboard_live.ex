@@ -1,10 +1,18 @@
 defmodule MagusWeb.Admin.DashboardLive do
   @moduledoc """
-  Admin dashboard with key metrics and analytics.
+  Admin dashboard: headline platform metrics, the platform activity chart and
+  a top-models rollup. All numbers come from `Magus.Usage.AdminStats` SQL
+  aggregates and load via `assign_async`, so the page shell renders instantly.
   """
   use MagusWeb, :live_view
 
+  alias Magus.Usage.AdminStats
+  alias MagusWeb.Formatters
   alias MagusWeb.Layouts
+  alias Phoenix.LiveView.AsyncResult
+
+  @top_models_days 30
+  @top_models_limit 10
 
   @impl true
   def mount(_params, _session, socket) do
@@ -12,98 +20,29 @@ defmodule MagusWeb.Admin.DashboardLive do
       socket
       |> assign(:page_title, "Admin Dashboard")
       |> assign(:current_path, "/admin")
+      |> assign(:top_models_days, @top_models_days)
       |> load_metrics()
 
     {:ok, socket}
   end
 
+  # Static render (SEO/first paint) shows the loading state; the connected
+  # mount kicks off the real queries so they only run once.
   defp load_metrics(socket) do
-    socket
-    |> assign(:total_users, count_users())
-    |> assign(:active_users, count_active_users())
-    |> assign(:total_messages, count_messages())
-    |> assign(:total_cost, calculate_total_cost())
-    |> assign(:popular_models, get_popular_models())
-    |> assign(:cost_by_model, get_cost_by_model())
-  end
+    if connected?(socket) do
+      socket
+      |> assign_async(:metrics, fn -> {:ok, %{metrics: AdminStats.overview()}} end)
+      |> assign_async(:top_models, fn ->
+        since = DateTime.add(DateTime.utc_now(), -@top_models_days, :day)
 
-  defp count_users do
-    require Ash.Query
-
-    Magus.Accounts.User
-    |> Ash.Query.for_read(:read)
-    |> Ash.count!(authorize?: false)
-  end
-
-  defp count_active_users do
-    require Ash.Query
-
-    fifteen_minutes_ago = DateTime.add(DateTime.utc_now(), -15, :minute)
-
-    # Count users who have message_usage records in the last 15 minutes
-    Magus.Usage.MessageUsage
-    |> Ash.Query.filter(inserted_at >= ^fifteen_minutes_ago)
-    |> Ash.Query.distinct(:user_id)
-    |> Ash.count!(authorize?: false)
-  end
-
-  defp count_messages do
-    require Ash.Query
-
-    Magus.Chat.Message
-    |> Ash.Query.for_read(:read)
-    |> Ash.count!(authorize?: false)
-  end
-
-  defp calculate_total_cost do
-    require Ash.Query
-
-    Magus.Usage.MessageUsage
-    |> Ash.Query.for_read(:read)
-    |> Ash.read!(authorize?: false)
-    |> Enum.reduce(Decimal.new(0), fn usage, acc ->
-      Decimal.add(acc, usage.total_cost || Decimal.new(0))
-    end)
-  end
-
-  defp get_popular_models do
-    require Ash.Query
-
-    Magus.Usage.MessageUsage
-    |> Ash.read!(authorize?: false)
-    |> Enum.group_by(& &1.model_name)
-    |> Enum.map(fn {model, usages} ->
-      %{
-        model: model || "Unknown",
-        count: length(usages),
-        cost:
-          Enum.reduce(usages, Decimal.new(0), fn u, acc ->
-            Decimal.add(acc, u.total_cost || Decimal.new(0))
-          end)
-      }
-    end)
-    |> Enum.sort_by(& &1.count, :desc)
-    |> Enum.take(10)
-  end
-
-  defp get_cost_by_model do
-    require Ash.Query
-
-    Magus.Usage.MessageUsage
-    |> Ash.read!(authorize?: false)
-    |> Enum.group_by(& &1.model_name)
-    |> Enum.map(fn {model, usages} ->
-      %{
-        model: model || "Unknown",
-        cost:
-          Enum.reduce(usages, Decimal.new(0), fn u, acc ->
-            Decimal.add(acc, u.total_cost || Decimal.new(0))
-          end),
-        count: length(usages)
-      }
-    end)
-    |> Enum.sort_by(& &1.cost, {:desc, Decimal})
-    |> Enum.take(10)
+        {:ok,
+         %{top_models: AdminStats.model_totals(since: since) |> Enum.take(@top_models_limit)}}
+      end)
+    else
+      socket
+      |> assign(:metrics, AsyncResult.loading())
+      |> assign(:top_models, AsyncResult.loading())
+    end
   end
 
   @impl true
@@ -124,41 +63,57 @@ defmodule MagusWeb.Admin.DashboardLive do
               Overview of your platform's activity and usage
             </p>
           </div>
-          <button type="button" phx-click="refresh" class="btn btn-outline btn-sm">
-            <.icon name="lucide-refresh-cw" class="w-4 h-4" /> Refresh
+          <button
+            type="button"
+            phx-click="refresh"
+            disabled={!!@metrics.loading}
+            class="btn btn-outline btn-sm"
+          >
+            <.icon
+              name="lucide-refresh-cw"
+              class={["w-4 h-4", @metrics.loading && "animate-spin"]}
+            /> Refresh
           </button>
         </div>
 
         <%!-- Metrics Cards --%>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <.metric_card
-            title="Active Users"
-            value={@active_users}
-            subtitle="Last 15 minutes"
-            icon="lucide-users"
-            color="primary"
-          />
-          <.metric_card
-            title="Total Users"
-            value={@total_users}
-            subtitle="Registered users"
-            icon="lucide-users"
-            color="secondary"
-          />
-          <.metric_card
-            title="Total Messages"
-            value={format_number(@total_messages)}
-            subtitle="All time"
-            icon="lucide-messages-square"
-            color="accent"
-          />
-          <.metric_card
-            title="Total Cost"
-            value={format_cost(@total_cost)}
-            subtitle="All usage"
-            icon="lucide-dollar-sign"
-            color="warning"
-          />
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" data-test-metric-cards>
+          <.async_result :let={metrics} assign={@metrics}>
+            <:loading>
+              <.metric_skeleton :for={_i <- 1..4} />
+            </:loading>
+            <:failed>
+              <div class="col-span-full alert alert-error">Failed to load metrics.</div>
+            </:failed>
+            <.metric_card
+              title="Active Users"
+              value={metrics.active_users}
+              subtitle="Last 15 minutes"
+              icon="lucide-users"
+              color={:primary}
+            />
+            <.metric_card
+              title="Total Users"
+              value={Formatters.format_number(metrics.total_users)}
+              subtitle="Registered users"
+              icon="lucide-users"
+              color={:secondary}
+            />
+            <.metric_card
+              title="Total Messages"
+              value={Formatters.format_number(metrics.total_messages)}
+              subtitle="All time"
+              icon="lucide-messages-square"
+              color={:accent}
+            />
+            <.metric_card
+              title="Total Cost"
+              value={Formatters.format_cost(metrics.total_cost)}
+              subtitle="All usage"
+              icon="lucide-dollar-sign"
+              color={:warning}
+            />
+          </.async_result>
         </div>
 
         <%!-- Activity Chart --%>
@@ -168,59 +123,54 @@ defmodule MagusWeb.Admin.DashboardLive do
           title="Platform Message Activity"
         />
 
-        <%!-- Charts Section --%>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <%!-- Most Popular Models --%>
-          <div class="card bg-base-200 border border-base-300">
-            <div class="card-body">
-              <h2 class="card-title text-base-content">Most Popular Models</h2>
-              <p class="text-sm text-base-content/60">Top models by usage count</p>
-              <div class="mt-4 space-y-2">
-                <%= if @popular_models == [] do %>
-                  <p class="text-center text-base-content/50 py-8">No usage data available</p>
-                <% else %>
-                  <div class="space-y-3">
-                    <%= for model <- @popular_models do %>
-                      <div class="flex items-center justify-between p-2 bg-base-300/50 rounded-lg">
-                        <div>
-                          <p class="font-medium text-base-content text-sm">{model.model}</p>
-                          <p class="text-xs text-base-content/60">{format_cost(model.cost)}</p>
-                        </div>
-                        <span class="font-mono text-lg font-bold text-base-content">
-                          {format_number(model.count)}
-                        </span>
-                      </div>
-                    <% end %>
-                  </div>
-                <% end %>
+        <%!-- Top Models --%>
+        <div class="card bg-base-200 border border-base-300">
+          <div class="card-body">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <h2 class="card-title text-base-content">Top Models</h2>
+                <p class="text-sm text-base-content/60">
+                  By cost, last {@top_models_days} days
+                </p>
               </div>
+              <.link navigate={~p"/admin/usage"} class="btn btn-ghost btn-xs">
+                Usage analytics <.icon name="lucide-arrow-right" class="w-3 h-3" />
+              </.link>
             </div>
-          </div>
-
-          <%!-- Cost by Model --%>
-          <div class="card bg-base-200 border border-base-300">
-            <div class="card-body">
-              <h2 class="card-title text-base-content">Cost by Model</h2>
-              <p class="text-sm text-base-content/60">Top models by usage cost</p>
-              <div class="mt-4 space-y-2">
-                <%= if @cost_by_model == [] do %>
-                  <p class="text-center text-base-content/50 py-8">No cost data available</p>
-                <% else %>
-                  <div class="space-y-3">
-                    <%= for model <- @cost_by_model do %>
-                      <div class="flex items-center justify-between p-2 bg-base-300/50 rounded-lg">
-                        <div>
-                          <p class="font-medium text-base-content text-sm">{model.model}</p>
-                          <p class="text-xs text-base-content/60">{model.count} requests</p>
-                        </div>
-                        <span class="font-mono text-sm text-base-content">
-                          {format_cost(model.cost)}
-                        </span>
-                      </div>
-                    <% end %>
+            <div class="mt-2 overflow-x-auto">
+              <.async_result :let={top_models} assign={@top_models}>
+                <:loading>
+                  <div class="flex items-center justify-center py-8">
+                    <span class="loading loading-spinner"></span>
                   </div>
-                <% end %>
-              </div>
+                </:loading>
+                <:failed>
+                  <p class="text-center text-error py-8">Failed to load model usage.</p>
+                </:failed>
+                <p :if={top_models == []} class="text-center text-base-content/50 py-8">
+                  No usage data available
+                </p>
+                <table :if={top_models != []} class="table table-sm" data-test-top-models>
+                  <thead>
+                    <tr class="bg-base-300/50">
+                      <th>Model</th>
+                      <th class="text-right">Requests</th>
+                      <th class="text-right">Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr :for={row <- top_models} class="hover:bg-base-300/30" data-test-top-model>
+                      <td class="font-medium text-sm">{row.model || "Unknown"}</td>
+                      <td class="text-right font-mono text-sm">
+                        {Formatters.format_number(row.count)}
+                      </td>
+                      <td class="text-right font-mono text-sm">
+                        {Formatters.format_cost(row.cost)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </.async_result>
             </div>
           </div>
         </div>
@@ -233,11 +183,11 @@ defmodule MagusWeb.Admin.DashboardLive do
   attr :value, :any, required: true
   attr :subtitle, :string, required: true
   attr :icon, :string, required: true
-  attr :color, :string, default: "primary"
+  attr :color, :atom, default: :primary, values: [:primary, :secondary, :accent, :warning]
 
   defp metric_card(assigns) do
     ~H"""
-    <div class="card bg-base-200 border border-base-300">
+    <div class="card bg-base-200 border border-base-300" data-test-metric-card>
       <div class="card-body p-4">
         <div class="flex items-start justify-between">
           <div>
@@ -245,8 +195,8 @@ defmodule MagusWeb.Admin.DashboardLive do
             <p class="text-2xl font-bold text-base-content mt-1">{@value}</p>
             <p class="text-xs text-base-content/50 mt-1">{@subtitle}</p>
           </div>
-          <div class={"p-2 rounded-lg bg-#{@color}/10"}>
-            <.icon name={@icon} class={"w-6 h-6 text-#{@color}"} />
+          <div class={["p-2 rounded-lg", icon_bg(@color)]}>
+            <.icon name={@icon} class={["w-6 h-6", icon_text(@color)]} />
           </div>
         </div>
       </div>
@@ -254,19 +204,27 @@ defmodule MagusWeb.Admin.DashboardLive do
     """
   end
 
-  defp format_number(num) when is_integer(num) do
-    num
-    |> Integer.to_string()
-    |> String.graphemes()
-    |> Enum.reverse()
-    |> Enum.chunk_every(3)
-    |> Enum.join(",")
-    |> String.reverse()
+  defp metric_skeleton(assigns) do
+    ~H"""
+    <div class="card bg-base-200 border border-base-300 animate-pulse">
+      <div class="card-body p-4 space-y-2">
+        <div class="h-4 w-24 bg-base-300 rounded"></div>
+        <div class="h-8 w-16 bg-base-300 rounded"></div>
+        <div class="h-3 w-20 bg-base-300 rounded"></div>
+      </div>
+    </div>
+    """
   end
 
-  defp format_number(num), do: to_string(num)
+  # Full literal class names so Tailwind's scanner picks them up — string
+  # interpolation like "bg-#{color}/10" never makes it into the build.
+  defp icon_bg(:primary), do: "bg-primary/10"
+  defp icon_bg(:secondary), do: "bg-secondary/10"
+  defp icon_bg(:accent), do: "bg-accent/10"
+  defp icon_bg(:warning), do: "bg-warning/10"
 
-  defp format_cost(decimal) do
-    "$" <> (decimal |> Decimal.round(4) |> Decimal.to_string())
-  end
+  defp icon_text(:primary), do: "text-primary"
+  defp icon_text(:secondary), do: "text-secondary"
+  defp icon_text(:accent), do: "text-accent"
+  defp icon_text(:warning), do: "text-warning"
 end

@@ -26,15 +26,14 @@ defmodule MagusWeb.Admin.PlansLive do
       Policy
       |> Ash.Query.for_read(:read)
       |> Ash.Query.sort(sort_order: :asc)
-      |> Ash.Query.load(:subscriptions)
       |> Ash.read!(authorize?: false)
+
+    # One grouped count instead of loading every subscription row per plan.
+    counts = Magus.Usage.AdminStats.plan_subscriber_counts()
 
     plans_with_counts =
       Enum.map(plans, fn plan ->
-        active_count =
-          Enum.count(plan.subscriptions, fn sub -> sub.status in [:active, :trialing] end)
-
-        Map.put(plan, :subscriber_count, active_count)
+        Map.put(plan, :subscriber_count, Map.get(counts, plan.id, 0))
       end)
 
     assign(socket, :plans, plans_with_counts)
@@ -186,7 +185,7 @@ defmodule MagusWeb.Admin.PlansLive do
               <tbody>
                 <%= if @plans == [] do %>
                   <tr>
-                    <td colspan="9" class="text-center py-8 text-base-content/50">
+                    <td colspan="7" class="text-center py-8 text-base-content/50">
                       No plans configured
                     </td>
                   </tr>

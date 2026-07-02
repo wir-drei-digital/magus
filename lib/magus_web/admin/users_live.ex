@@ -1,12 +1,24 @@
 defmodule MagusWeb.Admin.UsersLive do
   @moduledoc """
   Admin view for managing users.
+
+  Search / filter / sort / page state lives in the URL query string (like the
+  admin Models index), so views are shareable and the back button works. Every
+  column — including the usage rollups (messages, cost, last active) and plan —
+  sorts in SQL via `AdminStats.list_users/1`, so ordering is correct across
+  pages. Data loads with `assign_async`.
   """
   use MagusWeb, :live_view
 
+  alias Magus.Usage.AdminStats
+  alias MagusWeb.Formatters
   alias MagusWeb.Layouts
+  alias Phoenix.LiveView.AsyncResult
 
   @per_page 20
+  @filters ~w(all admins non_admins demo)
+  @default_sort "inserted_at"
+  @default_dir "desc"
 
   @impl true
   def mount(_params, _session, socket) do
@@ -14,194 +26,120 @@ defmodule MagusWeb.Admin.UsersLive do
       socket
       |> assign(:page_title, "Users")
       |> assign(:current_path, "/admin/users")
-      |> assign(:search_query, "")
-      |> assign(:sort_by, :inserted_at)
-      |> assign(:sort_order, :desc)
-      |> assign(:page, 1)
       |> assign(:per_page, @per_page)
-      |> assign(:filter, "all")
-      |> load_users()
 
     {:ok, socket}
   end
 
+  @impl true
+  def handle_params(params, _uri, socket) do
+    list = %{
+      search: to_string(params["q"] || ""),
+      filter: normalize(params["filter"], @filters, "all"),
+      sort: normalize(params["sort"], AdminStats.user_sorts(), @default_sort),
+      dir: normalize(params["dir"], ~w(asc desc), @default_dir),
+      page: parse_page(params["page"])
+    }
+
+    {:noreply, socket |> assign(:list, list) |> load_users()}
+  end
+
   defp load_users(socket) do
-    require Ash.Query
+    %{search: search, filter: filter, sort: sort, dir: dir, page: page} = socket.assigns.list
 
-    %{
-      search_query: query,
-      sort_by: sort_by,
-      sort_order: sort_order,
-      page: page,
-      per_page: per_page,
-      filter: filter
-    } = socket.assigns
+    if connected?(socket) do
+      assign_async(socket, :page_data, fn ->
+        %{users: users, total_count: total_count} =
+          AdminStats.list_users(
+            search: search,
+            filter: filter,
+            sort: sort,
+            dir: dir,
+            page: page,
+            per_page: @per_page
+          )
 
-    offset = (page - 1) * per_page
-
-    base_query =
-      Magus.Accounts.User
-      |> Ash.Query.for_read(:read)
-
-    # Apply search filter
-    base_query =
-      if query != "" do
-        Ash.Query.filter(base_query, contains(email, ^query) or contains(display_name, ^query))
-      else
-        base_query
-      end
-
-    # Apply the selected filter
-    base_query =
-      case filter do
-        "admins" -> Ash.Query.filter(base_query, is_admin == true)
-        "non_admins" -> Ash.Query.filter(base_query, is_admin == false)
-        "demo" -> Ash.Query.filter(base_query, test_account == true)
-        _ -> base_query
-      end
-
-    # Get total count
-    total_count = Ash.count!(base_query, authorize?: false)
-
-    # Apply sorting and pagination
-    users =
-      base_query
-      |> Ash.Query.sort([{sort_by, sort_order}])
-      |> Ash.Query.offset(offset)
-      |> Ash.Query.limit(per_page)
-      |> Ash.read!(authorize?: false)
-
-    # Load user stats in a single query (avoid N+1)
-    user_ids = Enum.map(users, & &1.id)
-    stats_by_user = get_bulk_user_stats(user_ids)
-    subscriptions_by_user = get_bulk_subscriptions(user_ids)
-
-    users_with_stats =
-      Enum.map(users, fn user ->
-        stats =
-          Map.get(stats_by_user, user.id, %{
-            message_count: 0,
-            total_cost: Decimal.new(0),
-            last_active: nil
-          })
-
-        subscription = Map.get(subscriptions_by_user, user.id)
-
-        Map.merge(user, %{
-          message_count: stats.message_count,
-          total_cost: stats.total_cost,
-          last_active: stats.last_active,
-          subscription_plan: subscription && subscription.name
-        })
+        {:ok,
+         %{
+           page_data: %{
+             users: users,
+             total_count: total_count,
+             total_pages: max(ceil(total_count / @per_page), 1)
+           }
+         }}
       end)
-
-    total_pages = ceil(total_count / per_page)
-
-    socket
-    |> assign(:users, users_with_stats)
-    |> assign(:total_count, total_count)
-    |> assign(:total_pages, max(total_pages, 1))
+    else
+      assign(socket, :page_data, AsyncResult.loading())
+    end
   end
 
-  defp get_bulk_user_stats(user_ids) when user_ids == [], do: %{}
-
-  defp get_bulk_user_stats(user_ids) do
-    require Ash.Query
-
-    usages =
-      Magus.Usage.MessageUsage
-      |> Ash.Query.filter(user_id in ^user_ids)
-      |> Ash.read!(authorize?: false)
-
-    # Group by user_id and aggregate stats
-    Enum.group_by(usages, & &1.user_id)
-    |> Enum.map(fn {user_id, user_usages} ->
-      message_count = length(user_usages)
-
-      total_cost =
-        Enum.reduce(user_usages, Decimal.new(0), fn u, acc ->
-          Decimal.add(acc, u.total_cost || Decimal.new(0))
-        end)
-
-      last_active =
-        user_usages
-        |> Enum.map(& &1.inserted_at)
-        |> Enum.max(DateTime, fn -> nil end)
-
-      {user_id, %{message_count: message_count, total_cost: total_cost, last_active: last_active}}
-    end)
-    |> Map.new()
-  end
-
-  defp get_bulk_subscriptions(user_ids) when user_ids == [], do: %{}
-
-  defp get_bulk_subscriptions(user_ids) do
-    require Ash.Query
-
-    Magus.Usage.Account
-    |> Ash.Query.filter(user_id in ^user_ids)
-    |> Ash.Query.load(:usage_plan)
-    |> Ash.read!(authorize?: false)
-    |> Map.new(fn sub ->
-      {sub.user_id, %{name: sub.usage_plan.name}}
-    end)
-  end
+  # Form events only translate into the URL; handle_params does the loading.
 
   @impl true
   def handle_event("search", %{"query" => query}, socket) do
-    socket =
-      socket
-      |> assign(:search_query, query)
-      |> assign(:page, 1)
-      |> load_users()
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("sort", %{"field" => field}, socket) do
-    field_atom = String.to_existing_atom(field)
-
-    {sort_by, sort_order} =
-      if socket.assigns.sort_by == field_atom do
-        # Toggle order
-        new_order = if socket.assigns.sort_order == :asc, do: :desc, else: :asc
-        {field_atom, new_order}
-      else
-        {field_atom, :asc}
-      end
-
-    socket =
-      socket
-      |> assign(:sort_by, sort_by)
-      |> assign(:sort_order, sort_order)
-      |> load_users()
-
-    {:noreply, socket}
+    patch_list(socket, %{search: query, page: 1})
   end
 
   @impl true
   def handle_event("filter", %{"value" => value}, socket) do
-    socket =
-      socket
-      |> assign(:filter, value)
-      |> assign(:page, 1)
-      |> load_users()
-
-    {:noreply, socket}
+    patch_list(socket, %{filter: value, page: 1})
   end
 
   @impl true
-  def handle_event("page", %{"page" => page}, socket) do
-    page = String.to_integer(page)
+  def handle_event("sort", %{"field" => field}, socket) do
+    list = socket.assigns.list
 
-    socket =
-      socket
-      |> assign(:page, page)
-      |> load_users()
+    dir =
+      cond do
+        list.sort != field -> "asc"
+        list.dir == "asc" -> "desc"
+        true -> "asc"
+      end
 
-    {:noreply, socket}
+    patch_list(socket, %{sort: field, dir: dir, page: 1})
   end
+
+  defp patch_list(socket, changes) do
+    list = Map.merge(socket.assigns.list, changes)
+    {:noreply, push_patch(socket, to: list_path(list))}
+  end
+
+  defp list_path(list) do
+    query =
+      %{
+        "q" => list.search,
+        "filter" => list.filter,
+        "sort" => list.sort,
+        "dir" => list.dir,
+        "page" => to_string(list.page)
+      }
+      |> Enum.reject(fn {k, v} -> default_param?(k, v) end)
+      |> Enum.sort()
+
+    ~p"/admin/users?#{query}"
+  end
+
+  # Bare /admin/users represents the default view: no search, all users,
+  # newest first, first page.
+  defp default_param?(_k, v) when v in [nil, ""], do: true
+  defp default_param?("filter", "all"), do: true
+  defp default_param?("sort", @default_sort), do: true
+  defp default_param?("dir", @default_dir), do: true
+  defp default_param?("page", "1"), do: true
+  defp default_param?(_k, _v), do: false
+
+  defp normalize(value, allowed, default) do
+    if is_binary(value) and value in allowed, do: value, else: default
+  end
+
+  defp parse_page(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {n, _} when n >= 1 -> n
+      _ -> 1
+    end
+  end
+
+  defp parse_page(_), do: 1
 
   @impl true
   def render(assigns) do
@@ -213,7 +151,11 @@ defmodule MagusWeb.Admin.UsersLive do
           <div>
             <h1 class="text-2xl font-bold text-base-content">Users</h1>
             <p class="text-base-content/60 text-sm mt-1">
-              Manage registered users ({@total_count} total)
+              <%= if @page_data.ok? do %>
+                Manage registered users ({@page_data.result.total_count} total)
+              <% else %>
+                Manage registered users
+              <% end %>
             </p>
           </div>
 
@@ -228,7 +170,7 @@ defmodule MagusWeb.Admin.UsersLive do
                 <input
                   type="text"
                   name="query"
-                  value={@search_query}
+                  value={@list.search}
                   placeholder="Search by email or name..."
                   class="input input-bordered input-sm w-full pl-9"
                   phx-debounce="300"
@@ -236,157 +178,148 @@ defmodule MagusWeb.Admin.UsersLive do
               </div>
             </form>
 
-            <select
-              class="select select-bordered select-sm"
-              phx-change="filter"
-              name="value"
-            >
-              <option value="all" selected={@filter == "all"}>All Users</option>
-              <option value="admins" selected={@filter == "admins"}>Admins Only</option>
-              <option value="non_admins" selected={@filter == "non_admins"}>Non-Admins</option>
-              <option value="demo" selected={@filter == "demo"}>Demo Accounts</option>
-            </select>
+            <form phx-change="filter">
+              <select class="select select-bordered select-sm" name="value">
+                <option value="all" selected={@list.filter == "all"}>All Users</option>
+                <option value="admins" selected={@list.filter == "admins"}>Admins Only</option>
+                <option value="non_admins" selected={@list.filter == "non_admins"}>
+                  Non-Admins
+                </option>
+                <option value="demo" selected={@list.filter == "demo"}>Demo Accounts</option>
+              </select>
+            </form>
           </div>
         </div>
 
         <%!-- Users Table --%>
         <div class="card bg-base-200 border border-base-300 overflow-hidden">
           <div class="overflow-x-auto">
-            <table class="table table-sm">
+            <table class="table table-sm" data-test-users-table>
               <thead>
                 <tr class="bg-base-300/50">
-                  <th
-                    class="cursor-pointer hover:bg-base-300"
-                    phx-click="sort"
-                    phx-value-field="email"
-                  >
-                    <div class="flex items-center gap-1">
-                      Email <.sort_indicator field={:email} current={@sort_by} order={@sort_order} />
-                    </div>
-                  </th>
-                  <th
-                    class="cursor-pointer hover:bg-base-300"
-                    phx-click="sort"
-                    phx-value-field="display_name"
-                  >
-                    <div class="flex items-center gap-1">
-                      Name
-                      <.sort_indicator field={:display_name} current={@sort_by} order={@sort_order} />
-                    </div>
-                  </th>
-                  <th
-                    class="cursor-pointer hover:bg-base-300"
-                    phx-click="sort"
-                    phx-value-field="inserted_at"
-                  >
-                    <div class="flex items-center gap-1">
-                      Joined
-                      <.sort_indicator field={:inserted_at} current={@sort_by} order={@sort_order} />
-                    </div>
-                  </th>
-                  <th>Subscription</th>
-                  <th class="text-right">Messages</th>
-                  <th class="text-right">Cost</th>
-                  <th>Last Active</th>
+                  <.sort_header label="Email" field="email" list={@list} />
+                  <.sort_header label="Name" field="display_name" list={@list} />
+                  <.sort_header label="Joined" field="inserted_at" list={@list} />
+                  <.sort_header label="Subscription" field="plan" list={@list} />
+                  <.sort_header label="Messages" field="message_count" list={@list} align="right" />
+                  <.sort_header label="Cost" field="total_cost" list={@list} align="right" />
+                  <.sort_header label="Last Active" field="last_active" list={@list} />
                   <th class="text-center">Admin</th>
                 </tr>
               </thead>
               <tbody>
-                <%= if @users == [] do %>
-                  <tr>
-                    <td colspan="9" class="text-center py-8 text-base-content/50">
+                <.async_result :let={page_data} assign={@page_data}>
+                  <:loading>
+                    <tr>
+                      <td colspan="8" class="text-center py-12">
+                        <span class="loading loading-spinner"></span>
+                      </td>
+                    </tr>
+                  </:loading>
+                  <:failed>
+                    <tr>
+                      <td colspan="8" class="text-center py-8 text-error">
+                        Failed to load users.
+                      </td>
+                    </tr>
+                  </:failed>
+                  <tr :if={page_data.users == []}>
+                    <td colspan="8" class="text-center py-8 text-base-content/50">
                       No users found
                     </td>
                   </tr>
-                <% else %>
-                  <%= for user <- @users do %>
-                    <tr
-                      class="hover:bg-base-300/30 cursor-pointer"
-                      phx-click={JS.navigate(~p"/admin/users/#{user.id}")}
-                    >
-                      <td>
-                        <div class="flex items-center gap-2">
-                          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center border border-base-300">
-                            <span class="text-sm font-medium text-base-content">
-                              {user.email |> to_string() |> String.first() |> String.upcase()}
-                            </span>
-                          </div>
-                          <span class="text-sm">{user.email}</span>
-                          <span
-                            :if={user.test_account}
-                            class="badge badge-info badge-sm"
-                            title="Demo account"
-                          >
-                            demo
+                  <tr
+                    :for={user <- page_data.users}
+                    class="hover:bg-base-300/30 cursor-pointer"
+                    data-test-user-row={user.id}
+                    phx-click={JS.navigate(~p"/admin/users/#{user.id}")}
+                  >
+                    <td>
+                      <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center border border-base-300">
+                          <span class="text-sm font-medium text-base-content">
+                            {user.email |> String.first() |> String.upcase()}
                           </span>
                         </div>
-                      </td>
-                      <td class="text-base-content/70">{user.display_name || "-"}</td>
-                      <td class="text-base-content/70 text-sm">
-                        {format_date(user.inserted_at)}
-                      </td>
-                      <td>
-                        <%= if user.subscription_plan do %>
-                          <span class="badge badge-outline badge-sm">{user.subscription_plan}</span>
-                        <% else %>
-                          <span class="text-base-content/30 text-sm">None</span>
-                        <% end %>
-                      </td>
-                      <td class="text-right font-mono text-sm">{user.message_count}</td>
-                      <td class="text-right font-mono text-sm">{format_cost(user.total_cost)}</td>
-                      <td class="text-base-content/70 text-sm">
-                        {format_last_active(user.last_active)}
-                      </td>
-                      <td class="text-center">
-                        <%= if user.is_admin do %>
-                          <span class="badge badge-primary badge-sm">Admin</span>
-                        <% else %>
-                          <span class="text-base-content/30">-</span>
-                        <% end %>
-                      </td>
-                    </tr>
-                  <% end %>
-                <% end %>
+                        <span class="text-sm">{user.email}</span>
+                        <span
+                          :if={user.test_account}
+                          class="badge badge-info badge-sm"
+                          title="Demo account"
+                        >
+                          demo
+                        </span>
+                      </div>
+                    </td>
+                    <td class="text-base-content/70">{user.display_name || "-"}</td>
+                    <td class="text-base-content/70 text-sm">
+                      {format_date(user.inserted_at)}
+                    </td>
+                    <td>
+                      <%= if user.plan_name do %>
+                        <span class="badge badge-outline badge-sm">{user.plan_name}</span>
+                      <% else %>
+                        <span class="text-base-content/30 text-sm">None</span>
+                      <% end %>
+                    </td>
+                    <td class="text-right font-mono text-sm">{user.message_count}</td>
+                    <td class="text-right font-mono text-sm">
+                      {Formatters.format_cost(user.total_cost, 2)}
+                    </td>
+                    <td class="text-base-content/70 text-sm">
+                      {format_last_active(user.last_active)}
+                    </td>
+                    <td class="text-center">
+                      <%= if user.is_admin do %>
+                        <span class="badge badge-primary badge-sm">Admin</span>
+                      <% else %>
+                        <span class="text-base-content/30">-</span>
+                      <% end %>
+                    </td>
+                  </tr>
+                </.async_result>
               </tbody>
             </table>
           </div>
 
           <%!-- Pagination --%>
-          <%= if @total_pages > 1 do %>
+          <%= if @page_data.ok? && @page_data.result.total_pages > 1 do %>
+            <% page_data = @page_data.result %>
             <div class="flex items-center justify-between px-4 py-3 border-t border-base-300">
               <div class="text-sm text-base-content/60">
-                Showing {(@page - 1) * @per_page + 1} to {min(@page * @per_page, @total_count)} of {@total_count}
+                Showing {(@list.page - 1) * @per_page + 1} to {min(
+                  @list.page * @per_page,
+                  page_data.total_count
+                )} of {page_data.total_count}
               </div>
               <div class="join">
-                <button
-                  class="join-item btn btn-sm"
-                  disabled={@page == 1}
-                  phx-click="page"
-                  phx-value-page={@page - 1}
+                <.link
+                  patch={list_path(%{@list | page: @list.page - 1})}
+                  class={["join-item btn btn-sm", @list.page == 1 && "btn-disabled"]}
                 >
                   <.icon name="lucide-chevron-left" class="w-4 h-4" />
-                </button>
-                <%= for p <- pagination_range(@page, @total_pages) do %>
+                </.link>
+                <%= for p <- pagination_range(@list.page, page_data.total_pages) do %>
                   <%= if p == :ellipsis do %>
                     <span class="join-item btn btn-sm btn-disabled">...</span>
                   <% else %>
-                    <button
-                      class={"join-item btn btn-sm #{if p == @page, do: "btn-active"}"}
-                      phx-click="page"
-                      phx-value-page={p}
+                    <.link
+                      patch={list_path(%{@list | page: p})}
+                      class={["join-item btn btn-sm", p == @list.page && "btn-active"]}
                     >
                       {p}
-                    </button>
+                    </.link>
                   <% end %>
                 <% end %>
-                <button
-                  class="join-item btn btn-sm"
-                  disabled={@page == @total_pages}
-                  phx-click="page"
-                  phx-value-page={@page + 1}
+                <.link
+                  patch={list_path(%{@list | page: @list.page + 1})}
+                  class={[
+                    "join-item btn btn-sm",
+                    @list.page == page_data.total_pages && "btn-disabled"
+                  ]}
                 >
                   <.icon name="lucide-chevron-right" class="w-4 h-4" />
-                </button>
+                </.link>
               </div>
             </div>
           <% end %>
@@ -403,21 +336,31 @@ defmodule MagusWeb.Admin.UsersLive do
     """
   end
 
-  attr :field, :atom, required: true
-  attr :current, :atom, required: true
-  attr :order, :atom, required: true
+  attr :label, :string, required: true
+  attr :field, :string, required: true
+  attr :list, :map, required: true
+  attr :align, :string, default: "left"
 
-  defp sort_indicator(assigns) do
+  defp sort_header(assigns) do
     ~H"""
-    <%= if @field == @current do %>
-      <%= if @order == :asc do %>
-        <.icon name="lucide-chevron-up" class="w-3 h-3" />
-      <% else %>
-        <.icon name="lucide-chevron-down" class="w-3 h-3" />
-      <% end %>
-    <% else %>
-      <.icon name="lucide-chevrons-up-down" class="w-3 h-3 opacity-30" />
-    <% end %>
+    <th
+      class={["cursor-pointer hover:bg-base-300", @align == "right" && "text-right"]}
+      phx-click="sort"
+      phx-value-field={@field}
+      data-test-sort={@field}
+    >
+      <div class={["flex items-center gap-1", @align == "right" && "justify-end"]}>
+        {@label}
+        <%= if @list.sort == @field do %>
+          <.icon
+            name={if @list.dir == "asc", do: "lucide-chevron-up", else: "lucide-chevron-down"}
+            class="w-3 h-3"
+          />
+        <% else %>
+          <.icon name="lucide-chevrons-up-down" class="w-3 h-3 opacity-30" />
+        <% end %>
+      </div>
+    </th>
     """
   end
 
@@ -428,8 +371,7 @@ defmodule MagusWeb.Admin.UsersLive do
   defp format_last_active(nil), do: "-"
 
   defp format_last_active(datetime) do
-    now = DateTime.utc_now()
-    diff_seconds = DateTime.diff(now, datetime, :second)
+    diff_seconds = DateTime.diff(DateTime.utc_now(), datetime, :second)
 
     cond do
       diff_seconds < 60 -> "Just now"
@@ -438,10 +380,6 @@ defmodule MagusWeb.Admin.UsersLive do
       diff_seconds < 604_800 -> "#{div(diff_seconds, 86400)}d ago"
       true -> Calendar.strftime(datetime, "%b %d")
     end
-  end
-
-  defp format_cost(decimal) do
-    "$" <> (decimal |> Decimal.round(2) |> Decimal.to_string())
   end
 
   defp pagination_range(_current, total) when total <= 7 do

@@ -2,8 +2,9 @@ defmodule MagusWeb.Admin.Components.ActivityChartComponent do
   @moduledoc """
   A reusable LiveComponent for displaying message activity charts using Chart.js.
 
-  Shows stacked bar chart by action name over time.
-  Uses hourly aggregation for 3d/7d periods, daily for longer periods.
+  Shows a stacked bar chart of request counts by action name over time. The
+  buckets are computed in SQL (`AdminStats.bucketed_counts/3`) and load via
+  `assign_async`, so switching periods never blocks the parent LiveView.
 
   ## Usage
 
@@ -24,27 +25,20 @@ defmodule MagusWeb.Admin.Components.ActivityChartComponent do
   """
   use MagusWeb, :live_component
 
-  require Ash.Query
+  alias Magus.Usage.AdminStats
+  alias MagusWeb.Admin.Charts
 
-  @activity_periods %{
-    "12h" => {12, :hour},
-    "24h" => {24, :hour},
-    "3d" => {3, :day},
-    "7d" => {7, :day},
-    "14d" => {14, :day},
-    "30d" => {30, :day}
+  # period -> {window in hours, bucket size in seconds, x-axis label fn}
+  @periods %{
+    "12h" => {12, 3_600, &Charts.hour_label/1},
+    "24h" => {24, 3_600, &Charts.hour_label/1},
+    "3d" => {72, 4 * 3_600, &Charts.day_hour_label/1},
+    "7d" => {168, 8 * 3_600, &Charts.day_hour_label/1},
+    "14d" => {14 * 24, 86_400, &Charts.week_day_label/1},
+    "30d" => {30 * 24, 86_400, &Charts.month_day_label/1}
   }
 
-  @colors [
-    "rgba(59, 130, 246, 0.8)",
-    "rgba(16, 185, 129, 0.8)",
-    "rgba(245, 158, 11, 0.8)",
-    "rgba(239, 68, 68, 0.8)",
-    "rgba(139, 92, 246, 0.8)",
-    "rgba(236, 72, 153, 0.8)",
-    "rgba(20, 184, 166, 0.8)",
-    "rgba(251, 146, 60, 0.8)"
-  ]
+  @period_options ["12h", "24h", "3d", "7d", "14d", "30d"]
 
   @impl true
   def mount(socket) do
@@ -59,177 +53,58 @@ defmodule MagusWeb.Admin.Components.ActivityChartComponent do
       |> assign(:user_id, Map.get(assigns, :user_id))
       |> assign(:title, Map.get(assigns, :title, "Message Activity"))
 
-    # Only reload data if this is first load or period changed
+    # Only reload data if this is the first load; parent re-renders must not
+    # refetch (period changes are handled by change_period).
     socket =
-      if not Map.has_key?(socket.assigns, :chart_data) do
-        load_chart_data(socket)
-      else
+      if Map.has_key?(socket.assigns, :chart) do
         socket
+      else
+        load_chart(socket)
       end
 
     {:ok, socket}
   end
 
   @impl true
-  def handle_event("change_period", %{"period" => period}, socket) do
+  def handle_event("change_period", %{"period" => period}, socket)
+      when period in @period_options do
     socket =
       socket
       |> assign(:period, period)
-      |> load_chart_data()
+      |> load_chart()
 
     {:noreply, socket}
   end
 
-  defp load_chart_data(socket) do
+  def handle_event("change_period", _params, socket), do: {:noreply, socket}
+
+  defp load_chart(socket) do
     %{period: period, user_id: user_id} = socket.assigns
+    {hours, bucket_seconds, label_fn} = Map.fetch!(@periods, period)
 
-    {amount, unit} = Map.get(@activity_periods, period, {24, :hour})
-    since = DateTime.add(DateTime.utc_now(), -amount, unit)
+    assign_async(socket, :chart, fn ->
+      since = DateTime.add(DateTime.utc_now(), -hours, :hour)
+      rows = AdminStats.bucketed_counts(:action, bucket_seconds, since: since, user_id: user_id)
 
-    usages = fetch_usages(user_id, since)
-    chart_data = build_chart_data(usages, period)
-    total_count = usages |> length()
-
-    socket
-    |> assign(:chart_data, chart_data)
-    |> assign(:total_count, total_count)
-  end
-
-  defp fetch_usages(nil, since) do
-    Magus.Usage.MessageUsage
-    |> Ash.Query.filter(inserted_at >= ^since)
-    |> Ash.read!(authorize?: false)
-  end
-
-  defp fetch_usages(user_id, since) do
-    Magus.Usage.MessageUsage
-    |> Ash.Query.filter(user_id == ^user_id and inserted_at >= ^since)
-    |> Ash.read!(authorize?: false)
-  end
-
-  defp build_chart_data(usages, period) do
-    # Determine aggregation: hourly for 3d/7d, daily for longer periods
-    use_hourly = period in ["12h", "24h", "3d", "7d"]
-
-    now = DateTime.utc_now()
-
-    # Get all unique action names
-    actions =
-      usages
-      |> Enum.map(& &1.action_name)
-      |> Enum.uniq()
-      |> Enum.reject(&is_nil/1)
-      |> Enum.sort()
-
-    actions = if actions == [], do: ["Unknown"], else: actions
-
-    # Generate time slots with start/end times for proper bucketing
-    {slot_ranges, labels} = generate_time_slots(period, now, use_hourly)
-
-    # Build datasets for each action
-    datasets =
-      actions
-      |> Enum.with_index()
-      |> Enum.map(fn {action, idx} ->
-        data =
-          Enum.map(slot_ranges, fn {slot_start, slot_end} ->
-            usages
-            |> Enum.count(fn usage ->
-              usage.action_name == action &&
-                DateTime.compare(usage.inserted_at, slot_start) != :lt &&
-                DateTime.compare(usage.inserted_at, slot_end) == :lt
-            end)
-          end)
-
-        %{
-          label: action || "Unknown",
-          data: data,
-          backgroundColor: Enum.at(@colors, rem(idx, length(@colors)))
-        }
-      end)
-
-    %{labels: labels, datasets: datasets}
-  end
-
-  defp generate_time_slots(period, now, true = _use_hourly) do
-    hours =
-      case period do
-        "12h" -> 12
-        "24h" -> 24
-        "3d" -> 72
-        "7d" -> 168
-        _ -> 24
-      end
-
-    # Bucket size: 1h for 12h/24h, 4h for 3d, 8h for 7d
-    bucket_hours =
-      case period do
-        "12h" -> 1
-        "24h" -> 1
-        "3d" -> 4
-        "7d" -> 8
-        _ -> 1
-      end
-
-    num_buckets = div(hours, bucket_hours)
-
-    slot_ranges =
-      Enum.map(0..(num_buckets - 1), fn bucket_idx ->
-        # Calculate start of this bucket (going backwards from now)
-        bucket_start_hours_ago = hours - bucket_idx * bucket_hours
-        bucket_end_hours_ago = hours - (bucket_idx + 1) * bucket_hours
-
-        slot_start = DateTime.add(now, -bucket_start_hours_ago, :hour)
-        slot_end = DateTime.add(now, -bucket_end_hours_ago, :hour)
-        {slot_start, slot_end}
-      end)
-
-    labels =
-      Enum.map(slot_ranges, fn {slot_start, _} ->
-        if period in ["3d", "7d"] do
-          Calendar.strftime(slot_start, "%a %H:00")
-        else
-          Calendar.strftime(slot_start, "%H:00")
-        end
-      end)
-
-    {slot_ranges, labels}
-  end
-
-  defp generate_time_slots(period, now, false = _use_hourly) do
-    days =
-      case period do
-        "14d" -> 14
-        "30d" -> 30
-        _ -> 7
-      end
-
-    slot_ranges =
-      Enum.map(0..(days - 1), fn day_idx ->
-        # Start of day (going backwards from now)
-        day_start = now |> DateTime.add(-(days - 1 - day_idx), :day) |> start_of_day()
-        day_end = DateTime.add(day_start, 1, :day)
-        {day_start, day_end}
-      end)
-
-    labels =
-      Enum.map(slot_ranges, fn {slot_start, _} ->
-        if days <= 14 do
-          Calendar.strftime(slot_start, "%a %d")
-        else
-          Calendar.strftime(slot_start, "%d")
-        end
-      end)
-
-    {slot_ranges, labels}
-  end
-
-  defp start_of_day(datetime) do
-    %{datetime | hour: 0, minute: 0, second: 0, microsecond: {0, 0}}
+      {:ok,
+       %{
+         chart: %{
+           data:
+             Charts.stacked_time_series(rows,
+               since: since,
+               bucket_seconds: bucket_seconds,
+               label: label_fn
+             ),
+           total: rows |> Enum.map(& &1.count) |> Enum.sum()
+         }
+       }}
+    end)
   end
 
   @impl true
   def render(assigns) do
+    assigns = assign(assigns, :period_options, @period_options)
+
     ~H"""
     <div class="card bg-base-200 border border-base-300">
       <div class="card-body">
@@ -237,31 +112,45 @@ defmodule MagusWeb.Admin.Components.ActivityChartComponent do
           <div>
             <h3 class="card-title text-base">{@title}</h3>
             <p class="text-xs text-base-content/60">
-              Total: {@total_count} requests
+              Total: {(@chart.ok? && @chart.result.total) || "…"} requests
             </p>
           </div>
           <form phx-change="change_period" phx-target={@myself}>
             <select class="select select-bordered select-xs" name="period">
-              <option value="12h" selected={@period == "12h"}>12 hours</option>
-              <option value="24h" selected={@period == "24h"}>24 hours</option>
-              <option value="3d" selected={@period == "3d"}>3 days</option>
-              <option value="7d" selected={@period == "7d"}>7 days</option>
-              <option value="14d" selected={@period == "14d"}>14 days</option>
-              <option value="30d" selected={@period == "30d"}>30 days</option>
+              <option :for={period <- @period_options} value={period} selected={@period == period}>
+                {period_label(period)}
+              </option>
             </select>
           </form>
         </div>
-        <div class="mt-4">
-          <canvas
-            id={"#{@id}-chart-#{@period}"}
-            phx-hook="StackedBarChart"
-            data-chart-data={Jason.encode!(@chart_data)}
-            class="w-full h-48"
-          >
-          </canvas>
+        <div class="mt-4 h-48">
+          <.async_result :let={chart} assign={@chart}>
+            <:loading>
+              <div class="flex items-center justify-center h-full">
+                <span class="loading loading-spinner"></span>
+              </div>
+            </:loading>
+            <:failed>
+              <p class="text-center text-error py-8">Failed to load activity.</p>
+            </:failed>
+            <canvas
+              id={"#{@id}-chart-#{@period}"}
+              phx-hook="StackedBarChart"
+              data-chart-data={Jason.encode!(chart.data)}
+              class="w-full h-48"
+            >
+            </canvas>
+          </.async_result>
         </div>
       </div>
     </div>
     """
   end
+
+  defp period_label("12h"), do: "12 hours"
+  defp period_label("24h"), do: "24 hours"
+  defp period_label("3d"), do: "3 days"
+  defp period_label("7d"), do: "7 days"
+  defp period_label("14d"), do: "14 days"
+  defp period_label("30d"), do: "30 days"
 end

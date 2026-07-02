@@ -738,11 +738,7 @@ defmodule MagusWeb.Admin.ProvidersLive do
   defp provider_bg(:fal), do: "bg-warning/10 text-warning"
   defp provider_bg(_), do: "bg-base-300 text-base-content"
 
-  defp format_cost(nil), do: "$0.00"
-
-  defp format_cost(decimal) do
-    "$" <> (decimal |> Decimal.round(4) |> Decimal.to_string())
-  end
+  defp format_cost(value), do: MagusWeb.Formatters.format_cost(value)
 
   # Format value based on provider (some use provider units, others use dollars)
   defp format_value(nil, _provider), do: "0"
