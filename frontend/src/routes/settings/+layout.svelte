@@ -10,6 +10,7 @@
 	const SECTION_LABELS: Record<string, string> = {
 		profile: 'Profile',
 		preferences: 'Preferences',
+		providers: 'Providers',
 		subscription: 'Subscription',
 		integrations: 'Integrations',
 		knowledge: 'Knowledge',

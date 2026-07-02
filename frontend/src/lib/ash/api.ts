@@ -4651,6 +4651,89 @@ export function disconnectMcpCredential(
 	) as Promise<RpcResult<McpCredentialEntry>>;
 }
 
+// ─── Model Providers (BYOK) ────────────────────────────────────────────────────
+
+/** Validation state of a provider's stored credential. */
+export type ProviderValidationStatus = 'pending' | 'valid' | 'invalid' | 'error';
+
+/**
+ * Display entry for a user-owned model provider. The `api_key` is input-only and
+ * never returned; a row existing implies a key was set.
+ */
+export type ProviderEntry = {
+	id: string;
+	name: string;
+	slug: string;
+	reqLlmId: string;
+	baseUrl: string | null;
+	enabled: boolean;
+	validationStatus: ProviderValidationStatus;
+	lastValidatedAt: string | null;
+};
+
+const PROVIDER_FIELDS: rpc.ListOwnedProvidersFields = [
+	'id',
+	'name',
+	'slug',
+	'reqLlmId',
+	'baseUrl',
+	'enabled',
+	'validationStatus',
+	'lastValidatedAt'
+];
+
+export function listOwnedProviders(): Promise<RpcResult<ProviderEntry[]>> {
+	return run((opts) => rpc.listOwnedProviders({ fields: PROVIDER_FIELDS, ...opts }));
+}
+
+export function createOwnedProvider(input: {
+	name: string;
+	reqLlmId: string;
+	baseUrl?: string | null;
+	apiKey?: string | null;
+}): Promise<RpcResult<ProviderEntry>> {
+	return run((opts) =>
+		rpc.createOwnedProvider({
+			input,
+			fields: PROVIDER_FIELDS as rpc.CreateOwnedProviderFields,
+			...opts
+		})
+	) as Promise<RpcResult<ProviderEntry>>;
+}
+
+export function updateOwnedProvider(
+	id: string,
+	input: {
+		name?: string;
+		baseUrl?: string | null;
+		apiKey?: string | null;
+		enabled?: boolean;
+	}
+): Promise<RpcResult<ProviderEntry>> {
+	return run((opts) =>
+		rpc.updateOwnedProvider({
+			identity: id,
+			input,
+			fields: PROVIDER_FIELDS as rpc.UpdateOwnedProviderFields,
+			...opts
+		})
+	) as Promise<RpcResult<ProviderEntry>>;
+}
+
+export function destroyOwnedProvider(id: string): Promise<RpcResult<Record<string, never>>> {
+	return run((opts) => rpc.destroyOwnedProvider({ identity: id, ...opts }));
+}
+
+export function validateProviderCredential(id: string): Promise<RpcResult<ProviderEntry>> {
+	return run((opts) =>
+		rpc.validateProviderCredential({
+			identity: id,
+			fields: PROVIDER_FIELDS as rpc.ValidateProviderCredentialFields,
+			...opts
+		})
+	) as Promise<RpcResult<ProviderEntry>>;
+}
+
 // ─── Skills ───────────────────────────────────────────────────────────────────
 
 export type SkillSummary = {
