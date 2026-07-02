@@ -4734,6 +4734,110 @@ export function validateProviderCredential(id: string): Promise<RpcResult<Provid
 	) as Promise<RpcResult<ProviderEntry>>;
 }
 
+// ─── Owned models (BYOK) ───────────────────────────────────────────────────────
+
+/**
+ * Result of a live probe of a provider for the model-id picker. The server
+ * returns a status plus the ids it could list (empty on any non-`ok` status);
+ * an `ok` status with ids drives the searchable select, everything else the
+ * free-text fallback.
+ */
+export type RemoteModelListing = {
+	status: 'ok' | 'unauthorized' | 'unavailable' | 'rate_limited';
+	modelIds: string[];
+};
+
+/**
+ * Probe a provider's endpoint for the model ids it can serve. The generated
+ * action types the result as an opaque map, so normalise the wire shape here:
+ * a soft failure never rejects; it yields a non-`ok` status the picker treats
+ * as "type it manually".
+ */
+export async function listRemoteModels(providerId: string): Promise<RpcResult<RemoteModelListing>> {
+	const result = await run<Record<string, unknown>>((opts) =>
+		rpc.listRemoteModels({ input: { providerId }, ...opts })
+	);
+	if (!result.success) return result;
+	const data = result.data;
+	const rawStatus = String(data.status ?? '');
+	const status: RemoteModelListing['status'] =
+		rawStatus === 'ok' ||
+		rawStatus === 'unauthorized' ||
+		rawStatus === 'unavailable' ||
+		rawStatus === 'rate_limited'
+			? rawStatus
+			: 'unavailable';
+	const rawIds = (data.modelIds ?? data.model_ids) as unknown;
+	const modelIds = Array.isArray(rawIds) ? rawIds.map((id) => String(id)) : [];
+	return { success: true, data: { status, modelIds } };
+}
+
+/**
+ * Display entry for a user-owned model. `modelProviderId` links the model to
+ * its owned provider so the settings page can group rows under each provider.
+ */
+export type OwnedModelEntry = {
+	id: string;
+	name: string;
+	provider: string | null;
+	modelProviderId: string | null;
+	contextWindow: number | null;
+	inputCost: string | null;
+	outputCost: string | null;
+};
+
+const OWNED_MODEL_FIELDS: rpc.ListOwnedModelsFields = [
+	'id',
+	'name',
+	'provider',
+	'modelProviderId',
+	'contextWindow',
+	'inputCost',
+	'outputCost'
+];
+
+export function listOwnedModels(): Promise<RpcResult<OwnedModelEntry[]>> {
+	return run((opts) => rpc.listOwnedModels({ fields: OWNED_MODEL_FIELDS, ...opts })) as Promise<
+		RpcResult<OwnedModelEntry[]>
+	>;
+}
+
+/**
+ * Create a text-only model under an owned provider. `modelId` is the
+ * provider-facing id (the server mints the routing key from it); costs are
+ * optional decimals expressed per-million-tokens.
+ */
+export function createOwnedModel(input: {
+	modelId: string;
+	name: string;
+	modelProviderId: string;
+	contextWindow?: number | null;
+	inputCostValue?: number | null;
+	outputCostValue?: number | null;
+}): Promise<RpcResult<OwnedModelEntry>> {
+	// The resource stores costs as decimals (serialised as strings); stringify the
+	// numeric form inputs, leaving null/undefined untouched so they are omitted.
+	const rpcInput: rpc.CreateOwnedModelInput = {
+		modelId: input.modelId,
+		name: input.name,
+		modelProviderId: input.modelProviderId,
+		...(input.contextWindow != null ? { contextWindow: input.contextWindow } : {}),
+		...(input.inputCostValue != null ? { inputCostValue: String(input.inputCostValue) } : {}),
+		...(input.outputCostValue != null ? { outputCostValue: String(input.outputCostValue) } : {})
+	};
+	return run((opts) =>
+		rpc.createOwnedModel({
+			input: rpcInput,
+			fields: OWNED_MODEL_FIELDS as rpc.CreateOwnedModelFields,
+			...opts
+		})
+	) as Promise<RpcResult<OwnedModelEntry>>;
+}
+
+export function destroyOwnedModel(id: string): Promise<RpcResult<Record<string, never>>> {
+	return run((opts) => rpc.destroyOwnedModel({ identity: id, ...opts }));
+}
+
 // ─── Skills ───────────────────────────────────────────────────────────────────
 
 export type SkillSummary = {
