@@ -8,7 +8,8 @@
 		MessageSquare,
 		ScrollText,
 		Search as SearchIcon,
-		SearchX
+		SearchX,
+		Wrench
 	} from '@lucide/svelte';
 	import { EmptyState } from '$lib/components/ui/empty-state';
 	import { searchAll, type SearchResult, type SearchResultType } from '$lib/ash/api';
@@ -28,6 +29,7 @@
 		message: { label: 'Message', icon: MessageSquare },
 		conversation: { label: 'Conversation', icon: MessageSquare },
 		prompt: { label: 'Prompt', icon: ScrollText },
+		skill: { label: 'Skill', icon: Wrench },
 		resource: { label: 'File', icon: Files },
 		chunk: { label: 'File content', icon: FileText }
 	};
@@ -87,6 +89,8 @@
 				return `${base}/chat/${result.id}`;
 			case 'prompt':
 				return `${base}/prompts/${result.id}`;
+			case 'skill':
+				return `${base}/skills/${result.id}`;
 			case 'resource':
 				return `${base}/files/file/${result.id}`;
 			case 'chunk':

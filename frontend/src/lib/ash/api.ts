@@ -484,7 +484,7 @@ export function deleteAccount(confirmEmail: string): Promise<RpcResult<{ deleted
 
 // ─── Search (full results route) ─────────────────────────────────────────────
 
-export type SearchResultType = 'message' | 'conversation' | 'prompt' | 'resource' | 'chunk';
+export type SearchResultType = 'message' | 'conversation' | 'prompt' | 'skill' | 'resource' | 'chunk';
 
 /**
  * A unified search hit. `snippet` is server-escaped HTML with `<mark>`
@@ -4658,6 +4658,7 @@ export type SkillSummary = {
 	hasExecutableBundle: boolean;
 	isSharedToWorkspace: boolean | null;
 	workspaceId: string | null;
+	isFavorited: boolean;
 };
 
 export type SkillDetail = SkillSummary & {
@@ -4684,7 +4685,8 @@ const SKILL_SUMMARY_FIELDS: rpc.MySkillsFields = [
 	'sourceFormat',
 	'hasExecutableBundle',
 	'isSharedToWorkspace',
-	'workspaceId'
+	'workspaceId',
+	'isFavorited'
 ];
 
 const SKILL_DETAIL_FIELDS: rpc.GetSkillFields = [
@@ -4700,6 +4702,10 @@ const SKILL_DETAIL_FIELDS: rpc.GetSkillFields = [
 
 export function mySkills(): Promise<RpcResult<SkillSummary[]>> {
 	return run((opts) => rpc.mySkills({ fields: SKILL_SUMMARY_FIELDS, ...opts }));
+}
+
+export function myFavoriteSkills(): Promise<RpcResult<SkillSummary[]>> {
+	return run((opts) => rpc.myFavoriteSkills({ fields: SKILL_SUMMARY_FIELDS, ...opts }));
 }
 
 export function workspaceSkills(workspaceId: string): Promise<RpcResult<SkillSummary[]>> {
@@ -4773,4 +4779,20 @@ export async function uploadSkillBundle(
 
 export function skillDownloadUrl(skill: { id: string }): string {
 	return `/skills/${skill.id}/download`;
+}
+
+export type SkillFavoriteEntry = { id: string; skillId: string };
+
+export function mySkillFavorites(): Promise<RpcResult<SkillFavoriteEntry[]>> {
+	return run((opts) => rpc.mySkillFavorites({ fields: ['id', 'skillId'], ...opts }));
+}
+
+export function favoriteSkill(skillId: string): Promise<RpcResult<SkillFavoriteEntry>> {
+	return run((opts) =>
+		rpc.favoriteSkill({ input: { skillId }, fields: ['id', 'skillId'], ...opts })
+	);
+}
+
+export function unfavoriteSkill(favoriteId: string): Promise<RpcResult<Record<string, never>>> {
+	return run((opts) => rpc.unfavoriteSkill({ identity: favoriteId, ...opts }));
 }
