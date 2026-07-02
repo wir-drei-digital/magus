@@ -154,14 +154,24 @@ defmodule Magus.Chat.Conversation do
 
     update :set_model do
       accept [:selected_model_id]
+      require_atomic? false
+      validate {Magus.Chat.Model.Validations.SelectableByActor, attribute: :selected_model_id}
     end
 
     update :set_image_model do
       accept [:selected_image_model_id]
+      require_atomic? false
+
+      validate {Magus.Chat.Model.Validations.SelectableByActor,
+                attribute: :selected_image_model_id}
     end
 
     update :set_video_model do
       accept [:selected_video_model_id]
+      require_atomic? false
+
+      validate {Magus.Chat.Model.Validations.SelectableByActor,
+                attribute: :selected_video_model_id}
     end
 
     update :generate_name do
@@ -594,6 +604,13 @@ defmodule Magus.Chat.Conversation do
       change set_attribute(:system_prompt_id, nil)
     end
 
+    update :record_skill_approval do
+      require_atomic? false
+      argument :skill_id, :uuid, allow_nil?: false
+
+      change Magus.Chat.Conversation.Changes.RecordSkillApproval
+    end
+
     action :build_message_history, {:array, :struct} do
       argument :conversation_id, :uuid, allow_nil?: false
       argument :current_message_id, :uuid
@@ -779,6 +796,13 @@ defmodule Magus.Chat.Conversation do
       public? true
       allow_nil? true
       description "Tool names discovered via tool_search and loaded into this conversation"
+    end
+
+    attribute :approved_skill_ids, {:array, :uuid} do
+      allow_nil? true
+      default []
+      public? true
+      description "Skill ids the user has approved to run bundled code in this conversation"
     end
 
     attribute :sampling_settings, :map do

@@ -493,7 +493,7 @@ export type context_windowAttributesOnlySchema = {
 // Conversation Schema
 export type ConversationResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "isMultiplayer" | "visibility" | "chatMode" | "systemPrompt" | "skillContext" | "skillTools" | "loadedTools" | "samplingSettings" | "imageGenerationSettings" | "videoGenerationSettings" | "isTaskConversation" | "isThread" | "branchedAt" | "deletedAt" | "extractionDueAt" | "insertedAt" | "updatedAt" | "userId" | "folderId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "systemPromptId" | "customAgentId" | "workspaceId" | "parentConversationId" | "sandboxConversationId" | "branchedAtMessageId" | "messageCount" | "lastMessageAt" | "isFavorited" | "isSharedToWorkspace";
+  __primitiveFields: "id" | "title" | "isMultiplayer" | "visibility" | "chatMode" | "systemPrompt" | "skillContext" | "skillTools" | "loadedTools" | "approvedSkillIds" | "samplingSettings" | "imageGenerationSettings" | "videoGenerationSettings" | "isTaskConversation" | "isThread" | "branchedAt" | "deletedAt" | "extractionDueAt" | "insertedAt" | "updatedAt" | "userId" | "folderId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "systemPromptId" | "customAgentId" | "workspaceId" | "parentConversationId" | "sandboxConversationId" | "branchedAtMessageId" | "messageCount" | "lastMessageAt" | "isFavorited" | "isSharedToWorkspace";
   id: UUIDv7;
   title: string | null;
   isMultiplayer: boolean;
@@ -503,6 +503,7 @@ export type ConversationResourceSchema = {
   skillContext: string | null;
   skillTools: Array<string> | null;
   loadedTools: Array<string> | null;
+  approvedSkillIds: Array<UUID> | null;
   samplingSettings: Record<string, any> | null;
   imageGenerationSettings: Record<string, any> | null;
   videoGenerationSettings: Record<string, any> | null;
@@ -552,7 +553,7 @@ export type ConversationResourceSchema = {
 
 export type ConversationAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "isMultiplayer" | "visibility" | "chatMode" | "systemPrompt" | "skillContext" | "skillTools" | "loadedTools" | "samplingSettings" | "imageGenerationSettings" | "videoGenerationSettings" | "isTaskConversation" | "isThread" | "branchedAt" | "deletedAt" | "extractionDueAt" | "insertedAt" | "updatedAt" | "userId" | "folderId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "systemPromptId" | "customAgentId" | "workspaceId" | "parentConversationId" | "sandboxConversationId" | "branchedAtMessageId";
+  __primitiveFields: "id" | "title" | "isMultiplayer" | "visibility" | "chatMode" | "systemPrompt" | "skillContext" | "skillTools" | "loadedTools" | "approvedSkillIds" | "samplingSettings" | "imageGenerationSettings" | "videoGenerationSettings" | "isTaskConversation" | "isThread" | "branchedAt" | "deletedAt" | "extractionDueAt" | "insertedAt" | "updatedAt" | "userId" | "folderId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "systemPromptId" | "customAgentId" | "workspaceId" | "parentConversationId" | "sandboxConversationId" | "branchedAtMessageId";
   id: UUIDv7;
   title: string | null;
   isMultiplayer: boolean;
@@ -562,6 +563,7 @@ export type ConversationAttributesOnlySchema = {
   skillContext: string | null;
   skillTools: Array<string> | null;
   loadedTools: Array<string> | null;
+  approvedSkillIds: Array<UUID> | null;
   samplingSettings: Record<string, any> | null;
   imageGenerationSettings: Record<string, any> | null;
   videoGenerationSettings: Record<string, any> | null;
@@ -1571,6 +1573,56 @@ export type TaskAttributesOnlySchema = {
 };
 
 
+// Skill Schema
+export type SkillResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "name" | "displayName" | "description" | "body" | "requestedTools" | "requiredSecrets" | "version" | "license" | "compatibility" | "icon" | "color" | "sourceFormat" | "sourceUrl" | "hasExecutableBundle" | "fileManifest" | "workspaceId" | "isSharedToWorkspace";
+  id: UUID;
+  name: string;
+  displayName: string | null;
+  description: string;
+  body: string | null;
+  requestedTools: Array<string> | null;
+  requiredSecrets: Array<Record<string, any>> | null;
+  version: string | null;
+  license: string | null;
+  compatibility: string | null;
+  icon: string | null;
+  color: string | null;
+  sourceFormat: "agents_md" | "goose" | "other" | "skill_md";
+  sourceUrl: string | null;
+  hasExecutableBundle: boolean;
+  fileManifest: Array<Record<string, any>> | null;
+  workspaceId: UUID | null;
+  isSharedToWorkspace: boolean | null;
+  workspace: { __type: "Relationship"; __resource: WorkspaceResourceSchema | null; };
+};
+
+
+
+export type SkillAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "name" | "displayName" | "description" | "body" | "requestedTools" | "requiredSecrets" | "version" | "license" | "compatibility" | "icon" | "color" | "sourceFormat" | "sourceUrl" | "hasExecutableBundle" | "fileManifest" | "workspaceId";
+  id: UUID;
+  name: string;
+  displayName: string | null;
+  description: string;
+  body: string | null;
+  requestedTools: Array<string> | null;
+  requiredSecrets: Array<Record<string, any>> | null;
+  version: string | null;
+  license: string | null;
+  compatibility: string | null;
+  icon: string | null;
+  color: string | null;
+  sourceFormat: "agents_md" | "goose" | "other" | "skill_md";
+  sourceUrl: string | null;
+  hasExecutableBundle: boolean;
+  fileManifest: Array<Record<string, any>> | null;
+  workspaceId: UUID | null;
+};
+
+
 // UserSubscription Schema
 export type UserSubscriptionResourceSchema = {
   __type: "Resource";
@@ -1608,7 +1660,7 @@ export type TabSessionResourceSchema = {
   __type: "Resource";
   __primitiveFields: "id" | "mode" | "navFilter" | "tabs" | "activeTabId";
   id: UUID;
-  mode: "agents" | "brain" | "chat" | "files" | "prompts";
+  mode: "agents" | "brain" | "chat" | "files" | "prompts" | "skills";
   navFilter: "all" | "personal" | "shared";
   tabs: Array<Record<string, any>>;
   activeTabId: string | null;
@@ -1620,7 +1672,7 @@ export type TabSessionAttributesOnlySchema = {
   __type: "Resource";
   __primitiveFields: "id" | "mode" | "navFilter" | "tabs" | "activeTabId";
   id: UUID;
-  mode: "agents" | "brain" | "chat" | "files" | "prompts";
+  mode: "agents" | "brain" | "chat" | "files" | "prompts" | "skills";
   navFilter: "all" | "personal" | "shared";
   tabs: Array<Record<string, any>>;
   activeTabId: string | null;
@@ -3025,6 +3077,13 @@ export type ConversationFilterInput = {
     eq?: Array<string>;
     notEq?: Array<string>;
     in?: Array<Array<string>>;
+    isNil?: boolean;
+  };
+
+  approvedSkillIds?: {
+    eq?: Array<UUID>;
+    notEq?: Array<UUID>;
+    in?: Array<Array<UUID>>;
     isNil?: boolean;
   };
 
@@ -5552,6 +5611,134 @@ export type TaskFilterInput = {
   assignedToUser?: UserFilterInput;
 
 };
+export type SkillFilterInput = {
+  and?: Array<SkillFilterInput>;
+  or?: Array<SkillFilterInput>;
+  not?: Array<SkillFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  name?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  displayName?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  description?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  body?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  requestedTools?: {
+    eq?: Array<string>;
+    notEq?: Array<string>;
+    in?: Array<Array<string>>;
+    isNil?: boolean;
+  };
+
+  requiredSecrets?: {
+    eq?: Array<Record<string, any>>;
+    notEq?: Array<Record<string, any>>;
+    in?: Array<Array<Record<string, any>>>;
+    isNil?: boolean;
+  };
+
+  version?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  license?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  compatibility?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  icon?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  color?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  sourceFormat?: {
+    eq?: "agents_md" | "goose" | "other" | "skill_md";
+    notEq?: "agents_md" | "goose" | "other" | "skill_md";
+    in?: Array<"agents_md" | "goose" | "other" | "skill_md">;
+  };
+
+  sourceUrl?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  hasExecutableBundle?: {
+    eq?: boolean;
+    notEq?: boolean;
+  };
+
+  fileManifest?: {
+    eq?: Array<Record<string, any>>;
+    notEq?: Array<Record<string, any>>;
+    in?: Array<Array<Record<string, any>>>;
+    isNil?: boolean;
+  };
+
+  workspaceId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+  isSharedToWorkspace?: {
+    eq?: boolean;
+    notEq?: boolean;
+    isNil?: boolean;
+  };
+
+
+  workspace?: WorkspaceFilterInput;
+
+};
 export type UserSubscriptionFilterInput = {
   and?: Array<UserSubscriptionFilterInput>;
   or?: Array<UserSubscriptionFilterInput>;
@@ -5643,9 +5830,9 @@ export type TabSessionFilterInput = {
   };
 
   mode?: {
-    eq?: "agents" | "brain" | "chat" | "files" | "prompts";
-    notEq?: "agents" | "brain" | "chat" | "files" | "prompts";
-    in?: Array<"agents" | "brain" | "chat" | "files" | "prompts">;
+    eq?: "agents" | "brain" | "chat" | "files" | "prompts" | "skills";
+    notEq?: "agents" | "brain" | "chat" | "files" | "prompts" | "skills";
+    in?: Array<"agents" | "brain" | "chat" | "files" | "prompts" | "skills">;
   };
 
   navFilter?: {
@@ -6063,7 +6250,7 @@ export type BrainSourceFilterField = (typeof brainSourceFilterFields)[number];
 export const context_windowFilterFields = ["id", "strategy", "windowStartAt", "summary", "summaryMessageCount", "lastBreakdown", "lastTotalTokens", "lastActualInputTokens", "lastCachedTokens", "lastModelKey", "lastMaxContext", "compactionStatus"] as const;
 export type context_windowFilterField = (typeof context_windowFilterFields)[number];
 
-export const conversationFilterFields = ["id", "title", "isMultiplayer", "visibility", "chatMode", "systemPrompt", "skillContext", "skillTools", "loadedTools", "samplingSettings", "imageGenerationSettings", "videoGenerationSettings", "isTaskConversation", "isThread", "branchedAt", "deletedAt", "extractionDueAt", "insertedAt", "updatedAt", "userId", "folderId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "systemPromptId", "customAgentId", "workspaceId", "parentConversationId", "sandboxConversationId", "branchedAtMessageId", "isFavorited", "isSharedToWorkspace", "messageCount", "lastMessageAt", "messages", "members", "inviteLinks", "invitations", "shareLinks", "user", "folder", "selectedModel", "selectedImageModel", "selectedVideoModel", "activeSystemPrompt", "customAgent", "workspace", "parentConversation", "sandboxConversation", "branchedAtMessage", "childConversations", "favorites", "memories"] as const;
+export const conversationFilterFields = ["id", "title", "isMultiplayer", "visibility", "chatMode", "systemPrompt", "skillContext", "skillTools", "loadedTools", "approvedSkillIds", "samplingSettings", "imageGenerationSettings", "videoGenerationSettings", "isTaskConversation", "isThread", "branchedAt", "deletedAt", "extractionDueAt", "insertedAt", "updatedAt", "userId", "folderId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "systemPromptId", "customAgentId", "workspaceId", "parentConversationId", "sandboxConversationId", "branchedAtMessageId", "isFavorited", "isSharedToWorkspace", "messageCount", "lastMessageAt", "messages", "members", "inviteLinks", "invitations", "shareLinks", "user", "folder", "selectedModel", "selectedImageModel", "selectedVideoModel", "activeSystemPrompt", "customAgent", "workspace", "parentConversation", "sandboxConversation", "branchedAtMessage", "childConversations", "favorites", "memories"] as const;
 export type ConversationFilterField = (typeof conversationFilterFields)[number];
 
 export const conversationCompanionFilterFields = ["id", "resourceType", "resourceId", "conversationId", "conversation"] as const;
@@ -6147,6 +6334,9 @@ export type OrganizationMemberFilterField = (typeof organizationMemberFilterFiel
 export const taskFilterFields = ["id", "title", "description", "status", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "dismissedAt", "recurrence", "conversationId", "parentId", "assignedToUserId", "conversation", "parent", "subtasks", "assignedToUser"] as const;
 export type TaskFilterField = (typeof taskFilterFields)[number];
 
+export const skillFilterFields = ["id", "name", "displayName", "description", "body", "requestedTools", "requiredSecrets", "version", "license", "compatibility", "icon", "color", "sourceFormat", "sourceUrl", "hasExecutableBundle", "fileManifest", "workspaceId", "isSharedToWorkspace", "workspace"] as const;
+export type SkillFilterField = (typeof skillFilterFields)[number];
+
 export const userSubscriptionFilterFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "extraSeats", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
 export type UserSubscriptionFilterField = (typeof userSubscriptionFilterFields)[number];
 
@@ -6202,7 +6392,7 @@ export type BrainSourceSortField = (typeof brainSourceSortFields)[number];
 export const context_windowSortFields = ["id", "strategy", "windowStartAt", "summary", "summaryMessageCount", "lastBreakdown", "lastTotalTokens", "lastActualInputTokens", "lastCachedTokens", "lastModelKey", "lastMaxContext", "compactionStatus"] as const;
 export type context_windowSortField = (typeof context_windowSortFields)[number];
 
-export const conversationSortFields = ["id", "title", "isMultiplayer", "visibility", "chatMode", "systemPrompt", "skillContext", "skillTools", "loadedTools", "samplingSettings", "imageGenerationSettings", "videoGenerationSettings", "isTaskConversation", "isThread", "branchedAt", "deletedAt", "extractionDueAt", "insertedAt", "updatedAt", "userId", "folderId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "systemPromptId", "customAgentId", "workspaceId", "parentConversationId", "sandboxConversationId", "branchedAtMessageId", "isFavorited", "isSharedToWorkspace", "messageCount", "lastMessageAt"] as const;
+export const conversationSortFields = ["id", "title", "isMultiplayer", "visibility", "chatMode", "systemPrompt", "skillContext", "skillTools", "loadedTools", "approvedSkillIds", "samplingSettings", "imageGenerationSettings", "videoGenerationSettings", "isTaskConversation", "isThread", "branchedAt", "deletedAt", "extractionDueAt", "insertedAt", "updatedAt", "userId", "folderId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "systemPromptId", "customAgentId", "workspaceId", "parentConversationId", "sandboxConversationId", "branchedAtMessageId", "isFavorited", "isSharedToWorkspace", "messageCount", "lastMessageAt"] as const;
 export type ConversationSortField = (typeof conversationSortFields)[number];
 
 export const conversationCompanionSortFields = ["id", "resourceType", "resourceId", "conversationId"] as const;
@@ -6285,6 +6475,9 @@ export type OrganizationMemberSortField = (typeof organizationMemberSortFields)[
 
 export const taskSortFields = ["id", "title", "description", "status", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "dismissedAt", "recurrence", "conversationId", "parentId", "assignedToUserId"] as const;
 export type TaskSortField = (typeof taskSortFields)[number];
+
+export const skillSortFields = ["id", "name", "displayName", "description", "body", "requestedTools", "requiredSecrets", "version", "license", "compatibility", "icon", "color", "sourceFormat", "sourceUrl", "hasExecutableBundle", "fileManifest", "workspaceId", "isSharedToWorkspace"] as const;
+export type SkillSortField = (typeof skillSortFields)[number];
 
 export const userSubscriptionSortFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "extraSeats", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
 export type UserSubscriptionSortField = (typeof userSubscriptionSortFields)[number];

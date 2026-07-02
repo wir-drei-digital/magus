@@ -185,4 +185,28 @@ defmodule Magus.Models.ResolverTest do
       refute Map.has_key?(Map.from_struct(res), :api_key)
     end
   end
+
+  describe "phase 2a carryover" do
+    test "explicit-id miss falls to :auto image key and propagates inherited_requested" do
+      {:ok, res} =
+        Magus.Models.Resolver.resolve(nil, %{
+          model_keys: %{chat: "openrouter:foo/chat", image: :auto},
+          mode: :image_generation,
+          selected_model_id: "00000000-0000-0000-0000-000000000000"
+        })
+
+      assert res.requested_selection == %{by: :id, value: "00000000-0000-0000-0000-000000000000"}
+      assert Magus.Models.Resolution.degraded?(res)
+    end
+
+    test "explicit key equal to the default model is :explicit and not degraded" do
+      default = Magus.Agents.Config.default_model()
+
+      {:ok, res} =
+        Magus.Models.Resolver.resolve(nil, %{model_keys: %{chat: default}, mode: :chat})
+
+      assert res.selection_source == :explicit
+      refute Magus.Models.Resolution.degraded?(res)
+    end
+  end
 end

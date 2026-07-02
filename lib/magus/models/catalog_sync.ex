@@ -24,12 +24,16 @@ defmodule Magus.Models.CatalogSync do
   """
   @spec build_custom() :: map()
   def build_custom do
+    # Global providers only: owned (BYOK) providers carry a user-minted slug
+    # and must never reach slug_to_atom/1's atom creation. Dropping them here
+    # also drops their models below, since the models filter keys off this map.
     providers =
-      Magus.Models.list_enabled_providers!()
+      Magus.Models.list_enabled_providers!(authorize?: false)
+      |> Enum.filter(&is_nil(&1.owner_user_id))
       |> Map.new(&{&1.id, &1})
 
     models =
-      Magus.Chat.list_provider_linked_active_models!()
+      Magus.Chat.list_provider_linked_active_models!(authorize?: false)
       |> Enum.filter(&Map.has_key?(providers, &1.model_provider_id))
 
     models

@@ -13,6 +13,8 @@ export type NotificationItem = {
 	navigateTo: string | null;
 	/** Absent on live channel payloads; present on RPC-loaded rows. */
 	insertedAt: string | null;
+	/** Raw metadata map; present for approval_request and other typed notifications. */
+	metadata?: Record<string, unknown> | null;
 };
 
 type RawPayload = Record<string, unknown>;
@@ -26,7 +28,8 @@ function toItem(payload: RawPayload): NotificationItem {
 		notificationType: String(payload.notification_type ?? 'system'),
 		targetConversationId: (payload.target_conversation_id as string | null) ?? null,
 		navigateTo: typeof metadata?.navigate_to === 'string' ? metadata.navigate_to : null,
-		insertedAt: (payload.inserted_at as string | null) ?? null
+		insertedAt: (payload.inserted_at as string | null) ?? null,
+		metadata
 	};
 }
 

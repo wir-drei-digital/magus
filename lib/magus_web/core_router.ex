@@ -229,6 +229,7 @@ defmodule MagusWeb.CoreRouter do
         get "/socket-token", RpcController, :socket_token
         post "/knowledge/oauth-finalize", RpcController, :knowledge_oauth_finalize
         post "/upload", UploadController, :create
+        post "/skills/import", SkillsController, :create
         post "/profile-image/upload", ImageController, :upload
         post "/profile-image/generate", ImageController, :generate
         post "/profile-image/remove", ImageController, :remove
@@ -257,6 +258,7 @@ defmodule MagusWeb.CoreRouter do
         pipe_through [:file_serving]
 
         get "/files/:id/download", FileController, :download
+        get "/skills/:id/download", Workbench.SkillController, :download
       end
 
       # Legacy routes — redirect to workbench equivalents with URL query params
@@ -518,6 +520,7 @@ defmodule MagusWeb.CoreRouter do
           live "/", Admin.DashboardLive, :index
           live "/dashboard", Admin.DashboardLive, :index
           live "/users", Admin.UsersLive, :index
+          live "/users/test-accounts/new", Admin.BulkCreateUsersLive, :new
           live "/users/:id", Admin.UserDetailLive, :show
           live "/models", Admin.ModelsLive, :index
           live "/models/new", Admin.ModelsLive, :new

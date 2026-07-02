@@ -104,6 +104,9 @@ defmodule Magus.Workspaces.Checks.ActorCanGrantResourceAccess do
   defp fetch_resource(:mcp_server, id),
     do: Magus.MCP.Server |> Ash.get(id, authorize?: false) |> ok()
 
+  defp fetch_resource(:skill, id),
+    do: Magus.Skills.Skill |> Ash.get(id, authorize?: false) |> ok()
+
   defp fetch_resource(_, _), do: nil
 
   defp fetch_knowledge_collection(id) do

@@ -96,6 +96,35 @@ defmodule Magus.Chat.Model do
       ]
     end
 
+    create :create_owned do
+      description "User-owned model under an owned provider (BYOK, text-only)."
+      argument :model_id, :string, allow_nil?: false
+
+      accept [
+        :name,
+        :provider,
+        :model_provider_id,
+        :context_window,
+        :input_cost_value,
+        :output_cost_value,
+        :input_cost_unit,
+        :output_cost_unit,
+        :output_modalities,
+        :input_modalities,
+        :supports_tools?,
+        :supports_reasoning?,
+        :short_description
+      ]
+
+      validate Magus.Chat.Model.Validations.WithinModelCap
+      change Magus.Chat.Model.Changes.BuildOwnedModel
+    end
+
+    read :owned do
+      description "Models owned by the actor."
+      filter expr(owner_user_id == ^actor(:id))
+    end
+
     update :update do
       primary? true
 
@@ -152,9 +181,34 @@ defmodule Magus.Chat.Model do
     end
 
     read :list_active do
-      description "List all active models available for selection"
-      filter expr(active? == true and internal? == false)
-      prepare build(sort: [name: :asc])
+      description "List all active models available for selection (global + own)"
+
+      # Scope owned models to the actor. A static `^actor(:id)` filter would make
+      # Ash require an actor (ReadActionRequiresActor), but internal/actor-less
+      # callers must still see global rows. A prepare lets us branch on the
+      # actor: with one, global + own; without one, global only. There is no
+      # authorizer on Model in 2b-1, so this filter is the visibility boundary.
+      prepare fn query, %{actor: actor} ->
+        require Ash.Query
+
+        query =
+          case actor do
+            %{id: actor_id} when is_binary(actor_id) ->
+              Ash.Query.filter(
+                query,
+                active? == true and internal? == false and
+                  (is_nil(owner_user_id) or owner_user_id == ^actor_id)
+              )
+
+            _ ->
+              Ash.Query.filter(
+                query,
+                active? == true and internal? == false and is_nil(owner_user_id)
+              )
+          end
+
+        Ash.Query.sort(query, name: :asc)
+      end
     end
 
     read :list_provider_linked_active do
@@ -202,6 +256,8 @@ defmodule Magus.Chat.Model do
       public? false
     end
 
+    attribute :owner_user_id, :uuid, allow_nil?: true, public?: false
+
     attribute :settings, :map do
       allow_nil? false
       default %{}
@@ -237,7 +293,7 @@ defmodule Magus.Chat.Model do
       allow_nil? false
       default :openrouter
       public? false
-      constraints one_of: [:openrouter, :xai, :publicai, :aimlapi, :fal]
+      constraints one_of: [:openrouter, :xai, :publicai, :aimlapi, :fal, :byok]
 
       description """
       Legacy routing/region key (consumed by lib/magus/providers/). Still

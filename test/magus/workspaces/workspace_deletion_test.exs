@@ -128,6 +128,20 @@ defmodule Magus.Workspaces.WorkspaceDeletionTest do
              |> Ash.count!(authorize?: false) == 0
     end
 
+    test "hard-deletes workspace skills", %{user: user, workspace: ws} do
+      {:ok, _skill} =
+        Magus.Skills.create_skill(
+          %{name: "ws-skill", description: "x", workspace_id: ws.id},
+          actor: user
+        )
+
+      :ok = WorkspaceDeletion.execute(ws, actor: user)
+
+      assert Magus.Skills.Skill
+             |> Ash.Query.filter(workspace_id == ^ws.id)
+             |> Ash.count!(authorize?: false) == 0
+    end
+
     test "removes workspace members", %{user: user, workspace: ws} do
       :ok = WorkspaceDeletion.execute(ws, actor: user)
 

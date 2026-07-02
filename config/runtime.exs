@@ -46,6 +46,12 @@ config :magus,
   google_client_id: System.get_env("GOOGLE_CLIENT_ID"),
   google_client_secret: System.get_env("GOOGLE_CLIENT_SECRET")
 
+# Optional override for the demo/test-account login email domain
+# (defaults to the value in config.exs).
+if domain = System.get_env("TEST_ACCOUNT_EMAIL_DOMAIN") do
+  config :magus, :test_accounts, email_domain: domain
+end
+
 # FalkorDB (Magus.Graph) connection. dev/test set this in their
 # respective compile-time config files (which runtime.exs would
 # otherwise override); production has no compile-time block, so we

@@ -200,6 +200,8 @@ defmodule Magus.Chat do
       define :get_model, action: :read, get_by: [:id]
       define :get_model_by_name, action: :by_name, args: [:name]
       define :get_model_by_key_with_provider, action: :by_key_with_provider, args: [:key]
+      define :create_owned_model, action: :create_owned
+      define :list_owned_models, action: :owned
     end
 
     resource Magus.Chat.RoutingSlot do
@@ -266,6 +268,7 @@ defmodule Magus.Chat do
       define :deactivate_system_prompt, action: :deactivate_system_prompt
       define :set_conversation_skill, action: :set_skill
       define :set_conversation_loaded_tools, action: :set_loaded_tools
+      define :record_skill_approval, action: :record_skill_approval
       define :schedule_extraction, action: :schedule_extraction
       define :mark_memory_consolidated, action: :mark_memory_consolidated
 

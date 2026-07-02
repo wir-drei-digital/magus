@@ -15,11 +15,13 @@
 	import {
 		groupNotifications,
 		notificationTitle,
-		type NotificationGroup
+		type NotificationGroup,
+		type NotificationItem
 	} from '$lib/notifications';
 	import { notificationFeed } from '$lib/stores/notifications.svelte';
 	import { relativeTime } from '$lib/time';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { sendUserMessage } from '$lib/ash/api';
 
 	onMount(() => {
 		void notificationFeed.loadInitial();
@@ -44,6 +46,45 @@
 			// Custom links may point at classic-only routes; full navigation.
 			window.location.href = item.navigateTo;
 		}
+	}
+
+	/** Returns true when this notification should show the inline approval row. */
+	function isApprovalRequest(item: NotificationItem): boolean {
+		return (
+			item.notificationType === 'approval_request' &&
+			typeof item.metadata?.approve_phrase === 'string' &&
+			item.metadata.approve_phrase.length > 0
+		);
+	}
+
+	// Per-notification busy guard — maps notification id to approving state.
+	let approving = $state<Record<string, boolean>>({});
+
+	async function approve(item: NotificationItem) {
+		if (approving[item.id]) return;
+		const phrase = item.metadata?.approve_phrase;
+		if (typeof phrase !== 'string' || !phrase) {
+			notificationFeed.markRead([item.id]);
+			return;
+		}
+		approving = { ...approving, [item.id]: true };
+		try {
+			if (item.targetConversationId && phrase) {
+				await sendUserMessage(item.targetConversationId, phrase, []);
+			} else {
+				console.warn('Skill approval notification missing target conversation or phrase', item.id);
+			}
+			notificationFeed.markRead([item.id]);
+			if (item.targetConversationId) {
+				void goto(`${base}/chat/${item.targetConversationId}`);
+			}
+		} finally {
+			approving = { ...approving, [item.id]: false };
+		}
+	}
+
+	function dismiss(item: NotificationItem) {
+		notificationFeed.markRead([item.id]);
 	}
 </script>
 
@@ -96,25 +137,65 @@
 						>
 							<Icon class="size-3.5 text-muted-foreground" />
 						</span>
-						<button
-							type="button"
-							class="min-w-0 flex-1 text-left"
-							data-testid="notification-row"
-							onclick={() => open(group)}
-						>
-							<span class="block truncate text-sm font-medium">
-								{notificationTitle(group.head)}
-							</span>
-							{#if group.head.body}
-								<span class="block truncate text-xs text-muted-foreground">{group.head.body}</span>
-							{/if}
-							<span class="block text-[11px] text-muted-foreground">
-								{#if group.head.insertedAt}{relativeTime(group.head.insertedAt)}{/if}
-								{#if group.count > 1}
-									<span class="text-primary">+{group.count - 1} more</span>
+						{#if isApprovalRequest(group.head)}
+							<div class="min-w-0 flex-1" data-testid="approval-card">
+								<span class="block truncate text-sm font-medium">
+									{notificationTitle(group.head)}
+								</span>
+								{#if group.head.body}
+									<span class="block truncate text-xs text-muted-foreground"
+										>{group.head.body}</span
+									>
 								{/if}
-							</span>
-						</button>
+								<span class="block text-[11px] text-muted-foreground">
+									{#if group.head.insertedAt}{relativeTime(group.head.insertedAt)}{/if}
+									{#if group.count > 1}
+										<span class="text-primary">+{group.count - 1} more</span>
+									{/if}
+								</span>
+								<div class="mt-1.5 flex gap-1.5">
+									<button
+										type="button"
+										class="rounded bg-primary px-2.5 py-0.5 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+										data-testid="approval-approve"
+										disabled={approving[group.head.id] ?? false}
+										onclick={() => approve(group.head)}
+									>
+										{approving[group.head.id] ? 'Approving…' : 'Approve'}
+									</button>
+									<button
+										type="button"
+										class="rounded border px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+										data-testid="approval-dismiss"
+										onclick={() => dismiss(group.head)}
+									>
+										Dismiss
+									</button>
+								</div>
+							</div>
+						{:else}
+							<button
+								type="button"
+								class="min-w-0 flex-1 text-left"
+								data-testid="notification-row"
+								onclick={() => open(group)}
+							>
+								<span class="block truncate text-sm font-medium">
+									{notificationTitle(group.head)}
+								</span>
+								{#if group.head.body}
+									<span class="block truncate text-xs text-muted-foreground"
+										>{group.head.body}</span
+									>
+								{/if}
+								<span class="block text-[11px] text-muted-foreground">
+									{#if group.head.insertedAt}{relativeTime(group.head.insertedAt)}{/if}
+									{#if group.count > 1}
+										<span class="text-primary">+{group.count - 1} more</span>
+									{/if}
+								</span>
+							</button>
+						{/if}
 						<button
 							type="button"
 							class="mt-1 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/note:opacity-100"

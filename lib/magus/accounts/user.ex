@@ -18,7 +18,13 @@ defmodule Magus.Accounts.User do
         confirm_on_update? false
         require_interaction? true
         confirmed_at_field :confirmed_at
-        auto_confirm_actions [:sign_in_with_magic_link, :reset_password_with_token]
+
+        auto_confirm_actions [
+          :sign_in_with_magic_link,
+          :reset_password_with_token,
+          :admin_create_test_user
+        ]
+
         sender Magus.Accounts.User.Senders.SendNewUserConfirmationEmail
       end
     end
@@ -179,14 +185,24 @@ defmodule Magus.Accounts.User do
 
     update :select_model do
       accept [:selected_model_id]
+      require_atomic? false
+      validate {Magus.Chat.Model.Validations.SelectableByActor, attribute: :selected_model_id}
     end
 
     update :select_image_model do
       accept [:selected_image_model_id]
+      require_atomic? false
+
+      validate {Magus.Chat.Model.Validations.SelectableByActor,
+                attribute: :selected_image_model_id}
     end
 
     update :select_video_model do
       accept [:selected_video_model_id]
+      require_atomic? false
+
+      validate {Magus.Chat.Model.Validations.SelectableByActor,
+                attribute: :selected_video_model_id}
     end
 
     update :update_image_generation_settings do
@@ -769,6 +785,64 @@ defmodule Magus.Accounts.User do
       end
     end
 
+    create :admin_create_test_user do
+      description """
+      Admin-only creation of a workshop/demo test account with a known
+      password. Unlike :register_with_password this sends NO emails: the
+      action is listed in the confirmation add-on's auto_confirm_actions,
+      so the account is confirmed inline and no confirmation/welcome mail
+      is dispatched. Consent flags are set to true automatically. Usage
+      limits are not handled here — the caller grants an exemption override
+      (see Magus.Accounts.TestAccounts).
+      """
+
+      argument :email, :ci_string do
+        allow_nil? false
+      end
+
+      argument :password, :string do
+        description "The password for the test account, in plain text."
+        allow_nil? false
+        constraints min_length: 8
+        sensitive? true
+      end
+
+      argument :display_name, :string do
+        description "Display name (also used as the full name) for the test account."
+        allow_nil? false
+        constraints max_length: 50
+      end
+
+      argument :language, :atom do
+        allow_nil? true
+        constraints one_of: [:en, :de]
+        default :en
+      end
+
+      accept [:test_account_expires_at]
+
+      change set_attribute(:email, arg(:email))
+      change set_attribute(:display_name, arg(:display_name))
+      change set_attribute(:name, arg(:display_name))
+      change set_attribute(:language, arg(:language))
+      change set_attribute(:test_account, true)
+      # Keep the plaintext (encrypted at rest) so an admin can re-show it later.
+      change set_attribute(:test_account_password, arg(:password))
+      change set_attribute(:accepted_terms, true)
+      change set_attribute(:accepted_age_requirement, true)
+      change set_attribute(:last_timezone_change_at, &DateTime.utc_now/0)
+
+      # Hash the provided password into hashed_password. No auth token is
+      # generated here — participants sign in later through the normal password
+      # flow, which mints tokens at sign-in time.
+      change {AshAuthentication.Strategy.Password.HashPasswordChange, strategy_name: :password}
+
+      # Put the demo account on the Pay-as-you-go plan (no Stripe) so it can
+      # use all models, the auto router, and media generation. Spend limits are
+      # additionally waived by the exemption override created by the caller.
+      change Magus.Accounts.User.Changes.CreateDemoSubscription
+    end
+
     action :request_password_reset_token do
       description "Send password reset instructions to a user if they exist."
 
@@ -976,6 +1050,11 @@ defmodule Magus.Accounts.User do
     policy action(:set_password) do
       authorize_if expr(id == ^actor(:id))
     end
+
+    # Bulk-creating workshop/demo test accounts is an admin-only operation.
+    policy action(:admin_create_test_user) do
+      authorize_if Magus.Checks.IsAdmin
+    end
   end
 
   attributes do
@@ -1137,6 +1216,25 @@ defmodule Magus.Accounts.User do
       allow_nil? false
       public? true
       description "Whether the user confirmed they are at least 16 years old"
+    end
+
+    attribute :test_account, :boolean do
+      default false
+      allow_nil? false
+      description "True for workshop/demo accounts created via the admin bulk-create tool."
+    end
+
+    attribute :test_account_expires_at, :utc_datetime_usec do
+      allow_nil? true
+
+      description "When a test account is auto-deleted by the cleanup worker. nil for normal accounts."
+    end
+
+    attribute :test_account_password, Magus.Agents.AgentSecret.EncryptedString do
+      allow_nil? true
+      sensitive? true
+
+      description "Plaintext password for a test account, encrypted at rest, so an admin can re-show it. Only set for test accounts."
     end
 
     timestamps()

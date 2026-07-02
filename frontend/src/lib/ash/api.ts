@@ -548,7 +548,7 @@ export type WorkbenchTab = {
 
 export type TabSession = {
 	id: string;
-	mode: 'chat' | 'brain' | 'agents' | 'prompts' | 'files';
+	mode: 'chat' | 'brain' | 'agents' | 'prompts' | 'files' | 'skills';
 	navFilter: 'all' | 'shared' | 'personal';
 	tabs: WorkbenchTab[];
 	activeTabId: string | null;
@@ -4909,4 +4909,135 @@ export function disconnectMcpCredential(
 			...opts
 		})
 	) as Promise<RpcResult<McpCredentialEntry>>;
+}
+
+// ─── Skills ───────────────────────────────────────────────────────────────────
+
+export type SkillSummary = {
+	id: string;
+	name: string;
+	displayName: string | null;
+	description: string;
+	requestedTools: string[] | null;
+	version: string | null;
+	license: string | null;
+	sourceFormat: 'agents_md' | 'goose' | 'other' | 'skill_md';
+	hasExecutableBundle: boolean;
+	isSharedToWorkspace: boolean | null;
+	workspaceId: string | null;
+};
+
+export type SkillDetail = SkillSummary & {
+	body: string | null;
+	requiredSecrets: Record<string, unknown>[] | null;
+	compatibility: string | null;
+	icon: string | null;
+	color: string | null;
+	sourceUrl: string | null;
+	fileManifest: Record<string, unknown>[] | null;
+};
+
+export type CreateSkillInput = rpc.CreateSkillInput;
+export type UpdateSkillInput = rpc.UpdateSkillInput;
+
+const SKILL_SUMMARY_FIELDS: rpc.MySkillsFields = [
+	'id',
+	'name',
+	'displayName',
+	'description',
+	'requestedTools',
+	'version',
+	'license',
+	'sourceFormat',
+	'hasExecutableBundle',
+	'isSharedToWorkspace',
+	'workspaceId'
+];
+
+const SKILL_DETAIL_FIELDS: rpc.GetSkillFields = [
+	...SKILL_SUMMARY_FIELDS,
+	'body',
+	'requiredSecrets',
+	'compatibility',
+	'icon',
+	'color',
+	'sourceUrl',
+	'fileManifest'
+];
+
+export function mySkills(): Promise<RpcResult<SkillSummary[]>> {
+	return run((opts) => rpc.mySkills({ fields: SKILL_SUMMARY_FIELDS, ...opts }));
+}
+
+export function workspaceSkills(workspaceId: string): Promise<RpcResult<SkillSummary[]>> {
+	return run((opts) =>
+		rpc.workspaceSkills({ input: { workspaceId }, fields: SKILL_SUMMARY_FIELDS, ...opts })
+	);
+}
+
+export function getSkill(id: string): Promise<RpcResult<SkillDetail>> {
+	return run((opts) => rpc.getSkill({ getBy: { id }, fields: SKILL_DETAIL_FIELDS, ...opts }));
+}
+
+export function createSkill(input: CreateSkillInput): Promise<RpcResult<SkillDetail>> {
+	return run((opts) => rpc.createSkill({ input, fields: SKILL_DETAIL_FIELDS, ...opts }));
+}
+
+export function updateSkill(id: string, input: UpdateSkillInput): Promise<RpcResult<SkillDetail>> {
+	return run((opts) =>
+		rpc.updateSkill({ identity: id, input, fields: SKILL_DETAIL_FIELDS, ...opts })
+	);
+}
+
+export function destroySkill(id: string): Promise<RpcResult<Record<string, never>>> {
+	return run((opts) => rpc.destroySkill({ identity: id, ...opts }));
+}
+
+export function shareSkillToTeam(id: string): Promise<RpcResult<SkillDetail>> {
+	return run((opts) =>
+		rpc.shareSkillToTeam({ identity: id, fields: SKILL_DETAIL_FIELDS, ...opts })
+	);
+}
+
+export function unshareSkillFromTeam(id: string): Promise<RpcResult<SkillDetail>> {
+	return run((opts) =>
+		rpc.unshareSkillFromTeam({ identity: id, fields: SKILL_DETAIL_FIELDS, ...opts })
+	);
+}
+
+export async function uploadSkillBundle(
+	file: File,
+	workspaceId?: string
+): Promise<RpcResult<{ id: string; name: string }>> {
+	const form = new FormData();
+	form.append('file', file);
+	if (workspaceId) form.append('workspace_id', workspaceId);
+
+	try {
+		const response = await fetch('/rpc/skills/import', {
+			method: 'POST',
+			body: form,
+			credentials: 'same-origin'
+		});
+		if (response.status === 401) return { success: false, errors: [UNAUTHENTICATED] };
+		return (await response.json()) as RpcResult<{ id: string; name: string }>;
+	} catch (error) {
+		return {
+			success: false,
+			errors: [
+				{
+					type: 'network_error',
+					message: error instanceof Error ? error.message : 'upload failed',
+					shortMessage: 'Network error',
+					vars: {},
+					fields: [],
+					path: []
+				}
+			]
+		};
+	}
+}
+
+export function skillDownloadUrl(skill: { id: string }): string {
+	return `/skills/${skill.id}/download`;
 }

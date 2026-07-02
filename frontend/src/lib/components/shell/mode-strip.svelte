@@ -5,6 +5,7 @@
 	import {
 		ArrowLeftRight,
 		BookOpen,
+		Boxes,
 		Bot,
 		Brain,
 		Clock,
@@ -31,7 +32,8 @@
 		{ key: 'brain', label: 'Brain', icon: Brain },
 		{ key: 'files', label: 'Files', icon: Files },
 		{ key: 'prompts', label: 'Prompts', icon: ScrollText },
-		{ key: 'agents', label: 'Agents', icon: Bot }
+		{ key: 'agents', label: 'Agents', icon: Bot },
+		{ key: 'skills', label: 'Skills', icon: Boxes }
 	];
 
 	const MODE_HOME: Record<WorkbenchMode, string> = {
@@ -39,7 +41,8 @@
 		brain: '/brain',
 		files: '/files',
 		prompts: '/prompts',
-		agents: '/agents'
+		agents: '/agents',
+		skills: '/skills'
 	};
 
 	// Inside a mode view (/chat/*, /files/*, …) a mode click only swaps the nav
@@ -49,7 +52,7 @@
 	function selectMode(mode: WorkbenchMode) {
 		void workbench.setMode(mode);
 		const rel = page.url.pathname.slice(base.length);
-		const inModeView = /^\/(chat|brain|files|prompts|agents)(\/|$)/.test(rel);
+		const inModeView = /^\/(chat|brain|files|prompts|agents|skills)(\/|$)/.test(rel);
 		if (!inModeView) void goto(`${base}${MODE_HOME[mode]}`);
 	}
 

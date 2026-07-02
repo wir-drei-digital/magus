@@ -186,7 +186,8 @@ config :magus, Oban,
        {"*/10 * * * *", Magus.SuperBrain.Workers.MigrationSweeper},
        {"*/15 * * * *", Magus.SuperBrain.Workers.BackfillScheduler},
        {"30 3 * * *", Magus.SuperBrain.Workers.NightlyBuildSuperScheduler},
-       {"0 4 * * *", Magus.SuperBrain.Workers.SuperGraphMaintenance}
+       {"0 4 * * *", Magus.SuperBrain.Workers.SuperGraphMaintenance},
+       {"15 3 * * *", Magus.Accounts.Workers.DeleteExpiredTestAccounts}
      ]}
   ]
 
@@ -307,7 +308,8 @@ config :magus,
     Magus.Brain,
     Magus.Workbench,
     Magus.SuperBrain,
-    Magus.MCP
+    Magus.MCP,
+    Magus.Skills
   ]
 
 # MCP client configuration. `init_timeout_ms` bounds how long a discovery
@@ -342,6 +344,21 @@ config :magus, :super_brain_embedder, Magus.Embeddings.OpenAIEmbedder
 
 # SuperBrain extraction-time batch embedder (overridden in test.exs to a Mox mock)
 config :magus, :super_brain_extraction_embedder, Magus.Embeddings.OpenAIBatchEmbedder
+
+# Admin-created workshop/demo test accounts: the email domain their logins are
+# synthesised under (e.g. demo1@magus.digital). Override per-deployment via the
+# TEST_ACCOUNT_EMAIL_DOMAIN env var (see runtime.exs).
+config :magus, :test_accounts, email_domain: "magus.digital"
+
+# Per-user caps for the user-owned model catalog (BYOK). A user may own at most
+# max_providers providers and max_models models.
+config :magus, :user_model_limits, max_providers: 10, max_models: 50
+
+# ReqLLM provider ids a user-owned provider may target. Keeps BYOK on
+# vetted, well-behaved provider modules; "openai_compatible" covers custom
+# OpenAI-compatible endpoints (which additionally require a safe base_url).
+config :magus, :user_provider_req_llm_allowlist,
+  ~w(anthropic openai openrouter xai google openai_compatible)
 
 # Chat domain configuration
 config :magus, Magus.Chat, unfiled_conversations_limit: 20

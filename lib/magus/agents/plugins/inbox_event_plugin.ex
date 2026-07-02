@@ -164,6 +164,8 @@ defmodule Magus.Agents.Plugins.InboxEventPlugin do
   defp check_approval_response(signal, conversation_id, user_id) do
     text = signal.data[:text] || signal.data["text"] || ""
 
+    maybe_record_skill_approval(text, conversation_id, user_id)
+
     with {:ok, user} when not is_nil(user) <- Magus.Accounts.get_user(user_id, authorize?: false),
          false <- is_nil(conversation_id) or text == "",
          {:ok, [event | _]} <-
@@ -186,4 +188,32 @@ defmodule Magus.Agents.Plugins.InboxEventPlugin do
       Logger.warning("InboxEventPlugin approval check error: #{inspect(e)}")
       :ok
   end
+
+  # A user reply "Approve skill: <uuid>" records that skill as approved on the
+  # conversation, gating bundled-skill materialization. Non-agent path: this is
+  # the only way approval is recorded, so the agent cannot self-approve.
+  defp maybe_record_skill_approval("Approve skill: " <> skill_id, conversation_id, user_id)
+       when is_binary(conversation_id) do
+    with {:ok, user} when not is_nil(user) <- Magus.Accounts.get_user(user_id, authorize?: false),
+         {:ok, conversation} <- Magus.Chat.get_conversation(conversation_id, actor: user),
+         {:ok, _} <-
+           Magus.Chat.record_skill_approval(conversation, %{skill_id: String.trim(skill_id)},
+             actor: user
+           ) do
+      :ok
+    else
+      error ->
+        Logger.warning(
+          "Skill approval not recorded (conversation #{conversation_id}): #{inspect(error)}"
+        )
+
+        :ok
+    end
+  rescue
+    e ->
+      Logger.warning("Skill approval record crashed: #{inspect(e)}")
+      :ok
+  end
+
+  defp maybe_record_skill_approval(_text, _conversation_id, _user_id), do: :ok
 end

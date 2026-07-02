@@ -268,14 +268,39 @@ defmodule Magus.Agents.Context.SystemPrompts do
   def mode_rules(_), do: @chat_rules
 
   @doc """
-  Get skills capabilities documentation.
+  Skills section for the system prompt. Merges built-in skills with the
+  actor's accessible user skills via `Magus.Skills.Discovery`, listing each
+  with its `load_skill` ref.
 
-  Returns a formatted section listing available skills that the AI can load
-  on-demand using the load_skill tool. Returns empty string if no skills available.
+  The `_loaded_tools` parameter is intentionally unused for the actor-scoped
+  view: the Discovery list shows all accessible skills without annotating
+  which are already loaded into the conversation, so there is nothing to
+  thread through here.
   """
-  @spec skills_capabilities(list(String.t()) | nil) :: String.t()
-  def skills_capabilities(loaded_tools \\ nil) do
-    Magus.Agents.Skills.Registry.get_skills_section(loaded_tools)
+  @spec skills_capabilities(list(String.t()) | nil, struct() | nil) :: String.t()
+  def skills_capabilities(_loaded_tools, actor) do
+    actor
+    |> Magus.Skills.Discovery.list_for_actor()
+    |> build_skills_section()
+  end
+
+  defp build_skills_section([]), do: ""
+
+  defp build_skills_section(views) do
+    lines =
+      Enum.map_join(views, "\n", fn v ->
+        "- **#{v.name}** (`#{v.ref}`): #{v.description}"
+      end)
+
+    """
+    ## Available Skills
+
+    Specialized instructions and tools are organized into skills. Load one with the `load_skill` tool, passing its ref shown in backticks:
+
+    #{lines}
+
+    Load the relevant skill when a request needs it. You can load multiple skills.
+    """
   end
 
   @orchestration_capabilities """
@@ -468,7 +493,7 @@ defmodule Magus.Agents.Context.SystemPrompts do
       {:persona, identity_context},
       {:instructions, custom_layer},
       {:documents, attached_documents_context},
-      {:skills, if(load_skills, do: skills_capabilities(loaded_tools))},
+      {:skills, if(load_skills, do: skills_capabilities(loaded_tools, user))},
       {:orchestration, orchestration_capabilities(tools)},
       {:agents, agents_context},
       {:apis, api_integrations_context},

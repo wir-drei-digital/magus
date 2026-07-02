@@ -19,6 +19,14 @@ defmodule Magus.Models.Provider do
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer]
 
+  # ReqLLM provider ids a user-owned provider (:create_owned) may target.
+  # Config-driven per deployment; resolved at compile time.
+  @user_req_llm_allowlist Application.compile_env(
+                            :magus,
+                            :user_provider_req_llm_allowlist,
+                            ~w(anthropic openai openrouter xai google openai_compatible)
+                          )
+
   postgres do
     table "model_providers"
     repo Magus.Repo
@@ -46,17 +54,83 @@ defmodule Magus.Models.Provider do
       filter expr(slug == ^arg(:slug))
       get? true
     end
+
+    create :create_owned do
+      description "User-owned provider (BYOK). Server-mints the slug; validates URL and cap."
+      accept [:name, :req_llm_id, :base_url, :api_key]
+
+      validate one_of(:req_llm_id, @user_req_llm_allowlist),
+        message: "is not an allowed provider"
+
+      validate present(:base_url),
+        where: [attribute_equals(:req_llm_id, "openai_compatible")],
+        message: "is required for custom OpenAI-compatible providers"
+
+      validate Magus.Models.Validations.SafeBaseUrl
+      validate Magus.Models.Validations.WithinProviderCap
+
+      change Magus.Models.Provider.Changes.SetOwnerFromActor
+      change Magus.Models.Provider.Changes.GenerateUniqueSlug
+      change Magus.Models.Provider.Changes.EnqueueCredentialValidation
+    end
+
+    update :update_owned do
+      description "Owner edits to a user-owned provider."
+      accept [:name, :base_url, :api_key, :enabled?]
+      require_atomic? false
+      validate Magus.Models.Validations.SafeBaseUrl
+      change Magus.Models.Provider.Changes.EnqueueCredentialValidation
+    end
+
+    read :owned do
+      description "Providers owned by the actor."
+      filter expr(owner_user_id == ^actor(:id))
+    end
+
+    update :stamp_validation do
+      description "Writes credential validation results (worker only)."
+      accept [:validation_status, :last_validated_at]
+    end
+
+    update :validate do
+      description "Re-enqueues credential validation for an owned provider."
+      accept []
+      require_atomic? false
+      change Magus.Models.Provider.Changes.EnqueueCredentialValidation
+    end
   end
 
   policies do
-    # Internal catalog plumbing (CatalogSync, request-option resolution)
-    # reads providers without an actor; api_key is sensitive?/non-public
-    # and never serialized through public APIs.
+    # Internal catalog plumbing (CatalogSync, request-option resolution) reads
+    # without an actor via authorize?: false and bypasses these policies.
     policy action_type(:read) do
+      authorize_if expr(is_nil(owner_user_id))
+      authorize_if expr(owner_user_id == ^actor(:id))
+      authorize_if Magus.Checks.IsAdmin
+    end
+
+    policy action(:create_owned) do
+      authorize_if actor_present()
+    end
+
+    policy action(:update_owned) do
+      authorize_if expr(owner_user_id == ^actor(:id))
+    end
+
+    policy action(:validate) do
+      authorize_if expr(owner_user_id == ^actor(:id))
+    end
+
+    policy action(:stamp_validation) do
       authorize_if always()
     end
 
-    policy action_type([:create, :update, :destroy]) do
+    policy action(:create) do
+      authorize_if Magus.Checks.IsAdmin
+    end
+
+    policy action([:update, :destroy]) do
+      authorize_if expr(not is_nil(owner_user_id) and owner_user_id == ^actor(:id))
       authorize_if Magus.Checks.IsAdmin
     end
   end
@@ -104,6 +178,17 @@ defmodule Magus.Models.Provider do
       allow_nil? false
       public? true
     end
+
+    attribute :owner_user_id, :uuid, allow_nil?: true, public?: false
+
+    attribute :validation_status, :atom do
+      allow_nil? false
+      default :pending
+      public? true
+      constraints one_of: [:pending, :valid, :invalid, :error]
+    end
+
+    attribute :last_validated_at, :utc_datetime, allow_nil?: true, public?: true
 
     timestamps()
   end

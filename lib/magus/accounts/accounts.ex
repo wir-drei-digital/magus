@@ -48,6 +48,7 @@ defmodule Magus.Accounts do
       define :update_video_generation_settings, action: :update_video_generation_settings
       define :get_by_email, action: :get_by_email, args: [:email]
       define :get_user, action: :read, get_by: [:id]
+      define :create_test_user, action: :admin_create_test_user
       define :update_user_settings, action: :update_settings
       define :update_avatar, action: :update_avatar, args: [:avatar_path]
       define :delete_avatar, action: :delete_avatar
