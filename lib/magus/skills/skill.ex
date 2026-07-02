@@ -47,6 +47,19 @@ defmodule Magus.Skills.Skill do
       prepare build(load: [:is_shared_to_workspace])
     end
 
+    read :my_favorite_skills do
+      prepare fn query, context ->
+        require Ash.Query
+        actor_id = context.actor && context.actor.id
+
+        if actor_id do
+          Ash.Query.filter(query, exists(favorites, user_id == ^actor_id))
+        else
+          Ash.Query.filter(query, false)
+        end
+      end
+    end
+
     update :share_to_team do
       accept []
       require_atomic? false
@@ -268,11 +281,38 @@ defmodule Magus.Skills.Skill do
       allow_nil? true
       public? true
     end
+
+    has_many :favorites, Magus.Skills.SkillFavorite
   end
 
   calculations do
     import Magus.Workspaces.Calculations
 
     is_shared_to_workspace(:skill)
+
+    calculate :is_favorited, :boolean do
+      public? true
+
+      calculation fn records, context ->
+        require Ash.Query
+        actor_id = context.actor && context.actor.id
+
+        if actor_id do
+          skill_ids = Enum.map(records, & &1.id)
+
+          favorite_skill_ids =
+            Magus.Skills.SkillFavorite
+            |> Ash.Query.for_read(:read)
+            |> Ash.Query.filter(user_id == ^actor_id and skill_id in ^skill_ids)
+            |> Ash.read!(authorize?: false)
+            |> Enum.map(& &1.skill_id)
+            |> MapSet.new()
+
+          Enum.map(records, &MapSet.member?(favorite_skill_ids, &1.id))
+        else
+          Enum.map(records, fn _ -> false end)
+        end
+      end
+    end
   end
 end

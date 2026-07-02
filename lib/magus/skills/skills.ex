@@ -23,6 +23,7 @@ defmodule Magus.Skills do
     resource Magus.Skills.Skill do
       rpc_action :my_skills, :my_skills
       rpc_action :workspace_skills, :workspace_skills
+      rpc_action :my_favorite_skills, :my_favorite_skills
       rpc_action :create_skill, :create
       rpc_action :update_skill, :update
       rpc_action :destroy_skill, :destroy
@@ -32,6 +33,12 @@ defmodule Magus.Skills do
       rpc_action :get_skill, :read do
         get_by [:id]
       end
+    end
+
+    resource Magus.Skills.SkillFavorite do
+      rpc_action :my_skill_favorites, :my_favorites
+      rpc_action :favorite_skill, :create
+      rpc_action :unfavorite_skill, :destroy
     end
   end
 
@@ -45,8 +52,15 @@ defmodule Magus.Skills do
       define :list_skills, action: :read
       define :my_skills, action: :my_skills
       define :workspace_skills, action: :workspace_skills, args: [:workspace_id]
+      define :my_favorite_skills, action: :my_favorite_skills
       define :share_skill_to_team, action: :share_to_team
       define :unshare_skill_from_team, action: :unshare_from_team
+    end
+
+    resource Magus.Skills.SkillFavorite do
+      define :favorite_skill, action: :create
+      define :unfavorite_skill, action: :destroy
+      define :my_skill_favorites, action: :my_favorites
     end
   end
 end
