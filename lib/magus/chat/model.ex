@@ -502,7 +502,7 @@ defmodule Magus.Chat.Model do
     # model pickers (workbench + SPA) so users can gauge how expensive a request
     # is. nil for image/video models.
     calculate :request_cost_cents,
-              :integer,
+              :float,
               Magus.Chat.Model.Calculations.RequestCostCents do
       public? true
       description "Approximate CHF cents for a reference request (composer model pickers)."
