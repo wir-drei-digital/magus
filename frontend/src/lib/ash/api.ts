@@ -2717,6 +2717,7 @@ export function createPrompt(input: {
 	content: string;
 	type: PromptType;
 	description?: string;
+	additionalInformation?: string;
 	workspaceId?: string | null;
 }): Promise<RpcResult<PromptDetail>> {
 	return run((opts) => rpc.createPrompt({ input, fields: PROMPT_DETAIL_FIELDS, ...opts }));

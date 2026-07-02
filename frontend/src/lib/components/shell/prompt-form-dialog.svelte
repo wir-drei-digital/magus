@@ -79,6 +79,7 @@
 				content,
 				type,
 				description: description.trim() || undefined,
+				additionalInformation: additionalInformation.trim() || undefined,
 				workspaceId: session.user?.currentWorkspaceId ?? null
 			});
 			saving = false;
@@ -139,7 +140,12 @@
 
 			<label class="flex flex-col gap-1.5 text-sm">
 				<span class="text-xs font-medium text-muted-foreground">Additional information</span>
-				<textarea bind:value={additionalInformation} rows="2" class={TEXTAREA_CLASS}></textarea>
+				<textarea
+					bind:value={additionalInformation}
+					rows="2"
+					data-testid="prompt-form-additional"
+					class={TEXTAREA_CLASS}
+				></textarea>
 			</label>
 
 			<label class="flex flex-col gap-1.5 text-sm">
