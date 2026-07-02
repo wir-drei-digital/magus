@@ -1626,12 +1626,11 @@ export type SkillAttributesOnlySchema = {
 // UserSubscription Schema
 export type UserSubscriptionResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "status" | "lastPaymentStatus" | "storageUsageBytes" | "extraSeats" | "billingInterval" | "periodUsageCents" | "monthlySpendCapCents" | "noSpendCap";
+  __primitiveFields: "id" | "status" | "lastPaymentStatus" | "storageUsageBytes" | "billingInterval" | "periodUsageCents" | "monthlySpendCapCents" | "noSpendCap";
   id: UUIDv7;
   status: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
   lastPaymentStatus: string | null;
   storageUsageBytes: number;
-  extraSeats: number;
   billingInterval: "annual" | "monthly";
   periodUsageCents: number;
   monthlySpendCapCents: number | null;
@@ -1642,12 +1641,11 @@ export type UserSubscriptionResourceSchema = {
 
 export type UserSubscriptionAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "status" | "lastPaymentStatus" | "storageUsageBytes" | "extraSeats" | "billingInterval" | "periodUsageCents" | "monthlySpendCapCents" | "noSpendCap";
+  __primitiveFields: "id" | "status" | "lastPaymentStatus" | "storageUsageBytes" | "billingInterval" | "periodUsageCents" | "monthlySpendCapCents" | "noSpendCap";
   id: UUIDv7;
   status: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
   lastPaymentStatus: string | null;
   storageUsageBytes: number;
-  extraSeats: number;
   billingInterval: "annual" | "monthly";
   periodUsageCents: number;
   monthlySpendCapCents: number | null;
@@ -5773,16 +5771,6 @@ export type UserSubscriptionFilterInput = {
     in?: Array<number>;
   };
 
-  extraSeats?: {
-    eq?: number;
-    notEq?: number;
-    greaterThan?: number;
-    greaterThanOrEqual?: number;
-    lessThan?: number;
-    lessThanOrEqual?: number;
-    in?: Array<number>;
-  };
-
   billingInterval?: {
     eq?: "annual" | "monthly";
     notEq?: "annual" | "monthly";
@@ -6337,7 +6325,7 @@ export type TaskFilterField = (typeof taskFilterFields)[number];
 export const skillFilterFields = ["id", "name", "displayName", "description", "body", "requestedTools", "requiredSecrets", "version", "license", "compatibility", "icon", "color", "sourceFormat", "sourceUrl", "hasExecutableBundle", "fileManifest", "workspaceId", "isSharedToWorkspace", "workspace"] as const;
 export type SkillFilterField = (typeof skillFilterFields)[number];
 
-export const userSubscriptionFilterFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "extraSeats", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
+export const userSubscriptionFilterFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
 export type UserSubscriptionFilterField = (typeof userSubscriptionFilterFields)[number];
 
 export const tabSessionFilterFields = ["id", "mode", "navFilter", "tabs", "activeTabId"] as const;
@@ -6479,7 +6467,7 @@ export type TaskSortField = (typeof taskSortFields)[number];
 export const skillSortFields = ["id", "name", "displayName", "description", "body", "requestedTools", "requiredSecrets", "version", "license", "compatibility", "icon", "color", "sourceFormat", "sourceUrl", "hasExecutableBundle", "fileManifest", "workspaceId", "isSharedToWorkspace"] as const;
 export type SkillSortField = (typeof skillSortFields)[number];
 
-export const userSubscriptionSortFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "extraSeats", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
+export const userSubscriptionSortFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
 export type UserSubscriptionSortField = (typeof userSubscriptionSortFields)[number];
 
 export const tabSessionSortFields = ["id", "mode", "navFilter", "tabs", "activeTabId"] as const;

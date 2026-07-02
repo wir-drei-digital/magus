@@ -584,7 +584,7 @@ defmodule Magus.Agents.RunOrchestratorTest do
     trial_cap = Magus.Usage.Calculator.free_trial_spend_cap_cents()
 
     Magus.Usage.Account
-    |> Ecto.Query.where([s], s.user_id == ^user.id and is_nil(s.sponsor_user_id))
+    |> Ecto.Query.where([s], s.user_id == ^user.id and is_nil(s.sponsor_org_id))
     |> Magus.Repo.update_all(set: [monthly_spend_cap_cents: 0, period_usage_cents: trial_cap])
 
     {user, source_conversation, target_conversation, agent}
@@ -614,7 +614,7 @@ defmodule Magus.Agents.RunOrchestratorTest do
 
     # Stripe-backed + past_due ⇒ delinquent in the spend gate.
     Magus.Usage.Account
-    |> Ecto.Query.where([s], s.user_id == ^user.id and is_nil(s.sponsor_user_id))
+    |> Ecto.Query.where([s], s.user_id == ^user.id and is_nil(s.sponsor_org_id))
     |> Magus.Repo.update_all(
       set: [
         stripe_subscription_id: "sub_delinquent_#{user.id}",

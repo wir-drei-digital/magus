@@ -129,7 +129,6 @@ defmodule Magus.Generators do
               max_upload_bytes: 104_857_600,
               image_generation_enabled: true,
               video_generation_enabled: true,
-              sponsorable_seats: nil,
               is_active: true,
               sort_order: 2
             },
@@ -142,84 +141,11 @@ defmodule Magus.Generators do
     user
   end
 
-  @doc """
-  Ensures a user has a personal subscription on a plan that lets them sponsor seats.
-
-  Options:
-    * `:sponsorable_seats` - Number of included sponsored seats (default: 5)
-    * `:key` - Plan key (default: "sponsoring-test")
-
-  Returns the plan.
-  """
-  def ensure_sponsoring_plan(user, opts \\ []) do
-    require Ash.Query
-
-    sponsorable_seats = Keyword.get(opts, :sponsorable_seats, 5)
-    key = Keyword.get(opts, :key, "sponsoring-test-#{System.unique_integer([:positive])}")
-
-    plan =
-      Magus.Usage.Policy
-      |> Ash.Changeset.for_create(
-        :create,
-        %{
-          key: key,
-          name: "Sponsoring Test #{key}",
-          price_monthly_cents: 6000,
-          storage_bytes: 107_374_182_400,
-          max_upload_bytes: 209_715_200,
-          image_generation_enabled: true,
-          video_generation_enabled: true,
-          sponsorable_seats: sponsorable_seats,
-          is_active: true,
-          sort_order: 99
-        },
-        authorize?: false
-      )
-      |> Ash.create!(authorize?: false)
-
-    upsert_personal_subscription(user, plan)
-    plan
-  end
-
-  @doc """
-  Ensures a user has a personal subscription on a plan that does NOT permit
-  sponsoring seats (`sponsorable_seats == nil`). Useful for testing rejection
-  of `:invite` for non-sponsoring plans. Returns the plan.
-  """
-  def ensure_no_sponsoring_plan(user) do
-    require Ash.Query
-
-    key = "no-sponsoring-test-#{System.unique_integer([:positive])}"
-
-    plan =
-      Magus.Usage.Policy
-      |> Ash.Changeset.for_create(
-        :create,
-        %{
-          key: key,
-          name: "No Sponsoring Test #{key}",
-          price_monthly_cents: 1000,
-          storage_bytes: 100 * 1024 * 1024,
-          max_upload_bytes: 10 * 1024 * 1024,
-          image_generation_enabled: false,
-          video_generation_enabled: false,
-          sponsorable_seats: nil,
-          is_active: true,
-          sort_order: 1
-        },
-        authorize?: false
-      )
-      |> Ash.create!(authorize?: false)
-
-    upsert_personal_subscription(user, plan)
-    plan
-  end
-
   defp upsert_personal_subscription(user, plan) do
     require Ash.Query
 
     case Magus.Usage.Account
-         |> Ash.Query.filter(user_id == ^user.id and is_nil(sponsor_user_id))
+         |> Ash.Query.filter(user_id == ^user.id and is_nil(sponsor_org_id))
          |> Ash.read_one(authorize?: false) do
       {:ok, %{} = sub} ->
         sub
@@ -715,13 +641,11 @@ defmodule Magus.Generators do
     * `:storage_bytes` - Storage limit in bytes (default: 100MB)
     * `:max_upload_bytes` - Max upload size (default: 10MB)
     * `:is_active` - Whether plan is active (default: true)
-    * `:sponsorable_seats` - Included sponsored seats (default: nil = cannot sponsor)
 
   ## Examples
 
       plan = generate(usage_plan())
       free_plan = generate(usage_plan(key: "free", name: "Free"))
-      sponsoring_plan = generate(usage_plan(sponsorable_seats: 5))
   """
   def usage_plan(opts \\ []) do
     unique_id = System.unique_integer([:positive])
@@ -736,8 +660,7 @@ defmodule Magus.Generators do
       video_generation_enabled: Keyword.get(opts, :video_generation_enabled, true),
       is_active: Keyword.get(opts, :is_active, true),
       sort_order: Keyword.get(opts, :sort_order, 0),
-      max_routing_tier: Keyword.get(opts, :max_routing_tier, :simple),
-      sponsorable_seats: Keyword.get(opts, :sponsorable_seats, nil)
+      max_routing_tier: Keyword.get(opts, :max_routing_tier, :simple)
     }
 
     changeset_generator(

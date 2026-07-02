@@ -50,9 +50,7 @@ defmodule Magus.Usage.Policy do
         :sort_order,
         :max_routing_tier,
         :image_generation_enabled,
-        :video_generation_enabled,
-        :sponsorable_seats,
-        :extra_seat_stripe_price_id
+        :video_generation_enabled
       ]
     end
 
@@ -69,9 +67,7 @@ defmodule Magus.Usage.Policy do
         :sort_order,
         :max_routing_tier,
         :image_generation_enabled,
-        :video_generation_enabled,
-        :sponsorable_seats,
-        :extra_seat_stripe_price_id
+        :video_generation_enabled
       ]
     end
   end
@@ -173,20 +169,6 @@ defmodule Magus.Usage.Policy do
       default false
       public? true
       description "Whether users on this plan can generate videos"
-    end
-
-    attribute :sponsorable_seats, :integer do
-      allow_nil? true
-      public? true
-
-      description "Number of sponsored seats included with this plan. `nil` or `0` means the user cannot sponsor seats; positive integer means included sponsored seats; combined with `extra_seats` on the personal subscription for the cap."
-    end
-
-    attribute :extra_seat_stripe_price_id, :string do
-      allow_nil? true
-      public? true
-
-      description "Stripe price ID for add-on seats beyond `sponsorable_seats`. `nil` means add-on seats are not offered on this plan."
     end
 
     attribute :sort_order, :integer do

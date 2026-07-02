@@ -20,9 +20,6 @@ defmodule Magus.Usage.Account do
   postgres do
     table "user_subscriptions"
     repo Magus.Repo
-
-    identity_wheres_to_sql unique_user_personal: "sponsor_user_id IS NULL",
-                           unique_user_sponsor: "sponsor_user_id IS NOT NULL"
   end
 
   paper_trail do
@@ -129,7 +126,7 @@ defmodule Magus.Usage.Account do
 
     read :personal_by_user_id do
       argument :user_id, :uuid, allow_nil?: false
-      filter expr(user_id == ^arg(:user_id) and is_nil(sponsor_user_id))
+      filter expr(user_id == ^arg(:user_id))
       get? true
     end
 
@@ -149,7 +146,6 @@ defmodule Magus.Usage.Account do
         :current_period_start,
         :current_period_end,
         :storage_usage_bytes,
-        :sponsor_user_id,
         :sponsor_org_id
       ]
     end
@@ -168,7 +164,6 @@ defmodule Magus.Usage.Account do
 
       change set_attribute(:canceled_at, nil)
       change set_attribute(:last_payment_status, "succeeded")
-      change Magus.Usage.Account.Changes.PropagatePlanToSponsoredSubs
     end
 
     update :downgrade_to_free do
@@ -182,7 +177,6 @@ defmodule Magus.Usage.Account do
       change set_attribute(:current_period_end, nil)
       change set_attribute(:canceled_at, nil)
       change set_attribute(:last_payment_status, nil)
-      change Magus.Usage.Account.Changes.PropagatePlanToSponsoredSubs
     end
 
     update :update_from_stripe do
@@ -195,8 +189,6 @@ defmodule Magus.Usage.Account do
         :current_period_end,
         :canceled_at
       ]
-
-      change Magus.Usage.Account.Changes.PropagatePlanToSponsoredSubs
     end
 
     update :update_payment_status do
@@ -206,11 +198,6 @@ defmodule Magus.Usage.Account do
     update :set_sponsor_org do
       description "Set or clear the sponsoring organization for consolidated billing. nil clears (revert to personal)."
       accept [:sponsor_org_id]
-    end
-
-    update :update_sponsored_plan do
-      accept [:usage_plan_id, :status]
-      description "Updates the plan or status on a sponsored subscription"
     end
 
     update :increment_storage do
@@ -273,18 +260,6 @@ defmodule Magus.Usage.Account do
     update :reset_period_usage do
       description "Zeroes the per-period usage mirror at a cycle boundary or on activation."
       change set_attribute(:period_usage_cents, 0)
-    end
-
-    update :set_extra_seats do
-      accept [:extra_seats]
-      require_atomic? false
-
-      validate fn changeset, _ ->
-        case Ash.Changeset.get_attribute(changeset, :extra_seats) do
-          n when is_integer(n) and n >= 0 -> :ok
-          _ -> {:error, field: :extra_seats, message: "must be a non-negative integer"}
-        end
-      end
     end
   end
 
@@ -382,26 +357,11 @@ defmodule Magus.Usage.Account do
       description "Cached storage usage, updated on file create/delete"
     end
 
-    attribute :sponsor_user_id, :uuid do
-      allow_nil? true
-      public? false
-
-      description "When set, this is a sponsored subscription paid for by the sponsor user. nil = personal subscription."
-    end
-
     attribute :sponsor_org_id, :uuid do
       allow_nil? true
       public? false
 
       description "When set, this account's seat + usage bill to the given organization (org-consolidated billing). nil = personal billing."
-    end
-
-    attribute :extra_seats, :integer do
-      allow_nil? false
-      default 0
-      public? true
-
-      description "Additional paid seats beyond the plan's included `sponsorable_seats`. Only meaningful on personal subscriptions (sponsor_user_id == nil)."
     end
 
     attribute :stripe_subscription_item_id, :string do
@@ -454,14 +414,6 @@ defmodule Magus.Usage.Account do
       allow_nil? false
     end
 
-    belongs_to :sponsor, Magus.Accounts.User do
-      source_attribute :sponsor_user_id
-      destination_attribute :id
-      allow_nil? true
-      public? false
-      define_attribute? false
-    end
-
     belongs_to :sponsor_org, Magus.Organizations.Organization do
       source_attribute :sponsor_org_id
       destination_attribute :id
@@ -483,11 +435,8 @@ defmodule Magus.Usage.Account do
   end
 
   identities do
-    # Personal subscription: one per user where sponsor_user_id is null
-    identity :unique_user_personal, [:user_id], where: expr(is_nil(sponsor_user_id))
-    # Sponsored subscription: one per (recipient, sponsor) pair
-    identity :unique_user_sponsor, [:user_id, :sponsor_user_id],
-      where: expr(not is_nil(sponsor_user_id))
+    # One subscription per user.
+    identity :unique_user_personal, [:user_id]
   end
 
   # --- Billing overview helpers (SPA billing section) ---
