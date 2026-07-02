@@ -39,9 +39,10 @@ export type WorkbenchMode = TabSession['mode'];
  * Client-side placeholder tabs from openTab that the server hasn't
  * acknowledged yet. These ids must never reach the server: ActivateTab &
  * friends reject unknown ids, and the rollback would restore the very state
- * that triggered the call, looping forever.
+ * that triggered the call, looping forever. Exported so callers can defer
+ * server-persisted tab mutations (e.g. companions) until the tab is canonical.
  */
-const isOptimisticTabId = (tabId: string) => tabId.startsWith('optimistic-');
+export const isOptimisticTabId = (tabId: string) => tabId.startsWith('optimistic-');
 
 /**
  * Workbench shell state: the persisted TabSession (optimistically mutated,

@@ -887,12 +887,15 @@ test('the right rail opens, inserts a prompt, and switches panels', async ({ pag
 	await expect(page.getByTestId('right-rail')).toBeVisible();
 	await expect(page.getByTestId('rail-prompts-panel')).toBeVisible();
 
-	// Inserting a user prompt lands its content in the composer.
+	// Inserting a user prompt lands its content in the composer and closes the
+	// rail (its effect would otherwise be hidden behind the sheet on mobile).
 	await page.getByText('Tone guide').hover();
 	await page.getByTestId('rail-insert-prompt').click();
 	await expect(page.getByTestId('composer-input')).toHaveValue('Use a warm tone.');
+	await expect(page.getByTestId('right-rail')).not.toBeVisible();
 
 	// Panel switching: settings form and files scope tabs render.
+	await page.getByTestId('right-rail-toggle').click();
 	await page.getByTestId('rail-tab-settings').click();
 	await expect(page.getByTestId('rail-system-prompt')).toBeVisible();
 	await page.getByTestId('rail-tab-files').click();
@@ -1394,4 +1397,61 @@ test('starting a thread from a message opens the thread companion', async ({ pag
 	await expect(page.getByTestId('thread-messages')).toBeVisible();
 	// The branch chip now marks the message as threaded.
 	await expect(page.getByTestId('message-open-thread')).toBeVisible();
+});
+
+test('opening a thread from the nav survives the tab-open round trip', async ({ page }) => {
+	// Regression: the deep-link effect used to consume the stashed thread
+	// companion against the still-optimistic tab (a local-only write), and the
+	// in-flight open_workbench_tab reconcile then clobbered it — the thread
+	// flashed open and vanished. The companion must be persisted server-side
+	// against the canonical tab.
+	const companionCalls: Array<Record<string, unknown> | null> = [];
+
+	await mockRpc(page, {
+		authenticated: true,
+		respond: {
+			conversations_threads: () => [
+				{
+					id: 'thread-1',
+					title: 'Side quest',
+					parentConversationId: conversations[1].id,
+					insertedAt: '2026-06-11T10:05:00Z',
+					messageCount: 1
+				}
+			],
+			set_workbench_companion: (input) => {
+				companionCalls.push((input.companion as Record<string, unknown>) ?? null);
+				return {
+					...tabSession,
+					tabs: [
+						{
+							id: input.tabId,
+							primary: { type: 'conversation', id: conversations[1].id },
+							companion: (input.companion as Record<string, unknown>) ?? null
+						}
+					],
+					activeTabId: input.tabId as string
+				};
+			},
+			message_history: (input) =>
+				input.conversationId === conversations[1].id
+					? { results: history, hasMore: false }
+					: { results: [], hasMore: false }
+		}
+	});
+
+	// Start OUTSIDE the parent conversation, so the click navigates and the
+	// tab has to be opened (the racy path).
+	await page.goto('/chat');
+	await expect(page.getByTestId('thread-row')).toBeVisible();
+
+	await page.getByTestId('thread-row').click();
+	await expect(page).toHaveURL(new RegExp(`/chat/${conversations[1].id}$`));
+
+	// The companion reached the server (not just the optimistic local state)…
+	await expect.poll(() => companionCalls.length).toBeGreaterThan(0);
+	expect(companionCalls[0]).toMatchObject({ type: 'thread', id: 'thread-1' });
+	// …and the thread pane is (still) open after the round trips settle.
+	await expect(page.getByTestId('companion-pane')).toBeVisible();
+	await expect(page.getByTestId('thread-messages')).toBeVisible();
 });

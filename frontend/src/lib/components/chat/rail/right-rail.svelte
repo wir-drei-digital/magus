@@ -157,9 +157,16 @@
 
 				<div class="flex min-w-0 flex-1 flex-col">
 					{#if activePanel === 'prompts'}
+						<!-- Completed actions close the rail (like requestCompanion above):
+						     their effect lands in the composer/conversation, which the
+						     bottom sheet would otherwise cover on mobile. -->
 						<PromptsPanel
 							conversationId={store.conversationId}
-							onInsert={(text) => store.requestInsertText(text)}
+							onInsert={(text) => {
+								store.requestInsertText(text);
+								open = false;
+							}}
+							onActivated={() => (open = false)}
 						/>
 					{:else if activePanel === 'brains'}
 						<BrainsPanel onCompanionRequest={requestCompanion} />

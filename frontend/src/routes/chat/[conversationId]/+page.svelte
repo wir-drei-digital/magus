@@ -6,7 +6,7 @@
 	import { takePendingMessage } from '$lib/chat/pending-message';
 	import CompanionHost from '$lib/components/companions/companion-host.svelte';
 	import ConversationView from '$lib/components/chat/conversation-view.svelte';
-	import { workbench } from '$lib/stores/workbench.svelte';
+	import { isOptimisticTabId, workbench } from '$lib/stores/workbench.svelte';
 
 	const conversationId = $derived(page.params.conversationId!);
 	// Search deep-links carry ?highlight=<messageId> to flash + scroll to a hit.
@@ -44,8 +44,14 @@
 			(tab) => tab.primary.type === 'conversation' && tab.primary.id === conversationId
 		);
 		if (existing && session.activeTabId === existing.id) {
-			const pending = takePendingCompanion(conversationId);
-			if (pending) void workbench.setCompanion(existing.id, pending);
+			// An optimistic tab means an openTab reconcile is in flight; consuming
+			// the (single-use) pending companion now would apply it local-only and
+			// the server session would clobber it moments later. Leave it stashed —
+			// the openTab().then() below applies it to the canonical tab.
+			if (!isOptimisticTabId(existing.id)) {
+				const pending = takePendingCompanion(conversationId);
+				if (pending) void workbench.setCompanion(existing.id, pending);
+			}
 			return;
 		}
 
