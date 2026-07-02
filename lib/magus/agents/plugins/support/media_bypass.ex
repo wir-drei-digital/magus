@@ -8,7 +8,7 @@ defmodule Magus.Agents.Plugins.Support.MediaBypass do
   alias Magus.Agents.Context.ConversationState, as: State
   alias Magus.Agents.Support.MediaGenerator
   alias Magus.Agents.Plugins.Support.{Helpers, Preflight}
-  alias Magus.Models.Resolver
+  alias Magus.Models.{Resolution, Resolver}
   alias Magus.Agents.Signals
   alias Magus.Chat
 
@@ -45,6 +45,47 @@ defmodule Magus.Agents.Plugins.Support.MediaBypass do
     user = Preflight.load_user_for_limits(state[:user_id])
     message_id = data[:message_id] || data["message_id"]
 
+    # Hard-stop (phase 2b-2b): a broken EXPLICIT media selection blocks the turn
+    # before any generation call, on the same error/event rails as the text path.
+    if Resolution.degraded?(resolution) do
+      conversation = load_conversation_for_scope(conversation_id)
+
+      Preflight.handle_broken_selection(
+        conversation_id,
+        message_id,
+        resolution,
+        Preflight.broken_selection_scope(resolution, conversation, mode)
+      )
+
+      Signals.state_change(conversation_id, :idle)
+      Signals.response_complete(conversation_id, %{})
+      {:ok, {:override, Jido.Actions.Control.Noop}}
+    else
+      dispatch_after_limit_check(
+        agent,
+        mode,
+        conversation_id,
+        state,
+        data,
+        model,
+        model_keys,
+        user,
+        message_id
+      )
+    end
+  end
+
+  defp dispatch_after_limit_check(
+         agent,
+         mode,
+         conversation_id,
+         state,
+         data,
+         model,
+         model_keys,
+         user,
+         message_id
+       ) do
     case Preflight.check_usage_limit(user, mode, model, nil) do
       {:ok, :allowed} ->
         text = data[:text] || data["text"] || ""
@@ -73,6 +114,23 @@ defmodule Magus.Agents.Plugins.Support.MediaBypass do
   end
 
   # --- Private ---
+
+  # Load only what `broken_selection_scope/3` needs to distinguish a
+  # conversation-set media pin from a user default. Returns nil on any failure;
+  # the scope helper then treats a key-based ask as user-scoped.
+  defp load_conversation_for_scope(conversation_id) do
+    case Chat.get_conversation(conversation_id,
+           load: [
+             :selected_image_model,
+             :selected_video_model,
+             custom_agent: [:image_model, :video_model]
+           ],
+           authorize?: false
+         ) do
+      {:ok, conversation} -> conversation
+      _ -> nil
+    end
+  end
 
   defp build_media_llm_context(_conversation_id, nil, text) do
     ReqLLM.Context.new([ReqLLM.Context.user(text)])

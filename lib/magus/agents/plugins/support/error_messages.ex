@@ -23,6 +23,8 @@ defmodule Magus.Agents.Plugins.Support.ErrorMessages do
     * anything else — generic fallback
   """
   @spec format_user_friendly_error(atom(), term()) :: String.t()
+  def format_user_friendly_error(:broken_model_selection, error) when is_binary(error), do: error
+
   def format_user_friendly_error(:limit_exceeded, error) when is_binary(error), do: error
 
   def format_user_friendly_error(:limit_exceeded, %Magus.Usage.PolicyError{} = error) do
