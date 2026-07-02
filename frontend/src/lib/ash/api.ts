@@ -3907,6 +3907,10 @@ export type BillingOverview = {
 	monthlySpendCapCents: number | null;
 	spentCents: number;
 	capCents: number | null;
+	/** Platform default monthly cap (cents). Applies when `monthlySpendCapCents`
+	 * is null and `noSpendCap` is false — a null cap means "use this default",
+	 * not "unlimited". */
+	defaultCapCents: number | null;
 	tokensUsed: number;
 	delinquent: boolean;
 	exempt: boolean;
@@ -3930,6 +3934,7 @@ function toBillingOverview(data: Record<string, unknown>): BillingOverview {
 		monthlySpendCapCents: numOrNull(data.monthly_spend_cap_cents),
 		spentCents: Number(data.spent_cents ?? 0),
 		capCents: numOrNull(data.cap_cents),
+		defaultCapCents: numOrNull(data.default_cap_cents),
 		tokensUsed: Number(data.tokens_used ?? 0),
 		delinquent: data.delinquent === true,
 		exempt: data.exempt === true,
