@@ -35,6 +35,7 @@ defmodule Magus.Organizations do
 
       rpc_action :org_usage_overview, :org_usage_overview
       rpc_action :org_billing_overview, :org_billing_overview
+      rpc_action :archive_organization, :archive
     end
 
     resource Magus.Organizations.OrganizationMember do
@@ -62,6 +63,7 @@ defmodule Magus.Organizations do
         args: [:stripe_subscription_id]
 
       define :update_organization, action: :update
+      define :archive_organization, action: :archive
       define :org_usage_overview, action: :org_usage_overview
       define :org_billing_overview, action: :org_billing_overview
     end

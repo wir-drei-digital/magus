@@ -39,6 +39,17 @@ defmodule Magus.Organizations.Organization do
 
     update :update do
       accept [:name]
+      require_atomic? false
+      validate {Magus.Organizations.Organization.Validations.NotArchived, []}
+    end
+
+    update :archive do
+      description "Soft-delete: offboards all members, deactivates org workspaces, cancels billing via the seam, keeps the row for history."
+      accept []
+      require_atomic? false
+      transaction? true
+      validate {Magus.Organizations.Organization.Validations.NotArchived, []}
+      change {Magus.Organizations.Organization.Changes.ArchiveOrganization, []}
     end
 
     update :update_owner do
@@ -134,6 +145,12 @@ defmodule Magus.Organizations.Organization do
       authorize_if Magus.Organizations.Organization.Checks.ActorIsOwner
     end
 
+    # The archive action is update-typed, so it needs its own policy or the
+    # narrowed default-deny below would forbid even the owner.
+    policy action(:archive) do
+      authorize_if Magus.Organizations.Organization.Checks.ActorIsOwner
+    end
+
     # Only the plain :update (name) action is owner-authorized. set_billing /
     # update_owner intentionally match no policy once their system-actor
     # bypasses fall through, so they default-deny for every human actor.
@@ -176,6 +193,8 @@ defmodule Magus.Organizations.Organization do
     attribute :stripe_subscription_item_id, :string, allow_nil?: true, public?: false
     attribute :current_period_start, :utc_datetime_usec, allow_nil?: true, public?: true
     attribute :current_period_end, :utc_datetime_usec, allow_nil?: true, public?: true
+
+    attribute :archived_at, :utc_datetime_usec, allow_nil?: true, public?: true
 
     timestamps()
   end

@@ -37,6 +37,18 @@ defmodule Magus.Organizations.SetMemberSpendCapTest do
     assert updated.spend_cap_cents == 5000
   end
 
+  test "owner clears an existing spend cap with nil", %{owner: owner, member: member} do
+    {:ok, capped} =
+      Magus.Organizations.set_member_spend_cap(member, %{spend_cap_cents: 5000}, actor: owner)
+
+    assert capped.spend_cap_cents == 5000
+
+    {:ok, cleared} =
+      Magus.Organizations.set_member_spend_cap(capped, %{spend_cap_cents: nil}, actor: owner)
+
+    assert cleared.spend_cap_cents == nil
+  end
+
   test "a non-owner cannot set a spend cap", %{member: member, member_user: member_user} do
     assert {:error, %Ash.Error.Forbidden{}} =
              Magus.Organizations.set_member_spend_cap(member, %{spend_cap_cents: 5000},
