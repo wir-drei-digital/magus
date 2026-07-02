@@ -327,7 +327,7 @@ test('authenticated users see the workbench shell with their conversations', asy
 	await expect(page.getByTestId('mode-strip')).toBeVisible();
 	await expect(page.getByTestId('conversation-list')).toBeVisible();
 	await expect(page.getByText('Quarterly planning')).toBeVisible();
-	await expect(page.getByTestId('connection-status')).toBeVisible();
+	await expect(page.getByTestId('mode-strip-footer')).toBeVisible();
 });
 
 test('switching modes swaps the nav but keeps the open view', async ({ page }) => {
@@ -1225,6 +1225,8 @@ const agentDetail = {
 	canWriteGlobalMemories: false,
 	canAccessGlobalFiles: true,
 	canAccessKnowledge: true,
+	disabledToolCategories: [],
+	preLoadedSkills: [],
 	heartbeatEnabled: false,
 	heartbeatInstructions: null,
 	heartbeatDefaultIntervalMinutes: 60,
