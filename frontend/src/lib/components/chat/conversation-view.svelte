@@ -5,14 +5,18 @@
 		conversationThreads,
 		createThread,
 		filesForDisplay,
+		selectDefaultModel,
+		setConversationModel,
 		type CompanionSpec,
 		type DisplayAttachment,
 		type ThreadSummary
 	} from '$lib/ash/api';
 	import { SvelteMap } from 'svelte/reactivity';
 	import type { ConversationStore } from '$lib/chat/conversation-store.svelte';
+	import { isBrokenSelection, precedingUserText, resetTarget } from '$lib/chat/broken-selection';
 	import { floorBoundaryMessageId, floorDividerLabel } from '$lib/chat/context-window';
 	import { buildChatStream, toolViewFromLive } from '$lib/chat/events';
+	import { session } from '$lib/stores/session.svelte';
 	import { readThreads, writeThreads } from '$lib/chat/threads-cache';
 	import { workbench } from '$lib/stores/workbench.svelte';
 	import PromptFormDialog from '$lib/components/shell/prompt-form-dialog.svelte';
@@ -254,6 +258,30 @@
 		promptDialogOpen = true;
 	}
 
+	// Broken-selection remediation (Task 1 hard-stop event): clear the scoped
+	// selection (user default vs conversation pin) with a null-clearing RPC, then
+	// re-send the blocked user text. The blocked turn produced no agent response,
+	// so a fresh send never double-persists.
+	async function resetBrokenSelection(messageId: string) {
+		const event = store.messages.find((message) => message.id === messageId);
+		if (!event || !isBrokenSelection(event.toolCallData)) return;
+
+		const text = precedingUserText(store.messages, messageId);
+		if (!text) return;
+
+		if (resetTarget(event.toolCallData) === 'user') {
+			const userId = session.user?.id;
+			if (!userId) return;
+			const result = await selectDefaultModel(userId, null);
+			if (!result.success) return;
+		} else {
+			const result = await setConversationModel(store.conversationId, null);
+			if (!result.success) return;
+		}
+
+		await store.send(text);
+	}
+
 	// The degraded-connection banner waits out a grace period: every
 	// conversation open passes through 'connecting' while the socket joins,
 	// and that routine handshake must not flash a warning (the composer's
@@ -385,6 +413,7 @@
 								onOpenPdf={onCompanionRequest ? openPdfAttachment : undefined}
 								onToggleDisabled={(id) => void store.toggleDisabled(id)}
 								onRetry={(text) => void store.send(text)}
+								onResetBrokenSelection={(id) => void resetBrokenSelection(id)}
 								onCreatePrompt={createPromptFrom}
 								onOpenCompanion={onCompanionRequest}
 								conversationId={store.conversationId}
