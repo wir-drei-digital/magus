@@ -11,7 +11,7 @@ defmodule Magus.Organizations.Organization.Changes.CreateOwnerMember do
         user_id: context.actor.id,
         invite_email: context.actor.email
       })
-      |> Ash.create!(authorize?: false)
+      |> Ash.create!(authorize?: false, actor: context.actor)
 
       {:ok, org}
     end)

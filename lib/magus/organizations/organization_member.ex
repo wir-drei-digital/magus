@@ -18,6 +18,10 @@ defmodule Magus.Organizations.OrganizationMember do
     table "organization_members"
     repo Magus.Repo
 
+    custom_indexes do
+      index [:user_id]
+    end
+
     identity_wheres_to_sql unique_membership: "user_id IS NOT NULL",
                            unique_invite: "status != 'removed'"
   end
@@ -179,6 +183,8 @@ defmodule Magus.Organizations.OrganizationMember do
       require_atomic? false
       transaction? true
       description "Promotes this member to :owner and demotes the acting owner to :member."
+
+      validate {Magus.Organizations.OrganizationMember.Validations.ValidTransferTarget, []}
 
       change fn changeset, context ->
         Ash.Changeset.after_action(changeset, fn _cs, target ->

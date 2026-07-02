@@ -17,7 +17,7 @@ defmodule Magus.Organizations.Organization.Changes.CreateSharedWorkspace do
           |> Ash.Changeset.for_update(:set_organization, %{organization_id: org.id},
             authorize?: false
           )
-          |> Ash.update!()
+          |> Ash.update!(actor: context.actor)
 
           {:ok, org}
 
