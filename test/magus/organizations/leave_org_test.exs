@@ -29,6 +29,7 @@ defmodule Magus.Organizations.LeaveOrgTest do
 
     {:ok, left} = Magus.Organizations.leave_org(member, actor: member_user)
     assert left.status == :removed
+    assert %DateTime{} = left.removed_at
   end
 
   test "you cannot leave on behalf of another member" do

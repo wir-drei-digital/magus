@@ -98,6 +98,8 @@ defmodule Magus.Organizations.OrganizationMember do
       change set_attribute(:status, :invited)
       change set_attribute(:invited_at, &DateTime.utc_now/0)
 
+      validate {Magus.Organizations.Organization.Validations.NotArchived, []}
+
       change fn changeset, _context ->
         changeset
         |> Ash.Changeset.force_change_attribute(:invite_token, generate_token())
@@ -168,6 +170,14 @@ defmodule Magus.Organizations.OrganizationMember do
       change {Magus.Organizations.OrganizationMember.Changes.FireSeatSync, event: :removed}
     end
 
+    update :remove_for_archive do
+      description "Internal: offboard a member during org archive. No seat-sync, no last-owner guard."
+      accept []
+      require_atomic? false
+      change set_attribute(:status, :removed)
+      change set_attribute(:removed_at, &DateTime.utc_now/0)
+    end
+
     update :leave_org do
       description "A member removes their own active membership (revert-to-personal)."
       accept []
@@ -212,6 +222,8 @@ defmodule Magus.Organizations.OrganizationMember do
             authorize?: false
           )
           |> Ash.update!()
+
+          Magus.Organizations.SeatSync.on_ownership_transferred(target.organization_id)
 
           {:ok, %{target | role: :owner}}
         end)
@@ -265,6 +277,12 @@ defmodule Magus.Organizations.OrganizationMember do
 
     policy action(:accept) do
       authorize_if actor_present()
+    end
+
+    # Internal offboarding during org archive. Human actors never match; the
+    # ArchiveOrganization change calls it with authorize?: false.
+    policy action(:remove_for_archive) do
+      authorize_if Magus.Organizations.Checks.ActorIsSystem
     end
 
     policy action(:leave_org) do

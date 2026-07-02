@@ -18,6 +18,18 @@ defmodule Magus.Organizations.SeatSyncTest do
       send(Application.get_env(:magus, :seat_sync_test_pid), {:removed, member_id})
       :ok
     end
+
+    @impl true
+    def on_organization_archived(org_id) do
+      send(Application.get_env(:magus, :seat_sync_test_pid), {:organization_archived, org_id})
+      :ok
+    end
+
+    @impl true
+    def on_ownership_transferred(org_id) do
+      send(Application.get_env(:magus, :seat_sync_test_pid), {:ownership_transferred, org_id})
+      :ok
+    end
   end
 
   setup do
@@ -44,5 +56,22 @@ defmodule Magus.Organizations.SeatSyncTest do
 
     {:ok, _} = Organizations.remove_org_member(member, actor: owner)
     assert_receive {:removed, removed_id} when removed_id == member.id
+  end
+
+  test "transferring ownership fires the seam once" do
+    owner = generate(user())
+    ensure_workspace_plan(owner)
+
+    {:ok, org} =
+      Organizations.create_organization(%{name: "T", slug: "transfer-org"}, actor: owner)
+
+    {:ok, invite} = Organizations.invite_org_member(org.id, "xfer@test.com", actor: owner)
+
+    joiner = generate(user())
+    {:ok, member} = Organizations.accept_invite(invite.invite_token, actor: joiner)
+
+    {:ok, _promoted} = Organizations.transfer_org_ownership(member, actor: owner)
+    assert_receive {:ownership_transferred, org_id} when org_id == org.id
+    refute_receive {:ownership_transferred, _}
   end
 end

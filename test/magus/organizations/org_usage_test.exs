@@ -27,6 +27,11 @@ defmodule Magus.Organizations.OrgUsageTest do
     {:ok, _sub} = Magus.Usage.get_user_subscription(m1.id, authorize?: false)
     Magus.Usage.deduct_usage(m1.id, 300, authorize?: false)
 
+    # accrue token usage on m1 (100 prompt + 100 completion per record)
+    model = generate(model())
+    create_usage_record(m1, model)
+    create_usage_record(m1, model)
+
     {:ok, owner_view} =
       Magus.Organizations.org_usage_overview(%{organization_id: org.id}, actor: owner)
 
@@ -34,11 +39,21 @@ defmodule Magus.Organizations.OrgUsageTest do
     assert owner_view.pooled_spent_cents >= 300
     assert length(owner_view.members) == 2
 
+    # tokens surface pooled + per member (2 records * 200 tokens = 400)
+    assert owner_view.pooled_tokens == 400
+    m1_row = Enum.find(owner_view.members, &(&1.user_id == m1.id))
+    assert m1_row.tokens == 400
+    owner_row = Enum.find(owner_view.members, &(&1.user_id == owner.id))
+    assert owner_row.tokens == 0
+
     {:ok, member_view} =
       Magus.Organizations.org_usage_overview(%{organization_id: org.id}, actor: m1)
 
     assert length(member_view.members) == 1
     assert hd(member_view.members).user_id == m1.id
+    assert hd(member_view.members).tokens == 400
+    # pooled tokens stay visible to a non-owner member
+    assert member_view.pooled_tokens == 400
   end
 
   test "a non-member cannot read org usage" do
@@ -54,11 +69,12 @@ defmodule Magus.Organizations.OrgUsageTest do
       )
 
     # The action policy only gates `actor_present()`; the real membership check
-    # lives in `OrgUsage.for_organization`, whose `{:error, :forbidden}` surfaces
-    # through the generic action as a wrapped `Ash.Error.Unknown`.
-    assert {:error, %Ash.Error.Unknown{} = error} =
+    # lives in `OrgUsage.for_organization`, whose `Ash.Error.Forbidden` surfaces
+    # through the generic action as a structured forbidden error (class
+    # :forbidden), which the cloud RPC/e2e layer renders as "forbidden".
+    assert {:error, %Ash.Error.Forbidden{} = error} =
              Magus.Organizations.org_usage_overview(%{organization_id: org.id}, actor: stranger)
 
-    assert Exception.message(error) =~ "forbidden"
+    assert error.class == :forbidden
   end
 end
