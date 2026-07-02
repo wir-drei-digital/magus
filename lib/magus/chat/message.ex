@@ -247,6 +247,7 @@ defmodule Magus.Chat.Message do
 
       change Magus.Chat.Message.Changes.AttachResources
       change Magus.Chat.Message.Changes.CreateConversationIfNotProvided
+      change Magus.Chat.Message.Changes.DefaultModeFromConversation
       change set_attribute(:role, :user)
       change relate_actor(:created_by)
 
@@ -265,6 +266,7 @@ defmodule Magus.Chat.Message do
 
       change Magus.Chat.Message.Changes.AttachResources
       change Magus.Chat.Message.Changes.CreateConversationIfNotProvided
+      change Magus.Chat.Message.Changes.DefaultModeFromConversation
       change set_attribute(:role, :user)
       change set_attribute(:status, :queued)
       change relate_actor(:created_by)
