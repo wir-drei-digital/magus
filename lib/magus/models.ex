@@ -23,6 +23,7 @@ defmodule Magus.Models do
       define :update_owned_provider, action: :update_owned
       define :list_owned_providers, action: :owned
       define :validate_provider_credential, action: :validate
+      define :list_remote_models, action: :list_remote_models, args: [:provider_id]
     end
 
     resource Magus.Models.RoleAssignment do

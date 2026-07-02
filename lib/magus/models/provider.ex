@@ -98,6 +98,13 @@ defmodule Magus.Models.Provider do
       require_atomic? false
       change Magus.Models.Provider.Changes.EnqueueCredentialValidation
     end
+
+    action :list_remote_models, :map do
+      description "Live models-list from the provider endpoint (owner-only, rate-windowed, never persisted)."
+      argument :provider_id, :uuid, allow_nil?: false
+
+      run Magus.Models.Provider.Actions.ListRemoteModels
+    end
   end
 
   policies do
@@ -119,6 +126,10 @@ defmodule Magus.Models.Provider do
 
     policy action(:validate) do
       authorize_if expr(owner_user_id == ^actor(:id))
+    end
+
+    policy action(:list_remote_models) do
+      authorize_if actor_present()
     end
 
     policy action(:stamp_validation) do
