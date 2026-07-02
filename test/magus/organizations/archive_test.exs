@@ -87,7 +87,7 @@ defmodule Magus.Organizations.ArchiveTest do
 
     # archived_at stamped, slug renamed, original slug freed for reuse
     assert %DateTime{} = archived.archived_at
-    assert archived.slug == "acme-archived-#{String.slice(org.id, 0, 6)}"
+    assert archived.slug == "acme-archived-#{String.slice(org.id, -6, 6)}"
     refute archived.slug == "acme"
 
     # every membership (owner + member + invited) is :removed with removed_at
@@ -223,6 +223,36 @@ defmodule Magus.Organizations.ArchiveTest do
 
     assert String.length(archived.slug) <= 64
     assert archived.slug =~ ~r/\A[a-z0-9][a-z0-9-]*[a-z0-9]\z/
-    assert String.ends_with?(archived.slug, "-archived-#{String.slice(org.id, 0, 6)}")
+    assert String.ends_with?(archived.slug, "-archived-#{String.slice(org.id, -6, 6)}")
+  end
+
+  test "archive -> recreate same slug -> archive again both succeed (UUIDv7 tail suffix)" do
+    # Regression: the archived-slug suffix must derive from the id's random tail,
+    # not its timestamp prefix. UUIDv7 ids minted in the same ~4.66h window share
+    # their first 6 hex chars, so a prefix-based suffix would collide on this exact
+    # flow (archive "acme-collision", recreate it, archive again) and the second
+    # archive would violate the unique-slug constraint forever.
+    owner = generate(user())
+    ensure_workspace_plan(owner)
+
+    {:ok, org1} =
+      Organizations.create_organization(%{name: "Collide", slug: "acme-collision"}, actor: owner)
+
+    {:ok, archived1} = Organizations.archive_organization(org1, actor: owner)
+    assert String.starts_with?(archived1.slug, "acme-collision-archived-")
+
+    # The freed slug is reusable; the fresh org's id shares the timestamp prefix
+    # but differs in its random tail.
+    reuser = generate(user())
+    ensure_workspace_plan(reuser)
+
+    {:ok, org2} =
+      Organizations.create_organization(%{name: "Collide 2", slug: "acme-collision"},
+        actor: reuser
+      )
+
+    assert {:ok, archived2} = Organizations.archive_organization(org2, actor: reuser)
+    assert String.starts_with?(archived2.slug, "acme-collision-archived-")
+    refute archived2.slug == archived1.slug
   end
 end

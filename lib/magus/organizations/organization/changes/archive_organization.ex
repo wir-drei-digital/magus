@@ -78,9 +78,16 @@ defmodule Magus.Organizations.Organization.Changes.ArchiveOrganization do
   # marker (10 chars incl. both hyphens) plus 6 id hex chars = 16; the prefix
   # keeps the org slug's first char and the suffix ends in a hex digit, so the
   # result always satisfies the regex.
+  #
+  # Suffix uses the LAST 6 chars of the id, never the first: the id is a UUIDv7,
+  # whose leading hex encodes a millisecond timestamp, so every id minted in the
+  # same ~4.66h window shares the same first 6 chars. Archiving "acme",
+  # recreating "acme", then archiving again would derive the SAME suffix and
+  # violate the unique-slug constraint, wedging the second archive forever. The
+  # tail is random bits (also hex), so same-millisecond ids still differ there.
   defp archived_slug(org) do
     reserved = String.length("-archived-") + 6
     prefix = String.slice(org.slug, 0, 64 - reserved)
-    "#{prefix}-archived-#{String.slice(org.id, 0, 6)}"
+    "#{prefix}-archived-#{String.slice(org.id, -6, 6)}"
   end
 end
