@@ -49,3 +49,13 @@ export function sortMembers<T extends MemberLike>(members: T[]): T[] {
 export function isValidInviteEmail(email: string): boolean {
 	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
+
+/**
+ * Gates the irreversible "Delete organization" confirm: the user must type the
+ * organization's name exactly (whitespace trimmed on both sides). Never confirms
+ * on an empty name, so a blank org name can't auto-arm the destructive action.
+ */
+export function canConfirmArchive(typed: string, orgName: string): boolean {
+	const target = orgName.trim();
+	return target !== '' && typed.trim() === target;
+}

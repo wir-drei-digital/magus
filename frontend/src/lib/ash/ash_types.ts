@@ -1452,7 +1452,7 @@ export type NotificationAttributesOnlySchema = {
 // Organization Schema
 export type OrganizationResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "slug" | "billingInterval" | "billingStatus" | "currentPeriodStart" | "currentPeriodEnd" | "ownerId";
+  __primitiveFields: "id" | "name" | "slug" | "billingInterval" | "billingStatus" | "currentPeriodStart" | "currentPeriodEnd" | "archivedAt" | "ownerId";
   id: UUIDv7;
   name: string;
   slug: string;
@@ -1460,6 +1460,7 @@ export type OrganizationResourceSchema = {
   billingStatus: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
   currentPeriodStart: UtcDateTimeUsec | null;
   currentPeriodEnd: UtcDateTimeUsec | null;
+  archivedAt: UtcDateTimeUsec | null;
   ownerId: UUID;
   owner: { __type: "Relationship"; __resource: UserResourceSchema; };
   members: { __type: "Relationship"; __array: true; __resource: OrganizationMemberResourceSchema; };
@@ -1469,7 +1470,7 @@ export type OrganizationResourceSchema = {
 
 export type OrganizationAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "slug" | "billingInterval" | "billingStatus" | "currentPeriodStart" | "currentPeriodEnd" | "ownerId";
+  __primitiveFields: "id" | "name" | "slug" | "billingInterval" | "billingStatus" | "currentPeriodStart" | "currentPeriodEnd" | "archivedAt" | "ownerId";
   id: UUIDv7;
   name: string;
   slug: string;
@@ -1477,6 +1478,7 @@ export type OrganizationAttributesOnlySchema = {
   billingStatus: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
   currentPeriodStart: UtcDateTimeUsec | null;
   currentPeriodEnd: UtcDateTimeUsec | null;
+  archivedAt: UtcDateTimeUsec | null;
   ownerId: UUID;
 };
 
@@ -5349,6 +5351,17 @@ export type OrganizationFilterInput = {
     isNil?: boolean;
   };
 
+  archivedAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
   ownerId?: {
     eq?: UUID;
     notEq?: UUID;
@@ -6313,7 +6326,7 @@ export type MCPServerCredentialFilterField = (typeof mCPServerCredentialFilterFi
 export const notificationFilterFields = ["id", "title", "body", "notificationType", "readAt", "metadata", "targetConversationId", "insertedAt", "updatedAt", "userId", "user"] as const;
 export type NotificationFilterField = (typeof notificationFilterFields)[number];
 
-export const organizationFilterFields = ["id", "name", "slug", "billingInterval", "billingStatus", "currentPeriodStart", "currentPeriodEnd", "ownerId", "owner", "members"] as const;
+export const organizationFilterFields = ["id", "name", "slug", "billingInterval", "billingStatus", "currentPeriodStart", "currentPeriodEnd", "archivedAt", "ownerId", "owner", "members"] as const;
 export type OrganizationFilterField = (typeof organizationFilterFields)[number];
 
 export const organizationMemberFilterFields = ["id", "role", "status", "spendCapCents", "invitedAt", "joinedAt", "removedAt", "inviteEmail", "organizationId", "userId", "organization", "user"] as const;
@@ -6455,7 +6468,7 @@ export type MCPServerCredentialSortField = (typeof mCPServerCredentialSortFields
 export const notificationSortFields = ["id", "title", "body", "notificationType", "readAt", "metadata", "targetConversationId", "insertedAt", "updatedAt", "userId"] as const;
 export type NotificationSortField = (typeof notificationSortFields)[number];
 
-export const organizationSortFields = ["id", "name", "slug", "billingInterval", "billingStatus", "currentPeriodStart", "currentPeriodEnd", "ownerId"] as const;
+export const organizationSortFields = ["id", "name", "slug", "billingInterval", "billingStatus", "currentPeriodStart", "currentPeriodEnd", "archivedAt", "ownerId"] as const;
 export type OrganizationSortField = (typeof organizationSortFields)[number];
 
 export const organizationMemberSortFields = ["id", "role", "status", "spendCapCents", "invitedAt", "joinedAt", "removedAt", "inviteEmail", "organizationId", "userId"] as const;
