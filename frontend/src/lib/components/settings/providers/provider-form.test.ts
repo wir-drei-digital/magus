@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { PROVIDER_TYPES, badgeKind, requiresBaseUrl } from './provider-form';
+import {
+	PAID_PLAN_REQUIRED,
+	PROVIDER_TYPES,
+	SUBSCRIPTION_SETTINGS_PATH,
+	badgeKind,
+	isPaidPlanRequired,
+	requiresBaseUrl
+} from './provider-form';
 
 describe('provider form logic', () => {
 	it('only openai_compatible requires base url', () => {
@@ -14,5 +21,23 @@ describe('provider form logic', () => {
 		expect(badgeKind('invalid')).toBe('danger');
 		expect(badgeKind('error')).toBe('warning');
 		expect(badgeKind('pending')).toBe('neutral');
+	});
+
+	it('detects the paid-plan-required gate rejection', () => {
+		expect(isPaidPlanRequired([{ message: PAID_PLAN_REQUIRED }])).toBe(true);
+		// Present alongside other errors still trips the gate.
+		expect(
+			isPaidPlanRequired([{ message: 'provider limit reached' }, { message: PAID_PLAN_REQUIRED }])
+		).toBe(true);
+	});
+
+	it('does not treat ordinary save errors as a gate rejection', () => {
+		expect(isPaidPlanRequired([])).toBe(false);
+		expect(isPaidPlanRequired([{ message: 'is not an allowed provider' }])).toBe(false);
+		expect(isPaidPlanRequired([{ message: undefined }])).toBe(false);
+	});
+
+	it('points the upgrade CTA at the subscription settings route', () => {
+		expect(SUBSCRIPTION_SETTINGS_PATH).toBe('/settings/subscription');
 	});
 });
