@@ -5,19 +5,18 @@
 	import {
 		ArrowLeftRight,
 		BookOpen,
-		Boxes,
 		Bot,
 		Brain,
 		Clock,
 		Files,
 		HelpCircle,
+		LibraryBig,
 		LogOut,
 		MessageCircle,
 		MessagesSquare,
 		Monitor,
 		Moon,
 		Newspaper,
-		ScrollText,
 		Settings,
 		Sun
 	} from '@lucide/svelte';
@@ -31,20 +30,19 @@
 		{ key: 'chat', label: 'Chat', icon: MessagesSquare },
 		{ key: 'brain', label: 'Brain', icon: Brain },
 		{ key: 'files', label: 'Files', icon: Files },
-		{ key: 'prompts', label: 'Prompts', icon: ScrollText },
-		{ key: 'agents', label: 'Agents', icon: Bot },
-		{ key: 'skills', label: 'Skills', icon: Boxes }
+		{ key: 'library', label: 'Library', icon: LibraryBig },
+		{ key: 'agents', label: 'Agents', icon: Bot }
 	];
 
 	const MODE_HOME: Record<WorkbenchMode, string> = {
 		chat: '/chat',
 		brain: '/brain',
 		files: '/files',
-		prompts: '/prompts',
+		library: '/library',
 		agents: '/agents',
-		skills: '/skills',
-		// Bridge until Task 11 rewrites this block (prompts/skills -> /library).
-		library: '/library'
+		// Legacy modes fold into Library; a saved session may still hold them.
+		prompts: '/library',
+		skills: '/library'
 	};
 
 	// Inside a mode view (/chat/*, /files/*, …) a mode click only swaps the nav
@@ -54,7 +52,7 @@
 	function selectMode(mode: WorkbenchMode) {
 		void workbench.setMode(mode);
 		const rel = page.url.pathname.slice(base.length);
-		const inModeView = /^\/(chat|brain|files|prompts|agents|skills)(\/|$)/.test(rel);
+		const inModeView = /^\/(chat|brain|files|library|agents|prompts|skills)(\/|$)/.test(rel);
 		if (!inModeView) void goto(`${base}${MODE_HOME[mode]}`);
 	}
 

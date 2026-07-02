@@ -5,9 +5,11 @@ type Mode = TabSession['mode'];
 const MODE_SEGMENTS: Array<[Mode, string]> = [
 	['brain', '/brain'],
 	['files', '/files'],
-	['prompts', '/prompts'],
-	['agents', '/agents'],
-	['skills', '/skills']
+	['library', '/library'],
+	// Legacy trees redirect to /library; don't flash the chat nav meanwhile.
+	['library', '/prompts'],
+	['library', '/skills'],
+	['agents', '/agents']
 ];
 
 /**

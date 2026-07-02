@@ -113,7 +113,11 @@ class WorkbenchStore {
 	}
 
 	get mode(): WorkbenchMode {
-		if (this.session) return this.session.mode;
+		if (this.session) {
+			const mode = this.session.mode;
+			// Saved sessions may still hold the pre-merge modes.
+			return mode === 'prompts' || mode === 'skills' ? 'library' : mode;
+		}
 		// Pre-session fallback: reloading on /brain/... must not flash the
 		// chat nav while the TabSession round trip is in flight.
 		if (typeof location !== 'undefined') return modeFromPath(location.pathname);
