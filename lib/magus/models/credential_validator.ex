@@ -36,6 +36,13 @@ defmodule Magus.Models.CredentialValidator do
 
   @spec probe(map()) :: {:valid, [String.t()]} | :invalid | :error
   def probe(provider) do
+    case Application.get_env(:magus, :credential_probe) do
+      fun when is_function(fun, 1) -> fun.(provider)
+      _ -> do_probe(provider)
+    end
+  end
+
+  defp do_probe(provider) do
     with {:ok, url, headers} <- request_for(provider) do
       opts =
         [url: url, headers: headers, receive_timeout: 5_000, retry: false] ++
