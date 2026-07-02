@@ -74,7 +74,6 @@ plans = [
     max_upload_bytes: 10_485_760,
     image_generation_enabled: false,
     video_generation_enabled: false,
-    sponsorable_seats: nil,
     is_active: true,
     sort_order: 0
   },
@@ -89,7 +88,6 @@ plans = [
     max_upload_bytes: 52_428_800,
     image_generation_enabled: true,
     video_generation_enabled: false,
-    sponsorable_seats: nil,
     is_active: true,
     sort_order: 1
   },
@@ -104,7 +102,6 @@ plans = [
     max_upload_bytes: 104_857_600,
     image_generation_enabled: true,
     video_generation_enabled: true,
-    sponsorable_seats: nil,
     is_active: true,
     sort_order: 2
   },
@@ -119,7 +116,6 @@ plans = [
     max_upload_bytes: 209_715_200,
     image_generation_enabled: true,
     video_generation_enabled: true,
-    sponsorable_seats: nil,
     is_active: true,
     sort_order: 3
   },
@@ -140,7 +136,6 @@ plans = [
     max_routing_tier: :complex,
     image_generation_enabled: true,
     video_generation_enabled: true,
-    sponsorable_seats: nil,
     is_active: false,
     sort_order: 10
   }

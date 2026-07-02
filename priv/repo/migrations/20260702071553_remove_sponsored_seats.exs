@@ -51,16 +51,7 @@ defmodule Magus.Repo.Migrations.RemoveSponsoredSeats do
                      name: "user_subscriptions_unique_user_personal_index"
                    )
 
-    create unique_index(:user_subscriptions, [:user_id, :sponsor_user_id],
-             name: "user_subscriptions_unique_user_sponsor_index",
-             where: "(sponsor_user_id IS NOT NULL)"
-           )
-
-    create unique_index(:user_subscriptions, [:user_id],
-             name: "user_subscriptions_unique_user_personal_index",
-             where: "(sponsor_user_id IS NULL)"
-           )
-
+    # Columns must exist before the partial indexes below can reference them.
     alter table(:user_subscriptions) do
       add :sponsor_user_id,
           references(:users,
@@ -77,6 +68,16 @@ defmodule Magus.Repo.Migrations.RemoveSponsoredSeats do
       add :sponsorable_seats, :bigint
       add :extra_seat_stripe_price_id, :text
     end
+
+    create unique_index(:user_subscriptions, [:user_id, :sponsor_user_id],
+             name: "user_subscriptions_unique_user_sponsor_index",
+             where: "(sponsor_user_id IS NOT NULL)"
+           )
+
+    create unique_index(:user_subscriptions, [:user_id],
+             name: "user_subscriptions_unique_user_personal_index",
+             where: "(sponsor_user_id IS NULL)"
+           )
 
     # Faithful re-create of the `seat_grants` table, copied verbatim from the
     # `up` of the original create migration (20260426195521_migrate_resources2),
