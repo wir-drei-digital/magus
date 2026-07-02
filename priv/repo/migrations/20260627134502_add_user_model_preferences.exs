@@ -29,7 +29,8 @@ defmodule Magus.Repo.Migrations.AddUserModelPreferences do
             type: :uuid,
             prefix: "public",
             on_delete: :delete_all
-          ), null: false
+          ),
+          null: false
 
       add :model_id,
           references(:models,
@@ -38,7 +39,8 @@ defmodule Magus.Repo.Migrations.AddUserModelPreferences do
             type: :uuid,
             prefix: "public",
             on_delete: :delete_all
-          ), null: false
+          ),
+          null: false
     end
 
     create unique_index(:user_model_preferences, [:user_id, :model_id],

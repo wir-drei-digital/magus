@@ -37,7 +37,9 @@ defmodule Magus.Skills.SkillFavoriteTest do
       skill = create_skill!(owner)
 
       assert {:ok, _} = Skills.favorite_skill(%{skill_id: skill.id}, actor: owner)
-      assert {:error, %Ash.Error.Invalid{}} = Skills.favorite_skill(%{skill_id: skill.id}, actor: owner)
+
+      assert {:error, %Ash.Error.Invalid{}} =
+               Skills.favorite_skill(%{skill_id: skill.id}, actor: owner)
     end
   end
 

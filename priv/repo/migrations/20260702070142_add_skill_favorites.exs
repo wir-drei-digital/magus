@@ -21,7 +21,8 @@ defmodule Magus.Repo.Migrations.AddSkillFavorites do
             name: "skill_favorites_user_id_fkey",
             type: :uuid,
             prefix: "public"
-          ), null: false
+          ),
+          null: false
 
       add :skill_id,
           references(:skills,
@@ -29,7 +30,8 @@ defmodule Magus.Repo.Migrations.AddSkillFavorites do
             name: "skill_favorites_skill_id_fkey",
             type: :uuid,
             prefix: "public"
-          ), null: false
+          ),
+          null: false
     end
 
     create unique_index(:skill_favorites, [:user_id, :skill_id],

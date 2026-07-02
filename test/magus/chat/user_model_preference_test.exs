@@ -11,7 +11,10 @@ defmodule Magus.Chat.UserModelPreferenceTest do
   end
 
   describe "set_favorite / set_hidden upsert" do
-    test "favoriting creates one row, then hiding updates the same row", %{user: user, model: model} do
+    test "favoriting creates one row, then hiding updates the same row", %{
+      user: user,
+      model: model
+    } do
       {:ok, fav} = Chat.set_model_favorite(%{model_id: model.id, favorite?: true}, actor: user)
       assert fav.favorite? == true
       assert fav.hidden? == false
@@ -34,12 +37,16 @@ defmodule Magus.Chat.UserModelPreferenceTest do
   describe "validation" do
     test "rejects an internal model", %{user: user} do
       internal = generate(model(internal?: true))
-      assert {:error, _} = Chat.set_model_favorite(%{model_id: internal.id, favorite?: true}, actor: user)
+
+      assert {:error, _} =
+               Chat.set_model_favorite(%{model_id: internal.id, favorite?: true}, actor: user)
     end
 
     test "rejects an inactive model", %{user: user} do
       inactive = generate(model(active?: false))
-      assert {:error, _} = Chat.set_model_favorite(%{model_id: inactive.id, favorite?: true}, actor: user)
+
+      assert {:error, _} =
+               Chat.set_model_favorite(%{model_id: inactive.id, favorite?: true}, actor: user)
     end
   end
 

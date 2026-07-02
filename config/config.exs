@@ -356,8 +356,9 @@ config :magus, :user_model_limits, max_providers: 10, max_models: 50
 # ReqLLM provider ids a user-owned provider may target. Keeps BYOK on
 # vetted, well-behaved provider modules; "openai_compatible" covers custom
 # OpenAI-compatible endpoints (which additionally require a safe base_url).
-config :magus, :user_provider_req_llm_allowlist,
-  ~w(anthropic openai openrouter xai google openai_compatible)
+config :magus,
+       :user_provider_req_llm_allowlist,
+       ~w(anthropic openai openrouter xai google openai_compatible)
 
 # Chat domain configuration
 config :magus, Magus.Chat, unfiled_conversations_limit: 20

@@ -59,7 +59,9 @@ defmodule Magus.Models.RequestOptions do
 
   # Global providers serve anyone; owned providers serve only their owner.
   defp authorized?(%{owner_user_id: nil}, _actor_id), do: true
-  defp authorized?(%{owner_user_id: owner}, actor_id), do: is_binary(actor_id) and owner == actor_id
+
+  defp authorized?(%{owner_user_id: owner}, actor_id),
+    do: is_binary(actor_id) and owner == actor_id
 
   # openai_compatible bypasses the LLMDB spec lookup with an inline map; every
   # other provider resolves to "<req_llm_id>:<model-id-without-slug>", which is a
