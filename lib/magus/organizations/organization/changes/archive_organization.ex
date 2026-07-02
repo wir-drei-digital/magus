@@ -46,7 +46,7 @@ defmodule Magus.Organizations.Organization.Changes.ArchiveOrganization do
     |> Ash.Query.filter(organization_id == ^org.id and is_active == true)
     |> Ash.read!(authorize?: false)
     |> Enum.each(fn workspace ->
-      # authorize?: true — the Task-1 :deactivate policy clause authorizes the
+      # authorize?: true - the Task-1 :deactivate policy clause authorizes the
       # org owner; actor is passed for paper-trail attribution.
       workspace
       |> Ash.Changeset.for_update(:deactivate, %{}, actor: actor)
