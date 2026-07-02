@@ -10,6 +10,10 @@ defmodule Magus.Workspaces.Workspace do
     table "workspaces"
     repo Magus.Repo
 
+    custom_indexes do
+      index [:organization_id]
+    end
+
     references do
       reference :default_agent, on_delete: :nilify
     end
@@ -124,6 +128,8 @@ defmodule Magus.Workspaces.Workspace do
                        is_active == true and role == :admin and user_id == ^actor(:id)
                      )
                    )
+
+      authorize_if expr(exists(organization, owner_id == ^actor(:id)))
     end
 
     policy action(:create) do

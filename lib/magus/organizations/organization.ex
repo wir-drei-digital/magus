@@ -111,11 +111,11 @@ defmodule Magus.Organizations.Organization do
 
   policies do
     bypass action(:set_billing) do
-      authorize_if always()
+      authorize_if Magus.Organizations.Checks.ActorIsSystem
     end
 
     bypass action(:update_owner) do
-      authorize_if always()
+      authorize_if Magus.Organizations.Checks.ActorIsSystem
     end
 
     policy action(:create) do
