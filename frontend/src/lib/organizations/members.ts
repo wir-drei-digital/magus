@@ -3,7 +3,7 @@
  * the Svelte views so they stay unit-testable in the node vitest environment and
  * carry no dependency on the generated RPC client.
  *
- * Authorization is NEVER decided here — these only shape display and ordering.
+ * Authorization is NEVER decided here; these only shape display and ordering.
  * Owner-only controls are gated in the view by the membership role, and the
  * server enforces every mutation via the organization policies.
  */

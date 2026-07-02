@@ -8,14 +8,14 @@
  * pass rows through untouched and only shape display and pluralization.
  */
 
-import { formatCents } from '$lib/billing/format';
-
 /** The minimal member shape these helpers read; the real member is a superset. */
 export type UsageMemberLike = {
 	userId: string;
 	displayName?: string | null;
 	spentCents: number;
 	capCents?: number | null;
+	/** Prompt + completion tokens this period; absent rows count as zero. */
+	tokens?: number | null;
 };
 
 /** The minimal overview shape these helpers read. */
@@ -30,6 +30,7 @@ export type UsageRow = {
 	name: string;
 	spentCents: number;
 	capCents: number | null;
+	tokens: number;
 };
 
 /**
@@ -42,20 +43,12 @@ export function usageRows(overview: UsageOverviewLike): UsageRow[] {
 		userId: member.userId,
 		name: member.displayName?.trim() || 'Unknown',
 		spentCents: member.spentCents,
-		capCents: member.capCents ?? null
+		capCents: member.capCents ?? null,
+		tokens: member.tokens ?? 0
 	}));
 }
 
 /** The pooled label shown next to pooled spend, e.g. "1 seat" / "4 seats". */
 export function seatLabel(seatCount: number): string {
 	return `${seatCount} seat${seatCount === 1 ? '' : 's'}`;
-}
-
-/**
- * A member's monthly spend cap in CHF, or a placeholder glyph when they have no
- * cap set. Reuses the shared cents formatter so the currency style matches spend.
- */
-export function formatCap(cents: number | null): string {
-	if (cents == null) return '—';
-	return formatCents(cents);
 }

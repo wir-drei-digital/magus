@@ -1101,11 +1101,15 @@ export type OrgUsageMember = {
 	displayName: string | null;
 	spentCents: number;
 	capCents: number | null;
+	/** Prompt + completion tokens this member used this period. */
+	tokens: number;
 };
 
 /** Pooled + per-member spend for the org Usage tab. */
 export type OrgUsageOverview = {
 	pooledSpentCents: number;
+	/** Combined prompt + completion tokens across the org this period. */
+	pooledTokens: number;
 	seatCount: number;
 	members: OrgUsageMember[];
 };
@@ -1126,12 +1130,14 @@ export async function orgUsageOverview(orgId: string): Promise<RpcResult<OrgUsag
 		success: true,
 		data: {
 			pooledSpentCents: Number(data.pooled_spent_cents ?? 0),
+			pooledTokens: Number(data.pooled_tokens ?? 0),
 			seatCount: Number(data.seat_count ?? 0),
 			members: rows.map((row) => ({
 				userId: String(row.user_id ?? ''),
 				displayName: typeof row.display_name === 'string' ? row.display_name : null,
 				spentCents: Number(row.spent_cents ?? 0),
-				capCents: row.cap_cents == null ? null : Number(row.cap_cents)
+				capCents: row.cap_cents == null ? null : Number(row.cap_cents),
+				tokens: Number(row.tokens ?? 0)
 			}))
 		}
 	};

@@ -7,7 +7,7 @@ import type { OrganizationDetail, OrgMemberEntry } from '$lib/ash/api';
  * membership once (org + role), loads the roster, and exposes `reload` so a page
  * mutation (invite, role change, remove) refreshes without re-resolving the org.
  *
- * `isOwner` reflects the membership role only — it hides owner-only controls in
+ * `isOwner` reflects the membership role only; it hides owner-only controls in
  * the UI. It is NOT the authorization boundary: the server enforces every
  * mutation via the organization policies.
  */

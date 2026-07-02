@@ -7,6 +7,7 @@
 	import { session } from '$lib/stores/session.svelte';
 	import { Button, Field, Section, CONTROL_CLASS } from '$lib/components/crud';
 	import { setOrgAdmin, type OrgAdminState } from '$lib/components/organizations/context';
+	import { slugify } from '$lib/organizations/slug';
 
 	let { children }: { children: Snippet } = $props();
 
@@ -57,7 +58,7 @@
 		}
 	}
 
-	// (Re)load once the signed-in user is known — the owner gate and the "you"
+	// (Re)load once the signed-in user is known; the owner gate and the "you"
 	// marker both need their id. Only uid is a tracked dependency; the async body
 	// isn't reactive past the first await.
 	$effect(() => {
@@ -77,14 +78,6 @@
 	let slugEdited = $state(false);
 	let creating = $state(false);
 	let createError = $state<string | null>(null);
-
-	function slugify(value: string): string {
-		return value
-			.toLowerCase()
-			.replace(/[^a-z0-9\s-]/g, '')
-			.replace(/\s+/g, '-')
-			.replace(/^-+|-+$/g, '');
-	}
 
 	function onNameInput() {
 		if (!slugEdited) slug = slugify(name);
