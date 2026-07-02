@@ -52,7 +52,12 @@
 			kind: 'form',
 			hint: 'Connect with your server URL and an app password.',
 			fields: [
-				{ name: 'base_url', label: 'Server URL', type: 'url', placeholder: 'https://cloud.example.com' },
+				{
+					name: 'base_url',
+					label: 'Server URL',
+					type: 'url',
+					placeholder: 'https://cloud.example.com'
+				},
 				{ name: 'username', label: 'Username', type: 'text' },
 				{ name: 'password', label: 'App password', type: 'password' }
 			]
@@ -62,7 +67,9 @@
 			label: 'Website',
 			kind: 'form',
 			hint: 'Crawl a public site or docs URL.',
-			fields: [{ name: 'seed_url', label: 'URL', type: 'url', placeholder: 'https://example.com/docs' }]
+			fields: [
+				{ name: 'seed_url', label: 'URL', type: 'url', placeholder: 'https://example.com/docs' }
+			]
 		}
 	];
 
@@ -274,7 +281,8 @@
 			<div class="flex flex-col gap-3">
 				<p class="text-sm">
 					Syncing {createdCount}
-					{createdCount === 1 ? 'folder' : 'folders'}. They'll appear in your knowledge base shortly.
+					{createdCount === 1 ? 'folder' : 'folders'}. They'll appear in your knowledge base
+					shortly.
 				</p>
 				<div class="flex justify-end">
 					<Button size="sm" onclick={() => (open = false)}>Done</Button>

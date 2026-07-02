@@ -5,9 +5,7 @@ import type { ThreadNavSummary } from '$lib/ash/api';
  * backend's oldest-first order. Threads without a parent (should not happen for
  * real threads) are skipped.
  */
-export function groupThreadsByParent(
-	threads: ThreadNavSummary[]
-): Map<string, ThreadNavSummary[]> {
+export function groupThreadsByParent(threads: ThreadNavSummary[]): Map<string, ThreadNavSummary[]> {
 	const map = new Map<string, ThreadNavSummary[]>();
 	for (const thread of threads) {
 		if (!thread.parentConversationId) continue;

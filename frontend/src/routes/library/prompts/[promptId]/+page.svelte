@@ -317,4 +317,4 @@
 	{/if}
 </div>
 
-<PromptFormDialog bind:open={editOpen} prompt={prompt} onSaved={(updated) => (prompt = updated)} />
+<PromptFormDialog bind:open={editOpen} {prompt} onSaved={(updated) => (prompt = updated)} />

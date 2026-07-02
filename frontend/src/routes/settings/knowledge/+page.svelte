@@ -76,7 +76,6 @@
 		else error = result.errors[0]?.message ?? 'Could not disconnect source';
 	}
 
-
 	function statusClass(status: string): string {
 		if (status === 'active') return 'bg-success/15 text-success';
 		if (status === 'error') return 'bg-destructive/15 text-destructive';

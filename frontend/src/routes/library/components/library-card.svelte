@@ -21,9 +21,7 @@
 	// Prompts double the first lines of their body as a preview; skills lean on
 	// their description in the header instead.
 	const preview = $derived(item.kind === 'prompt' ? item.prompt.content.trim() : '');
-	const toolCount = $derived(
-		item.kind === 'skill' ? (item.skill.requestedTools?.length ?? 0) : 0
-	);
+	const toolCount = $derived(item.kind === 'skill' ? (item.skill.requestedTools?.length ?? 0) : 0);
 </script>
 
 <!-- The card itself is the link (whole-surface navigation); the favorite button

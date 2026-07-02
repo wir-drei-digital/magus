@@ -1191,7 +1191,8 @@
 								data-testid="attachment-token-budget"
 							>
 								Always-include tokens: {alwaysTokens.toLocaleString()} / {MAX_ALWAYS_INCLUDE_TOKENS.toLocaleString()}
-								{#if tokenTier === 'over'} — over budget, trim always-include files{/if}
+								{#if tokenTier === 'over'}
+									— over budget, trim always-include files{/if}
 							</p>
 						{/if}
 					{:else}
@@ -1293,10 +1294,7 @@
 										</div>
 									{/if}
 
-									<AgentIntegrationConfig
-										{integration}
-										onSaved={() => loadIntegrations(agentId)}
-									/>
+									<AgentIntegrationConfig {integration} onSaved={() => loadIntegrations(agentId)} />
 								</div>
 							{/each}
 						</div>

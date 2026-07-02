@@ -52,10 +52,7 @@
 	});
 
 	const canSave = $derived(
-		name.trim() !== '' &&
-		NAME_RE.test(name.trim()) &&
-		description.trim() !== '' &&
-		!saving
+		name.trim() !== '' && NAME_RE.test(name.trim()) && description.trim() !== '' && !saving
 	);
 
 	function validateName(): boolean {

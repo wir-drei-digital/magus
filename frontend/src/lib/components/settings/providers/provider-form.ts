@@ -29,9 +29,7 @@ export type ValidationStatus = 'pending' | 'valid' | 'invalid' | 'error';
  * Maps a credential validation status to a visual badge kind. Kept pure and
  * decoupled from any styling so the page can translate the kind to classes.
  */
-export function badgeKind(
-	status: ValidationStatus
-): 'neutral' | 'success' | 'danger' | 'warning' {
+export function badgeKind(status: ValidationStatus): 'neutral' | 'success' | 'danger' | 'warning' {
 	switch (status) {
 		case 'valid':
 			return 'success';

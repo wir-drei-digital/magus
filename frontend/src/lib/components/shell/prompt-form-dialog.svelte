@@ -135,7 +135,11 @@
 
 			<label class="flex flex-col gap-1.5 text-sm">
 				<span class="text-xs font-medium text-muted-foreground">Description</span>
-				<input bind:value={description} class={CONTROL_CLASS} data-testid="prompt-form-description" />
+				<input
+					bind:value={description}
+					class={CONTROL_CLASS}
+					data-testid="prompt-form-description"
+				/>
 			</label>
 
 			<label class="flex flex-col gap-1.5 text-sm">

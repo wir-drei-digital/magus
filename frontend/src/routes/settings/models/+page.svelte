@@ -21,7 +21,8 @@
 			.sort(
 				(a, b) =>
 					(prefMap.get(a.id)?.position ?? Number.POSITIVE_INFINITY) -
-						(prefMap.get(b.id)?.position ?? Number.POSITIVE_INFINITY) || a.name.localeCompare(b.name)
+						(prefMap.get(b.id)?.position ?? Number.POSITIVE_INFINITY) ||
+					a.name.localeCompare(b.name)
 			)
 	);
 
@@ -131,9 +132,17 @@
 							aria-pressed={pref?.favorite ?? false}
 							class="rounded p-1 hover:bg-accent/60"
 						>
-							<Star class="size-4 {pref?.favorite ? 'fill-primary text-primary' : 'text-muted-foreground'}" />
+							<Star
+								class="size-4 {pref?.favorite
+									? 'fill-primary text-primary'
+									: 'text-muted-foreground'}"
+							/>
 						</button>
-						<span class="flex-1 truncate text-sm {pref?.hidden ? 'text-muted-foreground line-through' : ''}">
+						<span
+							class="flex-1 truncate text-sm {pref?.hidden
+								? 'text-muted-foreground line-through'
+								: ''}"
+						>
 							{model.name}
 						</span>
 						{#if model.provider}
