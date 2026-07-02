@@ -125,6 +125,12 @@ defmodule Magus.Chat.Model do
       filter expr(owner_user_id == ^actor(:id))
     end
 
+    destroy :destroy_owned do
+      description "Owner deletes a user-owned model."
+      require_atomic? false
+      change Magus.Chat.Model.Changes.RequireOwner
+    end
+
     update :update do
       primary? true
 

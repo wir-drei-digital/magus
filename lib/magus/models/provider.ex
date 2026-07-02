@@ -17,7 +17,13 @@ defmodule Magus.Models.Provider do
     otp_app: :magus,
     domain: Magus.Models,
     data_layer: AshPostgres.DataLayer,
-    authorizers: [Ash.Policy.Authorizer]
+    authorizers: [Ash.Policy.Authorizer],
+    extensions: [AshTypescript.Resource]
+
+  postgres do
+    table "model_providers"
+    repo Magus.Repo
+  end
 
   # ReqLLM provider ids a user-owned provider (:create_owned) may target.
   # Config-driven per deployment; resolved at compile time.
@@ -27,9 +33,11 @@ defmodule Magus.Models.Provider do
                             ~w(anthropic openai openrouter xai google openai_compatible)
                           )
 
-  postgres do
-    table "model_providers"
-    repo Magus.Repo
+  typescript do
+    type_name "ModelProvider"
+
+    # Elixir-style `?` attribute names are invalid TypeScript identifiers.
+    field_names enabled?: "enabled"
   end
 
   actions do
@@ -87,6 +95,12 @@ defmodule Magus.Models.Provider do
       filter expr(owner_user_id == ^actor(:id))
     end
 
+    destroy :destroy_owned do
+      description "Owner deletes a user-owned provider; its owned models are deleted first."
+      require_atomic? false
+      change Magus.Models.Provider.Changes.DestroyOwnedModels
+    end
+
     update :stamp_validation do
       description "Writes credential validation results (worker only)."
       accept [:validation_status, :last_validated_at]
@@ -121,6 +135,10 @@ defmodule Magus.Models.Provider do
     end
 
     policy action(:update_owned) do
+      authorize_if expr(owner_user_id == ^actor(:id))
+    end
+
+    policy action(:destroy_owned) do
       authorize_if expr(owner_user_id == ^actor(:id))
     end
 

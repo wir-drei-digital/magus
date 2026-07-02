@@ -7,6 +7,7 @@ export type AshDate = string;
 export type Decimal = string;
 export type UUID = string;
 export type UUIDv7 = string;
+export type UtcDateTime = string;
 export type UtcDateTimeUsec = string;
 
 // User Schema
@@ -889,6 +890,7 @@ export type ModelResourceSchema = {
   internal: boolean;
   modelProviderId: UUID | null;
   requestCostCents: number | null;
+  modelProvider: { __type: "Relationship"; __resource: ModelProviderResourceSchema | null; };
 };
 
 
@@ -1411,6 +1413,36 @@ export type MCPServerCredentialAttributesOnlySchema = {
   status: "connected" | "disconnected" | "error" | "needs_auth";
   mcpServerId: UUID;
   userId: UUID;
+};
+
+
+// ModelProvider Schema
+export type ModelProviderResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "name" | "slug" | "reqLlmId" | "baseUrl" | "enabled" | "validationStatus" | "lastValidatedAt";
+  id: UUID;
+  name: string;
+  slug: string;
+  reqLlmId: string;
+  baseUrl: string | null;
+  enabled: boolean;
+  validationStatus: "error" | "invalid" | "pending" | "valid";
+  lastValidatedAt: UtcDateTime | null;
+};
+
+
+
+export type ModelProviderAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "name" | "slug" | "reqLlmId" | "baseUrl" | "enabled" | "validationStatus" | "lastValidatedAt";
+  id: UUID;
+  name: string;
+  slug: string;
+  reqLlmId: string;
+  baseUrl: string | null;
+  enabled: boolean;
+  validationStatus: "error" | "invalid" | "pending" | "valid";
+  lastValidatedAt: UtcDateTime | null;
 };
 
 
@@ -4040,6 +4072,7 @@ export type ModelFilterInput = {
   };
 
 
+  modelProvider?: ModelProviderFilterInput;
 
 };
 export type UserFolderStateFilterInput = {
@@ -5157,6 +5190,67 @@ export type MCPServerCredentialFilterInput = {
   user?: UserFilterInput;
 
 };
+export type ModelProviderFilterInput = {
+  and?: Array<ModelProviderFilterInput>;
+  or?: Array<ModelProviderFilterInput>;
+  not?: Array<ModelProviderFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  name?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  slug?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  reqLlmId?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  baseUrl?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  enabled?: {
+    eq?: boolean;
+    notEq?: boolean;
+  };
+
+  validationStatus?: {
+    eq?: "error" | "invalid" | "pending" | "valid";
+    notEq?: "error" | "invalid" | "pending" | "valid";
+    in?: Array<"error" | "invalid" | "pending" | "valid">;
+  };
+
+  lastValidatedAt?: {
+    eq?: UtcDateTime;
+    notEq?: UtcDateTime;
+    greaterThan?: UtcDateTime;
+    greaterThanOrEqual?: UtcDateTime;
+    lessThan?: UtcDateTime;
+    lessThanOrEqual?: UtcDateTime;
+    in?: Array<UtcDateTime>;
+    isNil?: boolean;
+  };
+
+
+
+};
 export type NotificationFilterInput = {
   and?: Array<NotificationFilterInput>;
   or?: Array<NotificationFilterInput>;
@@ -6127,6 +6221,9 @@ export type MCPServerFilterField = (typeof mCPServerFilterFields)[number];
 export const mCPServerCredentialFilterFields = ["id", "authKind", "oauthExpiresAt", "status", "mcpServerId", "userId", "mcpServer", "user"] as const;
 export type MCPServerCredentialFilterField = (typeof mCPServerCredentialFilterFields)[number];
 
+export const modelProviderFilterFields = ["id", "name", "slug", "reqLlmId", "baseUrl", "enabled", "validationStatus", "lastValidatedAt"] as const;
+export type ModelProviderFilterField = (typeof modelProviderFilterFields)[number];
+
 export const notificationFilterFields = ["id", "title", "body", "notificationType", "readAt", "metadata", "targetConversationId", "insertedAt", "updatedAt", "userId", "user"] as const;
 export type NotificationFilterField = (typeof notificationFilterFields)[number];
 
@@ -6265,6 +6362,9 @@ export type MCPServerSortField = (typeof mCPServerSortFields)[number];
 
 export const mCPServerCredentialSortFields = ["id", "authKind", "oauthExpiresAt", "status", "mcpServerId", "userId"] as const;
 export type MCPServerCredentialSortField = (typeof mCPServerCredentialSortFields)[number];
+
+export const modelProviderSortFields = ["id", "name", "slug", "reqLlmId", "baseUrl", "enabled", "validationStatus", "lastValidatedAt"] as const;
+export type ModelProviderSortField = (typeof modelProviderSortFields)[number];
 
 export const notificationSortFields = ["id", "title", "body", "notificationType", "readAt", "metadata", "targetConversationId", "insertedAt", "updatedAt", "userId"] as const;
 export type NotificationSortField = (typeof notificationSortFields)[number];
