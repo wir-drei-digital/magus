@@ -12,15 +12,37 @@ defmodule Magus.Agents.AgentInboxEvent.Changes.TriggerUrgentWake do
   One urgent run per event, ever: the `"inbox:<event_id>"` idempotency key
   makes replays and post-failure retries no-ops; an unhandled event falls
   back to the next heartbeat.
+
+  ## Nested-transaction deferral
+
+  When the event is created inside a still-open parent transaction (e.g.
+  `Magus.Plan.Task` update → `NotifyAgentAssignment` after_action →
+  `create_inbox_event`), Ash starts no new transaction for the nested create,
+  so this `after_transaction` hook runs synchronously *inside* the outer
+  transaction. Enqueuing there would write an `AgentRun` and dispatch the
+  agent before the outer transaction commits: if a later step rolls back, the
+  event and run vanish but the agent was already dispatched (phantom run), and
+  during the window the in-flight gate wrongly blocks legitimate enqueues.
+
+  To guarantee we only wake for *committed* events, when
+  `Ash.DataLayer.in_transaction?/1` is true we defer: a supervised async task
+  polls (outside the transaction) for the committed event and runs the wake
+  only once the event is durably visible, still unlinked, and pending/waiting.
+  If the outer transaction rolls back the event never appears and no wake
+  fires. Outside a transaction the wake runs synchronously as before.
   """
 
   use Ash.Resource.Change
 
   require Logger
 
+  alias Magus.Agents.AgentInboxEvent
   alias Magus.Agents.HeartbeatEventMessage
   alias Magus.Agents.RunOrchestrator
   alias Magus.Agents.Support.HomeConversation
+
+  @poll_attempts 10
+  @poll_interval_ms 200
 
   @impl true
   def change(changeset, _opts, _context) do
@@ -35,7 +57,72 @@ defmodule Magus.Agents.AgentInboxEvent.Changes.TriggerUrgentWake do
   end
 
   defp maybe_wake(%{urgency: :immediate, agent_run_id: nil} = event) do
-    with {:ok, agent} <- Ash.get(Magus.Agents.CustomAgent, event.agent_id, authorize?: false),
+    if Ash.DataLayer.in_transaction?(AgentInboxEvent) do
+      defer_wake(event)
+    else
+      do_wake(event)
+    end
+  end
+
+  defp maybe_wake(_event), do: :ok
+
+  # Inside an open outer transaction: the event row is not yet committed and a
+  # later after_action could still roll it back. Hand off to a supervised task
+  # that polls for the committed event before waking. Never fails event
+  # creation: if the supervisor is unavailable the event falls back to the next
+  # heartbeat pickup.
+  defp defer_wake(event) do
+    Logger.debug(
+      "TriggerUrgentWake: deferring wake for event #{event.id} (created in transaction)"
+    )
+
+    Task.Supervisor.start_child(Magus.AgentLoopTaskSupervisor, fn ->
+      poll_and_wake(event.id, @poll_attempts)
+    end)
+
+    :ok
+  rescue
+    e ->
+      Logger.warning(
+        "TriggerUrgentWake: could not defer wake for event #{event.id} (falls back to heartbeat): #{Exception.message(e)}"
+      )
+
+      :ok
+  catch
+    :exit, reason ->
+      Logger.warning(
+        "TriggerUrgentWake: could not defer wake for event #{event.id} (falls back to heartbeat): #{inspect(reason)}"
+      )
+
+      :ok
+  end
+
+  defp poll_and_wake(_event_id, 0), do: :ok
+
+  defp poll_and_wake(event_id, attempts_left) do
+    case Ash.get(AgentInboxEvent, event_id, authorize?: false) do
+      {:ok, %{agent_run_id: nil, status: status} = event} when status in [:pending, :waiting] ->
+        do_wake(event)
+
+      {:ok, _event} ->
+        # Event committed but already linked or no longer pending: nothing to do.
+        :ok
+
+      {:error, _} ->
+        Process.sleep(@poll_interval_ms)
+        poll_and_wake(event_id, attempts_left - 1)
+    end
+  rescue
+    e ->
+      Logger.warning(
+        "TriggerUrgentWake: deferred wake failed for event #{event_id}: #{Exception.message(e)}"
+      )
+
+      :ok
+  end
+
+  defp do_wake(%{agent_id: agent_id} = event) do
+    with {:ok, agent} <- Ash.get(Magus.Agents.CustomAgent, agent_id, authorize?: false),
          true <- agent.heartbeat_enabled and not agent.is_paused,
          {:ok, home} <- HomeConversation.ensure(agent.user_id, agent.id) do
       enqueue(event, agent, home)
@@ -50,8 +137,6 @@ defmodule Magus.Agents.AgentInboxEvent.Changes.TriggerUrgentWake do
 
       :ok
   end
-
-  defp maybe_wake(_event), do: :ok
 
   defp enqueue(event, agent, home) do
     attrs = %{
