@@ -88,6 +88,16 @@ defmodule Magus.Agents.TriggerUrgentWakeTest do
 
     event = Ash.get!(Magus.Agents.AgentInboxEvent, event.id, authorize?: false)
     assert event.agent_run_id == run.id
+
+    logs =
+      Magus.Agents.AgentActivityLog
+      |> Ash.Query.for_read(:for_agent, %{agent_id: agent.id})
+      |> Ash.read!(authorize?: false)
+
+    assert Enum.any?(logs, fn log ->
+             log.activity_type == :wake_urgent and
+               log.summary == "Urgent wake for inbox event: #{event.title}"
+           end)
   end
 
   test "deferred event does not enqueue", %{user: user, agent: agent} do

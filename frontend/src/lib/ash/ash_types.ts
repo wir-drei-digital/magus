@@ -81,7 +81,7 @@ export type AgentActivityLogResourceSchema = {
   id: UUIDv7;
   agentId: UUID;
   userId: UUID;
-  activityType: "approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "task_completed" | "task_created" | "task_updated" | "triage_completed";
+  activityType: "approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "recovery" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "run_timed_out" | "task_completed" | "task_created" | "task_updated" | "triage_completed" | "wake_skipped" | "wake_urgent";
   summary: string;
   eventId: UUID | null;
   runId: UUID | null;
@@ -103,7 +103,7 @@ export type AgentActivityLogAttributesOnlySchema = {
   id: UUIDv7;
   agentId: UUID;
   userId: UUID;
-  activityType: "approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "task_completed" | "task_created" | "task_updated" | "triage_completed";
+  activityType: "approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "recovery" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "run_timed_out" | "task_completed" | "task_created" | "task_updated" | "triage_completed" | "wake_skipped" | "wake_urgent";
   summary: string;
   eventId: UUID | null;
   runId: UUID | null;
@@ -2084,9 +2084,9 @@ export type AgentActivityLogFilterInput = {
   };
 
   activityType?: {
-    eq?: "approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "task_completed" | "task_created" | "task_updated" | "triage_completed";
-    notEq?: "approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "task_completed" | "task_created" | "task_updated" | "triage_completed";
-    in?: Array<"approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "task_completed" | "task_created" | "task_updated" | "triage_completed">;
+    eq?: "approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "recovery" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "run_timed_out" | "task_completed" | "task_created" | "task_updated" | "triage_completed" | "wake_skipped" | "wake_urgent";
+    notEq?: "approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "recovery" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "run_timed_out" | "task_completed" | "task_created" | "task_updated" | "triage_completed" | "wake_skipped" | "wake_urgent";
+    in?: Array<"approval_requested" | "content_curated" | "error" | "event_dismissed" | "event_resolved" | "external_tool_call" | "memory_updated" | "recovery" | "response_sent" | "run_completed" | "run_failed" | "run_spawned" | "run_timed_out" | "task_completed" | "task_created" | "task_updated" | "triage_completed" | "wake_skipped" | "wake_urgent">;
   };
 
   summary?: {

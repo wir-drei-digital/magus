@@ -39,6 +39,7 @@ defmodule Magus.Agents.AgentInboxEvent.Changes.TriggerUrgentWake do
   alias Magus.Agents.AgentInboxEvent
   alias Magus.Agents.HeartbeatEventMessage
   alias Magus.Agents.RunOrchestrator
+  alias Magus.Agents.Support.AutonomyTrace
   alias Magus.Agents.Support.HomeConversation
 
   @poll_attempts 10
@@ -156,6 +157,14 @@ defmodule Magus.Agents.AgentInboxEvent.Changes.TriggerUrgentWake do
         link_event(event, run)
         trace(home.id, run)
 
+        AutonomyTrace.log(
+          agent.id,
+          agent.user_id,
+          :wake_urgent,
+          "Urgent wake for inbox event: #{event.title}",
+          %{event_id: event.id}
+        )
+
       {:ok, :existing, _run} ->
         :ok
 
@@ -165,6 +174,15 @@ defmodule Magus.Agents.AgentInboxEvent.Changes.TriggerUrgentWake do
 
       {:error, reason} when reason in [:budget_exceeded, :insufficient_spend_budget] ->
         Logger.info("TriggerUrgentWake: skipped (#{reason}) for event #{event.id}")
+
+        AutonomyTrace.log(
+          agent.id,
+          agent.user_id,
+          :wake_skipped,
+          "Urgent wake skipped for inbox event: #{event.title}",
+          %{reason: to_string(reason), event_id: event.id}
+        )
+
         :ok
 
       {:error, reason} ->

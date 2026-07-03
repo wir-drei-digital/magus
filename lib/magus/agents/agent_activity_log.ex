@@ -114,7 +114,11 @@ defmodule Magus.Agents.AgentActivityLog do
                     :content_curated,
                     :memory_updated,
                     :external_tool_call,
-                    :error
+                    :error,
+                    :wake_skipped,
+                    :wake_urgent,
+                    :run_timed_out,
+                    :recovery
                   ]
 
       allow_nil? false

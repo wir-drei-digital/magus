@@ -73,6 +73,45 @@ defmodule Magus.Agents.AgentRun.Changes.CleanupStaleTest do
       }
     end
 
+    test "writes a :run_timed_out activity log entry when reaping an agent-scoped run",
+         %{user: user, parent: parent} do
+      agent = generate(custom_agent(user))
+
+      run =
+        sub_agent_run(
+          source_conversation_id: parent.id,
+          target_agent_id: agent.id,
+          initiator_user_id: user.id,
+          objective: "Stale agent task"
+        )
+
+      {:ok, run} = Magus.Agents.start_agent_run(run, authorize?: false)
+
+      stale_time = DateTime.add(DateTime.utc_now(), -3, :minute)
+
+      {:ok, run} =
+        run
+        |> Ash.Changeset.for_update(:heartbeat, %{})
+        |> Ash.Changeset.force_change_attribute(:last_heartbeat_at, stale_time)
+        |> Ash.update(authorize?: false)
+
+      {:ok, _} =
+        run
+        |> Ash.Changeset.for_update(:cleanup_stale, %{})
+        |> Ash.update(authorize?: false)
+
+      logs =
+        Magus.Agents.AgentActivityLog
+        |> Ash.Query.for_read(:for_agent, %{agent_id: agent.id})
+        |> Ash.read!(authorize?: false)
+
+      assert Enum.any?(logs, fn log ->
+               log.activity_type == :run_timed_out and
+                 log.summary == "Run timed out: no liveness for 2m" and
+                 log.details["run_id"] == run.id
+             end)
+    end
+
     test "no-ops when run is no longer running", %{parent: parent} do
       run =
         sub_agent_run(

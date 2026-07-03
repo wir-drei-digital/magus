@@ -29,6 +29,8 @@ defmodule Magus.Agents.AgentRun.Changes.CleanupStale do
 
   require Logger
 
+  alias Magus.Agents.Support.AutonomyTrace
+
   @default_max_run_duration_minutes 30
 
   @impl true
@@ -109,6 +111,18 @@ defmodule Magus.Agents.AgentRun.Changes.CleanupStale do
       request_id: run.request_id,
       error: "Run timed out"
     })
+
+    AutonomyTrace.log(
+      run.target_agent_id,
+      run.initiator_user_id,
+      :run_timed_out,
+      "Run timed out: no liveness for 2m",
+      %{
+        run_id: run.id,
+        source: run.source,
+        objective: String.slice(run.objective || "", 0, 200)
+      }
+    )
 
     Magus.Agents.RunOrchestrator.maybe_start_next(run.target_conversation_id)
   end

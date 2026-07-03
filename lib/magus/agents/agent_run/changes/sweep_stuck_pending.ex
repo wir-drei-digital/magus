@@ -24,6 +24,8 @@ defmodule Magus.Agents.AgentRun.Changes.SweepStuckPending do
 
   require Logger
 
+  alias Magus.Agents.Support.AutonomyTrace
+
   @stuck_timeout_hours 6
 
   @impl true
@@ -50,6 +52,14 @@ defmodule Magus.Agents.AgentRun.Changes.SweepStuckPending do
               request_id: current.request_id,
               error: "Run stuck in pending"
             })
+
+            AutonomyTrace.log(
+              current.target_agent_id,
+              current.initiator_user_id,
+              :run_timed_out,
+              "Run stuck in pending > #{@stuck_timeout_hours}h",
+              %{run_id: current.id, source: current.source}
+            )
           else
             # Lost maybe_start_next (e.g. node restart between enqueue and
             # claim): nudge the claim loop; it no-ops when capacity is full.
