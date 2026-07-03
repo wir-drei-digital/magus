@@ -189,7 +189,7 @@ defmodule Magus.Integrations.Providers.RssSource do
   end
 
   defp fetch_and_parse_feed(url) do
-    case Req.get(url, receive_timeout: 15_000, decode_body: false, raw: true) do
+    case Req.get(url, receive_timeout: 15_000, decode_body: false, raw: true, retry: false) do
       {:ok, %Req.Response{status: 200, body: body}} when byte_size(body) <= @max_body_bytes ->
         parse_feed_body(body)
 

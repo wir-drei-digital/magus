@@ -8,9 +8,11 @@ defmodule Magus.Integrations.IntegrationHealthTest do
   an errored integration resets the counters.
 
   RSS polling failures happen in-process (no network): we point the
-  integration at an unreachable local port with a short Req timeout, which
-  Req reports immediately as `{:error, %Mint.TransportError{...}}` without
-  ever touching the network, keeping these tests deterministic and offline.
+  integration at an unreachable local port (with Req retries disabled via
+  `retry: false` in `RssSource.fetch_and_parse_feed/1`), which Req reports
+  immediately as `{:error, %Mint.TransportError{...}}` without ever
+  touching the network or retrying, keeping these tests deterministic,
+  offline, and fast.
   """
 
   use Magus.DataCase, async: true
@@ -173,12 +175,15 @@ defmodule Magus.Integrations.IntegrationHealthTest do
       assert hd(notifications).notification_type == :system
     end
 
-    test "does not notify again on failures after the integration is already errored", %{
-      integration: integration,
-      user: user
-    } do
+    test "does not notify again when the worker runs again on an already-errored integration",
+         %{integration: integration, user: user} do
+      # Drive 9 failures directly via the action (equivalent to 9 failed
+      # polls) so the test stays fast, then let the worker perform the 10th
+      # poll itself through the real perform/1 -> handle_poll_failure ->
+      # handle_threshold_reached path, exercising the actual
+      # already_errored? guard rather than asserting on bare actions.
       integration =
-        Enum.reduce(1..10, integration, fn _, acc ->
+        Enum.reduce(1..9, integration, fn _, acc ->
           {:ok, updated} =
             Integrations.record_integration_poll_failure(acc, %{last_error: "boom"},
               authorize?: false
@@ -187,24 +192,28 @@ defmodule Magus.Integrations.IntegrationHealthTest do
           updated
         end)
 
-      {:ok, integration} = Integrations.mark_integration_errored(integration, authorize?: false)
+      assert integration.consecutive_failures == 9
 
-      # Simulate the worker recognizing the transition already happened by
-      # calling record_poll_failure directly again (11th failure) — this
-      # must not create a second notification.
-      {:ok, _updated} =
-        Integrations.record_integration_poll_failure(integration, %{last_error: "boom again"},
-          authorize?: false
-        )
+      assert {:error, :all_feeds_failed} =
+               PollDataSource.perform(%Oban.Job{args: %{"integration_id" => integration.id}})
 
-      # Only the direct actions were exercised here (no second call into the
-      # worker's notify-on-transition logic), so we assert no notification
-      # got created by this reduce/mark_errored sequence beyond what a
-      # single transition would create. Since mark_integration_errored
-      # itself does not notify (the worker does), we expect zero
-      # notifications from this path.
+      {:ok, errored} = Integrations.get_user_integration(integration.id, authorize?: false)
+      assert errored.status == :error
+      assert errored.consecutive_failures == 10
+
       {:ok, notifications} = Magus.Notifications.list_unread_notifications(actor: user)
-      assert notifications == []
+      assert length(notifications) == 1
+
+      # Run the worker again on the now-:error integration. Whether it
+      # short-circuits via check_active/1 (status no longer :active) or
+      # re-runs the threshold branch, no additional notification must be
+      # created.
+      PollDataSource.perform(%Oban.Job{args: %{"integration_id" => integration.id}})
+
+      {:ok, notifications_after_second_run} =
+        Magus.Notifications.list_unread_notifications(actor: user)
+
+      assert length(notifications_after_second_run) == 1
     end
 
     test "check_active cancels before any counter update when integration is inactive", %{
