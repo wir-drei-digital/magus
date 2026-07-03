@@ -149,7 +149,7 @@ defmodule Magus.Generators do
          |> Ash.read_one(authorize?: false) do
       {:ok, %{} = sub} ->
         sub
-        |> Ash.Changeset.for_update(:update, %{usage_plan_id: plan.id}, authorize?: false)
+        |> Ash.Changeset.for_update(:upgrade, %{usage_plan_id: plan.id}, authorize?: false)
         |> Ash.update!(authorize?: false)
 
       _ ->
