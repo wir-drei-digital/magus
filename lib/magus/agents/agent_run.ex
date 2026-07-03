@@ -234,7 +234,14 @@ defmodule Magus.Agents.AgentRun do
     end
 
     attribute :source, :atom do
-      constraints one_of: [:mention, :heartbeat, :manual_trigger, :sub_agent_spawn]
+      constraints one_of: [
+                    :mention,
+                    :heartbeat,
+                    :manual_trigger,
+                    :sub_agent_spawn,
+                    :inbox_urgent
+                  ]
+
       default :mention
       allow_nil? false
       public? true
