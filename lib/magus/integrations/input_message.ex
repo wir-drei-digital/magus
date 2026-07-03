@@ -11,13 +11,30 @@ defmodule Magus.Integrations.InputMessage do
     otp_app: :magus,
     domain: Magus.Integrations,
     data_layer: AshPostgres.DataLayer,
-    authorizers: [Ash.Policy.Authorizer]
+    authorizers: [Ash.Policy.Authorizer],
+    extensions: [AshOban]
 
   postgres do
     table "integration_input_messages"
     repo Magus.Repo
 
     identity_wheres_to_sql unique_external: "external_id IS NOT NULL"
+  end
+
+  oban do
+    triggers do
+      trigger :fail_stuck do
+        action :fail_stuck_message
+        queue :input_message_sweep
+        scheduler_cron "*/15 * * * *"
+        read_action :stuck_processing
+        worker_read_action :stuck_processing
+        where expr(is_stuck_processing)
+        worker_module_name Magus.Integrations.InputMessage.Workers.FailStuck
+        scheduler_module_name Magus.Integrations.InputMessage.Schedulers.FailStuck
+        max_attempts 1
+      end
+    end
   end
 
   actions do
@@ -53,8 +70,30 @@ defmodule Magus.Integrations.InputMessage do
       change set_attribute(:status, :failed)
     end
 
+    update :fail_stuck_message do
+      description """
+      Oban-triggered: fails an InputMessage stuck in :processing (gated
+      upstream by `stuck_processing`, which the `:fail_stuck` trigger's
+      `where` clause uses to select candidates).
+      """
+
+      accept []
+      change set_attribute(:status, :failed)
+      change set_attribute(:error_message, "Processing timed out after 10 minutes")
+    end
+
     update :route_to_conversation do
       accept [:routed_to_conversation_id]
+    end
+
+    read :stuck_processing do
+      description """
+      InputMessages stuck in :processing for more than 10 minutes (by
+      updated_at). Backs the 15-minute `:fail_stuck` trigger.
+      """
+
+      pagination keyset?: true, required?: false
+      filter expr(is_stuck_processing)
     end
 
     read :pending do
@@ -93,6 +132,13 @@ defmodule Magus.Integrations.InputMessage do
   end
 
   policies do
+    # The 15-minute stuck-message sweep reads/updates across all users'
+    # InputMessages with no real actor; AshOban authorizes its own calls via
+    # this check (mirrors AgentRun / CustomAgent's watchdog triggers).
+    bypass AshOban.Checks.AshObanInteraction do
+      authorize_if always()
+    end
+
     policy action_type(:read) do
       authorize_if relates_to_actor_via(:user)
     end
@@ -166,6 +212,17 @@ defmodule Magus.Integrations.InputMessage do
     belongs_to :user_integration, Magus.Integrations.UserIntegration
 
     belongs_to :routed_to_conversation, Magus.Chat.Conversation
+  end
+
+  calculations do
+    calculate :is_stuck_processing, :boolean do
+      public? false
+
+      calculation expr(
+                    status == :processing and
+                      updated_at < ago(10, :minute)
+                  )
+    end
   end
 
   identities do

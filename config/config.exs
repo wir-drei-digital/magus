@@ -167,6 +167,10 @@ config :magus, Oban,
     brain_page_cleanup: 1,
     # Data source polling (RSS feeds, etc.)
     integrations: [limit: 5],
+    # Daily credential-expiry warning sweep
+    credential_expiry: 1,
+    # 15-min stuck-InputMessage (:processing > 10m) sweep
+    input_message_sweep: 1,
     brain_name_page: [limit: 2],
     # Brain chunk embedding generation (page chunks + source chunks).
     brain_embedding: [limit: 5],
