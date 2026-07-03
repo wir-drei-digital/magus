@@ -31,6 +31,9 @@ defmodule Magus.Organizations.OrgUsage do
          pooled_spent_cents: pooled,
          pooled_tokens: pooled_tokens,
          seat_count: length(members),
+         # The UI titles the member table by scope ("Per-member spend" vs
+         # "Your spend"), so the viewer's role travels with the data it scopes.
+         viewer_owner: owner?,
          members: visible
        }}
     end

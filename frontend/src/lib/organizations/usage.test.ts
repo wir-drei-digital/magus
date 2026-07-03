@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { usageRows, seatLabel } from './usage';
+import { usageRows, seatLabel, memberSection } from './usage';
 
 describe('org usage helpers', () => {
 	describe('usageRows', () => {
@@ -22,7 +22,9 @@ describe('org usage helpers', () => {
 			// so the helper must pass rows through untouched.
 			const rows = usageRows({
 				seatCount: 1,
-				members: [{ userId: 'only', displayName: 'Solo', spentCents: 500, capCents: null, tokens: 7 }]
+				members: [
+					{ userId: 'only', displayName: 'Solo', spentCents: 500, capCents: null, tokens: 7 }
+				]
 			});
 			expect(rows).toHaveLength(1);
 			expect(rows[0].userId).toBe('only');
@@ -54,6 +56,22 @@ describe('org usage helpers', () => {
 				]
 			});
 			expect(rows.map((row) => row.tokens)).toEqual([1_500, 0]);
+		});
+	});
+
+	describe('memberSection', () => {
+		it('titles the full table for the owner', () => {
+			expect(memberSection(true)).toEqual({
+				title: 'Per-member spend',
+				description: "Credit spend this period and each member's monthly cap."
+			});
+		});
+
+		it('titles the own-row table for a non-owner member', () => {
+			expect(memberSection(false)).toEqual({
+				title: 'Your spend',
+				description: 'Your credit spend this period and monthly cap.'
+			});
 		});
 	});
 

@@ -970,9 +970,9 @@ const MY_ORG_FIELDS = [
  * create one. This action requires an explicit `fields` selection.
  */
 export function myOrganization(): Promise<RpcResult<MyOrgMembership[]>> {
-	return run((opts) =>
-		rpc.myOrganization({ fields: MY_ORG_FIELDS, ...opts })
-	) as Promise<RpcResult<MyOrgMembership[]>>;
+	return run((opts) => rpc.myOrganization({ fields: MY_ORG_FIELDS, ...opts })) as Promise<
+		RpcResult<MyOrgMembership[]>
+	>;
 }
 
 export function listOrgMembers(organizationId: string): Promise<RpcResult<OrgMemberEntry[]>> {
@@ -1111,6 +1111,8 @@ export type OrgUsageOverview = {
 	/** Combined prompt + completion tokens across the org this period. */
 	pooledTokens: number;
 	seatCount: number;
+	/** Whether the viewer is the org owner (owner: all member rows; member: own row only). */
+	viewerOwner: boolean;
 	members: OrgUsageMember[];
 };
 
@@ -1132,6 +1134,7 @@ export async function orgUsageOverview(orgId: string): Promise<RpcResult<OrgUsag
 			pooledSpentCents: Number(data.pooled_spent_cents ?? 0),
 			pooledTokens: Number(data.pooled_tokens ?? 0),
 			seatCount: Number(data.seat_count ?? 0),
+			viewerOwner: data.viewer_owner === true,
 			members: rows.map((row) => ({
 				userId: String(row.user_id ?? ''),
 				displayName: typeof row.display_name === 'string' ? row.display_name : null,

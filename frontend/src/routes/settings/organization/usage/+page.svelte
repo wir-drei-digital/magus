@@ -3,7 +3,7 @@
 	import { getOrgAdmin } from '$lib/components/organizations/context';
 	import { orgUsageOverview, type OrgUsageOverview } from '$lib/ash/api';
 	import { formatCents, formatTokens, formatCap } from '$lib/billing/format';
-	import { usageRows } from '$lib/organizations/usage';
+	import { memberSection, usageRows } from '$lib/organizations/usage';
 
 	const ctx = getOrgAdmin();
 
@@ -31,6 +31,7 @@
 
 	const rows = $derived(overview ? usageRows(overview) : []);
 	const seatCount = $derived(overview?.seatCount ?? 0);
+	const members = $derived(memberSection(overview?.viewerOwner ?? true));
 </script>
 
 <div class="flex flex-col gap-5">
@@ -59,11 +60,7 @@
 		</div>
 	</Section>
 
-	<Section
-		title="Per-member spend"
-		description="Credit spend this period and each member's monthly cap."
-		testid="org-usage-members"
-	>
+	<Section title={members.title} description={members.description} testid="org-usage-members">
 		{#if !loaded}
 			<div class="space-y-2" data-testid="org-usage-loading">
 				{#each [1, 2, 3] as i (i)}

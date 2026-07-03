@@ -36,6 +36,7 @@ defmodule Magus.Organizations.OrgUsageTest do
       Magus.Organizations.org_usage_overview(%{organization_id: org.id}, actor: owner)
 
     assert owner_view.seat_count == 2
+    assert owner_view.viewer_owner == true
     assert owner_view.pooled_spent_cents >= 300
     assert length(owner_view.members) == 2
 
@@ -49,6 +50,7 @@ defmodule Magus.Organizations.OrgUsageTest do
     {:ok, member_view} =
       Magus.Organizations.org_usage_overview(%{organization_id: org.id}, actor: m1)
 
+    assert member_view.viewer_owner == false
     assert length(member_view.members) == 1
     assert hd(member_view.members).user_id == m1.id
     assert hd(member_view.members).tokens == 400

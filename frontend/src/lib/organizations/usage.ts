@@ -52,3 +52,22 @@ export function usageRows(overview: UsageOverviewLike): UsageRow[] {
 export function seatLabel(seatCount: number): string {
 	return `${seatCount} seat${seatCount === 1 ? '' : 's'}`;
 }
+
+/**
+ * Title + description for the member table section. The server scopes the rows
+ * (owner: every member; member: own row only), so a non-owner's table must not
+ * be titled "Per-member spend" - it only ever contains their own numbers.
+ */
+export function memberSection(viewerOwner: boolean): { title: string; description: string } {
+	if (viewerOwner) {
+		return {
+			title: 'Per-member spend',
+			description: "Credit spend this period and each member's monthly cap."
+		};
+	}
+
+	return {
+		title: 'Your spend',
+		description: 'Your credit spend this period and monthly cap.'
+	};
+}
