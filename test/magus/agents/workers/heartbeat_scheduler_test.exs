@@ -157,6 +157,53 @@ defmodule Magus.Agents.Workers.HeartbeatSchedulerTest do
     assert reloaded_agent.next_scheduled_at != nil
   end
 
+  test "writes a :wake_skipped activity log entry when the daily run budget is exhausted" do
+    user = generate(user())
+    ensure_subscription(user)
+
+    agent =
+      custom_agent(user, %{
+        heartbeat_enabled: true,
+        next_scheduled_at: nil,
+        max_daily_runs: 1
+      })
+
+    {:ok, home} = Magus.Agents.Support.HomeConversation.ensure(user.id, agent.id)
+
+    # Pre-seed a completed heartbeat run today so the daily cap (1) is already
+    # hit before the next tick runs.
+    {:ok, existing_run} =
+      Magus.Agents.create_agent_run(
+        %{
+          kind: :delegate,
+          source: :heartbeat,
+          source_conversation_id: home.id,
+          target_conversation_id: home.id,
+          target_agent_id: agent.id,
+          initiator_user_id: user.id,
+          request_id: "rid-budget-#{Ash.UUIDv7.generate()}",
+          idempotency_key: "key-budget-#{Ash.UUIDv7.generate()}",
+          objective: "x"
+        },
+        authorize?: false
+      )
+
+    {:ok, started} = Magus.Agents.start_agent_run(existing_run, authorize?: false)
+    {:ok, _completed} = Magus.Agents.complete_agent_run(started, authorize?: false)
+
+    :ok = HeartbeatScheduler.tick()
+
+    logs =
+      Magus.Agents.AgentActivityLog
+      |> Ash.Query.for_read(:for_agent, %{agent_id: agent.id})
+      |> Ash.read!(authorize?: false)
+
+    assert Enum.any?(logs, fn log ->
+             log.activity_type == :wake_skipped and
+               log.summary == "Heartbeat skipped: daily run budget exhausted"
+           end)
+  end
+
   test "does not write a duplicate Heartbeat-started event message on idempotency replay" do
     user = generate(user())
     ensure_subscription(user)

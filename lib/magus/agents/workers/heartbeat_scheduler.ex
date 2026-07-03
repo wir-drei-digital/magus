@@ -19,6 +19,7 @@ defmodule Magus.Agents.Workers.HeartbeatScheduler do
 
   alias Magus.Agents.HeartbeatEventMessage
   alias Magus.Agents.RunOrchestrator
+  alias Magus.Agents.Support.AutonomyTrace
   alias Magus.Agents.Support.HomeConversation
 
   @default_heartbeat_interval_minutes 360
@@ -126,19 +127,44 @@ defmodule Magus.Agents.Workers.HeartbeatScheduler do
         advance_schedule(agent)
 
       {:error, :budget_exceeded} ->
-        log_skip(home.id, :skipped_budget, %{
-          used: count_today(agent.id),
-          limit: agent.max_daily_runs || 0
-        })
+        used = count_today(agent.id)
+        limit = agent.max_daily_runs || 0
+
+        log_skip(home.id, :skipped_budget, %{used: used, limit: limit})
+
+        AutonomyTrace.log(
+          agent.id,
+          user.id,
+          :wake_skipped,
+          "Heartbeat skipped: daily run budget exhausted",
+          %{reason: "budget_exceeded", used: used, limit: limit}
+        )
 
         advance_schedule(agent)
 
       {:error, :insufficient_spend_budget} ->
         log_skip(home.id, :skipped_spend_budget, %{})
+
+        AutonomyTrace.log(
+          agent.id,
+          user.id,
+          :wake_skipped,
+          "Heartbeat skipped: insufficient spend budget",
+          %{reason: "insufficient_spend_budget"}
+        )
+
         advance_schedule(agent)
 
       {:error, reason} ->
         Logger.warning("HeartbeatScheduler: enqueue failed for #{agent.id}: #{inspect(reason)}")
+
+        AutonomyTrace.log(
+          agent.id,
+          user.id,
+          :wake_skipped,
+          "Heartbeat skipped: enqueue failed",
+          %{reason: inspect(reason)}
+        )
 
         advance_schedule(agent)
     end

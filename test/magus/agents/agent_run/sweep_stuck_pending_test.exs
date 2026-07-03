@@ -162,6 +162,36 @@ defmodule Magus.Agents.AgentRun.SweepStuckPendingTest do
       }
     end
 
+    test "writes a :run_timed_out activity log entry when timing out an agent-scoped run",
+         %{user: user, parent: parent} do
+      agent = generate(custom_agent(user))
+
+      run =
+        sub_agent_run(
+          source_conversation_id: parent.id,
+          target_agent_id: agent.id,
+          initiator_user_id: user.id,
+          objective: "Long stuck agent task"
+        )
+        |> backdate_inserted_at(7 * 60)
+
+      {:ok, _} =
+        run
+        |> Ash.Changeset.for_update(:sweep_stuck_pending, %{})
+        |> Ash.update(authorize?: false)
+
+      logs =
+        Magus.Agents.AgentActivityLog
+        |> Ash.Query.for_read(:for_agent, %{agent_id: agent.id})
+        |> Ash.read!(authorize?: false)
+
+      assert Enum.any?(logs, fn log ->
+               log.activity_type == :run_timed_out and
+                 log.summary == "Run stuck in pending > 6h" and
+                 log.details["run_id"] == run.id
+             end)
+    end
+
     test "leaves a young pending run's status untouched when swept directly (no-op path)",
          %{parent: parent} do
       run =
