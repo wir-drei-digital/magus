@@ -30,6 +30,7 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
   alias Magus.Agents.Support.AiAgent
 
   @default_heartbeat_interval_minutes 360
+  @autonomous_sources [:heartbeat, :manual_trigger, :inbox_urgent]
 
   @impl Jido.Plugin
   def mount(_agent, config) do
@@ -135,6 +136,7 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
         RunOrchestrator.maybe_start_next(completed_run.target_conversation_id)
         resolve_inbox_event_for_run(completed_run)
         resolve_linked_inbox_events(completed_run)
+        drain_urgent_events(completed_run)
         ensure_next_scheduled_at(completed_run)
         update_task_with_result(completed_run, result_text)
         report_to_parent_conversation(completed_run, result_text)
@@ -155,6 +157,7 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
   def handle_run_completed(run) do
     update_spawn_output(run)
     resolve_linked_inbox_events(run)
+    drain_urgent_events(run)
     ensure_next_scheduled_at(run)
     :ok
   end
@@ -166,6 +169,7 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
   def handle_run_failed(run, _error_message \\ nil) do
     update_spawn_output(run)
     unlink_linked_inbox_events(run)
+    drain_urgent_events(run)
     :ok
   end
 
@@ -177,6 +181,7 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
         RunOrchestrator.maybe_start_next(failed_run.target_conversation_id)
         requeue_inbox_event_for_run(failed_run)
         unlink_linked_inbox_events(failed_run)
+        drain_urgent_events(failed_run)
         Magus.Agents.SubAgent.Resumer.maybe_resume_parent(failed_run)
         Process.put(:activity_log_last_failed_run, failed_run)
         Logger.info("AgentRunCompletion: run #{failed_run.id} failed")
@@ -218,12 +223,80 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
     Magus.Agents.AgentRunHelpers.unlink_linked_inbox_events(run)
   end
 
+  # After an autonomous run reaches a terminal state, give pending urgent
+  # events that arrived mid-run (their wake was rejected by the in-flight
+  # gate) their follow-up run before the agent goes back to sleep. The
+  # per-event idempotency key caps this at one urgent run per event ever:
+  # an event whose run already happened resolves to :existing and stays
+  # pending for the next heartbeat.
+  defp drain_urgent_events(%{source: source, target_agent_id: agent_id} = run)
+       when source in @autonomous_sources and is_binary(agent_id) do
+    events =
+      Magus.Agents.AgentInboxEvent
+      |> Ash.Query.filter(
+        agent_id == ^agent_id and
+          urgency == :immediate and
+          status in [:pending, :waiting] and
+          is_nil(agent_run_id)
+      )
+      |> Ash.Query.sort(inserted_at: :desc)
+      |> Ash.Query.limit(1)
+      |> Ash.read!(authorize?: false)
+
+    case events do
+      [event] -> enqueue_urgent_followup(event, run)
+      [] -> :ok
+    end
+  rescue
+    e ->
+      Logger.warning("AgentRunCompletion: drain failed: #{Exception.message(e)}")
+      :ok
+  end
+
+  defp drain_urgent_events(_run), do: :ok
+
+  defp enqueue_urgent_followup(event, run) do
+    attrs = %{
+      kind: :delegate,
+      source: :inbox_urgent,
+      source_conversation_id: run.target_conversation_id,
+      target_conversation_id: run.target_conversation_id,
+      target_agent_id: run.target_agent_id,
+      initiator_user_id: run.initiator_user_id,
+      request_id: "inbox-urgent-#{Ash.UUID.generate()}",
+      idempotency_key: "inbox:#{event.id}",
+      objective: "Urgent inbox event: #{event.title}"
+    }
+
+    case RunOrchestrator.enqueue_with_outcome(attrs) do
+      {:ok, :created, new_run} ->
+        case Magus.Agents.link_event_to_run(event, new_run.id, authorize?: false) do
+          {:ok, _} ->
+            :ok
+
+          {:error, reason} ->
+            Logger.warning(
+              "AgentRunCompletion: drain link failed for event #{event.id}: #{inspect(reason)}"
+            )
+
+            :ok
+        end
+
+      {:ok, :existing, _} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.info("AgentRunCompletion: drain enqueue skipped (#{inspect(reason)})")
+        :ok
+    end
+  end
+
   # For :heartbeat runs, if the agent did not call `set_next_wakeup` during
   # the run (i.e. `next_scheduled_at` is nil or in the past), apply the
   # default heartbeat interval as a fallback so heartbeats keep firing.
   # Manual triggers do not advance the schedule.
-  defp ensure_next_scheduled_at(%{source: :heartbeat, target_agent_id: agent_id})
-       when is_binary(agent_id) do
+  defp ensure_next_scheduled_at(%{source: source, target_agent_id: agent_id})
+       when source in [:heartbeat, :inbox_urgent] and is_binary(agent_id) do
     case Ash.get(Magus.Agents.CustomAgent, agent_id, authorize?: false) do
       {:ok, agent} ->
         if needs_fallback_schedule?(agent) do
