@@ -8035,6 +8035,11 @@ msgstr "Zur App"
 msgid "Create an Organization"
 msgstr "Organisation erstellen"
 
+#: lib/magus_web/onboarding/register_live.ex:207
+#, elixir-autogen, elixir-format
+msgid "Create an organization to invite teammates (optional)"
+msgstr "Erstelle eine Organisation, um Teammitglieder einzuladen (optional)"
+
 #: lib/magus_web/onboarding/create_organization_live.ex:64
 #, elixir-autogen, elixir-format
 msgid "Create your organization"

@@ -80,7 +80,7 @@ defmodule MagusWeb.OnboardingLive.CreateOrganizationLive do
                 type="text"
                 label={gettext("Organization name")}
                 required
-                phx-debounce="blur"
+                phx-debounce="300"
               />
             </div>
 
@@ -89,7 +89,6 @@ defmodule MagusWeb.OnboardingLive.CreateOrganizationLive do
                 field={@form[:slug]}
                 type="text"
                 label={gettext("URL slug")}
-                required
                 phx-debounce="blur"
               />
               <p class="text-xs text-base-content/60 mt-1">
