@@ -9,7 +9,7 @@
 		startOrgCheckout,
 		type OrgBillingOverview
 	} from '$lib/ash/api';
-	import { billingAction, billingStatusLabel } from '$lib/organizations/billing';
+	import { billingAction, billingStatusDisplay } from '$lib/organizations/billing';
 	import { seatLabel } from '$lib/organizations/usage';
 
 	const ctx = getOrgAdmin();
@@ -86,7 +86,7 @@
 			<div class="flex items-center justify-between gap-4">
 				<div>
 					<p class="font-medium" data-testid="org-billing-status">
-						{billingStatusLabel(overview.billingStatus)}
+						{billingStatusDisplay(overview)}
 					</p>
 					<p class="text-xs text-muted-foreground">
 						{seatLabel(overview.seatCount)}{#if overview.currentPeriodEnd}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { billingStatusLabel, billingAction } from './billing';
+import { billingStatusLabel, billingStatusDisplay, billingAction } from './billing';
 
 describe('org billing helpers', () => {
 	describe('billingStatusLabel', () => {
@@ -17,6 +17,41 @@ describe('org billing helpers', () => {
 
 		it('renders a placeholder for a blank status', () => {
 			expect(billingStatusLabel('')).toBe('Unknown');
+		});
+	});
+
+	describe('billingStatusDisplay', () => {
+		it("reads 'Not set up' before checkout, ignoring the server's default active status", () => {
+			// billing_status defaults to :active at creation; without a Stripe
+			// subscription the card must not claim the org is actively billed.
+			expect(
+				billingStatusDisplay({
+					billingStatus: 'active',
+					seatCount: 1,
+					billingSetUp: false,
+					billingEdition: true
+				})
+			).toBe('Not set up');
+		});
+
+		it('falls through to the status label once billing is set up', () => {
+			expect(
+				billingStatusDisplay({
+					billingStatus: 'active',
+					seatCount: 4,
+					billingSetUp: true,
+					billingEdition: true
+				})
+			).toBe('Active');
+
+			expect(
+				billingStatusDisplay({
+					billingStatus: 'past_due',
+					seatCount: 4,
+					billingSetUp: true,
+					billingEdition: true
+				})
+			).toBe('Past due');
 		});
 	});
 

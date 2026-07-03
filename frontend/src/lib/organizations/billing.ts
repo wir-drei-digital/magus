@@ -53,3 +53,15 @@ export function billingAction(overview: BillingOverviewLike): BillingAction {
 	if (!overview.billingSetUp) return { kind: 'setup' };
 	return { kind: 'manage' };
 }
+
+/**
+ * The status headline for the Plan card. `billing_status` defaults to `active`
+ * on the server before any checkout has happened (the column only gates
+ * past_due/canceled), so an org without a Stripe subscription must not read
+ * "Active" next to a "Set up billing" CTA - it reads "Not set up" until
+ * checkout completes.
+ */
+export function billingStatusDisplay(overview: BillingOverviewLike): string {
+	if (!overview.billingSetUp) return 'Not set up';
+	return billingStatusLabel(overview.billingStatus);
+}
