@@ -67,6 +67,8 @@ defmodule Magus.Agents.AgentInboxEvent do
 
                {:ok, record}
              end)
+
+      change Magus.Agents.AgentInboxEvent.Changes.TriggerUrgentWake
     end
 
     update :start_processing do
