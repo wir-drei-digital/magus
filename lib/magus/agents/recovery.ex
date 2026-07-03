@@ -54,39 +54,86 @@ defmodule Magus.Agents.Recovery do
     end
   end
 
-  defp recover_interrupted_turn(conversation_id, active_message_id) do
-    # Wait for the agent process to be alive before proceeding
-    await_agent_ready(conversation_id)
+  @doc false
+  # Exposed (not private) so tests can invoke recovery synchronously and
+  # assert on the tagged return value instead of racing the async Task
+  # spawned by `maybe_recover/1`. Not part of the public API.
+  @spec recover_interrupted_turn(String.t(), String.t() | nil) ::
+          {:dispatched, term()} | :skipped_newer | :aborted_not_ready | :no_message | :error
+  def recover_interrupted_turn(conversation_id, active_message_id) do
+    case await_agent_ready(conversation_id) do
+      :ok ->
+        # Mark any stuck streaming messages as error
+        cleanup_interrupted_messages(conversation_id)
 
-    # Mark any stuck streaming messages as error
-    cleanup_interrupted_messages(conversation_id)
+        maybe_redispatch(conversation_id, active_message_id)
 
-    # Find the interrupted message and re-dispatch it
-    case find_interrupted_message(conversation_id, active_message_id) do
-      {:ok, message} ->
-        Logger.info(
-          "Recovery: re-dispatching message #{message.id} for conversation #{conversation_id}"
-        )
-
-        Magus.Agents.Dispatcher.dispatch_user_message(message)
-
-      :error ->
-        Logger.warning("Recovery: no user message found for conversation #{conversation_id}")
+      :timeout ->
+        # Mark any stuck streaming messages as error even though we're aborting
+        cleanup_interrupted_messages(conversation_id)
 
         Signals.state_change(conversation_id, :idle)
+        :aborted_not_ready
     end
   rescue
     error ->
       Logger.error("Recovery failed for conversation #{conversation_id}: #{inspect(error)}")
 
       Signals.state_change(conversation_id, :idle)
+      :error
+  end
+
+  defp maybe_redispatch(conversation_id, active_message_id) do
+    # Find the interrupted message and re-dispatch it, unless a newer user
+    # message has since arrived (that message will drive its own turn, so
+    # re-dispatching the stale one would duplicate work / interleave turns).
+    case find_interrupted_message(conversation_id, active_message_id) do
+      {:ok, message} ->
+        if newer_user_message_exists?(conversation_id, message) do
+          Logger.info(
+            "Recovery: newer user message supersedes #{message.id} in #{conversation_id}; skipping re-dispatch"
+          )
+
+          :skipped_newer
+        else
+          Logger.info(
+            "Recovery: re-dispatching message #{message.id} for conversation #{conversation_id}"
+          )
+
+          Magus.Agents.Dispatcher.dispatch_user_message(message)
+
+          {:dispatched, message.id}
+        end
+
+      :error ->
+        Logger.warning("Recovery: no user message found for conversation #{conversation_id}")
+
+        Signals.state_change(conversation_id, :idle)
+        :no_message
+    end
+  end
+
+  defp newer_user_message_exists?(conversation_id, message) do
+    Magus.Chat.Message
+    |> Ash.Query.filter(
+      conversation_id == ^conversation_id and role == :user and
+        inserted_at > ^message.inserted_at
+    )
+    |> Ash.Query.limit(1)
+    |> Ash.read!(authorize?: false)
+    |> case do
+      [] -> false
+      _ -> true
+    end
+  rescue
+    _ -> false
   end
 
   defp await_agent_ready(conversation_id, attempts \\ 0)
 
   defp await_agent_ready(_conversation_id, attempts) when attempts >= 10 do
-    Logger.warning("Recovery: agent not ready after #{attempts} attempts, proceeding anyway")
-    :ok
+    Logger.warning("Recovery: agent not ready after #{attempts} attempts, aborting recovery")
+    :timeout
   end
 
   defp await_agent_ready(conversation_id, attempts) do
