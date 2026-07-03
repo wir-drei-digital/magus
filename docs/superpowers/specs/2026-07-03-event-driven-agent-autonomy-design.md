@@ -16,11 +16,12 @@ budget gates, idempotent enqueue) but never wired together. Investigation on
   order (`agent_inbox_event.ex:196`) and a UI badge. No code path enqueues a
   run when an urgent event arrives. An `:immediate` task assignment waits up
   to 6 hours.
-- **Two disconnected wake paths.** @mentions dispatch a run immediately via
-  `InboxEventPlugin` → `RunOrchestrator.enqueue` and never touch the inbox;
-  everything else (assignments, approvals, integration thresholds including
-  LogSource crash alerts, which are `urgency: :deferred`) waits for the
-  heartbeat cron.
+- **Only mentions wake an agent immediately.** @mentions dispatch a run
+  directly via `InboxEventPlugin` → `RunOrchestrator.enqueue` (a split this
+  design keeps: mentions are conversational request-response); everything
+  else (assignments, approvals, integration thresholds including LogSource
+  crash alerts, which are `urgency: :deferred`) waits for the heartbeat
+  cron.
 - **The stale-run watchdog kills healthy runs.** A run is reaped when
   `status == :running and last_heartbeat_at < ago(2, :minute)`
   (`agent_run.ex:395`), but `last_heartbeat_at` is set once at claim and only
@@ -47,8 +48,11 @@ A solid foundation for autonomous agent collaboration:
    `:immediate` event wakes the agent within seconds; `:deferred` events wait
    for the digest heartbeat. The heartbeat becomes the fallback timer, not
    the delivery mechanism.
-2. **The inbox is the ledger.** Everything an agent is asked to do flows
-   through one auditable queue with one lifecycle, including mentions.
+2. **Two intentional paths.** Mentions are conversational request-response:
+   direct dispatch, concurrent, the reply appears immediately as a message
+   from the mentioned agent in the conversation where the mention happened
+   (two agents mentioned, two replies). The inbox is the queue for
+   asynchronous work signals only; `AgentRun` is the audit record for both.
 3. **Nothing stops silently.** Every skip, timeout, and failure leaves a
    trace; sustained failure escalates to the owner instead of looping or
    going dark.
@@ -67,7 +71,7 @@ A solid foundation for autonomous agent collaboration:
 | Approval responses | On approval match, create an `:approval_response` event (`urgency: :immediate`) carrying the answer, in addition to resolving the `:waiting` event; the urgent-wake path does the rest |
 | Run liveness | Throttled `last_heartbeat_at` touches from streaming/tool plugin activity; CleanupStale additionally verifies the target agent process is not alive-and-busy before reaping |
 | Budget accounting | `:inbox_urgent` runs count toward `max_daily_runs` alongside `:heartbeat`; spend-budget gate applies |
-| Mentions | Phase 4: also create a `:mention` inbox event (pre-linked to the dispatched run) so the ledger is complete; dispatch latency unchanged |
+| Mentions | Stay a direct conversational dispatch path, never touch the inbox: they must run concurrently (N mentions → N replies), while the inbox path is serialized per agent via the in-flight gate; `AgentRun` (`source: :mention`) is their audit record |
 | Escalation | 3 consecutive failed autonomous runs → owner notification; 10 → auto-pause with visible reason |
 | Sweeps/retention | ash_oban triggers per resource (project convention), not a monolithic janitor |
 
@@ -261,15 +265,14 @@ attach without further code changes.
   `:processing` older than 10 minutes → `:failed` with an audit log entry
   (covers `DispatchInput` crashes mid-flight).
 
-### 8. Ledger unification and retention
+### 8. Retention
 
-**Mentions through the inbox (Phase 4).** `InboxEventPlugin` keeps its direct
-dispatch (latency unchanged) but also creates a `:mention` inbox event with
-`agent_run_id` pre-set to the dispatched run and the existing
-`"mention:#{message_id}:#{agent_id}"` idempotency key. Run completion
-resolves it via the existing linked-event machinery; failure unlinks it so
-the next heartbeat reconsiders. The inbox becomes the complete record of
-everything the agent was asked to do.
+Mentions explicitly stay out of the inbox. They are conversational
+request-response: `InboxEventPlugin` keeps its direct concurrent dispatch,
+the reply appears as a message from each mentioned agent in the source
+conversation, and `AgentRun` (`source: :mention`) remains the audit record.
+Pulling them through the inbox would serialize them behind the per-agent
+in-flight gate (breaking N mentions → N replies) for no functional gain.
 
 **Retention (ash_oban triggers, daily):**
 
@@ -299,9 +302,8 @@ failure-streak notifications + auto-pause (`pause_reason`), telemetry,
 integration failure counters, credential expiry, `InputMessage` sweep.
 *Delivers: every failure visible, sustained failure escalates.*
 
-**Phase 4 — Ledger and retention.** Mentions through the inbox, all
-retention triggers, `IntegrationConversation` cleanup. *Delivers: complete
-audit trail, bounded tables.*
+**Phase 4 — Retention.** All retention triggers, `expires_at` enforcement,
+`IntegrationConversation` cleanup. *Delivers: bounded tables.*
 
 Each phase is independently shippable; Phases 1 and 2 are the reliability
 core and should land first, in either order.
