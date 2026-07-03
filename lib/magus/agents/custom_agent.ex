@@ -15,7 +15,7 @@ defmodule Magus.Agents.CustomAgent do
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer],
     notifiers: [Ash.Notifier.PubSub],
-    extensions: [AshTypescript.Resource]
+    extensions: [AshTypescript.Resource, AshOban]
 
   postgres do
     table "custom_agents"
@@ -34,6 +34,22 @@ defmodule Magus.Agents.CustomAgent do
 
   typescript do
     type_name "CustomAgent"
+  end
+
+  oban do
+    triggers do
+      trigger :watchdog_reset_overdue_schedules do
+        action :watchdog_reset_schedule
+        queue :agent_heartbeat_watchdog
+        scheduler_cron "0 * * * *"
+        read_action :watchdog_overdue_agents
+        worker_read_action :watchdog_overdue_agents
+        where expr(is_watchdog_overdue)
+        worker_module_name Magus.Agents.CustomAgent.Workers.WatchdogReset
+        scheduler_module_name Magus.Agents.CustomAgent.Schedulers.WatchdogReset
+        max_attempts 1
+      end
+    end
   end
 
   actions do
@@ -87,6 +103,17 @@ defmodule Magus.Agents.CustomAgent do
     read :get_default do
       get? true
       filter expr(user_id == ^actor(:id) and is_default == true)
+    end
+
+    read :watchdog_overdue_agents do
+      description """
+      Heartbeat-enabled, unpaused agents whose next_scheduled_at is more than
+      2x their heartbeat_default_interval_minutes in the past. Backs the
+      hourly watchdog trigger that self-heals a lost schedule advance.
+      """
+
+      pagination keyset?: true, required?: false
+      filter expr(is_watchdog_overdue)
     end
 
     create :create do
@@ -179,6 +206,15 @@ defmodule Magus.Agents.CustomAgent do
 
     update :clear_next_scheduled_at do
       change set_attribute(:next_scheduled_at, nil)
+    end
+
+    update :watchdog_reset_schedule do
+      description "Oban-triggered self-heal for an overdue heartbeat schedule"
+      accept []
+      require_atomic? false
+      transaction? false
+
+      change Magus.Agents.CustomAgent.Changes.WatchdogReset
     end
 
     update :increment_use_count do
@@ -673,6 +709,12 @@ defmodule Magus.Agents.CustomAgent do
   policies do
     import Magus.Workspaces.Policies
 
+    # The hourly watchdog trigger reads/updates across all users' agents with
+    # no real actor; AshOban authorizes its own calls via this check.
+    bypass AshOban.Checks.AshObanInteraction do
+      authorize_if always()
+    end
+
     # Generic action — agent access is checked via get_custom_agent/2 (read
     # policies) inside the run before anything is enqueued.
     policy action(:trigger_run) do
@@ -993,6 +1035,27 @@ defmodule Magus.Agents.CustomAgent do
               Magus.Agents.CustomAgent.Calculations.EditableByActor do
       public? true
       description "Whether the current actor may update this agent (SPA inspect/edit split)"
+    end
+
+    calculate :is_watchdog_overdue, :boolean do
+      public? false
+
+      description """
+      True when heartbeat is enabled, the agent isn't paused, and
+      next_scheduled_at is more than 2x heartbeat_default_interval_minutes in
+      the past. Gates the hourly watchdog Oban trigger.
+      """
+
+      calculation expr(
+                    heartbeat_enabled == true and
+                      is_paused == false and
+                      not is_nil(next_scheduled_at) and
+                      fragment(
+                        "? < (now() at time zone 'utc') - (interval '1 minute' * ? * 2)",
+                        next_scheduled_at,
+                        heartbeat_default_interval_minutes
+                      )
+                  )
     end
 
     is_shared_to_workspace(:custom_agent)
