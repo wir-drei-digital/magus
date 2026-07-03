@@ -323,6 +323,69 @@ defmodule Magus.Agents.RunOrchestratorTest do
     end
   end
 
+  describe "idempotency uniqueness" do
+    test "a second direct create with the same idempotency_key is rejected by the DB", %{
+      user: user,
+      source_conversation: source_conversation
+    } do
+      target_conversation = generate(conversation(actor: user, is_task_conversation: true))
+      idempotency_key = "uniq-test-#{Ash.UUID.generate()}"
+
+      attrs = %{
+        kind: :delegate,
+        source: :mention,
+        source_conversation_id: source_conversation.id,
+        target_conversation_id: target_conversation.id,
+        request_id: "request-#{Ash.UUIDv7.generate()}",
+        idempotency_key: idempotency_key,
+        objective: "Do the thing",
+        metadata: %{}
+      }
+
+      assert {:ok, _run1} = Magus.Agents.create_agent_run(attrs, authorize?: false)
+
+      # Bypass find_or_create_run's check-then-insert entirely: create directly
+      # a second time with the exact same key, so the only thing that can stop
+      # the duplicate is the DB-level unique constraint.
+      duplicate_attrs = %{
+        attrs
+        | request_id: "request-#{Ash.UUIDv7.generate()}"
+      }
+
+      assert {:error, _reason} =
+               Magus.Agents.create_agent_run(duplicate_attrs, authorize?: false)
+    end
+
+    test "enqueue_with_outcome still returns {:ok, :existing, run} on a duplicate key", %{
+      user: user,
+      source_conversation: source_conversation
+    } do
+      target_conversation = generate(conversation(actor: user, is_task_conversation: true))
+      idempotency_key = "uniq-test-#{Ash.UUID.generate()}"
+
+      attrs = %{
+        kind: :delegate,
+        source: :mention,
+        source_conversation_id: source_conversation.id,
+        target_conversation_id: target_conversation.id,
+        request_id: "request-#{Ash.UUIDv7.generate()}",
+        idempotency_key: idempotency_key,
+        objective: "Do the thing",
+        metadata: %{}
+      }
+
+      assert {:ok, :created, run1} = RunOrchestrator.enqueue_with_outcome(attrs)
+
+      duplicate_attrs = %{
+        attrs
+        | request_id: "request-#{Ash.UUIDv7.generate()}"
+      }
+
+      assert {:ok, :existing, run2} = RunOrchestrator.enqueue_with_outcome(duplicate_attrs)
+      assert run1.id == run2.id
+    end
+  end
+
   describe "enqueue heartbeat budget gates" do
     setup %{user: user, source_conversation: source_conversation} do
       target_conversation = generate(conversation(actor: user, is_task_conversation: true))

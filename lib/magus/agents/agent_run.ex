@@ -19,6 +19,8 @@ defmodule Magus.Agents.AgentRun do
   postgres do
     table "agent_runs"
     repo Magus.Repo
+
+    identity_wheres_to_sql unique_idempotency_key: "idempotency_key IS NOT NULL"
   end
 
   oban do
@@ -404,6 +406,12 @@ defmodule Magus.Agents.AgentRun do
                     status == :running and
                       last_heartbeat_at < ago(2, :minute)
                   )
+    end
+  end
+
+  identities do
+    identity :unique_idempotency_key, [:idempotency_key] do
+      where expr(not is_nil(idempotency_key))
     end
   end
 end
