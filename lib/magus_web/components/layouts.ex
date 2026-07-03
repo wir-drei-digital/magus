@@ -665,7 +665,6 @@ defmodule MagusWeb.Layouts do
       %{label: gettext("Users"), href: "/admin/users", icon: "lucide-users"},
       %{label: gettext("Models"), href: "/admin/models", icon: "lucide-cpu"},
       %{label: gettext("Plans"), href: "/admin/plans", icon: "lucide-credit-card"},
-      %{label: gettext("Workspaces"), href: "/admin/workspaces", icon: "lucide-building-2"},
       %{label: gettext("Announcements"), href: "/admin/announcements", icon: "lucide-megaphone"},
       %{label: gettext("Usage"), href: "/admin/usage", icon: "lucide-activity"},
       %{label: gettext("Providers"), href: "/admin/providers", icon: "lucide-server"},

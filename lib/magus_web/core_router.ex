@@ -498,8 +498,6 @@ defmodule MagusWeb.CoreRouter do
           live "/providers/:id/edit", Admin.ProvidersLive, :edit
           live "/config", Admin.ConfigHealthLive, :index
           live "/usage", Admin.UsageLive, :index
-          live "/workspaces", Admin.WorkspacesLive, :index
-          live "/workspaces/:id/edit", Admin.WorkspacesLive, :edit
         end
       end
 
