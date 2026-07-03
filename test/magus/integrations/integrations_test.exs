@@ -500,6 +500,74 @@ defmodule Magus.IntegrationsTest do
     end
   end
 
+  describe "reactivate_if_errored/2" do
+    setup do
+      user = generate(user())
+      agent = create_agent(user)
+
+      {:ok, integration} =
+        Integrations.create_user_integration(
+          :simple_webhook,
+          %{user_id: user.id, custom_agent_id: agent.id},
+          actor: user
+        )
+
+      %{user: user, integration: integration}
+    end
+
+    test "reactivates an :error integration, clearing failure state", %{
+      user: user,
+      integration: integration
+    } do
+      {:ok, errored} =
+        Integrations.record_integration_poll_failure(integration, %{last_error: "boom"},
+          authorize?: false
+        )
+
+      {:ok, errored} = Integrations.mark_integration_errored(errored, authorize?: false)
+      assert errored.status == :error
+      assert errored.consecutive_failures > 0
+
+      assert {:ok, reactivated} = Integrations.reactivate_if_errored(errored, actor: user)
+
+      assert reactivated.status == :active
+      assert reactivated.consecutive_failures == 0
+      assert reactivated.last_error == nil
+      assert reactivated.error_message == nil
+    end
+
+    test "leaves a :pending integration untouched", %{user: user, integration: integration} do
+      assert integration.status == :pending
+
+      assert {:ok, unchanged} =
+               Integrations.reactivate_if_errored(integration, actor: user)
+
+      assert unchanged.status == :pending
+      assert unchanged == integration
+    end
+
+    test "leaves an :active integration untouched", %{user: user, integration: integration} do
+      {:ok, active} = Integrations.activate_user_integration(integration, actor: user)
+
+      assert {:ok, unchanged} = Integrations.reactivate_if_errored(active, actor: user)
+
+      assert unchanged.status == :active
+      assert unchanged == active
+    end
+
+    test "does NOT reactivate a user-disabled integration", %{
+      user: user,
+      integration: integration
+    } do
+      {:ok, disabled} = Integrations.deactivate_user_integration(integration, actor: user)
+      assert disabled.status == :disabled
+
+      assert {:ok, unchanged} = Integrations.reactivate_if_errored(disabled, actor: user)
+
+      assert unchanged.status == :disabled
+    end
+  end
+
   describe "audit_log" do
     test "can record audit entry" do
       user = generate(user())

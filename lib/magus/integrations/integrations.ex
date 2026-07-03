@@ -300,4 +300,31 @@ defmodule Magus.Integrations do
       []
     end
   end
+
+  @doc """
+  Reactivate an integration if (and only if) it's currently in `:error` status.
+
+  Intended to be called after a successful credential refresh/regeneration
+  (OAuth reconnect, API key regenerate, etc.) so a user who fixes their
+  credentials gets their auto-errored integration working again. Integrations
+  in other statuses (`:pending`, `:active`, `:disabled`) are left untouched —
+  in particular, a user-initiated `:disabled` integration must NOT be
+  silently reactivated just because credentials were refreshed.
+
+  Returns `{:ok, integration}` in all non-error-transition-failure cases: the
+  original integration when no reactivation was needed, or the reactivated
+  integration on success.
+  """
+  def reactivate_if_errored(integration, opts \\ [])
+
+  def reactivate_if_errored(
+        %Magus.Integrations.UserIntegration{status: :error} = integration,
+        opts
+      ) do
+    activate_user_integration(integration, opts)
+  end
+
+  def reactivate_if_errored(%Magus.Integrations.UserIntegration{} = integration, _opts) do
+    {:ok, integration}
+  end
 end
