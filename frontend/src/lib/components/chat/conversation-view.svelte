@@ -28,13 +28,19 @@
 	let {
 		store,
 		onCompanionRequest,
-		highlightMessageId = null
+		highlightMessageId = null,
+		hideNavButton = false
 	}: {
 		store: ConversationStore;
 		/** Opens a companion on this conversation's tab (wired by the page). */
 		onCompanionRequest?: (spec: CompanionSpec) => void;
 		/** Search deep-link target: scroll to + briefly flash this message. */
 		highlightMessageId?: string | null;
+		/**
+		 * True while a companion is docked: the companion-host mobile switcher
+		 * bar already carries the nav button, so the header skips its own.
+		 */
+		hideNavButton?: boolean;
 	} = $props();
 
 	const conversationId = $derived(store.conversationId);
@@ -303,7 +309,7 @@
 {/if}
 
 <div class="flex h-full min-h-0 flex-col" data-testid="conversation-view">
-	<ConversationHeader {store} {onCompanionRequest} />
+	<ConversationHeader {store} {onCompanionRequest} {hideNavButton} />
 	{#if showDegraded && store.connection !== 'live'}
 		<div
 			class="border-b bg-warning/10 px-4 py-1.5 text-center text-xs text-warning"
@@ -324,8 +330,11 @@
 		</div>
 	{/if}
 
+	<!-- wb-scroll (hidden scrollbar) like every other pane: a visible classic
+	     scrollbar eats width inside the scroller, shifting the centered message
+	     column out of line with the composer column below (no scrollbar). -->
 	<div
-		class="relative min-h-0 flex-1 overflow-y-auto px-4 py-4"
+		class="wb-scroll relative min-h-0 flex-1 overflow-y-auto px-4 py-4"
 		bind:this={scroller}
 		onscroll={onScroll}
 	>
@@ -463,6 +472,14 @@
 				{/if}
 			</div>
 		{/if}
+	</div>
+
+	<!-- Soft transition into the composer: the stream scrolls out under a short
+	     transparent → background fade instead of a hard edge. -->
+	<div class="pointer-events-none relative" aria-hidden="true">
+		<div
+			class="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-b from-transparent to-background"
+		></div>
 	</div>
 
 	{#if !stickToBottom}

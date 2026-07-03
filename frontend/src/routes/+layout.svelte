@@ -3,8 +3,8 @@
 	import { untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
-	import { Menu } from '@lucide/svelte';
 	import { session } from '$lib/stores/session.svelte';
+	import { navDrawer } from '$lib/stores/nav-drawer.svelte';
 	import { notificationFeed } from '$lib/stores/notifications.svelte';
 	import { workbench } from '$lib/stores/workbench.svelte';
 	import ModeStrip from '$lib/components/shell/mode-strip.svelte';
@@ -20,14 +20,14 @@
 	let { children }: { children: Snippet } = $props();
 
 	// Mobile only: the left rail (mode strip + nav) collapses into a slide-in
-	// drawer toggled by a floating hamburger. Desktop ignores this entirely
-	// (the rail is statically positioned at md+).
-	let drawerOpen = $state(false);
+	// drawer opened by the inline menu buttons in each pane header (see
+	// MobileNavButton). Desktop ignores this entirely (the rail is statically
+	// positioned at md+).
 
 	// A nav tap that changes the route closes the drawer; mode switches that
 	// only swap the nav pane in place keep it open so the user can pick an item.
 	afterNavigate(() => {
-		drawerOpen = false;
+		navDrawer.open = false;
 	});
 
 	// Render immediately from local state; authenticate and go live in the
@@ -103,7 +103,7 @@
 		<div class="relative flex min-h-0 flex-1 overflow-hidden">
 			<!-- Left rail: statically positioned at md+, a slide-in drawer below md. -->
 			<div
-				class="fixed inset-y-0 left-0 z-50 flex transition-transform duration-200 ease-out md:static md:z-auto md:translate-x-0 md:transition-none {drawerOpen
+				class="fixed inset-y-0 left-0 z-50 flex transition-transform duration-200 ease-out md:static md:z-auto md:translate-x-0 md:transition-none {navDrawer.open
 					? 'translate-x-0'
 					: '-translate-x-full'}"
 				data-testid="shell-rail"
@@ -113,29 +113,14 @@
 			</div>
 
 			<!-- Drawer backdrop (mobile only). -->
-			{#if drawerOpen}
+			{#if navDrawer.open}
 				<button
 					type="button"
 					class="fixed inset-0 z-40 bg-black/50 md:hidden"
 					aria-label="Close navigation"
-					onclick={() => (drawerOpen = false)}
+					onclick={() => (navDrawer.open = false)}
 				></button>
 			{/if}
-
-			<!-- Floating nav toggle (mobile only). Classic parity: it overlays the
-			     top-left corner so views keep full height; each view's header pads
-			     left (pl-14) on mobile to clear it. Respects the notch via safe-area.
-			     top 0.25rem centers the 36px button in the 44px (min-h-11) headers. -->
-			<button
-				type="button"
-				class="bg-background/80 hover:bg-background fixed z-30 flex size-9 items-center justify-center rounded-full border text-foreground shadow-sm backdrop-blur-sm md:hidden"
-				style="top: max(0.25rem, env(safe-area-inset-top)); left: max(0.5rem, env(safe-area-inset-left));"
-				aria-label="Open navigation"
-				data-testid="mobile-menu"
-				onclick={() => (drawerOpen = true)}
-			>
-				<Menu class="size-5" />
-			</button>
 
 			<div class="flex min-h-0 min-w-0 flex-1 flex-col">
 				{#if workbench.tabsEnabled}
@@ -158,6 +143,6 @@
 
 <svelte:window
 	onkeydown={(event) => {
-		if (event.key === 'Escape') drawerOpen = false;
+		if (event.key === 'Escape') navDrawer.open = false;
 	}}
 />

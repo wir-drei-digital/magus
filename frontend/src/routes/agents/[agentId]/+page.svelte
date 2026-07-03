@@ -3,6 +3,7 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
 	import { Bot, MessageCircle, Trash2, Zap } from '@lucide/svelte';
+	import MobileNavButton from '$lib/components/shell/mobile-nav-button.svelte';
 	import {
 		agentActivity,
 		agentInboxEvents,
@@ -711,7 +712,8 @@
 			<div class="h-40 animate-pulse rounded-xl bg-muted"></div>
 		</div>
 	{:else}
-		<header class="flex min-h-11 shrink-0 items-center gap-2 border-b py-2 pr-6 pl-14 md:pl-6">
+		<header class="flex min-h-11 shrink-0 items-center gap-2 border-b py-2 px-6">
+			<MobileNavButton />
 			{#if agent.imageUrl}
 				<img
 					src={agent.imageUrl}

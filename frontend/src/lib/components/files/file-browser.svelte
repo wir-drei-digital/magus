@@ -17,6 +17,7 @@
 		Search,
 		Upload
 	} from '@lucide/svelte';
+	import MobileNavButton from '$lib/components/shell/mobile-nav-button.svelte';
 	import {
 		fileUrl,
 		fileDownloadUrl,
@@ -269,6 +270,7 @@
 	{/if}
 
 	<header class="flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2">
+		<MobileNavButton />
 		<nav class="flex min-w-0 flex-1 items-center gap-1 text-sm" data-testid="files-breadcrumbs">
 			{#if store.scope === 'folder'}
 				<a href="{base}/files" class="shrink-0 text-muted-foreground hover:text-foreground">

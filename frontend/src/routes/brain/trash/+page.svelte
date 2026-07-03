@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { FileText, Undo2 } from '@lucide/svelte';
+	import MobileNavButton from '$lib/components/shell/mobile-nav-button.svelte';
 	import { restoreBrainPage, trashedBrainPages, type PageTreeNode } from '$lib/ash/api';
 	import { brainNav } from '$lib/stores/brain-nav.svelte';
 	import { session } from '$lib/stores/session.svelte';
@@ -40,11 +41,14 @@
 </svelte:head>
 
 <div class="flex h-full min-h-0 flex-col" data-testid="brain-trash">
-	<header class="flex min-h-11 items-baseline gap-2 border-b py-2 pr-6 pl-14 md:pl-6">
-		<h1 class="text-sm font-semibold">Trash</h1>
-		<p class="min-w-0 truncate text-xs text-muted-foreground">
-			Trashed pages are deleted permanently after 30 days.
-		</p>
+	<header class="flex min-h-11 items-center gap-2 border-b px-6 py-2">
+		<MobileNavButton />
+		<div class="flex min-w-0 items-baseline gap-2">
+			<h1 class="text-sm font-semibold">Trash</h1>
+			<p class="min-w-0 truncate text-xs text-muted-foreground">
+				Trashed pages are deleted permanently after 30 days.
+			</p>
+		</div>
 	</header>
 
 	<div class="wb-scroll min-h-0 flex-1 overflow-y-auto p-4">

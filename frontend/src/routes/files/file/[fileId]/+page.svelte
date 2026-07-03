@@ -3,6 +3,7 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
 	import { ArrowLeft, Download, MessageSquare, Trash2, ZoomIn, ZoomOut } from '@lucide/svelte';
+	import MobileNavButton from '$lib/components/shell/mobile-nav-button.svelte';
 	import { fileDownloadUrl, fileUrl, getFile, trashFile, type FileEntry } from '$lib/ash/api';
 	import { openCompanionChat } from '$lib/ash/api';
 	import type { ComposerSelection } from '$lib/chat/conversation-store.svelte';
@@ -120,7 +121,8 @@
 <Resizable.PaneGroup direction="horizontal" autoSaveId="magus:file-chat-split">
 	<Resizable.Pane defaultSize={60} minSize={35}>
 		<div class="flex h-full min-h-0 flex-col" data-testid="file-detail">
-			<header class="flex min-h-11 shrink-0 items-center gap-3 border-b py-2 pr-4 pl-14 md:pl-4">
+			<header class="flex min-h-11 shrink-0 items-center gap-3 border-b py-2 px-4">
+				<MobileNavButton />
 				<a
 					href="{base}/files{file?.folderId ? `/folder/${file.folderId}` : ''}"
 					class="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"

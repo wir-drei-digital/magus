@@ -3,6 +3,7 @@
 	import type { CompanionSpec } from '$lib/ash/api';
 	import type { ComposerSelection } from '$lib/chat/conversation-store.svelte';
 	import { workbench } from '$lib/stores/workbench.svelte';
+	import MobileNavButton from '$lib/components/shell/mobile-nav-button.svelte';
 	import * as Resizable from '$lib/components/ui/resizable';
 	import BrainPageCompanion from './brain-page-companion.svelte';
 	import ClassicCompanion from './classic-companion.svelte';
@@ -83,12 +84,14 @@
      without closing the companion. -->
 <div class="flex h-full min-h-0 flex-col">
 	{#if companion && tabId}
-		<!-- Mobile pane switcher. min-h-11 matches the shared pane-header
-		     height; pl-14 clears the floating nav toggle. -->
+		<!-- Mobile pane switcher; min-h-11 matches the shared pane-header height.
+		     It is the topmost row during a companion takeover, so it carries the
+		     inline nav button. -->
 		<div
-			class="flex min-h-11 shrink-0 items-center gap-1.5 border-b py-2 pr-4 pl-14 md:hidden"
+			class="flex min-h-11 shrink-0 items-center gap-1.5 border-b px-4 py-2 md:hidden"
 			data-testid="companion-mobile-switcher"
 		>
+			<MobileNavButton />
 			<button
 				type="button"
 				class="wb-pill-btn {mobileView === 'primary' ? 'wb-pill-btn-active' : ''}"

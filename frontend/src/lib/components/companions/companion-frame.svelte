@@ -39,9 +39,9 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col bg-background" data-testid="companion-pane">
-	<!-- pl-14 on mobile clears the floating hamburger during a full-width
-	     companion takeover; desktop keeps the normal padding. -->
-	<header class="flex min-h-11 shrink-0 items-center gap-2 border-b py-2 pr-4 pl-14 md:pl-4">
+	<!-- No nav button here: during a mobile takeover the companion-host
+	     switcher bar above this header carries it. -->
+	<header class="flex min-h-11 shrink-0 items-center gap-2 border-b px-4 py-2">
 		{#if icon}
 			{@render icon()}
 		{/if}

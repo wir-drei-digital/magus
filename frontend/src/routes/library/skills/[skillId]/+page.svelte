@@ -3,6 +3,7 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
 	import { ArrowLeft, Box, FileCode, Package, Star, Wrench } from '@lucide/svelte';
+	import MobileNavButton from '$lib/components/shell/mobile-nav-button.svelte';
 	import {
 		destroySkill,
 		favoriteSkill,
@@ -162,7 +163,8 @@
 		{#if saveError}
 			<p class="border-b bg-destructive/10 px-6 py-1.5 text-xs text-destructive">{saveError}</p>
 		{/if}
-		<header class="flex min-h-11 shrink-0 items-center gap-2.5 border-b py-2 pr-6 pl-14 md:pl-4">
+		<header class="flex min-h-11 shrink-0 items-center gap-2.5 border-b py-2 pr-6 pl-4">
+			<MobileNavButton />
 			<button
 				type="button"
 				class="wb-pill-btn wb-pill-btn-square shrink-0"

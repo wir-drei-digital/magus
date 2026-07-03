@@ -11,6 +11,7 @@
 		type AgentDetail
 	} from '$lib/ash/api';
 	import LandingComposer from '$lib/components/chat/landing-composer.svelte';
+	import MobileNavButton from '$lib/components/shell/mobile-nav-button.svelte';
 	import AnnouncementsSection from '$lib/components/chat/announcements-section.svelte';
 	import OpenTasksSection from '$lib/components/chat/open-tasks-section.svelte';
 	import OnboardingCardsSection from '$lib/components/chat/onboarding-cards-section.svelte';
@@ -101,49 +102,54 @@
 	<title>Magus — Chat</title>
 </svelte:head>
 
-<div class="flex h-full flex-col items-center justify-center overflow-y-auto px-4">
-	<div class="w-full max-w-3xl py-10">
-		<div class="mb-4 flex justify-center">
-			<span
-				class="magus-logo-animated cursor-default text-6xl leading-none text-primary select-none"
-				class:is-spinning={spinning}
-				data-testid="new-chat-logo"
-				aria-hidden="true"
-				onmouseenter={() => (spinning = true)}
-				onanimationend={(event) => {
-					if (event.animationName === 'magus-spin') spinning = false;
-				}}
-			>
-				◬
-			</span>
-		</div>
-
-		{#if startingSkill}
-			<p
-				class="flex items-center justify-center gap-2 text-center text-sm text-muted-foreground"
-				data-testid="new-chat-starting-skill"
-			>
+<div class="relative h-full">
+	<!-- No pane header on the landing — the nav button floats in its corner,
+	     outside the scroller so it stays put when the content scrolls. -->
+	<MobileNavButton class="absolute top-2.5 left-3 z-10" />
+	<div class="flex h-full flex-col items-center justify-center overflow-y-auto px-4">
+		<div class="w-full max-w-3xl py-10">
+			<div class="mb-4 flex justify-center">
 				<span
-					class="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
-				></span>
-				Starting…
-			</p>
-		{:else}
-			<p
-				class="mb-6 text-center font-display text-3xl font-semibold tracking-tight text-foreground"
-				data-testid="new-chat-greeting"
-			>
-				{firstTime ? 'What would you like to explore?' : "What's on your mind?"}
-			</p>
+					class="magus-logo-animated cursor-default text-6xl leading-none text-primary select-none"
+					class:is-spinning={spinning}
+					data-testid="new-chat-logo"
+					aria-hidden="true"
+					onmouseenter={() => (spinning = true)}
+					onanimationend={(event) => {
+						if (event.animationName === 'magus-spin') spinning = false;
+					}}
+				>
+					◬
+				</span>
+			</div>
 
-			<!-- Classic new-chat parity: announcements, then actionable + discovery
+			{#if startingSkill}
+				<p
+					class="flex items-center justify-center gap-2 text-center text-sm text-muted-foreground"
+					data-testid="new-chat-starting-skill"
+				>
+					<span
+						class="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
+					></span>
+					Starting…
+				</p>
+			{:else}
+				<p
+					class="mb-6 text-center font-display text-3xl font-semibold tracking-tight text-foreground"
+					data-testid="new-chat-greeting"
+				>
+					{firstTime ? 'What would you like to explore?' : "What's on your mind?"}
+				</p>
+
+				<!-- Classic new-chat parity: announcements, then actionable + discovery
 			     sections, between the greeting and the composer. Each renders
 			     nothing when empty. -->
-			<AnnouncementsSection />
-			<OpenTasksSection />
-			<OnboardingCardsSection />
+				<AnnouncementsSection />
+				<OpenTasksSection />
+				<OnboardingCardsSection />
 
-			<LandingComposer {agent} {seedText} />
-		{/if}
+				<LandingComposer {agent} {seedText} />
+			{/if}
+		</div>
 	</div>
 </div>

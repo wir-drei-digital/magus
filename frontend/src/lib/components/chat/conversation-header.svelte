@@ -9,6 +9,7 @@
 	import { relativeTime } from '$lib/time';
 	import { workbench } from '$lib/stores/workbench.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import MobileNavButton from '$lib/components/shell/mobile-nav-button.svelte';
 	import RightRail from './rail/right-rail.svelte';
 	import ShareConversationDialog from './share-conversation-dialog.svelte';
 	import PresenceAvatars from './presence-avatars.svelte';
@@ -18,10 +19,13 @@
 
 	let {
 		store,
-		onCompanionRequest
+		onCompanionRequest,
+		hideNavButton = false
 	}: {
 		store: ConversationStore;
 		onCompanionRequest?: (spec: CompanionSpec) => void;
+		/** True when the companion-host switcher bar above already carries it. */
+		hideNavButton?: boolean;
 	} = $props();
 
 	const conversationId = $derived(store.conversationId);
@@ -81,10 +85,13 @@
 <!-- min-h-11 (44px): the shared pane-header height — companions, files,
      library, and detour pages use the same floor so panes line up. -->
 <div
-	class="flex min-h-11 shrink-0 items-center justify-between gap-3 border-b bg-background/60 py-2 pr-4 pl-14 md:pl-4"
+	class="flex min-h-11 shrink-0 items-center justify-between gap-3 border-b bg-background/60 py-2 px-4"
 	data-testid="conversation-header"
 >
 	<div class="flex min-w-0 items-center gap-2">
+		{#if !hideNavButton}
+			<MobileNavButton />
+		{/if}
 		<span
 			class="flex size-6 shrink-0 items-center justify-center rounded-full border border-input bg-secondary text-xs"
 			aria-hidden="true"

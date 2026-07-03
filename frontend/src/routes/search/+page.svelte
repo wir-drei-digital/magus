@@ -11,6 +11,7 @@
 		Search as SearchIcon,
 		SearchX
 	} from '@lucide/svelte';
+	import MobileNavButton from '$lib/components/shell/mobile-nav-button.svelte';
 	import { EmptyState } from '$lib/components/ui/empty-state';
 	import { searchAll, type SearchResult, type SearchResultType } from '$lib/ash/api';
 
@@ -105,9 +106,8 @@
 </svelte:head>
 
 <div class="flex h-full min-h-0 flex-col" data-testid="search-view">
-	<header
-		class="flex min-h-11 shrink-0 items-center gap-2 border-b bg-background/80 py-2 pr-6 pl-14 md:pl-6"
-	>
+	<header class="flex min-h-11 shrink-0 items-center gap-2 border-b bg-background/80 py-2 px-6">
+		<MobileNavButton />
 		<SearchIcon class="size-4 shrink-0 text-muted-foreground" />
 		<h1 class="min-w-0 flex-1 truncate text-base font-semibold">Search</h1>
 	</header>

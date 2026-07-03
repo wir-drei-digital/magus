@@ -3,6 +3,7 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
 	import { Download, LibraryBig, Plus, Search } from '@lucide/svelte';
+	import MobileNavButton from '$lib/components/shell/mobile-nav-button.svelte';
 	import {
 		favoritePrompt,
 		favoriteSkill,
@@ -134,9 +135,8 @@
 <div class="flex h-full min-h-0 flex-col" data-testid="library-gallery">
 	<!-- Single header row: title, search, filters, and actions together. Wraps
 	     on narrow panes (compact master/detail) instead of overflowing. -->
-	<header
-		class="flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-b py-2 pr-4 pl-14 md:pl-4"
-	>
+	<header class="flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-b py-2 px-4">
+		<MobileNavButton />
 		<LibraryBig class="size-4 shrink-0 text-muted-foreground" />
 		<h1 class="shrink-0 text-sm font-semibold">Library</h1>
 

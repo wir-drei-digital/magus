@@ -88,6 +88,7 @@
 				{store}
 				{highlightMessageId}
 				onCompanionRequest={(spec) => openCompanion(conversationId, spec)}
+				hideNavButton={!!(tab?.companion && tab?.id)}
 			/>
 		</CompanionHost>
 	{/if}
