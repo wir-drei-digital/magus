@@ -12,7 +12,7 @@
      icon buttons. -->
 <button
 	type="button"
-	class={cn('wb-pill-btn wb-pill-btn-square shrink-0 md:hidden', className)}
+	class={cn('wb-pill-btn wb-pill-btn-square shrink-0 md:!hidden', className)}
 	aria-label="Open navigation"
 	data-testid="mobile-menu"
 	onclick={() => (navDrawer.open = true)}
