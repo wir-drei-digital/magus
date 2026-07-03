@@ -53,6 +53,12 @@
 
 	let tags = $state<TagEntry[]>([]);
 
+	// Only offer tags in the prompt's scope: its workspace's shared tags, or
+	// the viewer's personal tags for personal prompts.
+	const scopedTags = $derived(
+		tags.filter((tag) => (tag.workspaceId ?? null) === (prompt?.workspaceId ?? null))
+	);
+
 	$effect(() => {
 		const id = promptId;
 		prompt = null;
@@ -145,7 +151,7 @@
 		await goto(`${base}/chat/${conversation.id}`);
 	}
 
-	async function toggleTag(tag: TagEntry) {
+	async function toggleTag(tag: { id: string; name: string }) {
 		if (!prompt) return;
 		const hasTag = prompt.tags.some((entry) => entry.id === tag.id);
 		const result = hasTag
@@ -286,7 +292,7 @@
 						#{tag.name} ×
 					</button>
 				{/each}
-				{#if tags.filter((tag) => !prompt?.tags.some((t) => t.id === tag.id)).length > 0}
+				{#if scopedTags.filter((tag) => !prompt?.tags.some((t) => t.id === tag.id)).length > 0}
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger
 							class="rounded-full border border-dashed border-input px-2 py-0.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
@@ -295,7 +301,7 @@
 							+ tag
 						</DropdownMenu.Trigger>
 						<DropdownMenu.Content align="start">
-							{#each tags.filter((tag) => !prompt?.tags.some((t) => t.id === tag.id)) as tag (tag.id)}
+							{#each scopedTags.filter((tag) => !prompt?.tags.some((t) => t.id === tag.id)) as tag (tag.id)}
 								<DropdownMenu.Item onSelect={() => void toggleTag(tag)}>
 									#{tag.name}
 								</DropdownMenu.Item>
@@ -308,11 +314,6 @@
 			<pre
 				class="whitespace-pre-wrap rounded-xl border border-input bg-card/60 p-4 font-mono text-sm leading-relaxed"
 				data-testid="prompt-content">{prompt.content}</pre>
-
-			{#if prompt.additionalInformation}
-				<h2 class="mt-4 text-sm font-medium text-foreground">Additional information</h2>
-				<p class="mt-1 whitespace-pre-wrap text-sm">{prompt.additionalInformation}</p>
-			{/if}
 		</div>
 	{/if}
 </div>

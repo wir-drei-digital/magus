@@ -120,29 +120,26 @@
 			<a href="{base}/chat" class="text-sm text-primary hover:underline">Back to chat</a>
 		</div>
 	{:else}
-		<div class="flex min-h-0 flex-1 flex-col md:flex-row">
+		<div class="flex min-h-0 flex-1 flex-col">
+			<!-- Horizontal pill tabs on top, matching the custom-agent settings nav. -->
 			<nav
-				class="shrink-0 border-b p-2 md:w-48 md:border-r md:border-b-0"
+				class="wb-scroll flex shrink-0 items-center gap-1.5 overflow-x-auto border-b px-4 py-2"
 				data-testid="workspace-nav"
 			>
-				<ul class="flex flex-row gap-0.5 overflow-x-auto md:flex-col">
-					{#each tabs as tab (tab.id)}
-						<li>
-							<a
-								href={tab.href}
-								data-testid="workspace-nav-{tab.id}"
-								aria-current={activeTab === tab.id ? 'page' : undefined}
-								class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors {activeTab ===
-								tab.id
-									? 'bg-secondary font-medium text-foreground'
-									: 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'}"
-							>
-								<tab.icon class="size-4 shrink-0" />
-								<span>{tab.label}</span>
-							</a>
-						</li>
-					{/each}
-				</ul>
+				{#each tabs as tab (tab.id)}
+					<a
+						href={tab.href}
+						data-testid="workspace-nav-{tab.id}"
+						aria-current={activeTab === tab.id ? 'page' : undefined}
+						class="flex shrink-0 items-center gap-2 rounded-full px-3 py-1 text-sm whitespace-nowrap transition-colors {activeTab ===
+						tab.id
+							? 'bg-secondary font-medium text-foreground'
+							: 'text-muted-foreground hover:bg-accent/40 hover:text-foreground'}"
+					>
+						<tab.icon class="size-4 shrink-0" />
+						<span>{tab.label}</span>
+					</a>
+				{/each}
 			</nav>
 
 			<div class="wb-scroll min-h-0 flex-1 overflow-y-auto">

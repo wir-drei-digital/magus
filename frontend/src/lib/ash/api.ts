@@ -66,6 +66,7 @@ export type CurrentUser = {
 	email: string;
 	displayName: string | null;
 	currentWorkspaceId: string | null;
+	isAdmin: boolean;
 	uiPreferences: Record<string, unknown>;
 	/** Allowed data regions for provider routing (e.g. ['US','EU']). */
 	dataRegionPreference: string[];
@@ -80,6 +81,7 @@ const CURRENT_USER_FIELDS: rpc.CurrentUserFields = [
 	'email',
 	'displayName',
 	'currentWorkspaceId',
+	'isAdmin',
 	'uiPreferences',
 	'dataRegionPreference',
 	'dataRegionConsents',
@@ -2786,10 +2788,30 @@ export function incrementPromptUseCount(id: string): Promise<RpcResult<{ id: str
 	return run((opts) => rpc.incrementPromptUseCount({ identity: id, fields: ['id'], ...opts }));
 }
 
-export type TagEntry = { id: string; name: string };
+export type TagEntry = {
+	id: string;
+	name: string;
+	userId: string | null;
+	workspaceId: string | null;
+};
+
+const TAG_FIELDS = ['id', 'name', 'userId', 'workspaceId'] as const;
 
 export function listTags(): Promise<RpcResult<TagEntry[]>> {
-	return run((opts) => rpc.listTags({ fields: ['id', 'name'], ...opts }));
+	return run((opts) => rpc.listTags({ fields: [...TAG_FIELDS], ...opts }));
+}
+
+/**
+ * Create (or fetch) a user-defined tag. With a workspaceId the tag is shared
+ * with that workspace; without one it is personal to the caller.
+ */
+export function getOrCreateTag(
+	name: string,
+	workspaceId: string | null
+): Promise<RpcResult<TagEntry>> {
+	return run((opts) =>
+		rpc.getOrCreateTag({ input: { name, workspaceId }, fields: [...TAG_FIELDS], ...opts })
+	);
 }
 
 export type PromptFavoriteEntry = { id: string; promptId: string };

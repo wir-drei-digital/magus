@@ -5,10 +5,12 @@
 		brainPageChildren,
 		myBrains,
 		rootBrainPages,
+		workspaceBrains,
 		type BrainSummary,
 		type CompanionSpec,
 		type PageTreeNode
 	} from '$lib/ash/api';
+	import { session } from '$lib/stores/session.svelte';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 	let {
@@ -28,8 +30,15 @@
 	const childrenByPage = new SvelteMap<string, PageTreeNode[]>();
 
 	onMount(() => {
-		void myBrains().then((result) => {
-			if (result.success) brains = result.data;
+		// Scope to the active workspace, mirroring the shell brain nav
+		// (brain-nav.svelte.ts): workspace query when one is selected, personal
+		// otherwise, then filter — workspaceBrains also returns shared personals.
+		const workspaceId = session.user?.currentWorkspaceId ?? null;
+		const request = workspaceId ? workspaceBrains(workspaceId) : myBrains();
+		void request.then((result) => {
+			if (result.success) {
+				brains = result.data.filter((brain) => (brain.workspaceId ?? null) === workspaceId);
+			}
 			loading = false;
 		});
 	});

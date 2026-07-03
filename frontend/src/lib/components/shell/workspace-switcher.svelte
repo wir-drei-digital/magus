@@ -3,6 +3,7 @@
 	import { Check, ChevronDown, Plus, Settings, User } from '@lucide/svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { workbench } from '$lib/stores/workbench.svelte';
+	import { cn } from '$lib/utils.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import CreateWorkspaceDialog from './create-workspace-dialog.svelte';
 
@@ -61,16 +62,19 @@
 		{#if currentWorkspace}
 			<DropdownMenu.Item>
 				{#snippet child({ props })}
+					<!-- Merge, don't clobber: the spread carries the item's base classes
+					     (incl. `flex items-center`); a plain class attribute would override
+					     them and stack the icon above the label. -->
 					<a
 						{...props}
 						href="{base}/workspaces/{currentWorkspace.slug}"
 						data-testid="workspace-settings-link"
-						class="gap-2 p-2"
+						class={cn((props as { class?: string }).class, 'gap-2 p-2')}
 					>
 						<div class="flex size-6 items-center justify-center rounded-md border">
 							<Settings class="size-4 shrink-0 text-muted-foreground" />
 						</div>
-						Workspace settings
+						<span class="flex-1">Workspace settings</span>
 					</a>
 				{/snippet}
 			</DropdownMenu.Item>

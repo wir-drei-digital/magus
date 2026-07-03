@@ -9106,6 +9106,83 @@ export async function unfavoritePrompt(
 }
 
 
+export type DestroyTagResult = | { success: true; data: {}; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Delete a Tag
+ *
+ * @ashActionType :destroy
+ */
+export async function destroyTag(
+  config: {
+  tenant?: string;
+  identity: UUID;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<DestroyTagResult> {
+  const payload = {
+    action: "destroy_tag",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity
+  };
+
+  return executeActionRpcRequest<DestroyTagResult>(
+    payload,
+    config
+  );
+}
+
+
+export type GetOrCreateTagInput = {
+  name: string;
+  workspaceId?: UUID | null;
+};
+
+export type GetOrCreateTagFields = UnifiedFieldSelection<TagResourceSchema>[];
+
+export type InferGetOrCreateTagResult<
+  Fields extends GetOrCreateTagFields | undefined,
+> = InferResult<TagResourceSchema, Fields>;
+
+export type GetOrCreateTagResult<Fields extends GetOrCreateTagFields | undefined = undefined> = | { success: true; data: InferGetOrCreateTagResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Create a new Tag
+ *
+ * @ashActionType :create
+ */
+export async function getOrCreateTag<Fields extends GetOrCreateTagFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  input: GetOrCreateTagInput;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<GetOrCreateTagResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "get_or_create_tag",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<GetOrCreateTagResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type ListTagsFields = UnifiedFieldSelection<TagResourceSchema>[];
 export type InferListTagsResult<
   Fields extends ListTagsFields,

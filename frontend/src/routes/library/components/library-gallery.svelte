@@ -132,40 +132,12 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col" data-testid="library-gallery">
-	<header class="flex shrink-0 items-center gap-2 border-b py-3 pr-4 pl-14 md:pl-4">
+	<!-- Single header row: title, search, filters, and actions together. Wraps
+	     on narrow panes (compact master/detail) instead of overflowing. -->
+	<header class="flex shrink-0 flex-wrap items-center gap-2 border-b py-2.5 pr-4 pl-14 md:pl-4">
 		<LibraryBig class="size-4 shrink-0 text-muted-foreground" />
-		<h1 class="flex-1 truncate text-base font-semibold">Library</h1>
-		<DropdownMenu.Root>
-			<DropdownMenu.Trigger data-testid="gallery-new">
-				{#snippet child({ props })}
-					<Button {...props} size="sm"><Plus class="size-3.5" /> New</Button>
-				{/snippet}
-			</DropdownMenu.Trigger>
-			<DropdownMenu.Content align="end">
-				<DropdownMenu.Item
-					data-testid="gallery-new-prompt"
-					onSelect={() => (libraryNav.createPromptOpen = true)}
-				>
-					New prompt
-				</DropdownMenu.Item>
-				<DropdownMenu.Item
-					data-testid="gallery-new-skill"
-					onSelect={() => (libraryNav.createSkillOpen = true)}
-				>
-					New skill
-				</DropdownMenu.Item>
-				<DropdownMenu.Separator />
-				<DropdownMenu.Item
-					data-testid="gallery-import-skill"
-					onSelect={() => (libraryNav.importOpen = true)}
-				>
-					<Download class="size-3.5" /> Import skill
-				</DropdownMenu.Item>
-			</DropdownMenu.Content>
-		</DropdownMenu.Root>
-	</header>
+		<h1 class="shrink-0 text-base font-semibold">Library</h1>
 
-	<div class="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2">
 		<label class="relative flex min-w-[9rem] flex-1 items-center">
 			<Search class="pointer-events-none absolute left-2.5 size-3.5 text-muted-foreground" />
 			<input
@@ -198,7 +170,36 @@
 			<option value="used">Most used</option>
 			<option value="name">A-Z</option>
 		</select>
-	</div>
+
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger data-testid="gallery-new">
+				{#snippet child({ props })}
+					<Button {...props} size="sm"><Plus class="size-3.5" /> New</Button>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="end">
+				<DropdownMenu.Item
+					data-testid="gallery-new-prompt"
+					onSelect={() => (libraryNav.createPromptOpen = true)}
+				>
+					New prompt
+				</DropdownMenu.Item>
+				<DropdownMenu.Item
+					data-testid="gallery-new-skill"
+					onSelect={() => (libraryNav.createSkillOpen = true)}
+				>
+					New skill
+				</DropdownMenu.Item>
+				<DropdownMenu.Separator />
+				<DropdownMenu.Item
+					data-testid="gallery-import-skill"
+					onSelect={() => (libraryNav.importOpen = true)}
+				>
+					<Download class="size-3.5" /> Import skill
+				</DropdownMenu.Item>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
+	</header>
 
 	<div class="wb-scroll min-h-0 flex-1 overflow-y-auto">
 		<div class="p-4 {compact ? '' : 'mx-auto max-w-5xl md:p-6'}">

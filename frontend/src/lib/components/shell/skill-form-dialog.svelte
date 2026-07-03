@@ -134,7 +134,7 @@
 		</Dialog.Header>
 
 		<form
-			class="flex max-h-[70vh] flex-col gap-4 overflow-y-auto"
+			class="flex max-h-[70vh] flex-col gap-4 overflow-x-hidden overflow-y-auto"
 			onsubmit={(event) => {
 				event.preventDefault();
 				void save();

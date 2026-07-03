@@ -807,10 +807,12 @@
 		</nav>
 
 		<!-- fieldset[disabled] inertly disables every nested input/button, so
-		     shared-agent viewers inspect without auto-save failure banners. -->
+		     shared-agent viewers inspect without auto-save failure banners.
+		     min-w-0 overrides the UA's fieldset min-inline-size: min-content,
+		     which otherwise lets one unbreakable line stretch past max-w-2xl. -->
 		<fieldset
 			disabled={readonly}
-			class="wb-scroll mx-auto block w-full max-w-2xl min-h-0 flex-1 space-y-4 overflow-y-auto p-6"
+			class="wb-scroll mx-auto block w-full max-w-2xl min-w-0 min-h-0 flex-1 space-y-4 overflow-y-auto p-6"
 		>
 			{#if section === 'general'}
 				<Section title="Profile" description="How this agent is identified across Magus.">
@@ -1435,11 +1437,11 @@
 						{#each inbox as event (event.id)}
 							<li class="flex items-start gap-3 py-2 text-sm">
 								<span class="min-w-0 flex-1">
-									<span class="block truncate font-medium">
-										{event.title ?? event.eventType}
+									<span class="flex min-w-0 items-center gap-1.5 font-medium">
+										<span class="min-w-0 truncate">{event.title ?? event.eventType}</span>
 										{#if event.urgency === 'immediate'}
 											<span
-												class="ml-1.5 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive"
+												class="shrink-0 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive"
 											>
 												Urgent
 											</span>

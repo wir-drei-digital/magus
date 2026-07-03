@@ -1315,18 +1315,24 @@ export type PromptFavoriteAttributesOnlySchema = {
 // Tag Schema
 export type TagResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name";
+  __primitiveFields: "id" | "name" | "userId" | "workspaceId";
   id: UUID;
   name: string;
+  userId: UUID | null;
+  workspaceId: UUID | null;
+  user: { __type: "Relationship"; __resource: UserResourceSchema | null; };
+  workspace: { __type: "Relationship"; __resource: WorkspaceResourceSchema | null; };
 };
 
 
 
 export type TagAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name";
+  __primitiveFields: "id" | "name" | "userId" | "workspaceId";
   id: UUID;
   name: string;
+  userId: UUID | null;
+  workspaceId: UUID | null;
 };
 
 
@@ -4983,7 +4989,24 @@ export type TagFilterInput = {
     in?: Array<string>;
   };
 
+  userId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
 
+  workspaceId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+
+  user?: UserFilterInput;
+
+  workspace?: WorkspaceFilterInput;
 
 };
 export type MCPServerFilterInput = {
@@ -6212,7 +6235,7 @@ export type PromptFilterField = (typeof promptFilterFields)[number];
 export const promptFavoriteFilterFields = ["id", "promptId", "prompt"] as const;
 export type PromptFavoriteFilterField = (typeof promptFavoriteFilterFields)[number];
 
-export const tagFilterFields = ["id", "name"] as const;
+export const tagFilterFields = ["id", "name", "userId", "workspaceId", "user", "workspace"] as const;
 export type TagFilterField = (typeof tagFilterFields)[number];
 
 export const mCPServerFilterFields = ["id", "name", "handle", "url", "transport", "mcpPath", "enabled", "authType", "cachedTools", "toolsCachedAt", "oauthMetadata", "reachability", "lastError", "lastReachableAt", "source", "registryName", "registryVersion", "description", "repositoryUrl", "userId", "workspaceId", "user", "workspace"] as const;
@@ -6354,7 +6377,7 @@ export type PromptSortField = (typeof promptSortFields)[number];
 export const promptFavoriteSortFields = ["id", "promptId"] as const;
 export type PromptFavoriteSortField = (typeof promptFavoriteSortFields)[number];
 
-export const tagSortFields = ["id", "name"] as const;
+export const tagSortFields = ["id", "name", "userId", "workspaceId"] as const;
 export type TagSortField = (typeof tagSortFields)[number];
 
 export const mCPServerSortFields = ["id", "name", "handle", "url", "transport", "mcpPath", "enabled", "authType", "cachedTools", "toolsCachedAt", "oauthMetadata", "reachability", "lastError", "lastReachableAt", "source", "registryName", "registryVersion", "description", "repositoryUrl", "userId", "workspaceId"] as const;

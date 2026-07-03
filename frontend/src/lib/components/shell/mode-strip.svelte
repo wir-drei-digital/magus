@@ -3,7 +3,6 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
 	import {
-		ArrowLeftRight,
 		BookOpen,
 		Bot,
 		Brain,
@@ -18,6 +17,7 @@
 		Moon,
 		Newspaper,
 		Settings,
+		ShieldCheck,
 		Sun
 	} from '@lucide/svelte';
 	import { session } from '$lib/stores/session.svelte';
@@ -68,7 +68,6 @@
 		(session.user?.displayName ?? session.user?.email ?? '?').slice(0, 1).toUpperCase()
 	);
 
-	let toggling = $state(false);
 	let theme = $state<'system' | 'light' | 'dark'>('system');
 
 	$effect(() => {
@@ -86,13 +85,6 @@
 			next === 'dark' ||
 			(next === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 		document.documentElement.classList.toggle('dark', dark);
-	}
-
-	async function backToClassic() {
-		toggling = true;
-		const ok = await session.setWorkbenchUi('classic');
-		toggling = false;
-		if (ok) window.location.href = '/chat';
 	}
 </script>
 
@@ -205,10 +197,17 @@
 						</a>
 					{/snippet}
 				</DropdownMenu.Item>
-				<DropdownMenu.Item onSelect={() => void backToClassic()} disabled={toggling}>
-					<ArrowLeftRight class="size-4" />
-					Switch to classic UI
-				</DropdownMenu.Item>
+				{#if session.user?.isAdmin}
+					<DropdownMenu.Item>
+						{#snippet child({ props })}
+							<!-- Admin lives in the Phoenix LiveView app, so leave the SPA. -->
+							<a {...props} href="/admin" data-sveltekit-reload data-testid="user-menu-admin">
+								<ShieldCheck class="size-4" />
+								Admin
+							</a>
+						{/snippet}
+					</DropdownMenu.Item>
+				{/if}
 				<DropdownMenu.Separator />
 				<!-- Theme picker — same 3-option strip as classic. -->
 				<div class="flex items-center gap-1 px-2 py-1.5" data-testid="theme-picker">
