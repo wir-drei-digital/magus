@@ -256,7 +256,7 @@ defmodule Magus.Usage.AdminStats do
     users =
       filtered_users(search, filter)
       |> join(:left, [u], mu in subquery(usage_rollup), on: mu.user_id == u.id)
-      |> join(:left, [u], s in Account, on: s.user_id == u.id and is_nil(s.sponsor_user_id))
+      |> join(:left, [u], s in Account, on: s.user_id == u.id)
       |> join(:left, [u, mu, s], p in Policy, on: p.id == s.usage_plan_id)
       |> select([u, mu, s, p], %{
         id: u.id,
