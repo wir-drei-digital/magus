@@ -48,6 +48,18 @@ defmodule Magus.Agents.AgentRun do
         scheduler_module_name Magus.Agents.AgentRun.Schedulers.SweepStuckPending
         max_attempts 1
       end
+
+      trigger :prune_terminal_runs do
+        action :prune
+        queue :agent_run_retention
+        scheduler_cron "40 4 * * *"
+        read_action :prunable_runs
+        worker_read_action :prunable_runs
+        where expr(is_prunable)
+        worker_module_name Magus.Agents.AgentRun.Workers.PruneTerminal
+        scheduler_module_name Magus.Agents.AgentRun.Schedulers.PruneTerminal
+        max_attempts 1
+      end
     end
   end
 
@@ -182,6 +194,23 @@ defmodule Magus.Agents.AgentRun do
     read :stuck_pending_runs do
       pagination keyset?: true, required?: false
       filter expr(status == :pending and inserted_at < ago(15, :minute))
+    end
+
+    read :prunable_runs do
+      description """
+      Terminal runs (complete/error/timed_out/cancelled/budget_exceeded)
+      older than 90 days (measured on `updated_at`, the terminal-transition
+      timestamp proxy). Backs the daily `:prune_terminal_runs` trigger.
+      """
+
+      pagination keyset?: true, required?: false
+      filter expr(is_prunable)
+    end
+
+    destroy :prune do
+      description "Oban-triggered retention destroy for a terminal run past its 90-day window"
+      accept []
+      require_atomic? false
     end
   end
 
@@ -439,6 +468,15 @@ defmodule Magus.Agents.AgentRun do
       calculation expr(
                     status == :pending and
                       inserted_at < ago(15, :minute)
+                  )
+    end
+
+    calculate :is_prunable, :boolean do
+      public? false
+
+      calculation expr(
+                    status in [:complete, :error, :timed_out, :cancelled, :budget_exceeded] and
+                      updated_at < ago(90, :day)
                   )
     end
   end

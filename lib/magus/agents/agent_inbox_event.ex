@@ -15,7 +15,7 @@ defmodule Magus.Agents.AgentInboxEvent do
     domain: Magus.Agents,
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer],
-    extensions: [AshTypescript.Resource]
+    extensions: [AshTypescript.Resource, AshOban]
 
   postgres do
     table "agent_inbox_events"
@@ -32,6 +32,34 @@ defmodule Magus.Agents.AgentInboxEvent do
 
   typescript do
     type_name "AgentInboxEvent"
+  end
+
+  oban do
+    triggers do
+      trigger :expire_due_events do
+        action :expire
+        queue :agent_inbox_event_retention
+        scheduler_cron "0 * * * *"
+        read_action :expiry_due
+        worker_read_action :expiry_due
+        where expr(is_expiry_due)
+        worker_module_name Magus.Agents.AgentInboxEvent.Workers.ExpireDue
+        scheduler_module_name Magus.Agents.AgentInboxEvent.Schedulers.ExpireDue
+        max_attempts 1
+      end
+
+      trigger :prune_terminal_events do
+        action :prune
+        queue :agent_inbox_event_retention
+        scheduler_cron "30 4 * * *"
+        read_action :prunable
+        worker_read_action :prunable
+        where expr(is_prunable)
+        worker_module_name Magus.Agents.AgentInboxEvent.Workers.PruneTerminal
+        scheduler_module_name Magus.Agents.AgentInboxEvent.Schedulers.PruneTerminal
+        max_attempts 1
+      end
+    end
   end
 
   actions do
@@ -253,9 +281,40 @@ defmodule Magus.Agents.AgentInboxEvent do
 
       prepare build(sort: [inserted_at: :desc], limit: 1)
     end
+
+    read :expiry_due do
+      description """
+      Events past their `expires_at` while still in a non-terminal status.
+      Backs the hourly `:expire_due_events` trigger.
+      """
+
+      pagination keyset?: true, required?: false
+      filter expr(is_expiry_due)
+    end
+
+    read :prunable do
+      description """
+      Terminal (resolved/dismissed/expired) events older than 30 days
+      (measured on `updated_at`, the terminal-transition timestamp proxy).
+      Backs the daily `:prune_terminal_events` trigger.
+      """
+
+      pagination keyset?: true, required?: false
+      filter expr(is_prunable)
+    end
+
+    destroy :prune do
+      description "Oban-triggered retention destroy for a terminal event past its 30-day window"
+      accept []
+      require_atomic? false
+    end
   end
 
   policies do
+    bypass AshOban.Checks.AshObanInteraction do
+      authorize_if always()
+    end
+
     # AI agents acting on behalf of users can read/update events
     # (used by autonomous tools like ListInboxEvents).
     bypass action_type([:read, :update]) do
@@ -417,6 +476,23 @@ defmodule Magus.Agents.AgentInboxEvent do
       public? true
 
       description "The AgentRun currently handling this event. Cleared on run failure; event marked resolved on run success."
+    end
+  end
+
+  calculations do
+    calculate :is_expiry_due, :boolean do
+      public? false
+
+      calculation expr(
+                    not is_nil(expires_at) and expires_at < now() and
+                      status in [:pending, :waiting, :processing]
+                  )
+    end
+
+    calculate :is_prunable, :boolean do
+      public? false
+
+      calculation expr(status in [:resolved, :dismissed, :expired] and updated_at < ago(30, :day))
     end
   end
 
