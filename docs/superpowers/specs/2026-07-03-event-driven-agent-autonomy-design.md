@@ -71,7 +71,7 @@ A solid foundation for autonomous agent collaboration:
 | Approval responses | On approval match, create an `:approval_response` event (`urgency: :immediate`) carrying the answer, in addition to resolving the `:waiting` event; the urgent-wake path does the rest |
 | Run liveness | Throttled `last_heartbeat_at` touches from streaming/tool plugin activity; CleanupStale additionally verifies the target agent process is not alive-and-busy before reaping |
 | Budget accounting | `:inbox_urgent` runs count toward `max_daily_runs` alongside `:heartbeat`; spend-budget gate applies |
-| Mentions | Stay a direct conversational dispatch path, never touch the inbox: they must run concurrently (N mentions → N replies), while the inbox path is serialized per agent via the in-flight gate; `AgentRun` (`source: :mention`) is their audit record |
+| Mentions | Stay a direct conversational dispatch path, never touch the inbox: a busy agent must still reply immediately (consult runs are exempt from the in-flight gate), and a mention is not triageable/dismissable like an inbox item; `AgentRun` (`source: :mention`) is their audit record (see §8) |
 | Escalation | 3 consecutive failed autonomous runs → owner notification; 10 → auto-pause with visible reason |
 | Sweeps/retention | ash_oban triggers per resource (project convention), not a monolithic janitor |
 
@@ -267,12 +267,26 @@ attach without further code changes.
 
 ### 8. Retention
 
-Mentions explicitly stay out of the inbox. They are conversational
-request-response: `InboxEventPlugin` keeps its direct concurrent dispatch,
-the reply appears as a message from each mentioned agent in the source
-conversation, and `AgentRun` (`source: :mention`) remains the audit record.
-Pulling them through the inbox would serialize them behind the per-agent
-in-flight gate (breaking N mentions → N replies) for no functional gain.
+Mentions explicitly stay out of the inbox. Fan-out is not the reason: one
+event per mentioned agent would work, and the in-flight gate is per agent,
+so two different agents would still reply concurrently. The real reasons
+are same-agent behavior and semantics:
+
+- A mention of an agent that is mid-autonomous-run would be rejected by the
+  in-flight gate and wait for the drain step, while the user sits in the
+  conversation. Today's `kind: :consult` dispatch is exempt from that gate
+  and replies immediately, even mid-run; the same agent mentioned from two
+  conversations answers both concurrently.
+- The inbox is a discretionary triage queue ("dismiss noise, do work, or
+  set your next wakeup"); a mention is a user waiting for a reply and must
+  not be dismissable or deferrable. Exempting mention events from the gate
+  and pinning their objective would just rebuild the direct path inside the
+  inbox wrapper.
+
+`InboxEventPlugin` therefore keeps its direct concurrent dispatch, the
+reply appears as a message from each mentioned agent in the source
+conversation (`persist_source_response`), and `AgentRun`
+(`source: :mention`) remains the audit record.
 
 **Retention (ash_oban triggers, daily):**
 
