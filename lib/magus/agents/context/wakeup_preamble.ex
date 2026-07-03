@@ -70,7 +70,8 @@ defmodule Magus.Agents.Context.WakeupPreamble do
   defp last_wakeup_run(agent_id, user) do
     Magus.Agents.AgentRun
     |> Ash.Query.filter(
-      target_agent_id == ^agent_id and source in [:heartbeat, :manual_trigger] and
+      target_agent_id == ^agent_id and
+        source in [:heartbeat, :manual_trigger, :inbox_urgent] and
         status == :complete
     )
     |> Ash.Query.sort(completed_at: :desc)
@@ -87,7 +88,7 @@ defmodule Magus.Agents.Context.WakeupPreamble do
     pending =
       Magus.Agents.AgentInboxEvent
       |> Ash.Query.filter(agent_id == ^agent_id and status in [:pending, :waiting])
-      |> Ash.Query.sort(inserted_at: :desc)
+      |> Ash.Query.sort(urgency: :desc, inserted_at: :desc)
       |> Ash.Query.limit(50)
       |> Ash.read!(actor: user)
 
