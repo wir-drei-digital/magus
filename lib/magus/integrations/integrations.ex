@@ -81,6 +81,7 @@ defmodule Magus.Integrations do
       define :get_input_message, action: :read, get_by: [:id]
       define :list_pending_input_messages, action: :pending
       define :list_recent_input_messages, action: :recent, args: [:user_id]
+      define :mark_input_processing, action: :mark_processing
       define :mark_input_processed, action: :mark_processed
       define :mark_input_failed, action: :mark_failed
       define :count_pending_input_messages, action: :count_pending, args: [:user_id]

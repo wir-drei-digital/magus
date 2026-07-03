@@ -51,11 +51,31 @@ defmodule Magus.Integrations.Credential.Changes.ProcessExpiryWarning do
   defp handle(%{expires_at: nil} = credential), do: credential
 
   defp handle(%{expires_at: expires_at} = credential) do
-    if DateTime.compare(expires_at, DateTime.utc_now()) == :lt do
-      handle_expired(credential)
-    else
-      handle_expiring_soon(credential)
+    cond do
+      # Stale-row guard: if the integration has a newer credential row (e.g. a
+      # reconnect that this sweep raced), this row is obsolete — skip it rather
+      # than error the now-healthy integration. Belt-and-braces alongside
+      # SetupIntegration destroying the old row before creating the new one.
+      superseded?(credential) ->
+        credential
+
+      DateTime.compare(expires_at, DateTime.utc_now()) == :lt ->
+        handle_expired(credential)
+
+      true ->
+        handle_expiring_soon(credential)
     end
+  end
+
+  defp superseded?(credential) do
+    require Ash.Query
+
+    Magus.Integrations.Credential
+    |> Ash.Query.filter(
+      user_integration_id == ^credential.user_integration_id and
+        inserted_at > ^credential.inserted_at
+    )
+    |> Ash.exists?(authorize?: false)
   end
 
   defp handle_expiring_soon(%{expiry_warned_at: %DateTime{}} = credential), do: credential
