@@ -179,6 +179,8 @@ defmodule Magus.Agents.Plugins.InboxEventPlugin do
           %{resolved_by: :user, resolution_note: "User chose: #{matched}"},
           actor: user
         )
+
+        create_approval_response_event(event, matched, text, user)
       end
     end
 
@@ -187,6 +189,38 @@ defmodule Magus.Agents.Plugins.InboxEventPlugin do
     e ->
       Logger.warning("InboxEventPlugin approval check error: #{inspect(e)}")
       :ok
+  end
+
+  # The requesting agent learns of the user's decision via an :immediate
+  # inbox event, which TriggerUrgentWake turns into an :inbox_urgent run.
+  defp create_approval_response_event(waiting_event, matched, text, user) do
+    attrs = %{
+      agent_id: waiting_event.agent_id,
+      event_type: :approval_response,
+      urgency: :immediate,
+      title: "Approval response: #{matched}",
+      summary: String.slice(text, 0, 500),
+      payload: %{
+        "chosen_option" => matched,
+        "response_text" => text,
+        "question" => waiting_event.payload["question"],
+        "source_conversation_id" => waiting_event.source_id,
+        "request_event_id" => waiting_event.id
+      },
+      source_type: :conversation,
+      source_id: waiting_event.source_id,
+      idempotency_key: "approval_response:#{waiting_event.id}"
+    }
+
+    case Magus.Agents.create_inbox_event(attrs, actor: user) do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning("InboxEventPlugin: approval response event failed: #{inspect(reason)}")
+
+        :ok
+    end
   end
 
   # A user reply "Approve skill: <uuid>" records that skill as approved on the
