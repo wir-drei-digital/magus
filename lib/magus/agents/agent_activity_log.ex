@@ -12,7 +12,7 @@ defmodule Magus.Agents.AgentActivityLog do
     domain: Magus.Agents,
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer],
-    extensions: [AshTypescript.Resource]
+    extensions: [AshTypescript.Resource, AshOban]
 
   postgres do
     table "agent_activity_logs"
@@ -23,7 +23,27 @@ defmodule Magus.Agents.AgentActivityLog do
     type_name "AgentActivityLog"
   end
 
+  oban do
+    triggers do
+      trigger :prune_old_logs do
+        action :prune
+        queue :agent_activity_log_retention
+        scheduler_cron "50 4 * * *"
+        read_action :prunable
+        worker_read_action :prunable
+        where expr(is_prunable)
+        worker_module_name Magus.Agents.AgentActivityLog.Workers.PruneOld
+        scheduler_module_name Magus.Agents.AgentActivityLog.Schedulers.PruneOld
+        max_attempts 1
+      end
+    end
+  end
+
   actions do
+    read :read do
+      primary? true
+    end
+
     create :create do
       accept [
         :agent_id,
@@ -73,9 +93,29 @@ defmodule Magus.Agents.AgentActivityLog do
         |> Ash.Query.offset(offset)
       end
     end
+
+    read :prunable do
+      description """
+      Logs older than 90 days (measured on `inserted_at`, since activity logs
+      are append-only). Backs the daily `:prune_old_logs` trigger.
+      """
+
+      pagination keyset?: true, required?: false
+      filter expr(is_prunable)
+    end
+
+    destroy :prune do
+      description "Oban-triggered retention destroy for a log past its 90-day window"
+      accept []
+      require_atomic? false
+    end
   end
 
   policies do
+    bypass AshOban.Checks.AshObanInteraction do
+      authorize_if always()
+    end
+
     policy action_type(:create) do
       authorize_if actor_present()
     end
@@ -197,6 +237,14 @@ defmodule Magus.Agents.AgentActivityLog do
       define_attribute? false
       source_attribute :conversation_id
       allow_nil? true
+    end
+  end
+
+  calculations do
+    calculate :is_prunable, :boolean do
+      public? false
+
+      calculation expr(inserted_at < ago(90, :day))
     end
   end
 end

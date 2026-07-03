@@ -171,6 +171,12 @@ config :magus, Oban,
     credential_expiry: 1,
     # 15-min stuck-InputMessage (:processing > 10m) sweep
     input_message_sweep: 1,
+    # Hourly expiry + daily retention pruning for AgentInboxEvent
+    agent_inbox_event_retention: 1,
+    # Daily retention pruning for terminal AgentRuns (90-day window)
+    agent_run_retention: 1,
+    # Daily retention pruning for AgentActivityLog (90-day window)
+    agent_activity_log_retention: 1,
     brain_name_page: [limit: 2],
     # Brain chunk embedding generation (page chunks + source chunks).
     brain_embedding: [limit: 5],
