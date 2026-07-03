@@ -18,6 +18,11 @@ defmodule Magus.Integrations.IntegrationConversation do
   postgres do
     table "integration_conversations"
     repo Magus.Repo
+
+    references do
+      reference :user_integration, on_delete: :delete
+      reference :conversation, on_delete: :delete
+    end
   end
 
   actions do
