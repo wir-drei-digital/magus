@@ -8,16 +8,14 @@
 
 <!-- Inline mobile nav trigger: pane headers render it as their first item
      (hidden at md+), replacing the old floating hamburger that every header
-     had to clear with pl-14. -->
+     had to clear with pl-14. Same circular pill style as the other header
+     icon buttons. -->
 <button
 	type="button"
-	class={cn(
-		'flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground md:hidden',
-		className
-	)}
+	class={cn('wb-pill-btn wb-pill-btn-square shrink-0 md:hidden', className)}
 	aria-label="Open navigation"
 	data-testid="mobile-menu"
 	onclick={() => (navDrawer.open = true)}
 >
-	<Menu class="size-[18px]" />
+	<Menu class="size-4" />
 </button>
