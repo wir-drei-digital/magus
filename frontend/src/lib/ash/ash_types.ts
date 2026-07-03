@@ -1134,7 +1134,7 @@ export type FileAttributesOnlySchema = {
 // UserIntegration Schema
 export type UserIntegrationResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "providerKey" | "status" | "config" | "externalId" | "lastSyncAt" | "errorMessage" | "conversationMode" | "asyncReplyEnabled" | "enabledTools";
+  __primitiveFields: "id" | "providerKey" | "status" | "config" | "externalId" | "lastSyncAt" | "errorMessage" | "consecutiveFailures" | "lastError" | "lastSuccessAt" | "conversationMode" | "asyncReplyEnabled" | "enabledTools";
   id: UUIDv7;
   providerKey: string;
   status: "active" | "disabled" | "error" | "pending" | null;
@@ -1142,6 +1142,9 @@ export type UserIntegrationResourceSchema = {
   externalId: string | null;
   lastSyncAt: UtcDateTimeUsec | null;
   errorMessage: string | null;
+  consecutiveFailures: number;
+  lastError: string | null;
+  lastSuccessAt: UtcDateTimeUsec | null;
   conversationMode: "multi" | "single" | null;
   asyncReplyEnabled: boolean | null;
   enabledTools: Array<string> | null;
@@ -1151,7 +1154,7 @@ export type UserIntegrationResourceSchema = {
 
 export type UserIntegrationAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "providerKey" | "status" | "config" | "externalId" | "lastSyncAt" | "errorMessage" | "conversationMode" | "asyncReplyEnabled" | "enabledTools";
+  __primitiveFields: "id" | "providerKey" | "status" | "config" | "externalId" | "lastSyncAt" | "errorMessage" | "consecutiveFailures" | "lastError" | "lastSuccessAt" | "conversationMode" | "asyncReplyEnabled" | "enabledTools";
   id: UUIDv7;
   providerKey: string;
   status: "active" | "disabled" | "error" | "pending" | null;
@@ -1159,6 +1162,9 @@ export type UserIntegrationAttributesOnlySchema = {
   externalId: string | null;
   lastSyncAt: UtcDateTimeUsec | null;
   errorMessage: string | null;
+  consecutiveFailures: number;
+  lastError: string | null;
+  lastSuccessAt: UtcDateTimeUsec | null;
   conversationMode: "multi" | "single" | null;
   asyncReplyEnabled: boolean | null;
   enabledTools: Array<string> | null;
@@ -4658,6 +4664,34 @@ export type UserIntegrationFilterInput = {
     isNil?: boolean;
   };
 
+  consecutiveFailures?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+  };
+
+  lastError?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  lastSuccessAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
   conversationMode?: {
     eq?: "multi" | "single";
     notEq?: "multi" | "single";
@@ -6472,7 +6506,7 @@ export type FeatureUsageEventFilterField = (typeof featureUsageEventFilterFields
 export const fileFilterFields = ["id", "name", "type", "source", "mimeType", "fileSize", "filePath", "status", "errorMessage", "chunkCount", "externalId", "externalEtag", "externalUpdatedAt", "externalUrl", "lastSyncedAt", "deletedAt", "isTemplate", "uploadedViaAgentId", "insertedAt", "updatedAt", "userId", "conversationId", "folderId", "workspaceId", "knowledgeCollectionId", "isSharedToWorkspace", "user", "conversation", "folder", "workspace", "knowledgeCollection", "uploadedViaAgent"] as const;
 export type FileFilterField = (typeof fileFilterFields)[number];
 
-export const userIntegrationFilterFields = ["id", "providerKey", "status", "config", "externalId", "lastSyncAt", "errorMessage", "conversationMode", "asyncReplyEnabled", "enabledTools"] as const;
+export const userIntegrationFilterFields = ["id", "providerKey", "status", "config", "externalId", "lastSyncAt", "errorMessage", "consecutiveFailures", "lastError", "lastSuccessAt", "conversationMode", "asyncReplyEnabled", "enabledTools"] as const;
 export type UserIntegrationFilterField = (typeof userIntegrationFilterFields)[number];
 
 export const knowledgeCollectionFilterFields = ["id", "name", "externalId", "externalPath", "syncStatus", "syncStrategy", "syncIntervalMinutes", "lastSyncedAt", "contentUpdatedAt", "syncCursor", "itemCount", "errorCount", "lastError", "settings", "syncLog", "workspaceId", "isSharedToWorkspace", "workspace"] as const;
@@ -6620,7 +6654,7 @@ export type FeatureUsageEventSortField = (typeof featureUsageEventSortFields)[nu
 export const fileSortFields = ["id", "name", "type", "source", "mimeType", "fileSize", "filePath", "status", "errorMessage", "chunkCount", "externalId", "externalEtag", "externalUpdatedAt", "externalUrl", "lastSyncedAt", "deletedAt", "isTemplate", "uploadedViaAgentId", "insertedAt", "updatedAt", "userId", "conversationId", "folderId", "workspaceId", "knowledgeCollectionId", "isSharedToWorkspace"] as const;
 export type FileSortField = (typeof fileSortFields)[number];
 
-export const userIntegrationSortFields = ["id", "providerKey", "status", "config", "externalId", "lastSyncAt", "errorMessage", "conversationMode", "asyncReplyEnabled", "enabledTools"] as const;
+export const userIntegrationSortFields = ["id", "providerKey", "status", "config", "externalId", "lastSyncAt", "errorMessage", "consecutiveFailures", "lastError", "lastSuccessAt", "conversationMode", "asyncReplyEnabled", "enabledTools"] as const;
 export type UserIntegrationSortField = (typeof userIntegrationSortFields)[number];
 
 export const knowledgeCollectionSortFields = ["id", "name", "externalId", "externalPath", "syncStatus", "syncStrategy", "syncIntervalMinutes", "lastSyncedAt", "contentUpdatedAt", "syncCursor", "itemCount", "errorCount", "lastError", "settings", "syncLog", "workspaceId", "isSharedToWorkspace"] as const;

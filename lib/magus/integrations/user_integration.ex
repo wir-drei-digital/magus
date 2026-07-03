@@ -44,6 +44,8 @@ defmodule Magus.Integrations.UserIntegration do
     update :activate do
       change set_attribute(:status, :active)
       change set_attribute(:error_message, nil)
+      change set_attribute(:consecutive_failures, 0)
+      change set_attribute(:last_error, nil)
     end
 
     update :deactivate do
@@ -53,6 +55,28 @@ defmodule Magus.Integrations.UserIntegration do
     update :mark_error do
       accept [:error_message]
       change set_attribute(:status, :error)
+    end
+
+    update :mark_errored do
+      accept []
+      change set_attribute(:status, :error)
+    end
+
+    update :record_poll_success do
+      accept []
+      change set_attribute(:consecutive_failures, 0)
+      change set_attribute(:last_error, nil)
+      change set_attribute(:last_success_at, &DateTime.utc_now/0)
+    end
+
+    update :record_poll_failure do
+      accept []
+      require_atomic? false
+
+      argument :last_error, :string, allow_nil?: true
+
+      change set_attribute(:last_error, arg(:last_error))
+      change increment(:consecutive_failures)
     end
 
     update :update_config do
@@ -181,6 +205,23 @@ defmodule Magus.Integrations.UserIntegration do
 
     attribute :error_message, :string do
       public? true
+    end
+
+    attribute :consecutive_failures, :integer do
+      default 0
+      allow_nil? false
+      public? true
+      description "Consecutive polling failures. Reset to 0 on success or reactivation."
+    end
+
+    attribute :last_error, :string do
+      public? true
+      description "Most recent poll failure reason. Cleared on success or reactivation."
+    end
+
+    attribute :last_success_at, :utc_datetime_usec do
+      public? true
+      description "Timestamp of the most recent successful poll."
     end
 
     attribute :conversation_mode, :atom do

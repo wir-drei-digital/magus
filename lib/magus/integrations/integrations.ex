@@ -45,6 +45,9 @@ defmodule Magus.Integrations do
 
       define :activate_user_integration, action: :activate
       define :deactivate_user_integration, action: :deactivate
+      define :mark_integration_errored, action: :mark_errored
+      define :record_integration_poll_success, action: :record_poll_success
+      define :record_integration_poll_failure, action: :record_poll_failure
       define :update_integration_config, action: :update_config
       define :link_integration_conversation, action: :link_conversation
       define :update_integration_enabled_tools, action: :update_enabled_tools

@@ -121,19 +121,27 @@ defmodule Magus.Integrations.Providers.RssSource do
     if feed_urls == [] do
       {:error, :no_feed_url_configured}
     else
-      results =
-        Enum.flat_map(feed_urls, fn url ->
-          case fetch_and_parse_feed(url) do
-            {:ok, items} ->
-              items
+      fetch_results = Enum.map(feed_urls, &{&1, fetch_and_parse_feed(&1)})
 
-            {:error, reason} ->
-              Logger.warning("Failed to fetch feed #{url}: #{inspect(reason)}")
-              []
-          end
+      if Enum.all?(fetch_results, fn {_url, result} -> match?({:error, _}, result) end) do
+        Enum.each(fetch_results, fn {url, {:error, reason}} ->
+          Logger.warning("Failed to fetch feed #{url}: #{inspect(reason)}")
         end)
 
-      {:ok, results}
+        {:error, :all_feeds_failed}
+      else
+        results =
+          Enum.flat_map(fetch_results, fn
+            {_url, {:ok, items}} ->
+              items
+
+            {url, {:error, reason}} ->
+              Logger.warning("Failed to fetch feed #{url}: #{inspect(reason)}")
+              []
+          end)
+
+        {:ok, results}
+      end
     end
   end
 
