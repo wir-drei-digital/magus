@@ -45,6 +45,17 @@ defmodule Magus.Agents.Context.WakeupPreambleTest do
     assert text =~ "manually triggered"
   end
 
+  test "builds preamble for :inbox_urgent with urgent header" do
+    user = generate(user())
+    agent = custom_agent(user, %{heartbeat_default_interval_minutes: 360})
+
+    text = WakeupPreamble.build(%{custom_agent: agent, source: :inbox_urgent, user: user})
+    assert text =~ "urgent inbox event"
+    assert text =~ "list_inbox_events"
+    assert text =~ "dismiss_event"
+    assert text =~ "set_next_wakeup"
+  end
+
   test "returns empty string for non-wakeup sources" do
     user = generate(user())
     agent = custom_agent(user, %{})

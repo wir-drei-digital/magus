@@ -1,8 +1,8 @@
 defmodule Magus.Agents.Context.WakeupPreamble do
   @moduledoc """
   Synthesizes the wakeup system-prompt preamble for autonomous runs
-  (source: :heartbeat or :manual_trigger). Returns "" for other
-  sources so it can be called unconditionally.
+  (source: :heartbeat, :manual_trigger, or :inbox_urgent). Returns ""
+  for other sources so it can be called unconditionally.
   """
   require Ash.Query
   require Logger
@@ -10,15 +10,16 @@ defmodule Magus.Agents.Context.WakeupPreamble do
   @doc """
   Builds the preamble text. Pass a map with:
     * :custom_agent: the CustomAgent struct
-    * :source:       :heartbeat | :manual_trigger | :mention | :sub_agent_spawn
+    * :source:       :heartbeat | :manual_trigger | :inbox_urgent | :mention | :sub_agent_spawn
     * :user:         the actor (for ash queries / display name)
 
-  Returns the empty string for sources other than `:heartbeat` and
-  `:manual_trigger` so callers can invoke this unconditionally during
-  context assembly.
+  Returns the empty string for sources other than `:heartbeat`,
+  `:manual_trigger`, and `:inbox_urgent` so callers can invoke this
+  unconditionally during context assembly.
   """
   @spec build(map()) :: String.t()
-  def build(%{source: source} = ctx) when source in [:heartbeat, :manual_trigger] do
+  def build(%{source: source} = ctx)
+      when source in [:heartbeat, :manual_trigger, :inbox_urgent] do
     agent = ctx.custom_agent
     user = ctx.user
 
@@ -50,6 +51,8 @@ defmodule Magus.Agents.Context.WakeupPreamble do
   def build(_), do: ""
 
   defp header(:heartbeat, _user), do: "You are waking up on your scheduled heartbeat."
+
+  defp header(:inbox_urgent, _user), do: "You were woken by an urgent inbox event."
 
   defp header(:manual_trigger, user) do
     name = Map.get(user || %{}, :display_name) || Map.get(user || %{}, :email) || "user"
