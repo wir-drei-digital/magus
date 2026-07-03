@@ -210,7 +210,7 @@ export type AgentSecretAttributesOnlySchema = {
 // CustomAgent Schema
 export type CustomAgentResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "handle" | "description" | "icon" | "imagePath" | "instructions" | "chatMode" | "disabledToolCategories" | "preLoadedSkills" | "samplingSettings" | "maxIterations" | "isDefault" | "isPublic" | "canReadGlobalMemories" | "canWriteGlobalMemories" | "canAccessGlobalFiles" | "canAccessKnowledge" | "isPaused" | "maxDailyRuns" | "maxTokensPerRun" | "heartbeatEnabled" | "heartbeatInstructions" | "heartbeatDefaultIntervalMinutes" | "nextScheduledAt" | "insertedAt" | "updatedAt" | "modelId" | "imageModelId" | "videoModelId" | "workspaceId" | "imageUrl" | "editableByActor" | "isSharedToWorkspace";
+  __primitiveFields: "id" | "name" | "handle" | "description" | "icon" | "imagePath" | "instructions" | "chatMode" | "disabledToolCategories" | "preLoadedSkills" | "samplingSettings" | "maxIterations" | "isDefault" | "isPublic" | "canReadGlobalMemories" | "canWriteGlobalMemories" | "canAccessGlobalFiles" | "canAccessKnowledge" | "isPaused" | "pauseReason" | "maxDailyRuns" | "maxTokensPerRun" | "heartbeatEnabled" | "heartbeatInstructions" | "heartbeatDefaultIntervalMinutes" | "nextScheduledAt" | "insertedAt" | "updatedAt" | "modelId" | "imageModelId" | "videoModelId" | "workspaceId" | "imageUrl" | "editableByActor" | "isSharedToWorkspace";
   id: UUIDv7;
   name: string;
   handle: string;
@@ -230,6 +230,7 @@ export type CustomAgentResourceSchema = {
   canAccessGlobalFiles: boolean | null;
   canAccessKnowledge: boolean | null;
   isPaused: boolean | null;
+  pauseReason: string | null;
   maxDailyRuns: number | null;
   maxTokensPerRun: number | null;
   heartbeatEnabled: boolean | null;
@@ -256,7 +257,7 @@ export type CustomAgentResourceSchema = {
 
 export type CustomAgentAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "handle" | "description" | "icon" | "imagePath" | "instructions" | "chatMode" | "disabledToolCategories" | "preLoadedSkills" | "samplingSettings" | "maxIterations" | "isDefault" | "isPublic" | "canReadGlobalMemories" | "canWriteGlobalMemories" | "canAccessGlobalFiles" | "canAccessKnowledge" | "isPaused" | "maxDailyRuns" | "maxTokensPerRun" | "heartbeatEnabled" | "heartbeatInstructions" | "heartbeatDefaultIntervalMinutes" | "nextScheduledAt" | "insertedAt" | "updatedAt" | "modelId" | "imageModelId" | "videoModelId" | "workspaceId";
+  __primitiveFields: "id" | "name" | "handle" | "description" | "icon" | "imagePath" | "instructions" | "chatMode" | "disabledToolCategories" | "preLoadedSkills" | "samplingSettings" | "maxIterations" | "isDefault" | "isPublic" | "canReadGlobalMemories" | "canWriteGlobalMemories" | "canAccessGlobalFiles" | "canAccessKnowledge" | "isPaused" | "pauseReason" | "maxDailyRuns" | "maxTokensPerRun" | "heartbeatEnabled" | "heartbeatInstructions" | "heartbeatDefaultIntervalMinutes" | "nextScheduledAt" | "insertedAt" | "updatedAt" | "modelId" | "imageModelId" | "videoModelId" | "workspaceId";
   id: UUIDv7;
   name: string;
   handle: string;
@@ -276,6 +277,7 @@ export type CustomAgentAttributesOnlySchema = {
   canAccessGlobalFiles: boolean | null;
   canAccessKnowledge: boolean | null;
   isPaused: boolean | null;
+  pauseReason: string | null;
   maxDailyRuns: number | null;
   maxTokensPerRun: number | null;
   heartbeatEnabled: boolean | null;
@@ -2547,6 +2549,13 @@ export type CustomAgentFilterInput = {
   isPaused?: {
     eq?: boolean;
     notEq?: boolean;
+    isNil?: boolean;
+  };
+
+  pauseReason?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
     isNil?: boolean;
   };
 
@@ -6391,7 +6400,7 @@ export type AgentInboxEventFilterField = (typeof agentInboxEventFilterFields)[nu
 export const agentSecretFilterFields = ["id", "key", "value", "scope", "description", "insertedAt", "customAgentId", "customAgent"] as const;
 export type AgentSecretFilterField = (typeof agentSecretFilterFields)[number];
 
-export const customAgentFilterFields = ["id", "name", "handle", "description", "icon", "imagePath", "instructions", "slashCommands", "chatMode", "disabledToolCategories", "preLoadedSkills", "samplingSettings", "maxIterations", "isDefault", "isPublic", "canReadGlobalMemories", "canWriteGlobalMemories", "canAccessGlobalFiles", "canAccessKnowledge", "isPaused", "maxDailyRuns", "maxTokensPerRun", "heartbeatEnabled", "heartbeatInstructions", "heartbeatDefaultIntervalMinutes", "nextScheduledAt", "insertedAt", "updatedAt", "modelId", "imageModelId", "videoModelId", "workspaceId", "imageUrl", "editableByActor", "isSharedToWorkspace", "model", "imageModel", "videoModel", "workspace", "attachments"] as const;
+export const customAgentFilterFields = ["id", "name", "handle", "description", "icon", "imagePath", "instructions", "slashCommands", "chatMode", "disabledToolCategories", "preLoadedSkills", "samplingSettings", "maxIterations", "isDefault", "isPublic", "canReadGlobalMemories", "canWriteGlobalMemories", "canAccessGlobalFiles", "canAccessKnowledge", "isPaused", "pauseReason", "maxDailyRuns", "maxTokensPerRun", "heartbeatEnabled", "heartbeatInstructions", "heartbeatDefaultIntervalMinutes", "nextScheduledAt", "insertedAt", "updatedAt", "modelId", "imageModelId", "videoModelId", "workspaceId", "imageUrl", "editableByActor", "isSharedToWorkspace", "model", "imageModel", "videoModel", "workspace", "attachments"] as const;
 export type CustomAgentFilterField = (typeof customAgentFilterFields)[number];
 
 export const magusAgentsSlashCommandFilterFields = ["name", "title", "instruction", "icon"] as const;
@@ -6539,7 +6548,7 @@ export type AgentInboxEventSortField = (typeof agentInboxEventSortFields)[number
 export const agentSecretSortFields = ["id", "key", "value", "scope", "description", "insertedAt", "customAgentId"] as const;
 export type AgentSecretSortField = (typeof agentSecretSortFields)[number];
 
-export const customAgentSortFields = ["id", "name", "handle", "description", "icon", "imagePath", "instructions", "slashCommands", "chatMode", "disabledToolCategories", "preLoadedSkills", "samplingSettings", "maxIterations", "isDefault", "isPublic", "canReadGlobalMemories", "canWriteGlobalMemories", "canAccessGlobalFiles", "canAccessKnowledge", "isPaused", "maxDailyRuns", "maxTokensPerRun", "heartbeatEnabled", "heartbeatInstructions", "heartbeatDefaultIntervalMinutes", "nextScheduledAt", "insertedAt", "updatedAt", "modelId", "imageModelId", "videoModelId", "workspaceId", "imageUrl", "editableByActor", "isSharedToWorkspace"] as const;
+export const customAgentSortFields = ["id", "name", "handle", "description", "icon", "imagePath", "instructions", "slashCommands", "chatMode", "disabledToolCategories", "preLoadedSkills", "samplingSettings", "maxIterations", "isDefault", "isPublic", "canReadGlobalMemories", "canWriteGlobalMemories", "canAccessGlobalFiles", "canAccessKnowledge", "isPaused", "pauseReason", "maxDailyRuns", "maxTokensPerRun", "heartbeatEnabled", "heartbeatInstructions", "heartbeatDefaultIntervalMinutes", "nextScheduledAt", "insertedAt", "updatedAt", "modelId", "imageModelId", "videoModelId", "workspaceId", "imageUrl", "editableByActor", "isSharedToWorkspace"] as const;
 export type CustomAgentSortField = (typeof customAgentSortFields)[number];
 
 export const magusAgentsSlashCommandSortFields = ["name", "title", "instruction", "icon"] as const;
