@@ -36,6 +36,18 @@ defmodule Magus.Agents.AgentRun do
         scheduler_module_name Magus.Agents.AgentRun.Schedulers.CleanupStale
         max_attempts 1
       end
+
+      trigger :sweep_stuck_pending_runs do
+        action :sweep_stuck_pending
+        queue :agent_run_cleanup
+        scheduler_cron "*/15 * * * *"
+        read_action :stuck_pending_runs
+        worker_read_action :stuck_pending_runs
+        where expr(is_stuck_pending)
+        worker_module_name Magus.Agents.AgentRun.Workers.SweepStuckPending
+        scheduler_module_name Magus.Agents.AgentRun.Schedulers.SweepStuckPending
+        max_attempts 1
+      end
     end
   end
 
@@ -134,6 +146,14 @@ defmodule Magus.Agents.AgentRun do
       change Magus.Agents.AgentRun.Changes.CleanupStale
     end
 
+    update :sweep_stuck_pending do
+      description "Oban-triggered sweep for runs stuck in :pending"
+      require_atomic? false
+      transaction? false
+
+      change Magus.Agents.AgentRun.Changes.SweepStuckPending
+    end
+
     read :running_for_source do
       argument :source_conversation_id, :uuid, allow_nil?: false
 
@@ -157,6 +177,11 @@ defmodule Magus.Agents.AgentRun do
     read :stale_runs do
       pagination keyset?: true, required?: false
       filter expr(is_stale)
+    end
+
+    read :stuck_pending_runs do
+      pagination keyset?: true, required?: false
+      filter expr(status == :pending and inserted_at < ago(15, :minute))
     end
   end
 
@@ -405,6 +430,15 @@ defmodule Magus.Agents.AgentRun do
       calculation expr(
                     status == :running and
                       last_heartbeat_at < ago(2, :minute)
+                  )
+    end
+
+    calculate :is_stuck_pending, :boolean do
+      public? false
+
+      calculation expr(
+                    status == :pending and
+                      inserted_at < ago(15, :minute)
                   )
     end
   end
