@@ -121,6 +121,14 @@ defmodule Magus.Integrations.Reactors.SetupIntegration do
           _ -> :api_key
         end
 
+      # Reconnect replaces credentials: destroy any existing rows for this
+      # integration before creating the new one. Credential has no uniqueness
+      # on user_integration_id, so without this a reconnect leaves the stale
+      # (possibly expired) row behind — it keeps satisfying the daily expiry
+      # sweep (re-erroring the healthy integration) and, once duplicated, makes
+      # the `get? true` `get_credential_for_integration` read raise.
+      destroy_existing_credentials(args.integration.id)
+
       case Magus.Integrations.create_credential(
              %{
                user_integration_id: args.integration.id,
@@ -213,6 +221,21 @@ defmodule Magus.Integrations.Reactors.SetupIntegration do
   # =============================================================================
 
   return :activate
+
+  # Destroy every existing Credential row for this integration. Uses a filtered
+  # read (not the `get? true` `for_integration` action, which raises on
+  # duplicates) so it is safe even if prior code paths already leaked multiple
+  # rows.
+  defp destroy_existing_credentials(user_integration_id) do
+    require Ash.Query
+
+    Magus.Integrations.Credential
+    |> Ash.Query.filter(user_integration_id == ^user_integration_id)
+    |> Ash.read!(authorize?: false)
+    |> Enum.each(fn credential ->
+      Magus.Integrations.revoke_credential(credential, authorize?: false)
+    end)
+  end
 
   defp not_found_error?(%Ash.Error.Query.NotFound{}), do: true
 

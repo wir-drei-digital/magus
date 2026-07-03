@@ -227,6 +227,47 @@ defmodule Magus.Integrations.CredentialExpiryTest do
       assert hd(notifications).notification_type == :system
     end
 
+    test "warned-in-window then expired: expired branch runs despite expiry_warned_at being set",
+         %{} do
+      user = generate(user())
+      integration = create_integration(user)
+
+      # Credential warned while still in-window (expiry_warned_at stamped),
+      # then time passes and expires_at is now in the past. The sweep must still
+      # select it (`is_expiring_or_expired` includes anything already expired)
+      # and run the expired branch — erroring the integration + notifying —
+      # even though expiry_warned_at is set.
+      credential =
+        create_credential(integration, %{
+          expires_at: DateTime.add(DateTime.utc_now(), -1, :hour)
+        })
+        |> backdate_expiry_warned_at(60)
+
+      assert %DateTime{} = credential.expiry_warned_at
+
+      ids =
+        Credential
+        |> Ash.Query.for_read(:expiring_soon)
+        |> Ash.read!(authorize?: false)
+        |> Enum.map(& &1.id)
+
+      assert credential.id in ids
+
+      {:ok, _updated} =
+        credential
+        |> Ash.Changeset.for_update(:process_expiry_warning, %{})
+        |> Ash.update(authorize?: false)
+
+      {:ok, reloaded_integration} =
+        Integrations.get_user_integration(integration.id, authorize?: false)
+
+      assert reloaded_integration.status == :error
+
+      {:ok, notifications} = Magus.Notifications.list_unread_notifications(actor: user)
+      assert length(notifications) == 1
+      assert hd(notifications).notification_type == :system
+    end
+
     test "does not notify again once the integration is already errored", %{} do
       user = generate(user())
       integration = create_integration(user)
@@ -248,6 +289,119 @@ defmodule Magus.Integrations.CredentialExpiryTest do
 
       {:ok, notifications} = Magus.Notifications.list_unread_notifications(actor: user)
       assert length(notifications) == 1
+    end
+  end
+
+  describe "reconnect via SetupIntegration replaces credentials" do
+    setup %{} do
+      user = generate(user())
+      agent = custom_agent(user, %{name: "Reconnect Owner"})
+
+      %{user: user, agent: agent}
+    end
+
+    defp all_credentials(integration_id) do
+      require Ash.Query
+
+      Credential
+      |> Ash.Query.filter(user_integration_id == ^integration_id)
+      |> Ash.read!(authorize?: false)
+    end
+
+    defp setup_integration(user, agent, credentials) do
+      {:ok, integration} =
+        Reactor.run(Magus.Integrations.Reactors.SetupIntegration, %{
+          user_id: user.id,
+          custom_agent_id: agent.id,
+          provider_key: :google_calendar,
+          credentials: credentials,
+          config: %{}
+        })
+
+      integration
+    end
+
+    test "reconnecting destroys the old credential and does not re-error the healthy integration",
+         %{user: user, agent: agent} do
+      # Initial connect.
+      integration = setup_integration(user, agent, %{"access_token" => "old-token"})
+
+      [old_credential] = all_credentials(integration.id)
+
+      # Simulate the credential having expired and the integration having been
+      # errored by a prior sweep.
+      Credential
+      |> Ecto.Query.where([c], c.id == ^old_credential.id)
+      |> Magus.Repo.update_all(set: [expires_at: DateTime.add(DateTime.utc_now(), -1, :day)])
+
+      {:ok, _} = Integrations.mark_integration_errored(integration, authorize?: false)
+
+      # Reconnect via the same SetupIntegration path (fresh, non-expired token).
+      reconnected = setup_integration(user, agent, %{"access_token" => "new-token"})
+
+      # Same integration row is reused (upsert), not a duplicate.
+      assert reconnected.id == integration.id
+
+      # Old credential row is gone; exactly one (new) credential remains.
+      credentials = all_credentials(integration.id)
+      assert length(credentials) == 1
+      new_credential = hd(credentials)
+      refute new_credential.id == old_credential.id
+
+      # get_credential_for_integration (a `get? true` read) returns the new row
+      # without raising on duplicates.
+      {:ok, fetched} =
+        Integrations.get_credential_for_integration(integration.id, authorize?: false)
+
+      assert fetched.id == new_credential.id
+      assert fetched.encrypted_data == %{"access_token" => "new-token"}
+
+      # A subsequent expiry sweep over the (now healthy) new credential must not
+      # re-error the reconnected integration: the new credential isn't expired,
+      # and the stale expired row is gone.
+      for credential <- all_credentials(integration.id) do
+        credential
+        |> Ash.Changeset.for_update(:process_expiry_warning, %{})
+        |> Ash.update!(authorize?: false)
+      end
+
+      {:ok, reloaded} = Integrations.get_user_integration(integration.id, authorize?: false)
+      refute reloaded.status == :error
+    end
+
+    test "stale-row guard: a leaked older expired credential is skipped, integration not errored",
+         %{user: user, agent: agent} do
+      # Belt-and-braces: even if some other path leaked a duplicate, the sweep
+      # skips a credential that has a newer sibling for the same integration.
+      integration = setup_integration(user, agent, %{"access_token" => "current"})
+      [current] = all_credentials(integration.id)
+
+      # Manually inject an OLDER, already-expired credential row (as if leaked by
+      # a pre-fix reconnect).
+      {:ok, stale} =
+        Integrations.create_credential(
+          %{
+            user_integration_id: integration.id,
+            credential_type: :oauth2,
+            encrypted_data: %{"access_token" => "stale"},
+            expires_at: DateTime.add(DateTime.utc_now(), -1, :day)
+          },
+          authorize?: false
+        )
+
+      # Backdate the stale row's inserted_at so `current` is unambiguously newer.
+      Credential
+      |> Ecto.Query.where([c], c.id == ^stale.id)
+      |> Magus.Repo.update_all(set: [inserted_at: DateTime.add(current.inserted_at, -1, :hour)])
+
+      {:ok, stale} = Ash.get(Credential, stale.id, authorize?: false)
+
+      stale
+      |> Ash.Changeset.for_update(:process_expiry_warning, %{})
+      |> Ash.update!(authorize?: false)
+
+      {:ok, reloaded} = Integrations.get_user_integration(integration.id, authorize?: false)
+      refute reloaded.status == :error
     end
   end
 

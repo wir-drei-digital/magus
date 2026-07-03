@@ -57,8 +57,36 @@ defmodule Magus.Agents.Reactors.DispatchInput do
     end
   end
 
+  # Step 2b: Mark the InputMessage :processing at the start of the run.
+  #
+  # This arms the stuck-message sweep (`InputMessage.fail_stuck`, every 15 min):
+  # a message is only swept if it has been :processing for >10 minutes. That
+  # threshold is safe because this reactor does NOT block for the agent's LLM
+  # turn — the `send_message` step calls `Chat.send_user_message`, whose
+  # `SignalAgent` change dispatches the agent turn asynchronously via
+  # `Task.Supervisor.start_child` in an `after_transaction` hook and returns as
+  # soon as the message row is committed. The reactor therefore completes in
+  # seconds and flips the message to :processed (or :failed) well within the
+  # 10-minute window; only a genuinely stuck run (process crash mid-reactor)
+  # leaves a message in :processing long enough to be swept.
+  step :mark_processing do
+    argument :input_message, result(:load_input_message)
+
+    run fn args, _context ->
+      case Integrations.mark_input_processing(args.input_message, authorize?: false) do
+        {:ok, updated} ->
+          {:ok, updated}
+
+        {:error, reason} ->
+          Logger.warning("Failed to mark input as processing: #{inspect(reason)}")
+          {:ok, args.input_message}
+      end
+    end
+  end
+
   # Step 3: Load the integration directly from the InputMessage's FK
   step :load_integration do
+    wait_for [:mark_processing]
     argument :input_message, result(:load_input_message)
 
     run fn args, _context ->

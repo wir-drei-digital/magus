@@ -78,8 +78,29 @@ defmodule Magus.Integrations.InputMessage do
       """
 
       accept []
+      require_atomic? false
       change set_attribute(:status, :failed)
       change set_attribute(:error_message, "Processing timed out after 10 minutes")
+
+      change fn changeset, _context ->
+        # Age is measured from the pre-update updated_at (when the message went
+        # stuck), not the post-update timestamp.
+        stuck_since = changeset.data.updated_at
+
+        Ash.Changeset.after_action(changeset, fn _changeset, message ->
+          require Logger
+
+          age_seconds =
+            if stuck_since, do: DateTime.diff(DateTime.utc_now(), stuck_since), else: nil
+
+          Logger.warning(
+            "InputMessage sweep failed stuck message #{message.id} " <>
+              "(integration=#{message.user_integration_id}, age=#{age_seconds}s)"
+          )
+
+          {:ok, message}
+        end)
+      end
     end
 
     update :route_to_conversation do

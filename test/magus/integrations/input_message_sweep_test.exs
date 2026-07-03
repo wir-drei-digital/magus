@@ -147,6 +147,12 @@ defmodule Magus.Integrations.InputMessageSweepTest do
         end)
         |> backdate_updated_at(15)
 
+      # NOTE on logging: `:fail_stuck_message` emits a `Logger.warning`
+      # (id + integration id + age) via an after_action hook when it fails a
+      # stuck message. This can't be asserted here because the test env sets
+      # `config :logger, level: :none` (config/test.exs), so ExUnit's
+      # `capture_log`/`with_log` capture nothing. The assertion below confirms
+      # the change (which includes the logging hook) runs to completion.
       {:ok, updated} =
         message
         |> Ash.Changeset.for_update(:fail_stuck_message, %{})
