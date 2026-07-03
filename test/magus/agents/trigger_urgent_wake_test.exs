@@ -129,4 +129,78 @@ defmodule Magus.Agents.TriggerUrgentWakeTest do
     assert event.status == :pending
     assert is_nil(event.agent_run_id)
   end
+
+  describe "nested-transaction deferral" do
+    setup do
+      # The deferred wake runs on a supervised task in a separate process;
+      # shared-mode sandbox lets it reach the committed rows. Scoped to this
+      # describe block so it doesn't affect the synchronous tests above.
+      Ecto.Adapters.SQL.Sandbox.mode(Magus.Repo, {:shared, self()})
+      :ok
+    end
+
+    defp assert_eventually(fun, timeout_ms \\ 3_000, interval_ms \\ 100) do
+      deadline = System.monotonic_time(:millisecond) + timeout_ms
+      do_assert_eventually(fun, deadline, interval_ms)
+    end
+
+    defp do_assert_eventually(fun, deadline, interval_ms) do
+      if fun.() do
+        :ok
+      else
+        if System.monotonic_time(:millisecond) >= deadline do
+          flunk("condition not met within timeout")
+        else
+          Process.sleep(interval_ms)
+          do_assert_eventually(fun, deadline, interval_ms)
+        end
+      end
+    end
+
+    test "event created inside a transaction does not wake synchronously, wakes after commit",
+         %{user: user, agent: agent} do
+      {:ok, event} =
+        Magus.Repo.transaction(fn ->
+          {:ok, event} = create_event(user, agent, %{})
+
+          # Still inside the open outer transaction: the after_transaction hook
+          # ran synchronously here but must have DEFERRED, so no run yet.
+          assert runs_for(agent) == []
+
+          event
+        end)
+
+      # After commit the deferred task polls for the committed event, enqueues
+      # the run, then links it back to the event. Wait for the linkage so we
+      # don't race the still-running deferred task.
+      assert_eventually(fn ->
+        event = Ash.get!(Magus.Agents.AgentInboxEvent, event.id, authorize?: false)
+        not is_nil(event.agent_run_id)
+      end)
+
+      assert [run] = runs_for(agent)
+      assert run.idempotency_key == "inbox:#{event.id}"
+
+      linked = Ash.get!(Magus.Agents.AgentInboxEvent, event.id, authorize?: false)
+      assert linked.agent_run_id == run.id
+    end
+
+    test "rolled-back event never wakes", %{user: user, agent: agent} do
+      captured_id =
+        Magus.Repo.transaction(fn ->
+          {:ok, event} = create_event(user, agent, %{})
+          id = event.id
+          # Abort the outer transaction: the event row is rolled back.
+          Magus.Repo.rollback({:aborted, id})
+        end)
+
+      assert {:error, {:aborted, event_id}} = captured_id
+
+      # Give the deferred poller its full window to (not) find the event.
+      Process.sleep(1_000)
+
+      assert runs_for(agent) == []
+      assert {:error, _} = Ash.get(Magus.Agents.AgentInboxEvent, event_id, authorize?: false)
+    end
+  end
 end
