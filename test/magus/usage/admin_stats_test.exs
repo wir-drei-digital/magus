@@ -43,7 +43,7 @@ defmodule Magus.Usage.AdminStatsTest do
     {count, _} =
       Magus.Repo.update_all(
         from(a in Magus.Usage.Account,
-          where: a.user_id == ^user.id and is_nil(a.sponsor_user_id)
+          where: a.user_id == ^user.id
         ),
         set: [usage_plan_id: plan.id, status: status]
       )
