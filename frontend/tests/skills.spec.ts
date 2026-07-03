@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Skills E2E suite: mirrors smoke.spec.ts in structure. The SPA is served by
 // `vite preview` with no Phoenix backend; RPC and the multipart import
-// endpoint are mocked at the network level.
+// endpoint are mocked at the network level. Skills live in the merged
+// /library view; the legacy /skills URLs redirect there.
 
 const user = {
 	id: '6a0b7e6e-0000-0000-0000-000000000000',
@@ -14,7 +15,7 @@ const user = {
 
 const tabSession = {
 	id: 't0000000-0000-0000-0000-000000000001',
-	mode: 'skills',
+	mode: 'library',
 	navFilter: 'all',
 	tabs: [] as { id: string; primary: { type: string; id: string } }[],
 	activeTabId: null as string | null
@@ -45,6 +46,7 @@ const bundledSkill = {
 	requestedTools: ['bash'],
 	version: '1.0.0',
 	workspaceId: null,
+	isFavorited: false,
 	isSharedToWorkspace: false,
 	updatedAt: '2026-06-11T10:00:00Z'
 };
@@ -58,6 +60,7 @@ const promptSkill = {
 	requestedTools: [],
 	version: '0.1.0',
 	workspaceId: null,
+	isFavorited: false,
 	isSharedToWorkspace: false,
 	updatedAt: '2026-06-10T10:00:00Z'
 };
@@ -116,7 +119,7 @@ async function mockRpc(
 				case 'activate_workbench_tab':
 					return respond({ ...sessionState });
 				case 'set_tab_session_mode':
-					sessionState.mode = (body.input as { mode?: string })?.mode ?? 'skills';
+					sessionState.mode = (body.input as { mode?: string })?.mode ?? 'library';
 					return respond({ ...sessionState });
 				case 'my_conversations':
 				case 'personal_conversations':
@@ -157,6 +160,8 @@ async function mockRpc(
 				case 'my_prompts':
 				case 'my_favorite_prompts':
 				case 'my_prompt_favorites':
+				case 'my_favorite_skills':
+				case 'my_skill_favorites':
 				case 'list_tags':
 				case 'workspace_agents':
 				case 'agent_activity':
@@ -210,17 +215,19 @@ async function mockRpc(
 	]);
 }
 
-test('browse + open: skills-nav and gallery render; clicking a card loads the detail', async ({
+test('browse + open: legacy /skills redirects to the library; clicking a card loads the detail', async ({
 	page
 }) => {
 	await mockRpc(page, { authenticated: true });
 	await page.goto('/skills');
 
-	await expect(page.getByTestId('skills-nav')).toBeVisible();
-	await expect(page.getByTestId('skill-gallery')).toBeVisible();
+	// The legacy URL redirects into the merged library, pre-filtered to skills.
+	await expect(page).toHaveURL(/\/library\?type=skills$/);
+	await expect(page.getByTestId('library-nav')).toBeVisible();
+	await expect(page.getByTestId('library-gallery')).toBeVisible();
 
 	// Both skill cards are rendered.
-	const cards = page.getByTestId('skill-card');
+	const cards = page.locator('[data-testid="library-card"][data-kind="skill"]');
 	await expect(cards).toHaveCount(2);
 
 	// Click the first card (Bash Runner, bundled) to open the detail.
@@ -235,9 +242,9 @@ test('runnable badge: bundled skill card shows sandbox chip; prompt-only does no
 	page
 }) => {
 	await mockRpc(page, { authenticated: true });
-	await page.goto('/skills');
+	await page.goto('/library?type=skills');
 
-	const cards = page.getByTestId('skill-card');
+	const cards = page.locator('[data-testid="library-card"][data-kind="skill"]');
 	await expect(cards).toHaveCount(2);
 
 	// Select each card by its display name rather than relying on sort order.
@@ -270,9 +277,8 @@ test('import: opening dialog, setting a file, and submitting navigates to the ne
 		compatibility: null
 	};
 
-	// Seed an empty gallery so the empty-state "Import skill" button is visible.
-	// get_skill always returns the imported detail (the only call that happens
-	// after import navigates to /skills/<importedSkillId>).
+	// Seed an empty gallery; get_skill always returns the imported detail (the
+	// only call that happens after import navigates to the new skill's reader).
 	await mockRpc(page, {
 		authenticated: true,
 		respond: {
@@ -288,10 +294,12 @@ test('import: opening dialog, setting a file, and submitting navigates to the ne
 		})
 	);
 
-	await page.goto('/skills');
+	await page.goto('/library');
 
-	// Empty state is visible: click the import button to open the dialog.
-	await page.getByTestId('import-skill-empty').click();
+	// The library is empty; import via the gallery's New dropdown.
+	await expect(page.getByTestId('gallery-empty')).toBeVisible();
+	await page.getByTestId('gallery-new').click();
+	await page.getByTestId('gallery-import-skill').click();
 	await expect(page.getByTestId('skill-import-dialog')).toBeVisible();
 
 	// Set a small in-memory zip file on the file input.
@@ -306,7 +314,7 @@ test('import: opening dialog, setting a file, and submitting navigates to the ne
 	await page.getByTestId('skill-import-submit').click();
 
 	// After import the dialog closes and the app navigates to the imported skill.
-	await expect(page).toHaveURL(new RegExp(`/skills/${importedSkillId}$`));
+	await expect(page).toHaveURL(new RegExp(`/library/skills/${importedSkillId}$`));
 	await expect(page.getByTestId('skill-title')).toHaveText('Imported Skill');
 });
 
@@ -336,25 +344,25 @@ test('create: filling the new-skill form and submitting navigates to the created
 		}
 	});
 
+	// The legacy /skills/new URL redirects to the library and opens the
+	// create-skill dialog (?new=skill).
 	await page.goto('/skills/new');
-
-	// The create form is immediately in edit mode for /new.
-	await expect(page.getByTestId('skill-name-input')).toBeVisible();
+	await expect(page.getByTestId('skill-form-dialog')).toBeVisible();
 
 	// Fill in the required fields.
-	await page.getByTestId('skill-name-input').fill('my-new-skill');
+	await page.getByTestId('skill-form-name').fill('my-new-skill');
 
 	// Fill description — locate by placeholder since Field label wraps it without testid.
 	await page.locator('input[placeholder="What this skill does"]').fill('A brand-new skill');
 
 	// Fill the body textarea.
-	await page.getByTestId('skill-body-input').fill('## My New Skill\n\nDoes great things.');
+	await page.getByTestId('skill-form-body').fill('## My New Skill\n\nDoes great things.');
 
 	// Click save.
-	await page.getByTestId('skill-save').click();
+	await page.getByTestId('skill-form-save').click();
 
 	// After creation the app navigates to the created skill.
-	await expect(page).toHaveURL(new RegExp(`/skills/${createdSkillId}$`));
+	await expect(page).toHaveURL(new RegExp(`/library/skills/${createdSkillId}$`));
 	await expect(page.getByTestId('skill-title')).toHaveText('My New Skill');
 });
 
@@ -410,7 +418,7 @@ test('approval card: notification bell shows card; Approve sends the phrase via 
 		}
 	});
 
-	await page.goto('/skills');
+	await page.goto('/library');
 
 	// The notification badge shows count 1.
 	await expect(page.getByTestId('notification-badge')).toHaveText('1');

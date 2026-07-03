@@ -254,8 +254,9 @@ defmodule Magus.Usage.PolicyEnforcer do
   def estimate_cost_cents(model) do
     cents =
       case Map.get(model, :output_cost_unit) do
-        :per_million_tokens -> token_estimate_cents(model)
-        nil -> token_estimate_cents(model)
+        # Gating budgets in whole cents, so round the exact estimate up.
+        :per_million_tokens -> ceil_to_cent(token_estimate_cents(model))
+        nil -> ceil_to_cent(token_estimate_cents(model))
         # per_image / per_second / per_video — flat coarse guard
         _ -> @media_estimate_cents
       end
@@ -267,9 +268,11 @@ defmodule Magus.Usage.PolicyEnforcer do
   CHF cents for a single token-model request of the given `input_tokens` /
   `output_tokens`, via the cached USD→CHF rate (1:1 until fetched). Returns
   `nil` for non per-million-token models (image/video), whose per-request cost
-  is per-image/second rather than token-based. Not floored at 1, so a free
-  model returns 0. Used by the composer model picker to show an approximate
-  cost per request; `estimate_cost_cents/1` is the gating-side wrapper.
+  is per-image/second rather than token-based. Returns a float with sub-cent
+  precision (not floored at 1, so a free model returns 0.0) — cheap models
+  would otherwise all collapse to "0.01". Used by the composer model pickers
+  to show an approximate cost per request; `estimate_cost_cents/1` is the
+  gating-side wrapper that rounds up to whole cents.
   """
   def request_cost_cents(model, input_tokens, output_tokens) do
     case Map.get(model, :output_cost_unit) do
@@ -285,8 +288,8 @@ defmodule Magus.Usage.PolicyEnforcer do
     do: token_cost_cents(model, @assumed_input_tokens, @assumed_output_tokens)
 
   defp token_cost_cents(model, input_tokens, output_tokens) do
-    in_per_m = decimal_or_zero(Map.get(model, :input_cost_value))
-    out_per_m = decimal_or_zero(Map.get(model, :output_cost_value))
+    in_per_m = cost_value(model, :input_cost_value, :input_cost)
+    out_per_m = cost_value(model, :output_cost_value, :output_cost)
 
     # dollars = (in_per_m * in_tokens + out_per_m * out_tokens) / 1_000_000
     dollars =
@@ -301,12 +304,29 @@ defmodule Magus.Usage.PolicyEnforcer do
     dollars
     |> Decimal.mult(Magus.Usage.ExchangeRate.usd_to_chf())
     |> Decimal.mult(100)
-    |> Decimal.round(0, :ceiling)
-    |> Decimal.to_integer()
+    |> Decimal.round(3)
+    |> Decimal.to_float()
   end
 
-  defp decimal_or_zero(%Decimal{} = d), do: d
-  defp decimal_or_zero(_), do: Decimal.new("0")
+  defp ceil_to_cent(cents), do: cents |> :math.ceil() |> trunc()
+
+  # Structured `*_cost_value` decimals win; legacy rows carry only display
+  # strings in mixed formats ("3.43", "$3.43/M"), which must not price as free.
+  defp cost_value(model, value_key, legacy_key) do
+    case Map.get(model, value_key) do
+      %Decimal{} = d -> d
+      _ -> parse_legacy_cost(Map.get(model, legacy_key))
+    end
+  end
+
+  defp parse_legacy_cost(cost) when is_binary(cost) do
+    case Regex.run(~r/\d+(?:\.\d+)?/, cost) do
+      [number] -> Decimal.new(number)
+      _ -> Decimal.new("0")
+    end
+  end
+
+  defp parse_legacy_cost(_), do: Decimal.new("0")
 
   @doc """
   Checks if a user can upload a batch of files.

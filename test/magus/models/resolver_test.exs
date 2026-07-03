@@ -200,13 +200,47 @@ defmodule Magus.Models.ResolverTest do
     end
 
     test "explicit key equal to the default model is :explicit and not degraded" do
+      # Self-provision the default: a fresh DB has no chat_default assignment
+      # (config default_model is nil), so relying on ambient state makes this
+      # test environment-dependent. assign_role upserts on role.
+      m = generate(model())
+
+      {:ok, _} =
+        Magus.Models.assign_role(%{role: "chat_default", model_id: m.id}, authorize?: false)
+
       default = Magus.Agents.Config.default_model()
+      assert default == m.key
 
       {:ok, res} =
         Magus.Models.Resolver.resolve(nil, %{model_keys: %{chat: default}, mode: :chat})
 
       assert res.selection_source == :explicit
       refute Magus.Models.Resolution.degraded?(res)
+    end
+  end
+
+  describe "bare binary actor id" do
+    test "a binary actor id scopes exactly like %{id: id}" do
+      Magus.DataCase.clear_catalog!()
+      user = generate(user())
+
+      {:ok, provider} =
+        Magus.Models.create_owned_provider(
+          %{name: "Mine", req_llm_id: "anthropic", api_key: "sk"},
+          actor: user
+        )
+
+      {:ok, model} =
+        Magus.Chat.create_owned_model(
+          %{name: "C", model_id: "claude-x", model_provider_id: provider.id},
+          actor: user
+        )
+
+      {:ok, res} =
+        Magus.Models.Resolver.resolve(user.id, %{model_keys: %{chat: model.key}, mode: :chat})
+
+      assert res.model.key == model.key
+      assert res.cost_source == :byok
     end
   end
 end

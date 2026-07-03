@@ -69,8 +69,15 @@
 				data-testid="search-overlay-input"
 				class="flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground"
 				onkeydown={(event) => {
-					if (event.key === 'Enter') submit();
-					else if (event.key === 'Tab') event.preventDefault();
+					if (event.key === 'Enter') {
+						// preventDefault, or closing the overlay mid-keydown restores focus
+						// to the nav Search button and Enter's default action "clicks" it,
+						// reopening the overlay over the results page.
+						event.preventDefault();
+						submit();
+					} else if (event.key === 'Tab') {
+						event.preventDefault();
+					}
 				}}
 			/>
 			<kbd

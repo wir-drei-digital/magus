@@ -9,7 +9,18 @@ defmodule Magus.Models do
   option resolution).
   """
 
-  use Ash.Domain, otp_app: :magus
+  use Ash.Domain, otp_app: :magus, extensions: [AshTypescript.Rpc]
+
+  typescript_rpc do
+    resource Magus.Models.Provider do
+      rpc_action :list_owned_providers, :owned
+      rpc_action :create_owned_provider, :create_owned
+      rpc_action :update_owned_provider, :update_owned
+      rpc_action :destroy_owned_provider, :destroy_owned
+      rpc_action :validate_provider_credential, :validate
+      rpc_action :list_remote_models, :list_remote_models
+    end
+  end
 
   resources do
     resource Magus.Models.Provider do
@@ -21,8 +32,10 @@ defmodule Magus.Models do
       define :get_provider_by_slug, action: :by_slug, args: [:slug]
       define :create_owned_provider, action: :create_owned
       define :update_owned_provider, action: :update_owned
+      define :destroy_owned_provider, action: :destroy_owned
       define :list_owned_providers, action: :owned
       define :validate_provider_credential, action: :validate
+      define :list_remote_models, action: :list_remote_models, args: [:provider_id]
     end
 
     resource Magus.Models.RoleAssignment do

@@ -15,7 +15,7 @@
 	import { buildChatStream, toolViewFromLive } from '$lib/chat/events';
 	import { readThreads, writeThreads } from '$lib/chat/threads-cache';
 	import { workbench } from '$lib/stores/workbench.svelte';
-	import NewResourceDialog from '$lib/components/shell/new-resource-dialog.svelte';
+	import PromptFormDialog from '$lib/components/shell/prompt-form-dialog.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import Composer from './composer.svelte';
@@ -28,13 +28,19 @@
 	let {
 		store,
 		onCompanionRequest,
-		highlightMessageId = null
+		highlightMessageId = null,
+		hideNavButton = false
 	}: {
 		store: ConversationStore;
 		/** Opens a companion on this conversation's tab (wired by the page). */
 		onCompanionRequest?: (spec: CompanionSpec) => void;
 		/** Search deep-link target: scroll to + briefly flash this message. */
 		highlightMessageId?: string | null;
+		/**
+		 * True while a companion is docked: the companion-host mobile switcher
+		 * bar already carries the nav button, so the header skips its own.
+		 */
+		hideNavButton?: boolean;
 	} = $props();
 
 	const conversationId = $derived(store.conversationId);
@@ -149,9 +155,15 @@
 	});
 
 	// Selecting text inside a message surfaces a floating "Ask chat" button that
-	// drops the quoted selection into the composer (classic MessageTextSelection
-	// parity). Scoped to this conversation's message list via [data-message-id].
-	let askSelection = $state<{ text: string; x: number; y: number } | null>(null);
+	// pins the quoted selection as a composer context pill (classic
+	// MessageTextSelection parity). Scoped via [data-message-id].
+	let askSelection = $state<{
+		text: string;
+		messageId: string;
+		role: string;
+		x: number;
+		y: number;
+	} | null>(null);
 
 	function refreshAskSelection() {
 		const selection = window.getSelection();
@@ -167,13 +179,20 @@
 			askSelection = null;
 			return;
 		}
+		const messageId = messageEl.getAttribute('data-message-id') ?? '';
+		const role = node?.closest('[data-role]')?.getAttribute('data-role') ?? 'agent';
 		const rect = selection.getRangeAt(0).getBoundingClientRect();
-		askSelection = { text, x: rect.left + rect.width / 2, y: rect.top };
+		askSelection = { text, messageId, role, x: rect.left + rect.width / 2, y: rect.top };
 	}
 
 	function askAboutSelection() {
 		if (!askSelection) return;
-		store.requestInsertText(`> ${askSelection.text}\n\n`);
+		store.addSelection({
+			kind: 'message',
+			text: askSelection.text,
+			messageId: askSelection.messageId,
+			role: askSelection.role
+		});
 		window.getSelection()?.removeAllRanges();
 		askSelection = null;
 	}
@@ -290,7 +309,7 @@
 {/if}
 
 <div class="flex h-full min-h-0 flex-col" data-testid="conversation-view">
-	<ConversationHeader {store} {onCompanionRequest} />
+	<ConversationHeader {store} {onCompanionRequest} {hideNavButton} />
 	{#if showDegraded && store.connection !== 'live'}
 		<div
 			class="border-b bg-warning/10 px-4 py-1.5 text-center text-xs text-warning"
@@ -311,8 +330,11 @@
 		</div>
 	{/if}
 
+	<!-- wb-scroll (hidden scrollbar) like every other pane: a visible classic
+	     scrollbar eats width inside the scroller, shifting the centered message
+	     column out of line with the composer column below (no scrollbar). -->
 	<div
-		class="relative min-h-0 flex-1 overflow-y-auto px-4 py-4"
+		class="wb-scroll relative min-h-0 flex-1 overflow-y-auto px-4 py-4"
 		bind:this={scroller}
 		onscroll={onScroll}
 	>
@@ -452,6 +474,14 @@
 		{/if}
 	</div>
 
+	<!-- Soft transition into the composer: the stream scrolls out under a short
+	     transparent → background fade instead of a hard edge. -->
+	<div class="pointer-events-none relative" aria-hidden="true">
+		<div
+			class="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-b from-transparent to-background"
+		></div>
+	</div>
+
 	{#if !stickToBottom}
 		<div class="pointer-events-none relative">
 			<button
@@ -484,7 +514,7 @@
 	</div>
 </div>
 
-<NewResourceDialog kind="prompt" bind:open={promptDialogOpen} initialBody={promptFromMessage} />
+<PromptFormDialog bind:open={promptDialogOpen} initialBody={promptFromMessage} />
 
 <!-- Classic LimitExceededModal: plan-limit denials get a dialog with the
      upgrade path, not just an inline error row. -->

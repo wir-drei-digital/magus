@@ -270,7 +270,7 @@ describe('send() enqueue-when-busy gate', () => {
 
 		expect(ok).toBe(true);
 		expect(enqueueMessage).toHaveBeenCalledTimes(1);
-		expect(enqueueMessage).toHaveBeenCalledWith('conv-1', 'a follow-up');
+		expect(enqueueMessage).toHaveBeenCalledWith('conv-1', 'a follow-up', null);
 		expect(sendUserMessage).not.toHaveBeenCalled();
 
 		store.stop();
@@ -287,6 +287,73 @@ describe('send() enqueue-when-busy gate', () => {
 		expect(enqueueMessage).not.toHaveBeenCalled();
 		// The normal path marks the turn busy after a successful send.
 		expect(store.busy).toBe(true);
+
+		store.stop();
+	});
+});
+
+describe('composer context pills → message metadata', () => {
+	it('serializes pinned selections into send metadata and clears them on success', async () => {
+		const store = await startedStore();
+		store.addSelection({ kind: 'message', text: 'quoted', messageId: 'm-1', role: 'agent' });
+		store.addSelection({ kind: 'draft', text: 'draft bit', title: 'My Draft' });
+		store.addSelection({ kind: 'brain', text: 'brain bit', title: 'My Page' });
+		store.addSelection({
+			kind: 'pdf',
+			image: 'data:image/jpeg;base64,x',
+			text: 'pdf bit',
+			page: 3,
+			filename: 'paper.pdf'
+		});
+		expect(store.hasSelections).toBe(true);
+
+		const ok = await store.send('hello');
+
+		expect(ok).toBe(true);
+		expect(sendUserMessage).toHaveBeenCalledWith('conv-1', 'hello', [], {
+			message_selections: [{ text: 'quoted', message_id: 'm-1', role: 'agent' }],
+			draft_selection: { text: 'draft bit', draft_title: 'My Draft' },
+			brain_selection: { text: 'brain bit', page_title: 'My Page' },
+			pdf_selection: {
+				image: 'data:image/jpeg;base64,x',
+				text: 'pdf bit',
+				page: 3,
+				filename: 'paper.pdf'
+			}
+		});
+		expect(store.hasSelections).toBe(false);
+
+		store.stop();
+	});
+
+	it('sends null metadata with no pills, dedupes repeated quotes, and removes by index', async () => {
+		const store = await startedStore();
+
+		store.addSelection({ kind: 'message', text: 'same', messageId: 'm-1', role: 'user' });
+		store.addSelection({ kind: 'message', text: 'same', messageId: 'm-1', role: 'user' });
+		expect(store.messageSelections).toHaveLength(1);
+		store.removeMessageSelection(0);
+		expect(store.hasSelections).toBe(false);
+
+		const ok = await store.send('hello');
+		expect(ok).toBe(true);
+		expect(sendUserMessage).toHaveBeenCalledWith('conv-1', 'hello', [], null);
+
+		store.stop();
+	});
+
+	it('keeps pills when the send fails so the user can retry', async () => {
+		const store = await startedStore();
+		store.addSelection({ kind: 'brain', text: 'keep me', title: null });
+		sendUserMessage.mockResolvedValueOnce({
+			success: false,
+			errors: [{ message: 'nope' }]
+		} as never);
+
+		const ok = await store.send('hello');
+
+		expect(ok).toBe(false);
+		expect(store.brainSelection).toEqual({ text: 'keep me', title: null });
 
 		store.stop();
 	});

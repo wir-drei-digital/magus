@@ -40,6 +40,22 @@ export default defineConfig({
 			'/api': 'http://localhost:4000',
 			'/uploads': 'http://localhost:4000',
 			'/fonts': 'http://localhost:4000',
+			// Phoenix-rendered auth pages (sign-in/register are LiveViews, so they
+			// also need /live and the classic /assets bundle). Cookies ignore the
+			// port, so a session created here is visible to the SPA origin too.
+			'/sign-in': 'http://localhost:4000',
+			'/sign-out': 'http://localhost:4000',
+			'/register': 'http://localhost:4000',
+			'/magic_link': 'http://localhost:4000',
+			'/reset': 'http://localhost:4000',
+			'/complete-profile': 'http://localhost:4000',
+			'/auth': 'http://localhost:4000',
+			'/admin': 'http://localhost:4000',
+			'/assets': 'http://localhost:4000',
+			'/live': {
+				target: 'ws://localhost:4000',
+				ws: true
+			},
 			'/socket': {
 				target: 'ws://localhost:4000',
 				ws: true

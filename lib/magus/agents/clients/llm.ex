@@ -32,7 +32,7 @@ defmodule Magus.Agents.Clients.LLM do
 
   @impl true
   def stream_text(model, context, opts) do
-    {model, opts} = with_provider_options(model, opts)
+    {model, opts} = provider_options(model, opts)
     ReqLLM.stream_text(model, context, opts)
   end
 
@@ -45,7 +45,7 @@ defmodule Magus.Agents.Clients.LLM do
 
   @impl true
   def generate_text(model, context, opts) do
-    {model, opts} = with_provider_options(model, opts)
+    {model, opts} = provider_options(model, opts)
     ReqLLM.generate_text(model, context, opts)
   end
 
@@ -79,16 +79,24 @@ defmodule Magus.Agents.Clients.LLM do
 
   @impl true
   def generate_object(model, prompt, schema, opts) do
-    {model, opts} = with_provider_options(model, opts)
+    {model, opts} = provider_options(model, opts)
     ReqLLM.generate_object(model, prompt, schema, opts)
   end
 
-  # Resolves DB-configured provider credentials/endpoints for the model key.
-  # Explicit opts win over resolved ones; non-binary model inputs pass through.
-  defp with_provider_options(model, opts) when is_binary(model) do
-    {resolved_model, provider_opts} = Magus.Models.RequestOptions.resolve(model)
+  @doc """
+  Resolves DB-configured provider credentials/endpoints for the model key.
+
+  Pops `:credential_actor_id` (the acting user) so owned-provider credentials
+  are released only to their owner; the opt never reaches ReqLLM. Explicit
+  opts win over resolved ones; non-binary model inputs pass through (with the
+  opt still popped).
+  """
+  @spec provider_options(term(), keyword()) :: {term(), keyword()}
+  def provider_options(model, opts) when is_binary(model) do
+    {actor_id, opts} = Keyword.pop(opts, :credential_actor_id)
+    {resolved_model, provider_opts} = Magus.Models.RequestOptions.resolve(model, actor_id)
     {resolved_model, Keyword.merge(provider_opts, opts)}
   end
 
-  defp with_provider_options(model, opts), do: {model, opts}
+  def provider_options(model, opts), do: {model, Keyword.delete(opts, :credential_actor_id)}
 end

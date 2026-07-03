@@ -5,7 +5,6 @@
 		Section as SettingsSection,
 		Button,
 		ToggleSwitch,
-		Field,
 		CONTROL_CLASS
 	} from '$lib/components/crud';
 	import {
@@ -22,25 +21,69 @@
 	let busy = $state(false);
 	let saveError = $state<string | null>(null);
 
-	// Editable spend-cap controls, seeded from the overview.
+	// Editable spend-cap controls, seeded from the overview. `capCents` is the
+	// explicit monthly cap; null means "use the platform default" (a null cap is
+	// not unlimited — that's what the no-cap toggle is for).
 	let noSpendCap = $state(false);
-	let capChf = $state('');
+	let capCents = $state<number | null>(null);
+	let capInput = $state(''); // custom-amount field, kept in sync with capCents
 	let seededFor: string | null = null;
 	$effect(() => {
 		const o = overview;
 		if (o && seededFor !== o.status + o.monthlySpendCapCents) {
 			seededFor = o.status + o.monthlySpendCapCents;
 			noSpendCap = o.noSpendCap;
-			capChf = o.monthlySpendCapCents != null ? (o.monthlySpendCapCents / 100).toFixed(2) : '';
+			capCents = o.monthlySpendCapCents;
+			capInput = o.monthlySpendCapCents != null ? chfString(o.monthlySpendCapCents) : '';
 		}
 	});
 
-	// Save is gated on an actual change to the spend preferences.
-	const capBaseline = $derived(
-		overview?.monthlySpendCapCents != null ? (overview.monthlySpendCapCents / 100).toFixed(2) : ''
+	// Slider, preset chips and the custom input all edit the same `capCents`.
+	const CAP_PRESETS_CENTS = [500, 1000, 2000, 5000];
+	const SLIDER_MAX_CHF = 50;
+
+	const defaultCapCents = $derived(overview?.defaultCapCents ?? overview?.capCents ?? null);
+
+	// Slider position in whole CHF: the set cap, else the default; clamped to range.
+	const sliderChf = $derived(
+		Math.min(SLIDER_MAX_CHF, Math.max(0, Math.round((capCents ?? defaultCapCents ?? 0) / 100)))
 	);
+
+	function chfString(cents: number): string {
+		const chf = cents / 100;
+		return Number.isInteger(chf) ? String(chf) : chf.toFixed(2);
+	}
+
+	function setCap(cents: number | null) {
+		capCents = cents;
+		capInput = cents != null ? chfString(cents) : '';
+	}
+
+	function onSliderInput(event: Event) {
+		setCap(Math.round(Number((event.currentTarget as HTMLInputElement).value)) * 100);
+	}
+
+	function onCustomInput(event: Event) {
+		capInput = (event.currentTarget as HTMLInputElement).value;
+		const chf = Number(capInput);
+		capCents =
+			capInput.trim() === '' || !Number.isFinite(chf) || chf < 0 ? null : Math.round(chf * 100);
+	}
+
+	function chipClass(active: boolean): string {
+		return (
+			'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ' +
+			(active
+				? 'border-primary bg-primary text-primary-foreground'
+				: 'border-input text-muted-foreground hover:bg-muted hover:text-foreground')
+		);
+	}
+
+	// Save is gated on an actual change to the spend preferences.
 	const prefsDirty = $derived(
-		!!overview && (noSpendCap !== overview.noSpendCap || (!noSpendCap && capChf !== capBaseline))
+		!!overview &&
+			(noSpendCap !== overview.noSpendCap ||
+				(!noSpendCap && capCents !== overview.monthlySpendCapCents))
 	);
 
 	// A failed/past-due payment that needs the user's attention.
@@ -63,8 +106,10 @@
 	async function savePreferences() {
 		busy = true;
 		saveError = null;
-		const cents = noSpendCap ? null : Math.round((Number(capChf) || 0) * 100);
-		const result = await setBillingPreferences({ monthlySpendCapCents: cents, noSpendCap });
+		const result = await setBillingPreferences({
+			monthlySpendCapCents: noSpendCap ? null : capCents,
+			noSpendCap
+		});
 		busy = false;
 		if (result.success) overview = result.data;
 		else saveError = result.errors[0]?.message ?? 'Could not save spend preferences';
@@ -167,31 +212,91 @@
 		{#if !overview.exempt}
 			<SettingsSection
 				title="Spending controls"
-				description="Cap your monthly pay-as-you-go spend."
+				description="Pay-as-you-go usage is billed at cost. Set a monthly cap, or turn the cap off and pay exactly what you use."
 			>
-				<div class="flex items-center justify-between gap-4 text-sm">
-					<span>No spending cap (uncapped pay-as-you-go)</span>
+				{#if !noSpendCap}
+					<div class="flex items-baseline justify-between gap-4">
+						<span class="text-sm font-medium">Monthly spend cap</span>
+						<span class="text-lg font-semibold" data-testid="billing-cap-readout">
+							{#if capCents != null}
+								{formatCents(capCents)}
+								<span class="text-sm font-normal text-muted-foreground">/ month</span>
+							{:else}
+								Default · {formatCents(defaultCapCents)}
+							{/if}
+						</span>
+					</div>
+
+					<input
+						type="range"
+						min="0"
+						max={SLIDER_MAX_CHF}
+						step="1"
+						value={sliderChf}
+						oninput={onSliderInput}
+						aria-label="Monthly spend cap"
+						class="mt-3 w-full accent-primary"
+						data-testid="billing-cap-slider"
+					/>
+					<div class="flex justify-between px-1 text-xs text-muted-foreground">
+						<span>CHF 0</span>
+						<span>CHF {SLIDER_MAX_CHF / 2}</span>
+						<span>CHF {SLIDER_MAX_CHF}+</span>
+					</div>
+
+					<div class="mt-3 flex flex-wrap items-center gap-2">
+						{#each CAP_PRESETS_CENTS as cents (cents)}
+							<button
+								type="button"
+								onclick={() => setCap(cents)}
+								class={chipClass(capCents === cents)}
+								data-testid="billing-cap-preset-{cents}"
+							>
+								CHF {cents / 100}
+							</button>
+						{/each}
+						<button
+							type="button"
+							onclick={() => setCap(null)}
+							class={chipClass(capCents === null)}
+							data-testid="billing-cap-default"
+						>
+							Default
+						</button>
+						<input
+							type="number"
+							min="0"
+							step="0.5"
+							value={capInput}
+							oninput={onCustomInput}
+							placeholder="Custom"
+							aria-label="Custom monthly cap in CHF"
+							class="{CONTROL_CLASS} ml-auto max-w-24"
+							data-testid="billing-cap-input"
+						/>
+					</div>
+
+					<p class="mt-2 text-xs text-muted-foreground">
+						For a sense of scale: a typical chat turn costs around 1 Rappen. Light use stays under
+						CHF 5/month; heavy agent use can reach CHF 20+. Usage stops at the cap.
+					</p>
+				{/if}
+
+				<div
+					class="mt-4 flex items-center justify-between gap-4 border-t border-border pt-4 text-sm"
+				>
+					<span>No spend cap: pay exactly what you use</span>
 					<ToggleSwitch
 						checked={noSpendCap}
 						onchange={(next) => (noSpendCap = next)}
-						label="No spending cap"
+						label="No spend cap"
 						testid="billing-no-cap"
 					/>
 				</div>
-
-				{#if !noSpendCap}
-					<div class="mt-3 max-w-xs">
-						<Field label="Monthly cap (CHF)">
-							<input
-								type="number"
-								min="0"
-								step="1"
-								bind:value={capChf}
-								class={CONTROL_CLASS}
-								data-testid="billing-cap-input"
-							/>
-						</Field>
-					</div>
+				{#if noSpendCap}
+					<p class="mt-2 text-sm text-muted-foreground">
+						Your usage is never blocked. Whatever you use is billed with your monthly invoice.
+					</p>
 				{/if}
 
 				{#if saveError}

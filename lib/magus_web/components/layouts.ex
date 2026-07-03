@@ -665,7 +665,6 @@ defmodule MagusWeb.Layouts do
       %{label: gettext("Users"), href: "/admin/users", icon: "lucide-users"},
       %{label: gettext("Models"), href: "/admin/models", icon: "lucide-cpu"},
       %{label: gettext("Plans"), href: "/admin/plans", icon: "lucide-credit-card"},
-      %{label: gettext("Workspaces"), href: "/admin/workspaces", icon: "lucide-building-2"},
       %{label: gettext("Announcements"), href: "/admin/announcements", icon: "lucide-megaphone"},
       %{label: gettext("Usage"), href: "/admin/usage", icon: "lucide-activity"},
       %{label: gettext("Providers"), href: "/admin/providers", icon: "lucide-server"},
@@ -706,8 +705,8 @@ defmodule MagusWeb.Layouts do
         <nav class="flex-1 overflow-y-auto p-4">
           <ul class="space-y-1">
             <li :for={item <- admin_nav_items()}>
-              <a
-                href={item.href}
+              <.link
+                navigate={item.href}
                 class={[
                   "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors",
                   if(active_path?(@current_path, item.href),
@@ -718,7 +717,7 @@ defmodule MagusWeb.Layouts do
               >
                 <.icon name={item.icon} class="w-5 h-5" />
                 {item.label}
-              </a>
+              </.link>
             </li>
           </ul>
         </nav>
@@ -781,8 +780,8 @@ defmodule MagusWeb.Layouts do
             <nav class="p-4">
               <ul class="space-y-1">
                 <li :for={item <- admin_nav_items()}>
-                  <a
-                    href={item.href}
+                  <.link
+                    navigate={item.href}
                     class={[
                       "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors",
                       if(active_path?(@current_path, item.href),
@@ -793,7 +792,7 @@ defmodule MagusWeb.Layouts do
                   >
                     <.icon name={item.icon} class="w-5 h-5" />
                     {item.label}
-                  </a>
+                  </.link>
                 </li>
               </ul>
             </nav>

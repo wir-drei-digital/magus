@@ -17,10 +17,13 @@
 
 	let {
 		conversationId,
-		onInsert
+		onInsert,
+		onActivated
 	}: {
 		conversationId: string;
 		onInsert: (text: string) => void;
+		/** Called after a system prompt was activated (the rail closes itself). */
+		onActivated?: () => void;
 	} = $props();
 
 	let tab = $state<'my' | 'favorites'>('my');
@@ -83,6 +86,7 @@
 		void getConversation(conversationId).then((conversation) => {
 			if (conversation.success) workbench.upsertConversation(conversation.data);
 		});
+		onActivated?.();
 	}
 
 	async function deactivate() {

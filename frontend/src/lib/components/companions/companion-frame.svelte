@@ -39,9 +39,9 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col bg-background" data-testid="companion-pane">
-	<!-- pl-14 on mobile clears the floating hamburger during a full-width
-	     companion takeover; desktop keeps the normal padding. -->
-	<header class="flex shrink-0 items-center gap-2 border-b py-2.5 pr-4 pl-14 md:pl-4">
+	<!-- No nav button here: during a mobile takeover the companion-host
+	     switcher bar above this header carries it. -->
+	<header class="flex min-h-11 shrink-0 items-center gap-2 border-b px-4 py-2">
 		{#if icon}
 			{@render icon()}
 		{/if}
@@ -59,10 +59,10 @@
 				}}
 			/>
 		{:else if onRename}
-			<div class="min-w-0 flex-1">
+			<div class="flex min-w-0 flex-1 items-baseline gap-2">
 				<button
 					type="button"
-					class="block max-w-full truncate text-left text-sm font-semibold hover:underline"
+					class="min-w-0 truncate text-left text-sm font-semibold hover:underline"
 					data-testid="companion-title"
 					title="Rename"
 					onclick={() => {
@@ -73,14 +73,16 @@
 					{title}
 				</button>
 				{#if meta}
-					<p class="truncate text-xs text-muted-foreground">{meta}</p>
+					<p class="min-w-0 truncate text-xs text-muted-foreground max-md:hidden">{meta}</p>
 				{/if}
 			</div>
 		{:else}
-			<div class="min-w-0 flex-1">
-				<h2 class="truncate text-sm font-semibold" data-testid="companion-title">{title}</h2>
+			<div class="flex min-w-0 flex-1 items-baseline gap-2">
+				<h2 class="min-w-0 truncate text-sm font-semibold" data-testid="companion-title">
+					{title}
+				</h2>
 				{#if meta}
-					<p class="truncate text-xs text-muted-foreground">{meta}</p>
+					<p class="min-w-0 truncate text-xs text-muted-foreground max-md:hidden">{meta}</p>
 				{/if}
 			</div>
 		{/if}

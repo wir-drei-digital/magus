@@ -2,7 +2,7 @@
 	import { tick } from 'svelte';
 	import { MessagesSquare } from '@lucide/svelte';
 	import { getConversation } from '$lib/ash/api';
-	import { ConversationStore } from '$lib/chat/conversation-store.svelte';
+	import { ConversationStore, type ComposerSelection } from '$lib/chat/conversation-store.svelte';
 	import Composer from '$lib/components/chat/composer.svelte';
 	import MessageItem from '$lib/components/chat/message-item.svelte';
 	import ToolCard from '$lib/components/chat/tool-card.svelte';
@@ -13,7 +13,8 @@
 	let {
 		conversationId,
 		onClose,
-		insert
+		insert,
+		selection
 	}: {
 		conversationId: string;
 		onClose: () => void;
@@ -23,6 +24,11 @@
 		 * with identical text; survives the store's async mount.
 		 */
 		insert?: { text: string; revision: number };
+		/**
+		 * Revision-armed request to pin a context pill to the composer (e.g. a
+		 * PDF region screenshot from the file view). Same contract as `insert`.
+		 */
+		selection?: { selection: ComposerSelection; revision: number };
 	} = $props();
 
 	let store = $state<ConversationStore | null>(null);
@@ -43,6 +49,14 @@
 		if (!store || !insert || insert.revision === lastInsertRevision) return;
 		lastInsertRevision = insert.revision;
 		if (insert.text) store.requestInsertText(insert.text);
+	});
+
+	// Same forwarding for context-pill requests (PDF screenshots etc.).
+	let lastSelectionRevision = 0;
+	$effect(() => {
+		if (!store || !selection || selection.revision === lastSelectionRevision) return;
+		lastSelectionRevision = selection.revision;
+		store.addSelection(selection.selection);
 	});
 
 	$effect(() => {

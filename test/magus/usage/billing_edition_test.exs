@@ -56,5 +56,13 @@ defmodule Magus.Usage.BillingEditionTest do
 
       assert overview.billing_edition == true
     end
+
+    test "includes the platform default spend cap (SPA slider shows Default · CHF X)" do
+      input = Ash.ActionInput.for_action(Magus.Usage.Account, :billing_overview, %{})
+      {:ok, overview} = Ash.run_action(input, authorize?: false)
+
+      assert overview.default_cap_cents == Magus.Usage.Calculator.default_spend_cap_cents()
+      assert is_integer(overview.default_cap_cents)
+    end
   end
 end

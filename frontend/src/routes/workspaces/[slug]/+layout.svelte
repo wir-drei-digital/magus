@@ -3,6 +3,7 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
 	import { BarChart3, Building2, Settings, Users } from '@lucide/svelte';
+	import MobileNavButton from '$lib/components/shell/mobile-nav-button.svelte';
 	import { getWorkspaceBySlug, listWorkspaceMembers } from '$lib/ash/api';
 	import { session } from '$lib/stores/session.svelte';
 	import { setWorkspaceAdmin, type WorkspaceAdminState } from '$lib/components/workspaces/context';
@@ -88,9 +89,8 @@
 </svelte:head>
 
 <div class="flex h-full min-h-0 flex-col" data-testid="workspace-admin-view">
-	<header
-		class="flex shrink-0 items-center gap-2 border-b bg-background/80 py-3 pr-6 pl-14 md:pl-6"
-	>
+	<header class="flex min-h-11 shrink-0 items-center gap-2 border-b bg-background/80 py-2 px-6">
+		<MobileNavButton />
 		<Building2 class="size-4 shrink-0 text-muted-foreground" />
 		<h1 class="min-w-0 flex-1 truncate text-base font-semibold">
 			{state.workspace?.name ?? 'Workspace'}
@@ -120,29 +120,26 @@
 			<a href="{base}/chat" class="text-sm text-primary hover:underline">Back to chat</a>
 		</div>
 	{:else}
-		<div class="flex min-h-0 flex-1 flex-col md:flex-row">
+		<div class="flex min-h-0 flex-1 flex-col">
+			<!-- Horizontal pill tabs on top, matching the custom-agent settings nav. -->
 			<nav
-				class="shrink-0 border-b p-2 md:w-48 md:border-r md:border-b-0"
+				class="wb-scroll flex shrink-0 items-center gap-1.5 overflow-x-auto border-b px-4 py-2"
 				data-testid="workspace-nav"
 			>
-				<ul class="flex flex-row gap-0.5 overflow-x-auto md:flex-col">
-					{#each tabs as tab (tab.id)}
-						<li>
-							<a
-								href={tab.href}
-								data-testid="workspace-nav-{tab.id}"
-								aria-current={activeTab === tab.id ? 'page' : undefined}
-								class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors {activeTab ===
-								tab.id
-									? 'bg-secondary font-medium text-foreground'
-									: 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'}"
-							>
-								<tab.icon class="size-4 shrink-0" />
-								<span>{tab.label}</span>
-							</a>
-						</li>
-					{/each}
-				</ul>
+				{#each tabs as tab (tab.id)}
+					<a
+						href={tab.href}
+						data-testid="workspace-nav-{tab.id}"
+						aria-current={activeTab === tab.id ? 'page' : undefined}
+						class="flex shrink-0 items-center gap-2 rounded-full px-3 py-1 text-sm whitespace-nowrap transition-colors {activeTab ===
+						tab.id
+							? 'bg-secondary font-medium text-foreground'
+							: 'text-muted-foreground hover:bg-accent/40 hover:text-foreground'}"
+					>
+						<tab.icon class="size-4 shrink-0" />
+						<span>{tab.label}</span>
+					</a>
+				{/each}
 			</nav>
 
 			<div class="wb-scroll min-h-0 flex-1 overflow-y-auto">

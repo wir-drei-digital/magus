@@ -4,6 +4,7 @@
 		Clock,
 		FileText,
 		Files,
+		ListChecks,
 		PanelRight,
 		ScrollText,
 		Settings,
@@ -19,6 +20,7 @@
 	import SettingsPanel from './settings-panel.svelte';
 	import JobsPanel from './jobs-panel.svelte';
 	import MembersPanel from './members-panel.svelte';
+	import TasksPanel from './tasks-panel.svelte';
 
 	let {
 		store,
@@ -28,7 +30,15 @@
 		onCompanionRequest?: (spec: CompanionSpec) => void;
 	} = $props();
 
-	type PanelId = 'prompts' | 'brains' | 'drafts' | 'files' | 'members' | 'settings' | 'jobs';
+	type PanelId =
+		| 'prompts'
+		| 'brains'
+		| 'drafts'
+		| 'tasks'
+		| 'files'
+		| 'members'
+		| 'settings'
+		| 'jobs';
 
 	let open = $state(false);
 	let activePanel = $state<PanelId>('prompts');
@@ -83,6 +93,7 @@
 		{ id: 'prompts' as const, icon: ScrollText, label: 'Prompts', visible: true },
 		{ id: 'brains' as const, icon: Brain, label: 'Brains', visible: true },
 		{ id: 'drafts' as const, icon: FileText, label: 'Drafts', visible: true },
+		{ id: 'tasks' as const, icon: ListChecks, label: 'Tasks', visible: true },
 		{ id: 'files' as const, icon: Files, label: 'Files', visible: true },
 		{ id: 'members' as const, icon: Users, label: 'Members', visible: true },
 		{ id: 'settings' as const, icon: Settings, label: 'Settings', visible: true },
@@ -157,9 +168,16 @@
 
 				<div class="flex min-w-0 flex-1 flex-col">
 					{#if activePanel === 'prompts'}
+						<!-- Completed actions close the rail (like requestCompanion above):
+						     their effect lands in the composer/conversation, which the
+						     bottom sheet would otherwise cover on mobile. -->
 						<PromptsPanel
 							conversationId={store.conversationId}
-							onInsert={(text) => store.requestInsertText(text)}
+							onInsert={(text) => {
+								store.requestInsertText(text);
+								open = false;
+							}}
+							onActivated={() => (open = false)}
 						/>
 					{:else if activePanel === 'brains'}
 						<BrainsPanel onCompanionRequest={requestCompanion} />
@@ -168,6 +186,8 @@
 							conversationId={store.conversationId}
 							onCompanionRequest={requestCompanion}
 						/>
+					{:else if activePanel === 'tasks'}
+						<TasksPanel conversationId={store.conversationId} />
 					{:else if activePanel === 'files'}
 						<FilesPanel conversationId={store.conversationId} />
 					{:else if activePanel === 'members'}

@@ -3,22 +3,21 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
 	import {
-		ArrowLeftRight,
 		BookOpen,
-		Boxes,
 		Bot,
 		Brain,
 		Clock,
 		Files,
 		HelpCircle,
+		LibraryBig,
 		LogOut,
 		MessageCircle,
 		MessagesSquare,
 		Monitor,
 		Moon,
 		Newspaper,
-		ScrollText,
 		Settings,
+		ShieldCheck,
 		Sun
 	} from '@lucide/svelte';
 	import { session } from '$lib/stores/session.svelte';
@@ -31,18 +30,19 @@
 		{ key: 'chat', label: 'Chat', icon: MessagesSquare },
 		{ key: 'brain', label: 'Brain', icon: Brain },
 		{ key: 'files', label: 'Files', icon: Files },
-		{ key: 'prompts', label: 'Prompts', icon: ScrollText },
-		{ key: 'agents', label: 'Agents', icon: Bot },
-		{ key: 'skills', label: 'Skills', icon: Boxes }
+		{ key: 'library', label: 'Library', icon: LibraryBig },
+		{ key: 'agents', label: 'Agents', icon: Bot }
 	];
 
 	const MODE_HOME: Record<WorkbenchMode, string> = {
 		chat: '/chat',
 		brain: '/brain',
 		files: '/files',
-		prompts: '/prompts',
+		library: '/library',
 		agents: '/agents',
-		skills: '/skills'
+		// Legacy modes fold into Library; a saved session may still hold them.
+		prompts: '/library',
+		skills: '/library'
 	};
 
 	// Inside a mode view (/chat/*, /files/*, …) a mode click only swaps the nav
@@ -52,7 +52,7 @@
 	function selectMode(mode: WorkbenchMode) {
 		void workbench.setMode(mode);
 		const rel = page.url.pathname.slice(base.length);
-		const inModeView = /^\/(chat|brain|files|prompts|agents|skills)(\/|$)/.test(rel);
+		const inModeView = /^\/(chat|brain|files|library|agents|prompts|skills)(\/|$)/.test(rel);
 		if (!inModeView) void goto(`${base}${MODE_HOME[mode]}`);
 	}
 
@@ -68,7 +68,6 @@
 		(session.user?.displayName ?? session.user?.email ?? '?').slice(0, 1).toUpperCase()
 	);
 
-	let toggling = $state(false);
 	let theme = $state<'system' | 'light' | 'dark'>('system');
 
 	$effect(() => {
@@ -86,13 +85,6 @@
 			next === 'dark' ||
 			(next === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 		document.documentElement.classList.toggle('dark', dark);
-	}
-
-	async function backToClassic() {
-		toggling = true;
-		const ok = await session.setWorkbenchUi('classic');
-		toggling = false;
-		if (ok) window.location.href = '/chat';
 	}
 </script>
 
@@ -205,10 +197,17 @@
 						</a>
 					{/snippet}
 				</DropdownMenu.Item>
-				<DropdownMenu.Item onSelect={() => void backToClassic()} disabled={toggling}>
-					<ArrowLeftRight class="size-4" />
-					Switch to classic UI
-				</DropdownMenu.Item>
+				{#if session.user?.isAdmin}
+					<DropdownMenu.Item>
+						{#snippet child({ props })}
+							<!-- Admin lives in the Phoenix LiveView app, so leave the SPA. -->
+							<a {...props} href="/admin" data-sveltekit-reload data-testid="user-menu-admin">
+								<ShieldCheck class="size-4" />
+								Admin
+							</a>
+						{/snippet}
+					</DropdownMenu.Item>
+				{/if}
 				<DropdownMenu.Separator />
 				<!-- Theme picker — same 3-option strip as classic. -->
 				<div class="flex items-center gap-1 px-2 py-1.5" data-testid="theme-picker">

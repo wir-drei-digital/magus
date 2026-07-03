@@ -3,6 +3,7 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
 	import {
+		BookMarked,
 		FileText,
 		Files,
 		MessageSquare,
@@ -10,6 +11,7 @@
 		Search as SearchIcon,
 		SearchX
 	} from '@lucide/svelte';
+	import MobileNavButton from '$lib/components/shell/mobile-nav-button.svelte';
 	import { EmptyState } from '$lib/components/ui/empty-state';
 	import { searchAll, type SearchResult, type SearchResultType } from '$lib/ash/api';
 
@@ -20,6 +22,7 @@
 		{ id: 'conversation', label: 'Conversations' },
 		{ id: 'message', label: 'Messages' },
 		{ id: 'prompt', label: 'Prompts' },
+		{ id: 'skill', label: 'Skills' },
 		{ id: 'resource', label: 'Files' },
 		{ id: 'chunk', label: 'File content' }
 	];
@@ -28,6 +31,7 @@
 		message: { label: 'Message', icon: MessageSquare },
 		conversation: { label: 'Conversation', icon: MessageSquare },
 		prompt: { label: 'Prompt', icon: ScrollText },
+		skill: { label: 'Skill', icon: BookMarked },
 		resource: { label: 'File', icon: Files },
 		chunk: { label: 'File content', icon: FileText }
 	};
@@ -86,7 +90,9 @@
 			case 'conversation':
 				return `${base}/chat/${result.id}`;
 			case 'prompt':
-				return `${base}/prompts/${result.id}`;
+				return `${base}/library/prompts/${result.id}`;
+			case 'skill':
+				return `${base}/library/skills/${result.id}`;
 			case 'resource':
 				return `${base}/files/file/${result.id}`;
 			case 'chunk':
@@ -100,9 +106,8 @@
 </svelte:head>
 
 <div class="flex h-full min-h-0 flex-col" data-testid="search-view">
-	<header
-		class="flex shrink-0 items-center gap-2 border-b bg-background/80 py-3 pr-6 pl-14 md:pl-6"
-	>
+	<header class="flex min-h-11 shrink-0 items-center gap-2 border-b bg-background/80 py-2 px-6">
+		<MobileNavButton />
 		<SearchIcon class="size-4 shrink-0 text-muted-foreground" />
 		<h1 class="min-w-0 flex-1 truncate text-base font-semibold">Search</h1>
 	</header>
@@ -119,7 +124,7 @@
 					bind:value={query}
 					oninput={onInput}
 					autofocus
-					placeholder="Search messages, conversations, prompts, files…"
+					placeholder="Search messages, conversations, prompts, skills, files…"
 					data-testid="search-input"
 					class="w-full rounded-lg border border-input bg-secondary py-2 pr-3 pl-9 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/60"
 				/>
@@ -144,7 +149,7 @@
 				<EmptyState
 					class="h-auto py-16"
 					title="Search your workspace"
-					description="Find across messages, conversations, prompts, and files. Type at least two characters to begin."
+					description="Find across messages, conversations, prompts, skills, and files. Type at least two characters to begin."
 				>
 					{#snippet icon()}<SearchIcon />{/snippet}
 				</EmptyState>

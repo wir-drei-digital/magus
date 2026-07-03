@@ -3,6 +3,7 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
 	import { MessageSquare, NotebookPen, Paperclip, Trash2 } from '@lucide/svelte';
+	import MobileNavButton from '$lib/components/shell/mobile-nav-button.svelte';
 	import {
 		brainPages,
 		getBrainPageForEdit,
@@ -356,8 +357,9 @@
 				     the bare editor surface — pulsing skeleton bars flickered on
 				     every navigation since loads are sub-second. -->
 				<header
-					class="flex shrink-0 items-center gap-2 border-b bg-background/80 py-3 pr-6 pl-14 backdrop-blur-sm md:pl-6"
+					class="flex min-h-11 shrink-0 items-center gap-2 border-b bg-background/80 py-2 px-6 backdrop-blur-sm"
 				>
+					<MobileNavButton />
 					{#if navNode?.icon}
 						<span class="shrink-0 text-base leading-none">{navNode.icon}</span>
 					{:else}
@@ -379,8 +381,9 @@
 				<div class="min-h-0 flex-1 bg-card"></div>
 			{:else}
 				<header
-					class="flex shrink-0 items-center gap-2 border-b bg-background/80 py-3 pr-6 pl-14 backdrop-blur-sm md:pl-6"
+					class="flex min-h-11 shrink-0 items-center gap-2 border-b bg-background/80 py-2 px-6 backdrop-blur-sm"
 				>
+					<MobileNavButton />
 					{#if pageData.icon}
 						<span class="shrink-0 text-base leading-none">{pageData.icon}</span>
 					{:else}

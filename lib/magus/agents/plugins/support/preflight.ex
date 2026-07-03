@@ -74,8 +74,13 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
       video: raw_model_keys[:video] == :auto
     }
 
+    # The member who sent the triggering message (owner fallback for autonomous
+    # turns) is both the credential actor for model resolution (scopes owned-model
+    # visibility) and the spend-gate subject below (magus-k3at). Compute once.
+    acting_user_id = Helpers.acting_user_id(agent, message_id)
+
     {:ok, resolution} =
-      Resolver.resolve(nil, %{
+      Resolver.resolve(acting_user_id, %{
         model_keys: model_keys,
         mode: mode,
         selected_model_id: selected_model_id,
@@ -87,7 +92,7 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
 
     # Enforce the spend gate against the member who sent the triggering message,
     # not the conversation owner (magus-k3at); owner fallback for autonomous turns.
-    user = load_user_for_limits(Helpers.acting_user_id(agent, message_id))
+    user = load_user_for_limits(acting_user_id)
     workspace = resolve_workspace(conversation, conversation_id)
 
     case check_usage_limit(user, mode, model, workspace) do
@@ -171,8 +176,13 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
     raw_model_keys = Helpers.normalize_model_keys(state[:model_keys])
     mode = state[:mode] || :chat
 
+    # Scope owned-model visibility to the acting user (agent owner for these
+    # autonomous resume turns): the caller's acting_user_id if present, else
+    # the agent owner from state.
+    acting_user_id = data[:acting_user_id] || data["acting_user_id"] || state[:user_id]
+
     {:ok, resolution} =
-      Resolver.resolve(nil, %{
+      Resolver.resolve(acting_user_id, %{
         model_keys: raw_model_keys,
         mode: mode,
         selected_model_id: nil,
@@ -243,8 +253,12 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
       mode = opts[:mode] || conversation.chat_mode || :chat
       text = opts[:text] || ""
 
+      # Read-only assembly path: no triggering message in scope, so scope
+      # owned-model visibility to the conversation (agent) owner.
+      acting_user_id = conversation.user_id
+
       {:ok, resolution} =
-        Resolver.resolve(nil, %{
+        Resolver.resolve(acting_user_id, %{
           model_keys: model_keys,
           mode: mode,
           selected_model_id: nil,
@@ -282,8 +296,10 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
 
   @doc "Resolve model and check usage limits. Returns `{:ok, model}` or `{:error, error}`."
   def validate_and_resolve_model(model_keys, mode, selected_model_id, user_id) do
+    # `data` is not in scope here; the caller's user_id (the limits subject) is
+    # the acting user that scopes owned-model visibility.
     {:ok, resolution} =
-      Resolver.resolve(nil, %{
+      Resolver.resolve(user_id, %{
         model_keys: model_keys,
         mode: mode,
         selected_model_id: selected_model_id
@@ -420,6 +436,7 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
             active_draft_id: active_draft_id,
             tools: tools,
             draft: data[:draft_selection],
+            brain: data[:brain_selection],
             pdf: data[:pdf_selection],
             service: data[:service_selection],
             message_selections: data[:message_selections],

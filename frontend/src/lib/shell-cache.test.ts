@@ -46,7 +46,7 @@ describe('modeFromPath', () => {
 	it('derives the mode from the route', () => {
 		expect(modeFromPath('/brain/page/123')).toBe('brain');
 		expect(modeFromPath('/files/file/9')).toBe('files');
-		expect(modeFromPath('/prompts/p1')).toBe('prompts');
+		expect(modeFromPath('/prompts/p1')).toBe('library');
 		expect(modeFromPath('/agents/a1')).toBe('agents');
 		expect(modeFromPath('/chat/c1')).toBe('chat');
 		expect(modeFromPath('/')).toBe('chat');

@@ -156,6 +156,48 @@ defmodule Magus.Chat.MessageTest do
       # Resources should be stored in metadata
       assert message.metadata != nil
     end
+
+    test "defaults mode from the conversation's chat_mode when the client omits it" do
+      user = generate(user())
+
+      {:ok, conversation} =
+        Chat.create_conversation(%{chat_mode: :image_generation}, actor: user)
+
+      {:ok, message} =
+        Chat.send_user_message(
+          %{text: "a cat in a hat", conversation_id: conversation.id},
+          actor: user
+        )
+
+      assert message.mode == :image_generation
+    end
+
+    test "explicit mode wins over the conversation's chat_mode" do
+      user = generate(user())
+
+      {:ok, conversation} =
+        Chat.create_conversation(%{chat_mode: :image_generation}, actor: user)
+
+      {:ok, message} =
+        Chat.send_user_message(
+          %{text: "just chatting", conversation_id: conversation.id, mode: :chat},
+          actor: user
+        )
+
+      assert message.mode == :chat
+    end
+
+    test "enqueue_message also defaults mode from the conversation's chat_mode" do
+      user = generate(user())
+
+      {:ok, conversation} =
+        Chat.create_conversation(%{chat_mode: :video_generation}, actor: user)
+
+      {:ok, message} =
+        Chat.enqueue_message(conversation.id, %{text: "a rocket launch"}, actor: user)
+
+      assert message.mode == :video_generation
+    end
   end
 
   describe "for_conversation/1" do
@@ -846,6 +888,31 @@ defmodule Magus.Chat.MessageTest do
                  %{text: "should fail", conversation_id: private.id},
                  actor: member
                )
+    end
+  end
+
+  describe "create_draft_event" do
+    # Regression: the export_format constraint once omitted :markdown while the
+    # Draft :export action offered it, so markdown exports failed with a raw
+    # "atom must be one of %{atom_list}" constraint error.
+    test "accepts every draft export format, including markdown" do
+      user = generate(user())
+      {:ok, conversation} = Chat.create_conversation(%{}, actor: user)
+
+      for format <- [:pdf, :docx, :latex, :markdown] do
+        assert {:ok, message} =
+                 Chat.create_draft_event_message(
+                   "Export the draft",
+                   conversation.id,
+                   :export,
+                   Ash.UUID.generate(),
+                   %{export_format: format},
+                   actor: user
+                 )
+
+        assert message.message_type == :draft_event
+        assert message.metadata["export_format"] == to_string(format)
+      end
     end
   end
 end

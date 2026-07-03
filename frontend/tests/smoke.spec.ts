@@ -242,6 +242,9 @@ async function mockRpc(
 				case 'my_prompts':
 				case 'my_favorite_prompts':
 				case 'my_prompt_favorites':
+				case 'my_skills':
+				case 'my_favorite_skills':
+				case 'my_skill_favorites':
 				case 'list_tags':
 				case 'workspace_agents':
 				case 'agent_activity':
@@ -324,7 +327,7 @@ test('authenticated users see the workbench shell with their conversations', asy
 	await expect(page.getByTestId('mode-strip')).toBeVisible();
 	await expect(page.getByTestId('conversation-list')).toBeVisible();
 	await expect(page.getByText('Quarterly planning')).toBeVisible();
-	await expect(page.getByTestId('connection-status')).toBeVisible();
+	await expect(page.getByTestId('mode-strip-footer')).toBeVisible();
 });
 
 test('switching modes swaps the nav but keeps the open view', async ({ page }) => {
@@ -884,12 +887,15 @@ test('the right rail opens, inserts a prompt, and switches panels', async ({ pag
 	await expect(page.getByTestId('right-rail')).toBeVisible();
 	await expect(page.getByTestId('rail-prompts-panel')).toBeVisible();
 
-	// Inserting a user prompt lands its content in the composer.
+	// Inserting a user prompt lands its content in the composer and closes the
+	// rail (its effect would otherwise be hidden behind the sheet on mobile).
 	await page.getByText('Tone guide').hover();
 	await page.getByTestId('rail-insert-prompt').click();
 	await expect(page.getByTestId('composer-input')).toHaveValue('Use a warm tone.');
+	await expect(page.getByTestId('right-rail')).not.toBeVisible();
 
 	// Panel switching: settings form and files scope tabs render.
+	await page.getByTestId('right-rail-toggle').click();
 	await page.getByTestId('rail-tab-settings').click();
 	await expect(page.getByTestId('rail-system-prompt')).toBeVisible();
 	await page.getByTestId('rail-tab-files').click();
@@ -1164,36 +1170,43 @@ const libraryPrompt = {
 	type: 'user',
 	isFavorited: false,
 	isSharedToWorkspace: false,
-	workspaceId: null
+	workspaceId: null,
+	content: 'Check tests. Check naming.',
+	useCount: 0,
+	tags: [{ id: 'tag-1', name: 'review' }]
 };
 
-test('prompts mode lists the library and opens a prompt', async ({ page }) => {
+test('library lists prompts and opens the reader', async ({ page }) => {
 	await mockRpc(page, {
 		authenticated: true,
 		respond: {
 			my_prompts: () => [libraryPrompt],
 			get_prompt: () => ({
 				...libraryPrompt,
-				content: 'Check tests. Check naming.',
 				chatMode: null,
 				additionalInformation: null,
-				isPublic: false,
-				tags: [{ id: 'tag-1', name: 'review' }]
+				isPublic: false
 			})
 		}
 	});
 
+	// The legacy /prompts URL redirects into the merged library view.
 	await page.goto('/prompts');
-	await expect(page.getByTestId('prompts-nav')).toBeVisible();
-	await expect(page.getByText('Code review checklist')).toBeVisible();
+	await expect(page).toHaveURL(/\/library\?type=prompts$/);
+	await expect(page.getByTestId('library-nav')).toBeVisible();
 
-	await page.getByText('Code review checklist').click();
+	const cards = page.locator('[data-testid="library-card"][data-kind="prompt"]');
+	await expect(cards).toHaveCount(1);
+
+	await cards.first().click();
 	await expect(page.getByTestId('prompt-title')).toHaveText('Code review checklist');
 	await expect(page.getByTestId('prompt-content')).toContainText('Check tests.');
-	await expect(page.getByText('#review ×')).toBeVisible();
+	await expect(page.getByLabel('Remove tag review')).toBeVisible();
 
+	// Edit opens the shared prompt form dialog seeded with the prompt.
 	await page.getByTestId('prompt-edit').click();
-	await expect(page.getByTestId('prompt-name-input')).toHaveValue('Code review checklist');
+	await expect(page.getByTestId('prompt-form-dialog')).toBeVisible();
+	await expect(page.getByTestId('prompt-form-name')).toHaveValue('Code review checklist');
 });
 
 const agentDetail = {
@@ -1212,6 +1225,8 @@ const agentDetail = {
 	canWriteGlobalMemories: false,
 	canAccessGlobalFiles: true,
 	canAccessKnowledge: true,
+	disabledToolCategories: [],
+	preLoadedSkills: [],
 	heartbeatEnabled: false,
 	heartbeatInstructions: null,
 	heartbeatDefaultIntervalMinutes: 60,
@@ -1384,4 +1399,61 @@ test('starting a thread from a message opens the thread companion', async ({ pag
 	await expect(page.getByTestId('thread-messages')).toBeVisible();
 	// The branch chip now marks the message as threaded.
 	await expect(page.getByTestId('message-open-thread')).toBeVisible();
+});
+
+test('opening a thread from the nav survives the tab-open round trip', async ({ page }) => {
+	// Regression: the deep-link effect used to consume the stashed thread
+	// companion against the still-optimistic tab (a local-only write), and the
+	// in-flight open_workbench_tab reconcile then clobbered it — the thread
+	// flashed open and vanished. The companion must be persisted server-side
+	// against the canonical tab.
+	const companionCalls: Array<Record<string, unknown> | null> = [];
+
+	await mockRpc(page, {
+		authenticated: true,
+		respond: {
+			conversations_threads: () => [
+				{
+					id: 'thread-1',
+					title: 'Side quest',
+					parentConversationId: conversations[1].id,
+					insertedAt: '2026-06-11T10:05:00Z',
+					messageCount: 1
+				}
+			],
+			set_workbench_companion: (input) => {
+				companionCalls.push((input.companion as Record<string, unknown>) ?? null);
+				return {
+					...tabSession,
+					tabs: [
+						{
+							id: input.tabId,
+							primary: { type: 'conversation', id: conversations[1].id },
+							companion: (input.companion as Record<string, unknown>) ?? null
+						}
+					],
+					activeTabId: input.tabId as string
+				};
+			},
+			message_history: (input) =>
+				input.conversationId === conversations[1].id
+					? { results: history, hasMore: false }
+					: { results: [], hasMore: false }
+		}
+	});
+
+	// Start OUTSIDE the parent conversation, so the click navigates and the
+	// tab has to be opened (the racy path).
+	await page.goto('/chat');
+	await expect(page.getByTestId('thread-row')).toBeVisible();
+
+	await page.getByTestId('thread-row').click();
+	await expect(page).toHaveURL(new RegExp(`/chat/${conversations[1].id}$`));
+
+	// The companion reached the server (not just the optimistic local state)…
+	await expect.poll(() => companionCalls.length).toBeGreaterThan(0);
+	expect(companionCalls[0]).toMatchObject({ type: 'thread', id: 'thread-1' });
+	// …and the thread pane is (still) open after the round trips settle.
+	await expect(page.getByTestId('companion-pane')).toBeVisible();
+	await expect(page.getByTestId('thread-messages')).toBeVisible();
 });

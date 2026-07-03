@@ -33,7 +33,9 @@
 	});
 
 	const webhookSecret = $derived(
-		typeof integration.config?.webhook_secret === 'string' ? integration.config.webhook_secret : null
+		typeof integration.config?.webhook_secret === 'string'
+			? integration.config.webhook_secret
+			: null
 	);
 	const keyPrefix = $derived(
 		typeof integration.config?.key_prefix === 'string' ? integration.config.key_prefix : null
@@ -45,7 +47,10 @@
 		busy = true;
 		error = null;
 		saved = false;
-		const result = await updateIntegrationConfig(integration.id, { ...integration.config, ...patch });
+		const result = await updateIntegrationConfig(integration.id, {
+			...integration.config,
+			...patch
+		});
 		busy = false;
 		if (result.success) {
 			saved = true;
@@ -105,18 +110,26 @@
 			<Button size="sm" disabled={busy} onclick={saveFeeds} data-testid="rss-save">
 				{busy ? 'Saving…' : 'Save feeds'}
 			</Button>
-			{#if saved}<span class="flex items-center gap-1 text-xs text-success"><Check class="size-3" /> Saved</span>{/if}
+			{#if saved}<span class="flex items-center gap-1 text-xs text-success"
+					><Check class="size-3" /> Saved</span
+				>{/if}
 		</div>
 	</div>
 {:else if integration.providerKey === 'log_source'}
 	<div class="mt-2 flex flex-col gap-2 border-t border-input pt-2" data-testid="log-config">
 		{#if webhookSecret}
 			<div class="flex flex-col gap-1">
-				<span class="text-[10px] tracking-wider text-muted-foreground uppercase">Webhook secret</span>
-				<code class="truncate rounded-md border border-input bg-secondary px-2 py-1 font-mono text-xs">
+				<span class="text-[10px] tracking-wider text-muted-foreground uppercase"
+					>Webhook secret</span
+				>
+				<code
+					class="truncate rounded-md border border-input bg-secondary px-2 py-1 font-mono text-xs"
+				>
 					{webhookSecret}
 				</code>
-				<span class="text-[11px] text-muted-foreground">Send as the <code>X-API-Key</code> header.</span>
+				<span class="text-[11px] text-muted-foreground"
+					>Send as the <code>X-API-Key</code> header.</span
+				>
 			</div>
 		{/if}
 		<div class="flex items-center gap-2 text-xs text-muted-foreground">
@@ -140,7 +153,9 @@
 			<Button size="sm" disabled={busy} onclick={saveLog} data-testid="log-save">
 				{busy ? 'Saving…' : 'Save thresholds'}
 			</Button>
-			{#if saved}<span class="flex items-center gap-1 text-xs text-success"><Check class="size-3" /> Saved</span>{/if}
+			{#if saved}<span class="flex items-center gap-1 text-xs text-success"
+					><Check class="size-3" /> Saved</span
+				>{/if}
 		</div>
 	</div>
 {:else if integration.providerKey === 'api' && keyPrefix}

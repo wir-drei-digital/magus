@@ -7,26 +7,28 @@
 	import { session } from '$lib/stores/session.svelte';
 	import { workbench } from '$lib/stores/workbench.svelte';
 	import { searchOverlay } from '$lib/stores/search-overlay.svelte';
+	import { libraryNav } from '$lib/stores/library-nav.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import AgentsNav from './agents-nav.svelte';
 	import BrainNav from './brain-nav.svelte';
 	import ChatNav from './chat-nav.svelte';
 	import FilesNav from './files-nav.svelte';
+	import LibraryNav from './library-nav.svelte';
 	import NewResourceDialog, { type NewResourceKind } from './new-resource-dialog.svelte';
-	import PromptsNav from './prompts-nav.svelte';
-	import SkillsNav from './skills-nav.svelte';
+	import PromptFormDialog from './prompt-form-dialog.svelte';
+	import SkillFormDialog from './skill-form-dialog.svelte';
 	import SettingsNav from './settings-nav.svelte';
 	import WorkspaceSwitcher from './workspace-switcher.svelte';
 	import SkillImportDialog from './skill-import-dialog.svelte';
-	import { skillsNav } from '$lib/stores/skills-nav.svelte';
 
 	// Settings reuses the main nav pane for its section list (no second sidebar).
 	const inSettings = $derived(page.url.pathname.startsWith(`${base}/settings`));
 
 	let fileInput = $state<HTMLInputElement | null>(null);
 
-	// Prompt/agent/brain creation share one shadcn dialog, keyed by kind.
-	let createKind = $state<NewResourceKind>('prompt');
+	// Agent/brain creation share one shadcn dialog, keyed by kind.
+	let createKind = $state<NewResourceKind>('brain');
 	let createOpen = $state(false);
 
 	function openCreate(kind: NewResourceKind) {
@@ -85,85 +87,92 @@
 			     shows the settings section list instead. -->
 			{#if !inSettings}
 				<Sidebar.Menu>
-					{#if workbench.mode === 'skills'}
+					{#if workbench.mode === 'library'}
 						<Sidebar.MenuItem>
-							<Sidebar.MenuButton
-								data-testid="new-skill"
-								onclick={() => {
-									void goto(`${base}/skills/new`);
-								}}
-							>
+							<DropdownMenu.Root>
+								<DropdownMenu.Trigger>
+									{#snippet child({ props })}
+										<Sidebar.MenuButton {...props} data-testid="library-new">
+											<Plus class="text-muted-foreground" />
+											<span>New</span>
+										</Sidebar.MenuButton>
+									{/snippet}
+								</DropdownMenu.Trigger>
+								<DropdownMenu.Content align="start" class="w-48">
+									<DropdownMenu.Item
+										data-testid="library-new-prompt"
+										onSelect={() => (libraryNav.createPromptOpen = true)}
+									>
+										New prompt
+									</DropdownMenu.Item>
+									<DropdownMenu.Item
+										data-testid="library-new-skill"
+										onSelect={() => (libraryNav.createSkillOpen = true)}
+									>
+										New skill
+									</DropdownMenu.Item>
+									<DropdownMenu.Separator />
+									<DropdownMenu.Item
+										data-testid="library-import-skill"
+										onSelect={() => (libraryNav.importOpen = true)}
+									>
+										<Download class="size-4" /> Import skill
+									</DropdownMenu.Item>
+								</DropdownMenu.Content>
+							</DropdownMenu.Root>
+						</Sidebar.MenuItem>
+					{:else if workbench.mode === 'chat'}
+						<Sidebar.MenuItem>
+							<Sidebar.MenuButton onclick={() => newConversation()} data-testid="new-conversation">
 								<Plus class="text-muted-foreground" />
-								<span>New skill</span>
+								<span>New chat</span>
 							</Sidebar.MenuButton>
 						</Sidebar.MenuItem>
+					{:else if workbench.mode === 'brain'}
+						<Sidebar.MenuItem>
+							<Sidebar.MenuButton onclick={() => openCreate('brain')} data-testid="new-brain">
+								<Plus class="text-muted-foreground" />
+								<span>New brain</span>
+							</Sidebar.MenuButton>
+						</Sidebar.MenuItem>
+					{:else if workbench.mode === 'files'}
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton
-								data-testid="import-skill"
-								onclick={() => {
-									skillsNav.importOpen = true;
-								}}
+								class={uploading ? 'pointer-events-none opacity-50' : ''}
+								onclick={() => fileInput?.click()}
+								data-testid="files-upload"
 							>
-								<Download class="text-muted-foreground" />
-								<span>Import skill</span>
-							</Sidebar.MenuButton>
-						</Sidebar.MenuItem>
-					{:else}
-						<Sidebar.MenuItem>
-							{#if workbench.mode === 'chat'}
-								<Sidebar.MenuButton
-									onclick={() => newConversation()}
-									data-testid="new-conversation"
-								>
-									<Plus class="text-muted-foreground" />
-									<span>New chat</span>
-								</Sidebar.MenuButton>
-							{:else if workbench.mode === 'brain'}
-								<Sidebar.MenuButton onclick={() => openCreate('brain')} data-testid="new-brain">
-									<Plus class="text-muted-foreground" />
-									<span>New brain</span>
-								</Sidebar.MenuButton>
-							{:else if workbench.mode === 'files'}
-								<Sidebar.MenuButton
-									class={uploading ? 'pointer-events-none opacity-50' : ''}
-									onclick={() => fileInput?.click()}
-									data-testid="files-upload"
-								>
-									{#if uploading}
-										<span
-											class="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
-										></span>
-										<span>Uploading…</span>
-									{:else}
-										<Upload class="text-muted-foreground" />
-										<span>Upload files</span>
-									{/if}
-								</Sidebar.MenuButton>
-								{#if uploadError}
-									<p class="px-2 pt-1 text-xs text-destructive">{uploadError}</p>
+								{#if uploading}
+									<span
+										class="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
+									></span>
+									<span>Uploading…</span>
+								{:else}
+									<Upload class="text-muted-foreground" />
+									<span>Upload files</span>
 								{/if}
-								<input
-									bind:this={fileInput}
-									type="file"
-									multiple
-									class="hidden"
-									onchange={(event) => {
-										const files = event.currentTarget.files;
-										if (files && files.length > 0) void uploadFiles(files);
-										event.currentTarget.value = '';
-									}}
-								/>
-							{:else if workbench.mode === 'prompts'}
-								<Sidebar.MenuButton onclick={() => openCreate('prompt')} data-testid="new-prompt">
-									<Plus class="text-muted-foreground" />
-									<span>New prompt</span>
-								</Sidebar.MenuButton>
-							{:else if workbench.mode === 'agents'}
-								<Sidebar.MenuButton onclick={() => openCreate('agent')} data-testid="new-agent">
-									<Plus class="text-muted-foreground" />
-									<span>New agent</span>
-								</Sidebar.MenuButton>
+							</Sidebar.MenuButton>
+							{#if uploadError}
+								<p class="px-2 pt-1 text-xs text-destructive">{uploadError}</p>
 							{/if}
+							<input
+								bind:this={fileInput}
+								type="file"
+								multiple
+								class="hidden"
+								onchange={(event) => {
+									const files = event.currentTarget.files;
+									if (files && files.length > 0) void uploadFiles(files);
+									event.currentTarget.value = '';
+								}}
+							/>
+						</Sidebar.MenuItem>
+					{:else if workbench.mode === 'agents'}
+						<Sidebar.MenuItem>
+							<Sidebar.MenuButton onclick={() => openCreate('agent')} data-testid="new-agent">
+								<Plus class="text-muted-foreground" />
+								<span>New agent</span>
+							</Sidebar.MenuButton>
 						</Sidebar.MenuItem>
 					{/if}
 				</Sidebar.Menu>
@@ -179,12 +188,10 @@
 				<FilesNav />
 			{:else if workbench.mode === 'brain'}
 				<BrainNav />
-			{:else if workbench.mode === 'prompts'}
-				<PromptsNav />
+			{:else if workbench.mode === 'library'}
+				<LibraryNav />
 			{:else if workbench.mode === 'agents'}
 				<AgentsNav />
-			{:else if workbench.mode === 'skills'}
-				<SkillsNav />
 			{/if}
 		</Sidebar.Content>
 
@@ -229,3 +236,5 @@
 </Sidebar.Provider>
 <NewResourceDialog kind={createKind} bind:open={createOpen} />
 <SkillImportDialog />
+<PromptFormDialog bind:open={libraryNav.createPromptOpen} />
+<SkillFormDialog bind:open={libraryNav.createSkillOpen} />

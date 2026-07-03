@@ -14,7 +14,7 @@ defmodule Magus.Chat.Model.Calculations.RequestCostCents do
 
   @impl true
   def load(_query, _opts, _context),
-    do: [:input_cost_value, :output_cost_value, :output_cost_unit]
+    do: [:input_cost_value, :output_cost_value, :output_cost_unit, :input_cost, :output_cost]
 
   @impl true
   def calculate(records, _opts, _context) do

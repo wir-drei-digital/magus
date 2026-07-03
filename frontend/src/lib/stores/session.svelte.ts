@@ -59,14 +59,6 @@ class Session {
 		return true;
 	}
 
-	get workbenchUi(): 'classic' | 'next' {
-		return this.user?.uiPreferences?.['workbench_ui'] === 'next' ? 'next' : 'classic';
-	}
-
-	async setWorkbenchUi(value: 'classic' | 'next'): Promise<boolean> {
-		return this.setUiPreference('workbench_ui', value);
-	}
-
 	/** Optimistic single-key write into ui_preferences, server-reconciled. */
 	async setUiPreference(key: string, value: unknown): Promise<boolean> {
 		if (!this.user) return false;

@@ -17,7 +17,17 @@ defmodule Magus.Models.Provider do
     otp_app: :magus,
     domain: Magus.Models,
     data_layer: AshPostgres.DataLayer,
-    authorizers: [Ash.Policy.Authorizer]
+    authorizers: [Ash.Policy.Authorizer],
+    extensions: [AshTypescript.Resource]
+
+  postgres do
+    table "model_providers"
+    repo Magus.Repo
+
+    custom_indexes do
+      index [:owner_user_id]
+    end
+  end
 
   # ReqLLM provider ids a user-owned provider (:create_owned) may target.
   # Config-driven per deployment; resolved at compile time.
@@ -27,9 +37,11 @@ defmodule Magus.Models.Provider do
                             ~w(anthropic openai openrouter xai google openai_compatible)
                           )
 
-  postgres do
-    table "model_providers"
-    repo Magus.Repo
+  typescript do
+    type_name "ModelProvider"
+
+    # Elixir-style `?` attribute names are invalid TypeScript identifiers.
+    field_names enabled?: "enabled"
   end
 
   actions do
@@ -87,6 +99,12 @@ defmodule Magus.Models.Provider do
       filter expr(owner_user_id == ^actor(:id))
     end
 
+    destroy :destroy_owned do
+      description "Owner deletes a user-owned provider; its owned models are deleted first."
+      require_atomic? false
+      change Magus.Models.Provider.Changes.DestroyOwnedModels
+    end
+
     update :stamp_validation do
       description "Writes credential validation results (worker only)."
       accept [:validation_status, :last_validated_at]
@@ -97,6 +115,13 @@ defmodule Magus.Models.Provider do
       accept []
       require_atomic? false
       change Magus.Models.Provider.Changes.EnqueueCredentialValidation
+    end
+
+    action :list_remote_models, :map do
+      description "Live models-list from the provider endpoint (owner-only, rate-windowed, never persisted)."
+      argument :provider_id, :uuid, allow_nil?: false
+
+      run Magus.Models.Provider.Actions.ListRemoteModels
     end
   end
 
@@ -117,12 +142,23 @@ defmodule Magus.Models.Provider do
       authorize_if expr(owner_user_id == ^actor(:id))
     end
 
+    policy action(:destroy_owned) do
+      authorize_if expr(owner_user_id == ^actor(:id))
+    end
+
     policy action(:validate) do
       authorize_if expr(owner_user_id == ^actor(:id))
     end
 
+    policy action(:list_remote_models) do
+      authorize_if actor_present()
+    end
+
     policy action(:stamp_validation) do
-      authorize_if always()
+      # Only the credential-validation Oban worker writes these fields, and it
+      # uses authorize?: false. No end-user path reaches this action, so require
+      # admin rather than authorizing everyone.
+      authorize_if Magus.Checks.IsAdmin
     end
 
     policy action(:create) do

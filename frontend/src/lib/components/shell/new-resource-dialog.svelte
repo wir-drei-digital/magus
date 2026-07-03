@@ -1,15 +1,14 @@
 <script lang="ts" module>
-	export type NewResourceKind = 'prompt' | 'agent' | 'brain';
+	export type NewResourceKind = 'agent' | 'brain';
 </script>
 
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
-	import { createCustomAgent, createPrompt } from '$lib/ash/api';
+	import { createCustomAgent } from '$lib/ash/api';
 	import { invalidateAgentCatalog } from '$lib/chat/catalog';
 	import { agentsNav } from '$lib/stores/agents-nav.svelte';
 	import { brainNav } from '$lib/stores/brain-nav.svelte';
-	import { promptsNav } from '$lib/stores/prompts-nav.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -27,11 +26,6 @@
 	} = $props();
 
 	const COPY: Record<NewResourceKind, { title: string; description: string; nameLabel: string }> = {
-		prompt: {
-			title: 'New prompt',
-			description: 'Create a reusable prompt for your library.',
-			nameLabel: 'Name'
-		},
 		agent: {
 			title: 'New agent',
 			description: 'Create a custom agent you can mention and automate.',
@@ -59,9 +53,7 @@
 		}
 	});
 
-	const canCreate = $derived(
-		name.trim() !== '' && !saving && (kind !== 'prompt' || body.trim() !== '')
-	);
+	const canCreate = $derived(name.trim() !== '' && !saving);
 
 	async function create() {
 		if (!canCreate) return;
@@ -69,22 +61,7 @@
 		error = null;
 		const workspaceId = session.user?.currentWorkspaceId ?? null;
 
-		if (kind === 'prompt') {
-			const result = await createPrompt({
-				name: name.trim(),
-				content: body,
-				type: 'user',
-				workspaceId
-			});
-			saving = false;
-			if (!result.success) {
-				error = result.errors[0]?.message ?? 'Prompt could not be created';
-				return;
-			}
-			promptsNav.refresh();
-			open = false;
-			await goto(`${base}/prompts/${result.data.id}`);
-		} else if (kind === 'agent') {
+		if (kind === 'agent') {
 			const result = await createCustomAgent({
 				name: name.trim(),
 				instructions: body.trim() || undefined,
@@ -137,17 +114,7 @@
 				/>
 			</label>
 
-			{#if kind === 'prompt'}
-				<label class="flex flex-col gap-1.5 text-sm">
-					<span class="text-xs font-medium text-muted-foreground">Content</span>
-					<textarea
-						bind:value={body}
-						rows="5"
-						data-testid="new-resource-content"
-						class={TEXTAREA_CLASS}
-					></textarea>
-				</label>
-			{:else if kind === 'agent'}
+			{#if kind === 'agent'}
 				<label class="flex flex-col gap-1.5 text-sm">
 					<span class="text-xs font-medium text-muted-foreground">Instructions (optional)</span>
 					<textarea

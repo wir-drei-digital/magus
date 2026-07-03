@@ -143,8 +143,7 @@
 									{notificationTitle(group.head)}
 								</span>
 								{#if group.head.body}
-									<span class="block truncate text-xs text-muted-foreground"
-										>{group.head.body}</span
+									<span class="block truncate text-xs text-muted-foreground">{group.head.body}</span
 									>
 								{/if}
 								<span class="block text-[11px] text-muted-foreground">
@@ -184,8 +183,7 @@
 									{notificationTitle(group.head)}
 								</span>
 								{#if group.head.body}
-									<span class="block truncate text-xs text-muted-foreground"
-										>{group.head.body}</span
+									<span class="block truncate text-xs text-muted-foreground">{group.head.body}</span
 									>
 								{/if}
 								<span class="block text-[11px] text-muted-foreground">

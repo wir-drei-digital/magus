@@ -45,7 +45,8 @@ defmodule Magus.Repo.Migrations.CreateSkills do
             name: "skills_user_id_fkey",
             type: :uuid,
             prefix: "public"
-          ), null: false
+          ),
+          null: false
 
       add :workspace_id,
           references(:workspaces,

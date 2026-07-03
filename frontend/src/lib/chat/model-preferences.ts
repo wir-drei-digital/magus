@@ -17,7 +17,10 @@ async function apply(
 	return null;
 }
 
-export function toggleFavorite(modelId: string, favorite: boolean): Promise<ModelPreference | null> {
+export function toggleFavorite(
+	modelId: string,
+	favorite: boolean
+): Promise<ModelPreference | null> {
 	return apply(setModelFavorite(modelId, favorite));
 }
 

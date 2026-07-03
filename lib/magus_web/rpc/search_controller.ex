@@ -10,7 +10,7 @@ defmodule MagusWeb.Rpc.SearchController do
   """
   use MagusWeb, :controller
 
-  @all_types [:message, :conversation, :prompt, :resource, :chunk]
+  @all_types [:message, :conversation, :prompt, :skill, :resource, :chunk]
 
   def search(conn, params) do
     user = conn.assigns.current_user
@@ -28,6 +28,7 @@ defmodule MagusWeb.Rpc.SearchController do
   defp parse_types("message"), do: [:message]
   defp parse_types("conversation"), do: [:conversation]
   defp parse_types("prompt"), do: [:prompt]
+  defp parse_types("skill"), do: [:skill]
   defp parse_types("resource"), do: [:resource]
   defp parse_types("chunk"), do: [:chunk]
   defp parse_types(_), do: @all_types

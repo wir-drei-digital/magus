@@ -7,6 +7,7 @@ export type AshDate = string;
 export type Decimal = string;
 export type UUID = string;
 export type UUIDv7 = string;
+export type UtcDateTime = string;
 export type UtcDateTimeUsec = string;
 
 // User Schema
@@ -889,6 +890,7 @@ export type ModelResourceSchema = {
   internal: boolean;
   modelProviderId: UUID | null;
   requestCostCents: number | null;
+  modelProvider: { __type: "Relationship"; __resource: ModelProviderResourceSchema | null; };
 };
 
 
@@ -1313,18 +1315,24 @@ export type PromptFavoriteAttributesOnlySchema = {
 // Tag Schema
 export type TagResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name";
+  __primitiveFields: "id" | "name" | "userId" | "workspaceId";
   id: UUID;
   name: string;
+  userId: UUID | null;
+  workspaceId: UUID | null;
+  user: { __type: "Relationship"; __resource: UserResourceSchema | null; };
+  workspace: { __type: "Relationship"; __resource: WorkspaceResourceSchema | null; };
 };
 
 
 
 export type TagAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name";
+  __primitiveFields: "id" | "name" | "userId" | "workspaceId";
   id: UUID;
   name: string;
+  userId: UUID | null;
+  workspaceId: UUID | null;
 };
 
 
@@ -1414,6 +1422,36 @@ export type MCPServerCredentialAttributesOnlySchema = {
 };
 
 
+// ModelProvider Schema
+export type ModelProviderResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "name" | "slug" | "reqLlmId" | "baseUrl" | "enabled" | "validationStatus" | "lastValidatedAt";
+  id: UUID;
+  name: string;
+  slug: string;
+  reqLlmId: string;
+  baseUrl: string | null;
+  enabled: boolean;
+  validationStatus: "error" | "invalid" | "pending" | "valid";
+  lastValidatedAt: UtcDateTime | null;
+};
+
+
+
+export type ModelProviderAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "name" | "slug" | "reqLlmId" | "baseUrl" | "enabled" | "validationStatus" | "lastValidatedAt";
+  id: UUID;
+  name: string;
+  slug: string;
+  reqLlmId: string;
+  baseUrl: string | null;
+  enabled: boolean;
+  validationStatus: "error" | "invalid" | "pending" | "valid";
+  lastValidatedAt: UtcDateTime | null;
+};
+
+
 // Notification Schema
 export type NotificationResourceSchema = {
   __type: "Resource";
@@ -1446,76 +1484,6 @@ export type NotificationAttributesOnlySchema = {
   insertedAt: UtcDateTimeUsec;
   updatedAt: UtcDateTimeUsec;
   userId: UUID;
-};
-
-
-// Organization Schema
-export type OrganizationResourceSchema = {
-  __type: "Resource";
-  __primitiveFields: "id" | "name" | "slug" | "billingInterval" | "billingStatus" | "currentPeriodStart" | "currentPeriodEnd" | "archivedAt" | "ownerId";
-  id: UUIDv7;
-  name: string;
-  slug: string;
-  billingInterval: "annual" | "monthly";
-  billingStatus: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
-  currentPeriodStart: UtcDateTimeUsec | null;
-  currentPeriodEnd: UtcDateTimeUsec | null;
-  archivedAt: UtcDateTimeUsec | null;
-  ownerId: UUID;
-  owner: { __type: "Relationship"; __resource: UserResourceSchema; };
-  members: { __type: "Relationship"; __array: true; __resource: OrganizationMemberResourceSchema; };
-};
-
-
-
-export type OrganizationAttributesOnlySchema = {
-  __type: "Resource";
-  __primitiveFields: "id" | "name" | "slug" | "billingInterval" | "billingStatus" | "currentPeriodStart" | "currentPeriodEnd" | "archivedAt" | "ownerId";
-  id: UUIDv7;
-  name: string;
-  slug: string;
-  billingInterval: "annual" | "monthly";
-  billingStatus: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
-  currentPeriodStart: UtcDateTimeUsec | null;
-  currentPeriodEnd: UtcDateTimeUsec | null;
-  archivedAt: UtcDateTimeUsec | null;
-  ownerId: UUID;
-};
-
-
-// OrganizationMember Schema
-export type OrganizationMemberResourceSchema = {
-  __type: "Resource";
-  __primitiveFields: "id" | "role" | "status" | "spendCapCents" | "invitedAt" | "joinedAt" | "removedAt" | "inviteEmail" | "organizationId" | "userId";
-  id: UUIDv7;
-  role: "member" | "owner";
-  status: "active" | "invited" | "removed";
-  spendCapCents: number | null;
-  invitedAt: UtcDateTimeUsec | null;
-  joinedAt: UtcDateTimeUsec | null;
-  removedAt: UtcDateTimeUsec | null;
-  inviteEmail: string | null;
-  organizationId: UUID;
-  userId: UUID | null;
-  organization: { __type: "Relationship"; __resource: OrganizationResourceSchema; };
-  user: { __type: "Relationship"; __resource: UserResourceSchema | null; };
-};
-
-
-
-export type OrganizationMemberAttributesOnlySchema = {
-  __type: "Resource";
-  __primitiveFields: "id" | "role" | "status" | "spendCapCents" | "invitedAt" | "joinedAt" | "removedAt" | "inviteEmail" | "organizationId" | "userId";
-  id: UUIDv7;
-  role: "member" | "owner";
-  status: "active" | "invited" | "removed";
-  spendCapCents: number | null;
-  invitedAt: UtcDateTimeUsec | null;
-  joinedAt: UtcDateTimeUsec | null;
-  removedAt: UtcDateTimeUsec | null;
-  inviteEmail: string | null;
-  organizationId: UUID;
-  userId: UUID | null;
 };
 
 
@@ -1578,7 +1546,7 @@ export type TaskAttributesOnlySchema = {
 // Skill Schema
 export type SkillResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "displayName" | "description" | "body" | "requestedTools" | "requiredSecrets" | "version" | "license" | "compatibility" | "icon" | "color" | "sourceFormat" | "sourceUrl" | "hasExecutableBundle" | "fileManifest" | "workspaceId" | "isSharedToWorkspace";
+  __primitiveFields: "id" | "name" | "displayName" | "description" | "body" | "requestedTools" | "requiredSecrets" | "version" | "license" | "compatibility" | "icon" | "color" | "sourceFormat" | "sourceUrl" | "hasExecutableBundle" | "fileManifest" | "workspaceId" | "isSharedToWorkspace" | "isFavorited";
   id: UUID;
   name: string;
   displayName: string | null;
@@ -1597,6 +1565,7 @@ export type SkillResourceSchema = {
   fileManifest: Array<Record<string, any>> | null;
   workspaceId: UUID | null;
   isSharedToWorkspace: boolean | null;
+  isFavorited: boolean | null;
   workspace: { __type: "Relationship"; __resource: WorkspaceResourceSchema | null; };
 };
 
@@ -1625,14 +1594,34 @@ export type SkillAttributesOnlySchema = {
 };
 
 
+// SkillFavorite Schema
+export type SkillFavoriteResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "skillId";
+  id: UUID;
+  skillId: UUID;
+  skill: { __type: "Relationship"; __resource: SkillResourceSchema; };
+};
+
+
+
+export type SkillFavoriteAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "skillId";
+  id: UUID;
+  skillId: UUID;
+};
+
+
 // UserSubscription Schema
 export type UserSubscriptionResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "status" | "lastPaymentStatus" | "storageUsageBytes" | "billingInterval" | "periodUsageCents" | "monthlySpendCapCents" | "noSpendCap";
+  __primitiveFields: "id" | "status" | "lastPaymentStatus" | "storageUsageBytes" | "extraSeats" | "billingInterval" | "periodUsageCents" | "monthlySpendCapCents" | "noSpendCap";
   id: UUIDv7;
   status: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
   lastPaymentStatus: string | null;
   storageUsageBytes: number;
+  extraSeats: number;
   billingInterval: "annual" | "monthly";
   periodUsageCents: number;
   monthlySpendCapCents: number | null;
@@ -1643,11 +1632,12 @@ export type UserSubscriptionResourceSchema = {
 
 export type UserSubscriptionAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "status" | "lastPaymentStatus" | "storageUsageBytes" | "billingInterval" | "periodUsageCents" | "monthlySpendCapCents" | "noSpendCap";
+  __primitiveFields: "id" | "status" | "lastPaymentStatus" | "storageUsageBytes" | "extraSeats" | "billingInterval" | "periodUsageCents" | "monthlySpendCapCents" | "noSpendCap";
   id: UUIDv7;
   status: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
   lastPaymentStatus: string | null;
   storageUsageBytes: number;
+  extraSeats: number;
   billingInterval: "annual" | "monthly";
   periodUsageCents: number;
   monthlySpendCapCents: number | null;
@@ -1660,7 +1650,7 @@ export type TabSessionResourceSchema = {
   __type: "Resource";
   __primitiveFields: "id" | "mode" | "navFilter" | "tabs" | "activeTabId";
   id: UUID;
-  mode: "agents" | "brain" | "chat" | "files" | "prompts" | "skills";
+  mode: "agents" | "brain" | "chat" | "files" | "library" | "prompts" | "skills";
   navFilter: "all" | "personal" | "shared";
   tabs: Array<Record<string, any>>;
   activeTabId: string | null;
@@ -1672,7 +1662,7 @@ export type TabSessionAttributesOnlySchema = {
   __type: "Resource";
   __primitiveFields: "id" | "mode" | "navFilter" | "tabs" | "activeTabId";
   id: UUID;
-  mode: "agents" | "brain" | "chat" | "files" | "prompts" | "skills";
+  mode: "agents" | "brain" | "chat" | "files" | "library" | "prompts" | "skills";
   navFilter: "all" | "personal" | "shared";
   tabs: Array<Record<string, any>>;
   activeTabId: string | null;
@@ -1757,32 +1747,29 @@ export type JobRunAttributesOnlySchema = {
 // Workspace Schema
 export type WorkspaceResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "slug" | "allowedModelIds" | "isActive" | "storageUsageBytes" | "organizationId" | "defaultAgentId";
+  __primitiveFields: "id" | "name" | "slug" | "allowedModelIds" | "isActive" | "storageUsageBytes" | "defaultAgentId";
   id: UUIDv7;
   name: string;
   slug: string;
   allowedModelIds: Array<UUID> | null;
   isActive: boolean;
   storageUsageBytes: number;
-  organizationId: UUID | null;
   defaultAgentId: UUID | null;
   defaultAgent: { __type: "Relationship"; __resource: CustomAgentResourceSchema | null; };
   members: { __type: "Relationship"; __array: true; __resource: WorkspaceMemberResourceSchema; };
-  organization: { __type: "Relationship"; __resource: OrganizationResourceSchema | null; };
 };
 
 
 
 export type WorkspaceAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "slug" | "allowedModelIds" | "isActive" | "storageUsageBytes" | "organizationId" | "defaultAgentId";
+  __primitiveFields: "id" | "name" | "slug" | "allowedModelIds" | "isActive" | "storageUsageBytes" | "defaultAgentId";
   id: UUIDv7;
   name: string;
   slug: string;
   allowedModelIds: Array<UUID> | null;
   isActive: boolean;
   storageUsageBytes: number;
-  organizationId: UUID | null;
   defaultAgentId: UUID | null;
 };
 
@@ -4091,6 +4078,7 @@ export type ModelFilterInput = {
   };
 
 
+  modelProvider?: ModelProviderFilterInput;
 
 };
 export type UserFolderStateFilterInput = {
@@ -5001,7 +4989,24 @@ export type TagFilterInput = {
     in?: Array<string>;
   };
 
+  userId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
 
+  workspaceId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+
+  user?: UserFilterInput;
+
+  workspace?: WorkspaceFilterInput;
 
 };
 export type MCPServerFilterInput = {
@@ -5208,6 +5213,67 @@ export type MCPServerCredentialFilterInput = {
   user?: UserFilterInput;
 
 };
+export type ModelProviderFilterInput = {
+  and?: Array<ModelProviderFilterInput>;
+  or?: Array<ModelProviderFilterInput>;
+  not?: Array<ModelProviderFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  name?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  slug?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  reqLlmId?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  baseUrl?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  enabled?: {
+    eq?: boolean;
+    notEq?: boolean;
+  };
+
+  validationStatus?: {
+    eq?: "error" | "invalid" | "pending" | "valid";
+    notEq?: "error" | "invalid" | "pending" | "valid";
+    in?: Array<"error" | "invalid" | "pending" | "valid">;
+  };
+
+  lastValidatedAt?: {
+    eq?: UtcDateTime;
+    notEq?: UtcDateTime;
+    greaterThan?: UtcDateTime;
+    greaterThanOrEqual?: UtcDateTime;
+    lessThan?: UtcDateTime;
+    lessThanOrEqual?: UtcDateTime;
+    in?: Array<UtcDateTime>;
+    isNil?: boolean;
+  };
+
+
+
+};
 export type NotificationFilterInput = {
   and?: Array<NotificationFilterInput>;
   or?: Array<NotificationFilterInput>;
@@ -5290,179 +5356,6 @@ export type NotificationFilterInput = {
     in?: Array<UUID>;
   };
 
-
-  user?: UserFilterInput;
-
-};
-export type OrganizationFilterInput = {
-  and?: Array<OrganizationFilterInput>;
-  or?: Array<OrganizationFilterInput>;
-  not?: Array<OrganizationFilterInput>;
-
-  id?: {
-    eq?: UUIDv7;
-    notEq?: UUIDv7;
-    in?: Array<UUIDv7>;
-  };
-
-  name?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-  };
-
-  slug?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-  };
-
-  billingInterval?: {
-    eq?: "annual" | "monthly";
-    notEq?: "annual" | "monthly";
-    in?: Array<"annual" | "monthly">;
-  };
-
-  billingStatus?: {
-    eq?: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
-    notEq?: "active" | "canceled" | "incomplete" | "past_due" | "trialing";
-    in?: Array<"active" | "canceled" | "incomplete" | "past_due" | "trialing">;
-  };
-
-  currentPeriodStart?: {
-    eq?: UtcDateTimeUsec;
-    notEq?: UtcDateTimeUsec;
-    greaterThan?: UtcDateTimeUsec;
-    greaterThanOrEqual?: UtcDateTimeUsec;
-    lessThan?: UtcDateTimeUsec;
-    lessThanOrEqual?: UtcDateTimeUsec;
-    in?: Array<UtcDateTimeUsec>;
-    isNil?: boolean;
-  };
-
-  currentPeriodEnd?: {
-    eq?: UtcDateTimeUsec;
-    notEq?: UtcDateTimeUsec;
-    greaterThan?: UtcDateTimeUsec;
-    greaterThanOrEqual?: UtcDateTimeUsec;
-    lessThan?: UtcDateTimeUsec;
-    lessThanOrEqual?: UtcDateTimeUsec;
-    in?: Array<UtcDateTimeUsec>;
-    isNil?: boolean;
-  };
-
-  archivedAt?: {
-    eq?: UtcDateTimeUsec;
-    notEq?: UtcDateTimeUsec;
-    greaterThan?: UtcDateTimeUsec;
-    greaterThanOrEqual?: UtcDateTimeUsec;
-    lessThan?: UtcDateTimeUsec;
-    lessThanOrEqual?: UtcDateTimeUsec;
-    in?: Array<UtcDateTimeUsec>;
-    isNil?: boolean;
-  };
-
-  ownerId?: {
-    eq?: UUID;
-    notEq?: UUID;
-    in?: Array<UUID>;
-  };
-
-
-  owner?: UserFilterInput;
-
-  members?: OrganizationMemberFilterInput;
-
-};
-export type OrganizationMemberFilterInput = {
-  and?: Array<OrganizationMemberFilterInput>;
-  or?: Array<OrganizationMemberFilterInput>;
-  not?: Array<OrganizationMemberFilterInput>;
-
-  id?: {
-    eq?: UUIDv7;
-    notEq?: UUIDv7;
-    in?: Array<UUIDv7>;
-  };
-
-  role?: {
-    eq?: "member" | "owner";
-    notEq?: "member" | "owner";
-    in?: Array<"member" | "owner">;
-  };
-
-  status?: {
-    eq?: "active" | "invited" | "removed";
-    notEq?: "active" | "invited" | "removed";
-    in?: Array<"active" | "invited" | "removed">;
-  };
-
-  spendCapCents?: {
-    eq?: number;
-    notEq?: number;
-    greaterThan?: number;
-    greaterThanOrEqual?: number;
-    lessThan?: number;
-    lessThanOrEqual?: number;
-    in?: Array<number>;
-    isNil?: boolean;
-  };
-
-  invitedAt?: {
-    eq?: UtcDateTimeUsec;
-    notEq?: UtcDateTimeUsec;
-    greaterThan?: UtcDateTimeUsec;
-    greaterThanOrEqual?: UtcDateTimeUsec;
-    lessThan?: UtcDateTimeUsec;
-    lessThanOrEqual?: UtcDateTimeUsec;
-    in?: Array<UtcDateTimeUsec>;
-    isNil?: boolean;
-  };
-
-  joinedAt?: {
-    eq?: UtcDateTimeUsec;
-    notEq?: UtcDateTimeUsec;
-    greaterThan?: UtcDateTimeUsec;
-    greaterThanOrEqual?: UtcDateTimeUsec;
-    lessThan?: UtcDateTimeUsec;
-    lessThanOrEqual?: UtcDateTimeUsec;
-    in?: Array<UtcDateTimeUsec>;
-    isNil?: boolean;
-  };
-
-  removedAt?: {
-    eq?: UtcDateTimeUsec;
-    notEq?: UtcDateTimeUsec;
-    greaterThan?: UtcDateTimeUsec;
-    greaterThanOrEqual?: UtcDateTimeUsec;
-    lessThan?: UtcDateTimeUsec;
-    lessThanOrEqual?: UtcDateTimeUsec;
-    in?: Array<UtcDateTimeUsec>;
-    isNil?: boolean;
-  };
-
-  inviteEmail?: {
-    eq?: string;
-    notEq?: string;
-    in?: Array<string>;
-    isNil?: boolean;
-  };
-
-  organizationId?: {
-    eq?: UUID;
-    notEq?: UUID;
-    in?: Array<UUID>;
-  };
-
-  userId?: {
-    eq?: UUID;
-    notEq?: UUID;
-    in?: Array<UUID>;
-    isNil?: boolean;
-  };
-
-
-  organization?: OrganizationFilterInput;
 
   user?: UserFilterInput;
 
@@ -5746,8 +5639,35 @@ export type SkillFilterInput = {
     isNil?: boolean;
   };
 
+  isFavorited?: {
+    eq?: boolean;
+    notEq?: boolean;
+    isNil?: boolean;
+  };
+
 
   workspace?: WorkspaceFilterInput;
+
+};
+export type SkillFavoriteFilterInput = {
+  and?: Array<SkillFavoriteFilterInput>;
+  or?: Array<SkillFavoriteFilterInput>;
+  not?: Array<SkillFavoriteFilterInput>;
+
+  id?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+  skillId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+  };
+
+
+  skill?: SkillFilterInput;
 
 };
 export type UserSubscriptionFilterInput = {
@@ -5775,6 +5695,16 @@ export type UserSubscriptionFilterInput = {
   };
 
   storageUsageBytes?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+  };
+
+  extraSeats?: {
     eq?: number;
     notEq?: number;
     greaterThan?: number;
@@ -5831,9 +5761,9 @@ export type TabSessionFilterInput = {
   };
 
   mode?: {
-    eq?: "agents" | "brain" | "chat" | "files" | "prompts" | "skills";
-    notEq?: "agents" | "brain" | "chat" | "files" | "prompts" | "skills";
-    in?: Array<"agents" | "brain" | "chat" | "files" | "prompts" | "skills">;
+    eq?: "agents" | "brain" | "chat" | "files" | "library" | "prompts" | "skills";
+    notEq?: "agents" | "brain" | "chat" | "files" | "library" | "prompts" | "skills";
+    in?: Array<"agents" | "brain" | "chat" | "files" | "library" | "prompts" | "skills">;
   };
 
   navFilter?: {
@@ -6104,13 +6034,6 @@ export type WorkspaceFilterInput = {
     in?: Array<number>;
   };
 
-  organizationId?: {
-    eq?: UUID;
-    notEq?: UUID;
-    in?: Array<UUID>;
-    isNil?: boolean;
-  };
-
   defaultAgentId?: {
     eq?: UUID;
     notEq?: UUID;
@@ -6122,8 +6045,6 @@ export type WorkspaceFilterInput = {
   defaultAgent?: CustomAgentFilterInput;
 
   members?: WorkspaceMemberFilterInput;
-
-  organization?: OrganizationFilterInput;
 
 };
 export type WorkspaceMemberFilterInput = {
@@ -6314,7 +6235,7 @@ export type PromptFilterField = (typeof promptFilterFields)[number];
 export const promptFavoriteFilterFields = ["id", "promptId", "prompt"] as const;
 export type PromptFavoriteFilterField = (typeof promptFavoriteFilterFields)[number];
 
-export const tagFilterFields = ["id", "name"] as const;
+export const tagFilterFields = ["id", "name", "userId", "workspaceId", "user", "workspace"] as const;
 export type TagFilterField = (typeof tagFilterFields)[number];
 
 export const mCPServerFilterFields = ["id", "name", "handle", "url", "transport", "mcpPath", "enabled", "authType", "cachedTools", "toolsCachedAt", "oauthMetadata", "reachability", "lastError", "lastReachableAt", "source", "registryName", "registryVersion", "description", "repositoryUrl", "userId", "workspaceId", "user", "workspace"] as const;
@@ -6323,22 +6244,22 @@ export type MCPServerFilterField = (typeof mCPServerFilterFields)[number];
 export const mCPServerCredentialFilterFields = ["id", "authKind", "oauthExpiresAt", "status", "mcpServerId", "userId", "mcpServer", "user"] as const;
 export type MCPServerCredentialFilterField = (typeof mCPServerCredentialFilterFields)[number];
 
+export const modelProviderFilterFields = ["id", "name", "slug", "reqLlmId", "baseUrl", "enabled", "validationStatus", "lastValidatedAt"] as const;
+export type ModelProviderFilterField = (typeof modelProviderFilterFields)[number];
+
 export const notificationFilterFields = ["id", "title", "body", "notificationType", "readAt", "metadata", "targetConversationId", "insertedAt", "updatedAt", "userId", "user"] as const;
 export type NotificationFilterField = (typeof notificationFilterFields)[number];
-
-export const organizationFilterFields = ["id", "name", "slug", "billingInterval", "billingStatus", "currentPeriodStart", "currentPeriodEnd", "archivedAt", "ownerId", "owner", "members"] as const;
-export type OrganizationFilterField = (typeof organizationFilterFields)[number];
-
-export const organizationMemberFilterFields = ["id", "role", "status", "spendCapCents", "invitedAt", "joinedAt", "removedAt", "inviteEmail", "organizationId", "userId", "organization", "user"] as const;
-export type OrganizationMemberFilterField = (typeof organizationMemberFilterFields)[number];
 
 export const taskFilterFields = ["id", "title", "description", "status", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "dismissedAt", "recurrence", "conversationId", "parentId", "assignedToUserId", "conversation", "parent", "subtasks", "assignedToUser"] as const;
 export type TaskFilterField = (typeof taskFilterFields)[number];
 
-export const skillFilterFields = ["id", "name", "displayName", "description", "body", "requestedTools", "requiredSecrets", "version", "license", "compatibility", "icon", "color", "sourceFormat", "sourceUrl", "hasExecutableBundle", "fileManifest", "workspaceId", "isSharedToWorkspace", "workspace"] as const;
+export const skillFilterFields = ["id", "name", "displayName", "description", "body", "requestedTools", "requiredSecrets", "version", "license", "compatibility", "icon", "color", "sourceFormat", "sourceUrl", "hasExecutableBundle", "fileManifest", "workspaceId", "isSharedToWorkspace", "isFavorited", "workspace"] as const;
 export type SkillFilterField = (typeof skillFilterFields)[number];
 
-export const userSubscriptionFilterFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
+export const skillFavoriteFilterFields = ["id", "skillId", "skill"] as const;
+export type SkillFavoriteFilterField = (typeof skillFavoriteFilterFields)[number];
+
+export const userSubscriptionFilterFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "extraSeats", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
 export type UserSubscriptionFilterField = (typeof userSubscriptionFilterFields)[number];
 
 export const tabSessionFilterFields = ["id", "mode", "navFilter", "tabs", "activeTabId"] as const;
@@ -6350,7 +6271,7 @@ export type JobFilterField = (typeof jobFilterFields)[number];
 export const jobRunFilterFields = ["id", "status", "startedAt", "completedAt", "errorMessage", "retryAttempt", "metadata"] as const;
 export type JobRunFilterField = (typeof jobRunFilterFields)[number];
 
-export const workspaceFilterFields = ["id", "name", "slug", "allowedModelIds", "isActive", "storageUsageBytes", "organizationId", "defaultAgentId", "defaultAgent", "members", "organization"] as const;
+export const workspaceFilterFields = ["id", "name", "slug", "allowedModelIds", "isActive", "storageUsageBytes", "defaultAgentId", "defaultAgent", "members"] as const;
 export type WorkspaceFilterField = (typeof workspaceFilterFields)[number];
 
 export const workspaceMemberFilterFields = ["id", "role", "status", "isActive", "invitedAt", "joinedAt", "deactivatedAt", "inviteEmail", "workspaceId", "userId", "workspace", "user"] as const;
@@ -6456,7 +6377,7 @@ export type PromptSortField = (typeof promptSortFields)[number];
 export const promptFavoriteSortFields = ["id", "promptId"] as const;
 export type PromptFavoriteSortField = (typeof promptFavoriteSortFields)[number];
 
-export const tagSortFields = ["id", "name"] as const;
+export const tagSortFields = ["id", "name", "userId", "workspaceId"] as const;
 export type TagSortField = (typeof tagSortFields)[number];
 
 export const mCPServerSortFields = ["id", "name", "handle", "url", "transport", "mcpPath", "enabled", "authType", "cachedTools", "toolsCachedAt", "oauthMetadata", "reachability", "lastError", "lastReachableAt", "source", "registryName", "registryVersion", "description", "repositoryUrl", "userId", "workspaceId"] as const;
@@ -6465,22 +6386,22 @@ export type MCPServerSortField = (typeof mCPServerSortFields)[number];
 export const mCPServerCredentialSortFields = ["id", "authKind", "oauthExpiresAt", "status", "mcpServerId", "userId"] as const;
 export type MCPServerCredentialSortField = (typeof mCPServerCredentialSortFields)[number];
 
+export const modelProviderSortFields = ["id", "name", "slug", "reqLlmId", "baseUrl", "enabled", "validationStatus", "lastValidatedAt"] as const;
+export type ModelProviderSortField = (typeof modelProviderSortFields)[number];
+
 export const notificationSortFields = ["id", "title", "body", "notificationType", "readAt", "metadata", "targetConversationId", "insertedAt", "updatedAt", "userId"] as const;
 export type NotificationSortField = (typeof notificationSortFields)[number];
-
-export const organizationSortFields = ["id", "name", "slug", "billingInterval", "billingStatus", "currentPeriodStart", "currentPeriodEnd", "archivedAt", "ownerId"] as const;
-export type OrganizationSortField = (typeof organizationSortFields)[number];
-
-export const organizationMemberSortFields = ["id", "role", "status", "spendCapCents", "invitedAt", "joinedAt", "removedAt", "inviteEmail", "organizationId", "userId"] as const;
-export type OrganizationMemberSortField = (typeof organizationMemberSortFields)[number];
 
 export const taskSortFields = ["id", "title", "description", "status", "position", "assignedToAgent", "completedBy", "assignedToCustomAgentId", "assignedByCustomAgentId", "blockedReason", "waitingOnUser", "resultSummary", "metadata", "dueAt", "dismissedAt", "recurrence", "conversationId", "parentId", "assignedToUserId"] as const;
 export type TaskSortField = (typeof taskSortFields)[number];
 
-export const skillSortFields = ["id", "name", "displayName", "description", "body", "requestedTools", "requiredSecrets", "version", "license", "compatibility", "icon", "color", "sourceFormat", "sourceUrl", "hasExecutableBundle", "fileManifest", "workspaceId", "isSharedToWorkspace"] as const;
+export const skillSortFields = ["id", "name", "displayName", "description", "body", "requestedTools", "requiredSecrets", "version", "license", "compatibility", "icon", "color", "sourceFormat", "sourceUrl", "hasExecutableBundle", "fileManifest", "workspaceId", "isSharedToWorkspace", "isFavorited"] as const;
 export type SkillSortField = (typeof skillSortFields)[number];
 
-export const userSubscriptionSortFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
+export const skillFavoriteSortFields = ["id", "skillId"] as const;
+export type SkillFavoriteSortField = (typeof skillFavoriteSortFields)[number];
+
+export const userSubscriptionSortFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "extraSeats", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
 export type UserSubscriptionSortField = (typeof userSubscriptionSortFields)[number];
 
 export const tabSessionSortFields = ["id", "mode", "navFilter", "tabs", "activeTabId"] as const;
@@ -6492,7 +6413,7 @@ export type JobSortField = (typeof jobSortFields)[number];
 export const jobRunSortFields = ["id", "status", "startedAt", "completedAt", "errorMessage", "retryAttempt", "metadata"] as const;
 export type JobRunSortField = (typeof jobRunSortFields)[number];
 
-export const workspaceSortFields = ["id", "name", "slug", "allowedModelIds", "isActive", "storageUsageBytes", "organizationId", "defaultAgentId"] as const;
+export const workspaceSortFields = ["id", "name", "slug", "allowedModelIds", "isActive", "storageUsageBytes", "defaultAgentId"] as const;
 export type WorkspaceSortField = (typeof workspaceSortFields)[number];
 
 export const workspaceMemberSortFields = ["id", "role", "status", "isActive", "invitedAt", "joinedAt", "deactivatedAt", "inviteEmail", "workspaceId", "userId"] as const;

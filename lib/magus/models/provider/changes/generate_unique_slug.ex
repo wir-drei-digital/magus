@@ -13,8 +13,11 @@ defmodule Magus.Models.Provider.Changes.GenerateUniqueSlug do
   def change(changeset, _opts, _context) do
     Ash.Changeset.before_action(changeset, fn cs ->
       case mint(@max_attempts) do
-        {:ok, slug} -> Ash.Changeset.force_change_attribute(cs, :slug, slug)
-        :error -> Ash.Changeset.add_error(cs, field: :slug, message: "could not mint a unique slug")
+        {:ok, slug} ->
+          Ash.Changeset.force_change_attribute(cs, :slug, slug)
+
+        :error ->
+          Ash.Changeset.add_error(cs, field: :slug, message: "could not mint a unique slug")
       end
     end)
   end

@@ -7,11 +7,15 @@ defmodule Magus.Repo.Migrations.AddTestAccountFields do
 
   use Ecto.Migration
 
+  # `add_if_not_exists`: production already has (some of) these columns from an
+  # out-of-band application (the column pre-dated this migration's first deploy
+  # attempt, failing it with duplicate_column), so guard each add. Safe for
+  # fresh databases: the guards behave like plain `add` there.
   def up do
     alter table(:users) do
-      add :test_account, :boolean, null: false, default: false
-      add :test_account_expires_at, :utc_datetime_usec
-      add :test_account_password, :binary
+      add_if_not_exists :test_account, :boolean, null: false, default: false
+      add_if_not_exists :test_account_expires_at, :utc_datetime_usec
+      add_if_not_exists :test_account_password, :binary
     end
   end
 

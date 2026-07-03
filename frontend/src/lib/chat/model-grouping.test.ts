@@ -52,9 +52,9 @@ describe('groupModels', () => {
 	it('hides hidden models unless showHidden is on', () => {
 		const models = [model('a'), model('b')];
 		const prefs = prefsById([pref('a', { hidden: true })]);
-		expect(groupModels(models, prefs, NO_FILTERS).flatMap((g) => g.models.map((m) => m.id))).toEqual([
-			'b'
-		]);
+		expect(
+			groupModels(models, prefs, NO_FILTERS).flatMap((g) => g.models.map((m) => m.id))
+		).toEqual(['b']);
 		expect(
 			groupModels(models, prefs, { ...NO_FILTERS, showHidden: true }).flatMap((g) =>
 				g.models.map((m) => m.id)

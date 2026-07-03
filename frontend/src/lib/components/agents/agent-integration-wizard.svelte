@@ -211,7 +211,10 @@
 				{#if apiKey}
 					<p class="text-sm">Your API key — copy it now, it won't be shown again:</p>
 					<div class="flex items-center gap-2 rounded-md border border-input bg-secondary p-2">
-						<code class="min-w-0 flex-1 truncate font-mono text-xs" data-testid="integration-api-key">
+						<code
+							class="min-w-0 flex-1 truncate font-mono text-xs"
+							data-testid="integration-api-key"
+						>
 							{apiKey}
 						</code>
 						<Button variant="outline" size="sm" onclick={copyKey}>

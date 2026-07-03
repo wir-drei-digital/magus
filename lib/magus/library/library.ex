@@ -33,6 +33,8 @@ defmodule Magus.Library do
 
     resource Magus.Library.Tag do
       rpc_action :list_tags, :read
+      rpc_action :get_or_create_tag, :get_or_create
+      rpc_action :destroy_tag, :destroy
     end
 
     resource Magus.Library.PromptFavorite do

@@ -66,6 +66,7 @@ export type CurrentUser = {
 	email: string;
 	displayName: string | null;
 	currentWorkspaceId: string | null;
+	isAdmin: boolean;
 	uiPreferences: Record<string, unknown>;
 	/** Allowed data regions for provider routing (e.g. ['US','EU']). */
 	dataRegionPreference: string[];
@@ -80,6 +81,7 @@ const CURRENT_USER_FIELDS: rpc.CurrentUserFields = [
 	'email',
 	'displayName',
 	'currentWorkspaceId',
+	'isAdmin',
 	'uiPreferences',
 	'dataRegionPreference',
 	'dataRegionConsents',
@@ -484,7 +486,13 @@ export function deleteAccount(confirmEmail: string): Promise<RpcResult<{ deleted
 
 // ─── Search (full results route) ─────────────────────────────────────────────
 
-export type SearchResultType = 'message' | 'conversation' | 'prompt' | 'resource' | 'chunk';
+export type SearchResultType =
+	| 'message'
+	| 'conversation'
+	| 'prompt'
+	| 'skill'
+	| 'resource'
+	| 'chunk';
 
 /**
  * A unified search hit. `snippet` is server-escaped HTML with `<mark>`
@@ -548,7 +556,7 @@ export type WorkbenchTab = {
 
 export type TabSession = {
 	id: string;
-	mode: 'chat' | 'brain' | 'agents' | 'prompts' | 'files' | 'skills';
+	mode: 'chat' | 'brain' | 'agents' | 'prompts' | 'files' | 'skills' | 'library';
 	navFilter: 'all' | 'shared' | 'personal';
 	tabs: WorkbenchTab[];
 	activeTabId: string | null;
@@ -2039,11 +2047,17 @@ export type AttachedResource = { type: 'file'; id: string };
 export function sendUserMessage(
 	conversationId: string,
 	text: string,
-	resources: AttachedResource[] = []
+	resources: AttachedResource[] = [],
+	metadata: Record<string, unknown> | null = null
 ): Promise<RpcResult<ChatMessage>> {
 	return run((opts) =>
 		rpc.sendUserMessage({
-			input: { conversationId, text, ...(resources.length > 0 ? { resources } : {}) },
+			input: {
+				conversationId,
+				text,
+				...(resources.length > 0 ? { resources } : {}),
+				...(metadata ? { metadata } : {})
+			},
 			fields: MESSAGE_FIELDS,
 			...opts
 		})
@@ -2061,11 +2075,12 @@ export function deleteMessage(id: string): Promise<RpcResult<Record<string, neve
  */
 export function enqueueMessage(
 	conversationId: string,
-	text: string
+	text: string,
+	metadata: Record<string, unknown> | null = null
 ): Promise<RpcResult<ChatMessage>> {
 	return run((opts) =>
 		rpc.enqueueMessage({
-			input: { conversationId, text },
+			input: { conversationId, text, ...(metadata ? { metadata } : {}) },
 			fields: MESSAGE_FIELDS as rpc.EnqueueMessageFields,
 			...opts
 		})
@@ -2994,6 +3009,7 @@ export function createPrompt(input: {
 	content: string;
 	type: PromptType;
 	description?: string;
+	additionalInformation?: string;
 	workspaceId?: string | null;
 }): Promise<RpcResult<PromptDetail>> {
 	return run((opts) => rpc.createPrompt({ input, fields: PROMPT_DETAIL_FIELDS, ...opts }));
@@ -3056,10 +3072,30 @@ export function incrementPromptUseCount(id: string): Promise<RpcResult<{ id: str
 	return run((opts) => rpc.incrementPromptUseCount({ identity: id, fields: ['id'], ...opts }));
 }
 
-export type TagEntry = { id: string; name: string };
+export type TagEntry = {
+	id: string;
+	name: string;
+	userId: string | null;
+	workspaceId: string | null;
+};
+
+const TAG_FIELDS = ['id', 'name', 'userId', 'workspaceId'] as const;
 
 export function listTags(): Promise<RpcResult<TagEntry[]>> {
-	return run((opts) => rpc.listTags({ fields: ['id', 'name'], ...opts }));
+	return run((opts) => rpc.listTags({ fields: [...TAG_FIELDS], ...opts }));
+}
+
+/**
+ * Create (or fetch) a user-defined tag. With a workspaceId the tag is shared
+ * with that workspace; without one it is personal to the caller.
+ */
+export function getOrCreateTag(
+	name: string,
+	workspaceId: string | null
+): Promise<RpcResult<TagEntry>> {
+	return run((opts) =>
+		rpc.getOrCreateTag({ input: { name, workspaceId }, fields: [...TAG_FIELDS], ...opts })
+	);
 }
 
 export type PromptFavoriteEntry = { id: string; promptId: string };
@@ -4184,6 +4220,10 @@ export type BillingOverview = {
 	monthlySpendCapCents: number | null;
 	spentCents: number;
 	capCents: number | null;
+	/** Platform default monthly cap (cents). Applies when `monthlySpendCapCents`
+	 * is null and `noSpendCap` is false — a null cap means "use this default",
+	 * not "unlimited". */
+	defaultCapCents: number | null;
 	tokensUsed: number;
 	delinquent: boolean;
 	exempt: boolean;
@@ -4207,6 +4247,7 @@ function toBillingOverview(data: Record<string, unknown>): BillingOverview {
 		monthlySpendCapCents: numOrNull(data.monthly_spend_cap_cents),
 		spentCents: Number(data.spent_cents ?? 0),
 		capCents: numOrNull(data.cap_cents),
+		defaultCapCents: numOrNull(data.default_cap_cents),
 		tokensUsed: Number(data.tokens_used ?? 0),
 		delinquent: data.delinquent === true,
 		exempt: data.exempt === true,
@@ -4932,6 +4973,193 @@ export function disconnectMcpCredential(
 	) as Promise<RpcResult<McpCredentialEntry>>;
 }
 
+// ─── Model Providers (BYOK) ────────────────────────────────────────────────────
+
+/** Validation state of a provider's stored credential. */
+export type ProviderValidationStatus = 'pending' | 'valid' | 'invalid' | 'error';
+
+/**
+ * Display entry for a user-owned model provider. The `api_key` is input-only and
+ * never returned; a row existing implies a key was set.
+ */
+export type ProviderEntry = {
+	id: string;
+	name: string;
+	slug: string;
+	reqLlmId: string;
+	baseUrl: string | null;
+	enabled: boolean;
+	validationStatus: ProviderValidationStatus;
+	lastValidatedAt: string | null;
+};
+
+const PROVIDER_FIELDS: rpc.ListOwnedProvidersFields = [
+	'id',
+	'name',
+	'slug',
+	'reqLlmId',
+	'baseUrl',
+	'enabled',
+	'validationStatus',
+	'lastValidatedAt'
+];
+
+export function listOwnedProviders(): Promise<RpcResult<ProviderEntry[]>> {
+	return run((opts) => rpc.listOwnedProviders({ fields: PROVIDER_FIELDS, ...opts }));
+}
+
+export function createOwnedProvider(input: {
+	name: string;
+	reqLlmId: string;
+	baseUrl?: string | null;
+	apiKey?: string | null;
+}): Promise<RpcResult<ProviderEntry>> {
+	return run((opts) =>
+		rpc.createOwnedProvider({
+			input,
+			fields: PROVIDER_FIELDS as rpc.CreateOwnedProviderFields,
+			...opts
+		})
+	) as Promise<RpcResult<ProviderEntry>>;
+}
+
+export function updateOwnedProvider(
+	id: string,
+	input: {
+		name?: string;
+		baseUrl?: string | null;
+		apiKey?: string | null;
+		enabled?: boolean;
+	}
+): Promise<RpcResult<ProviderEntry>> {
+	return run((opts) =>
+		rpc.updateOwnedProvider({
+			identity: id,
+			input,
+			fields: PROVIDER_FIELDS as rpc.UpdateOwnedProviderFields,
+			...opts
+		})
+	) as Promise<RpcResult<ProviderEntry>>;
+}
+
+export function destroyOwnedProvider(id: string): Promise<RpcResult<Record<string, never>>> {
+	return run((opts) => rpc.destroyOwnedProvider({ identity: id, ...opts }));
+}
+
+export function validateProviderCredential(id: string): Promise<RpcResult<ProviderEntry>> {
+	return run((opts) =>
+		rpc.validateProviderCredential({
+			identity: id,
+			fields: PROVIDER_FIELDS as rpc.ValidateProviderCredentialFields,
+			...opts
+		})
+	) as Promise<RpcResult<ProviderEntry>>;
+}
+
+// ─── Owned models (BYOK) ───────────────────────────────────────────────────────
+
+/**
+ * Result of a live probe of a provider for the model-id picker. The server
+ * returns a status plus the ids it could list (empty on any non-`ok` status);
+ * an `ok` status with ids drives the searchable select, everything else the
+ * free-text fallback.
+ */
+export type RemoteModelListing = {
+	status: 'ok' | 'unauthorized' | 'unavailable' | 'rate_limited';
+	modelIds: string[];
+};
+
+/**
+ * Probe a provider's endpoint for the model ids it can serve. The generated
+ * action types the result as an opaque map, so normalise the wire shape here:
+ * a soft failure never rejects; it yields a non-`ok` status the picker treats
+ * as "type it manually".
+ */
+export async function listRemoteModels(providerId: string): Promise<RpcResult<RemoteModelListing>> {
+	const result = await run<Record<string, unknown>>((opts) =>
+		rpc.listRemoteModels({ input: { providerId }, ...opts })
+	);
+	if (!result.success) return result;
+	const data = result.data;
+	const rawStatus = String(data.status ?? '');
+	const status: RemoteModelListing['status'] =
+		rawStatus === 'ok' ||
+		rawStatus === 'unauthorized' ||
+		rawStatus === 'unavailable' ||
+		rawStatus === 'rate_limited'
+			? rawStatus
+			: 'unavailable';
+	const rawIds = (data.modelIds ?? data.model_ids) as unknown;
+	const modelIds = Array.isArray(rawIds) ? rawIds.map((id) => String(id)) : [];
+	return { success: true, data: { status, modelIds } };
+}
+
+/**
+ * Display entry for a user-owned model. `modelProviderId` links the model to
+ * its owned provider so the settings page can group rows under each provider.
+ */
+export type OwnedModelEntry = {
+	id: string;
+	name: string;
+	provider: string | null;
+	modelProviderId: string | null;
+	contextWindow: number | null;
+	inputCost: string | null;
+	outputCost: string | null;
+};
+
+const OWNED_MODEL_FIELDS: rpc.ListOwnedModelsFields = [
+	'id',
+	'name',
+	'provider',
+	'modelProviderId',
+	'contextWindow',
+	'inputCost',
+	'outputCost'
+];
+
+export function listOwnedModels(): Promise<RpcResult<OwnedModelEntry[]>> {
+	return run((opts) => rpc.listOwnedModels({ fields: OWNED_MODEL_FIELDS, ...opts })) as Promise<
+		RpcResult<OwnedModelEntry[]>
+	>;
+}
+
+/**
+ * Create a text-only model under an owned provider. `modelId` is the
+ * provider-facing id (the server mints the routing key from it); costs are
+ * optional decimals expressed per-million-tokens.
+ */
+export function createOwnedModel(input: {
+	modelId: string;
+	name: string;
+	modelProviderId: string;
+	contextWindow?: number | null;
+	inputCostValue?: number | null;
+	outputCostValue?: number | null;
+}): Promise<RpcResult<OwnedModelEntry>> {
+	// The resource stores costs as decimals (serialised as strings); stringify the
+	// numeric form inputs, leaving null/undefined untouched so they are omitted.
+	const rpcInput: rpc.CreateOwnedModelInput = {
+		modelId: input.modelId,
+		name: input.name,
+		modelProviderId: input.modelProviderId,
+		...(input.contextWindow != null ? { contextWindow: input.contextWindow } : {}),
+		...(input.inputCostValue != null ? { inputCostValue: String(input.inputCostValue) } : {}),
+		...(input.outputCostValue != null ? { outputCostValue: String(input.outputCostValue) } : {})
+	};
+	return run((opts) =>
+		rpc.createOwnedModel({
+			input: rpcInput,
+			fields: OWNED_MODEL_FIELDS as rpc.CreateOwnedModelFields,
+			...opts
+		})
+	) as Promise<RpcResult<OwnedModelEntry>>;
+}
+
+export function destroyOwnedModel(id: string): Promise<RpcResult<Record<string, never>>> {
+	return run((opts) => rpc.destroyOwnedModel({ identity: id, ...opts }));
+}
+
 // ─── Skills ───────────────────────────────────────────────────────────────────
 
 export type SkillSummary = {
@@ -4946,10 +5174,11 @@ export type SkillSummary = {
 	hasExecutableBundle: boolean;
 	isSharedToWorkspace: boolean | null;
 	workspaceId: string | null;
+	isFavorited: boolean;
+	body: string | null;
 };
 
 export type SkillDetail = SkillSummary & {
-	body: string | null;
 	requiredSecrets: Record<string, unknown>[] | null;
 	compatibility: string | null;
 	icon: string | null;
@@ -4972,12 +5201,15 @@ const SKILL_SUMMARY_FIELDS: rpc.MySkillsFields = [
 	'sourceFormat',
 	'hasExecutableBundle',
 	'isSharedToWorkspace',
-	'workspaceId'
+	'workspaceId',
+	'isFavorited',
+	// body rides on the summary so the Library gallery's client-side search
+	// can match skill instructions (content for prompts, body for skills).
+	'body'
 ];
 
 const SKILL_DETAIL_FIELDS: rpc.GetSkillFields = [
 	...SKILL_SUMMARY_FIELDS,
-	'body',
 	'requiredSecrets',
 	'compatibility',
 	'icon',
@@ -4988,6 +5220,10 @@ const SKILL_DETAIL_FIELDS: rpc.GetSkillFields = [
 
 export function mySkills(): Promise<RpcResult<SkillSummary[]>> {
 	return run((opts) => rpc.mySkills({ fields: SKILL_SUMMARY_FIELDS, ...opts }));
+}
+
+export function myFavoriteSkills(): Promise<RpcResult<SkillSummary[]>> {
+	return run((opts) => rpc.myFavoriteSkills({ fields: SKILL_SUMMARY_FIELDS, ...opts }));
 }
 
 export function workspaceSkills(workspaceId: string): Promise<RpcResult<SkillSummary[]>> {
@@ -5061,4 +5297,20 @@ export async function uploadSkillBundle(
 
 export function skillDownloadUrl(skill: { id: string }): string {
 	return `/skills/${skill.id}/download`;
+}
+
+export type SkillFavoriteEntry = { id: string; skillId: string };
+
+export function mySkillFavorites(): Promise<RpcResult<SkillFavoriteEntry[]>> {
+	return run((opts) => rpc.mySkillFavorites({ fields: ['id', 'skillId'], ...opts }));
+}
+
+export function favoriteSkill(skillId: string): Promise<RpcResult<SkillFavoriteEntry>> {
+	return run((opts) =>
+		rpc.favoriteSkill({ input: { skillId }, fields: ['id', 'skillId'], ...opts })
+	);
+}
+
+export function unfavoriteSkill(favoriteId: string): Promise<RpcResult<Record<string, never>>> {
+	return run((opts) => rpc.unfavoriteSkill({ identity: favoriteId, ...opts }));
 }

@@ -3,6 +3,7 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
 	import { Bot, MessageCircle, Trash2, Zap } from '@lucide/svelte';
+	import MobileNavButton from '$lib/components/shell/mobile-nav-button.svelte';
 	import {
 		agentActivity,
 		agentInboxEvents,
@@ -711,24 +712,27 @@
 			<div class="h-40 animate-pulse rounded-xl bg-muted"></div>
 		</div>
 	{:else}
-		<header class="flex shrink-0 items-center gap-3 border-b py-3 pr-6 pl-14 md:pl-6">
+		<header class="flex min-h-11 shrink-0 items-center gap-2 border-b py-2 px-6">
+			<MobileNavButton />
 			{#if agent.imageUrl}
 				<img
 					src={agent.imageUrl}
 					alt={agent.name}
-					class="size-9 shrink-0 rounded-full border border-input object-cover"
+					class="size-6 shrink-0 rounded-full border border-input object-cover"
 					data-testid="agent-avatar"
 				/>
 			{:else}
 				<span
-					class="flex size-9 shrink-0 items-center justify-center rounded-full border border-input bg-secondary text-base"
+					class="flex size-6 shrink-0 items-center justify-center rounded-full border border-input bg-secondary text-xs"
 				>
-					{#if agent.icon}{agent.icon}{:else}<Bot class="size-4 text-muted-foreground" />{/if}
+					{#if agent.icon}{agent.icon}{:else}<Bot class="size-3.5 text-muted-foreground" />{/if}
 				</span>
 			{/if}
-			<div class="min-w-0 flex-1">
-				<h1 class="truncate text-base font-semibold" data-testid="agent-title">{agent.name}</h1>
-				<p class="truncate text-xs text-muted-foreground">
+			<div class="flex min-w-0 flex-1 items-baseline gap-2">
+				<h1 class="min-w-0 truncate text-sm font-semibold" data-testid="agent-title">
+					{agent.name}
+				</h1>
+				<p class="min-w-0 truncate text-xs text-muted-foreground max-md:hidden">
 					@{agent.handle}
 					{#if agent.isPaused}· paused{/if}
 					{#if agent.isSharedToWorkspace}· workspace{/if}
@@ -807,10 +811,12 @@
 		</nav>
 
 		<!-- fieldset[disabled] inertly disables every nested input/button, so
-		     shared-agent viewers inspect without auto-save failure banners. -->
+		     shared-agent viewers inspect without auto-save failure banners.
+		     min-w-0 overrides the UA's fieldset min-inline-size: min-content,
+		     which otherwise lets one unbreakable line stretch past max-w-2xl. -->
 		<fieldset
 			disabled={readonly}
-			class="wb-scroll mx-auto block w-full max-w-2xl min-h-0 flex-1 space-y-4 overflow-y-auto p-6"
+			class="wb-scroll mx-auto block w-full max-w-2xl min-w-0 min-h-0 flex-1 space-y-4 overflow-y-auto p-6"
 		>
 			{#if section === 'general'}
 				<Section title="Profile" description="How this agent is identified across Magus.">
@@ -1191,7 +1197,8 @@
 								data-testid="attachment-token-budget"
 							>
 								Always-include tokens: {alwaysTokens.toLocaleString()} / {MAX_ALWAYS_INCLUDE_TOKENS.toLocaleString()}
-								{#if tokenTier === 'over'} — over budget, trim always-include files{/if}
+								{#if tokenTier === 'over'}
+									— over budget, trim always-include files{/if}
 							</p>
 						{/if}
 					{:else}
@@ -1293,10 +1300,7 @@
 										</div>
 									{/if}
 
-									<AgentIntegrationConfig
-										{integration}
-										onSaved={() => loadIntegrations(agentId)}
-									/>
+									<AgentIntegrationConfig {integration} onSaved={() => loadIntegrations(agentId)} />
 								</div>
 							{/each}
 						</div>
@@ -1437,11 +1441,11 @@
 						{#each inbox as event (event.id)}
 							<li class="flex items-start gap-3 py-2 text-sm">
 								<span class="min-w-0 flex-1">
-									<span class="block truncate font-medium">
-										{event.title ?? event.eventType}
+									<span class="flex min-w-0 items-center gap-1.5 font-medium">
+										<span class="min-w-0 truncate">{event.title ?? event.eventType}</span>
 										{#if event.urgency === 'immediate'}
 											<span
-												class="ml-1.5 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive"
+												class="shrink-0 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive"
 											>
 												Urgent
 											</span>

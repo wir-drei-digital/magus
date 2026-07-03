@@ -248,7 +248,7 @@ defmodule Magus.Chat.ModelTest do
 
       loaded = Ash.load!(model, [:request_cost_cents], authorize?: false)
 
-      assert is_integer(loaded.request_cost_cents)
+      assert is_float(loaded.request_cost_cents)
 
       assert loaded.request_cost_cents ==
                Magus.Usage.PolicyEnforcer.picker_request_cost_cents(model)

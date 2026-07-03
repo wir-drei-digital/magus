@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { Settings } from '@lucide/svelte';
+	import MobileNavButton from '$lib/components/shell/mobile-nav-button.svelte';
 	import { page } from '$app/state';
 
 	let { children }: { children: Snippet } = $props();
@@ -10,6 +11,7 @@
 	const SECTION_LABELS: Record<string, string> = {
 		profile: 'Profile',
 		preferences: 'Preferences',
+		providers: 'Providers',
 		subscription: 'Subscription',
 		integrations: 'Integrations',
 		knowledge: 'Knowledge',
@@ -29,9 +31,8 @@
 <!-- Section navigation lives in the main nav pane (SettingsNav); this view is
      just the header + the active section's content. -->
 <div class="flex h-full min-h-0 flex-col" data-testid="settings-view">
-	<header
-		class="flex shrink-0 items-center gap-2 border-b bg-background/80 py-3 pr-6 pl-14 md:pl-6"
-	>
+	<header class="flex min-h-11 shrink-0 items-center gap-2 border-b bg-background/80 py-2 px-6">
+		<MobileNavButton />
 		<Settings class="size-4 shrink-0 text-muted-foreground" />
 		<h1 class="min-w-0 flex-1 truncate text-base font-semibold">
 			{#if sectionLabel}

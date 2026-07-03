@@ -46,6 +46,10 @@ defmodule Magus.Chat.Model do
     repo Magus.Repo
 
     migration_defaults input_modalities: "\"nil\"", output_modalities: "\"nil\""
+
+    custom_indexes do
+      index [:owner_user_id]
+    end
   end
 
   typescript do
@@ -123,6 +127,12 @@ defmodule Magus.Chat.Model do
     read :owned do
       description "Models owned by the actor."
       filter expr(owner_user_id == ^actor(:id))
+    end
+
+    destroy :destroy_owned do
+      description "Owner deletes a user-owned model."
+      require_atomic? false
+      change Magus.Chat.Model.Changes.RequireOwner
     end
 
     update :update do
@@ -492,7 +502,7 @@ defmodule Magus.Chat.Model do
     # model pickers (workbench + SPA) so users can gauge how expensive a request
     # is. nil for image/video models.
     calculate :request_cost_cents,
-              :integer,
+              :float,
               Magus.Chat.Model.Calculations.RequestCostCents do
       public? true
       description "Approximate CHF cents for a reference request (composer model pickers)."

@@ -21,7 +21,32 @@ defmodule Magus.Usage.LimitEnforcerTest do
         output_cost_value: Decimal.new("5")
       }
 
-      assert PolicyEnforcer.request_cost_cents(model, 20_000, 4_000) == 4
+      assert PolicyEnforcer.request_cost_cents(model, 20_000, 4_000) == 4.0
+    end
+
+    test "keeps sub-cent precision instead of rounding up" do
+      # $0.05/M input, $0.10/M output; 20k in + 4k out = $0.0014 -> 0.14 cents.
+      model = %{
+        output_cost_unit: :per_million_tokens,
+        input_cost_value: Decimal.new("0.05"),
+        output_cost_value: Decimal.new("0.10")
+      }
+
+      assert PolicyEnforcer.request_cost_cents(model, 20_000, 4_000) == 0.14
+    end
+
+    test "falls back to parsing legacy cost strings when value fields are unset" do
+      # Legacy rows carry only display strings in mixed formats; they must not
+      # price as free.
+      model = %{
+        output_cost_unit: :per_million_tokens,
+        input_cost_value: nil,
+        output_cost_value: nil,
+        input_cost: "$1/M",
+        output_cost: "5.00"
+      }
+
+      assert PolicyEnforcer.request_cost_cents(model, 20_000, 4_000) == 4.0
     end
 
     test "returns nil for non-token (image/video) models" do

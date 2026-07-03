@@ -553,9 +553,10 @@ defmodule Magus.Accounts.AccountDeletion do
   end
 
   # Deletes the user's owned models and providers (BYOK). Ordering matters:
-  # models reference providers (NO ACTION FK), so models must go first, and
-  # message_usages reference models (NO ACTION FK), so those references are
-  # nilled before the model delete or Postgres would restrict it.
+  # models reference providers (NO ACTION FK), so models must go first.
+  # message_usages.model_id auto-nilifies on model delete (ON DELETE SET NULL,
+  # migration 20251226212252), so it never restricts the delete; we still
+  # nil it out explicitly below as a redundant defensive safeguard.
   defp delete_owned_models_and_providers(user_id) do
     import Ecto.Query
     uid = user_id_uuid_binary(user_id)
@@ -564,9 +565,11 @@ defmodule Magus.Accounts.AccountDeletion do
       from(m in "models", where: m.owner_user_id == ^uid, select: m.id)
       |> Magus.Repo.all()
 
-    # message_usages.model_id is a NO ACTION FK; nil it for owned models so the
-    # delete is not restricted. These usage rows belong to the owner's own
-    # (already-deleted) messages in 2b-1, since owned models are private.
+    # message_usages.model_id is ON DELETE SET NULL, so Postgres would nilify
+    # these rows on the model delete anyway. Doing it here first is a redundant
+    # defensive safeguard, not a restriction workaround. These usage rows belong
+    # to the owner's own (already-deleted) messages in 2b-1, since owned models
+    # are private.
     if owned_model_ids != [] do
       from(mu in "message_usages", where: mu.model_id in ^owned_model_ids)
       |> Magus.Repo.update_all(set: [model_id: nil])

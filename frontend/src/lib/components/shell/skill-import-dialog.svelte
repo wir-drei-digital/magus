@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { uploadSkillBundle } from '$lib/ash/api';
-	import { skillsNav } from '$lib/stores/skills-nav.svelte';
+	import { libraryNav } from '$lib/stores/library-nav.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -13,7 +13,7 @@
 
 	// Reset internal state when the dialog closes so the next open starts clean.
 	$effect(() => {
-		if (!skillsNav.importOpen) {
+		if (!libraryNav.importOpen) {
 			file = null;
 			busy = false;
 			errors = [];
@@ -33,13 +33,13 @@
 			errors = result.errors.map((e) => e.message ?? 'Import failed');
 			return;
 		}
-		skillsNav.refresh();
-		skillsNav.importOpen = false;
-		await goto(`${base}/skills/${result.data.id}`);
+		libraryNav.refresh();
+		libraryNav.importOpen = false;
+		await goto(`${base}/library/skills/${result.data.id}`);
 	}
 </script>
 
-<Dialog.Root bind:open={skillsNav.importOpen}>
+<Dialog.Root bind:open={libraryNav.importOpen}>
 	<Dialog.Content class="sm:max-w-md" data-testid="skill-import-dialog">
 		<Dialog.Header>
 			<Dialog.Title>Import skill</Dialog.Title>
@@ -80,7 +80,7 @@
 				<Button
 					type="button"
 					variant="ghost"
-					onclick={() => (skillsNav.importOpen = false)}
+					onclick={() => (libraryNav.importOpen = false)}
 					disabled={busy}
 				>
 					Cancel

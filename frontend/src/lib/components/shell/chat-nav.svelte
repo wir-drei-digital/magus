@@ -271,8 +271,11 @@
 				{compactTime(navTimestamp(conversation))}
 			</span>
 		</Sidebar.MenuButton>
+		<!-- top-1.5 (not top-1/2): the item grows when the thread sub-list renders
+		     inside it, and centering would float the overlay over the threads
+		     instead of the conversation row (same fix as the folder overlay). -->
 		<span
-			class="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 rounded-md bg-sidebar-accent pl-1.5 opacity-0 shadow-[-8px_0_8px_-4px_var(--color-sidebar-accent)] transition-opacity group-hover/row:opacity-100"
+			class="absolute right-1 top-1.5 flex items-center gap-0.5 rounded-md bg-sidebar-accent pl-1.5 opacity-0 shadow-[-8px_0_8px_-4px_var(--color-sidebar-accent)] transition-opacity group-hover/row:opacity-100"
 		>
 			{#if workspaceId && conversation.workspaceId}
 				<button
@@ -315,10 +318,7 @@
 			<Sidebar.MenuSub class="mr-0 pr-0">
 				{#each threads as thread (thread.id)}
 					<Sidebar.MenuItem class="group/thread">
-						<Sidebar.MenuButton
-							data-testid="thread-row"
-							onclick={() => void openThreadRow(thread)}
-						>
+						<Sidebar.MenuButton data-testid="thread-row" onclick={() => void openThreadRow(thread)}>
 							<CornerDownRight class="text-muted-foreground" />
 							<span class="min-w-0 flex-1 truncate">{thread.title ?? 'Thread'}</span>
 						</Sidebar.MenuButton>

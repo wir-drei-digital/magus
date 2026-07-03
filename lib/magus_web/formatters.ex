@@ -29,4 +29,33 @@ defmodule MagusWeb.Formatters do
 
   def format_bytes(bytes) when is_number(bytes), do: "#{bytes} B"
   def format_bytes(_), do: "0 B"
+
+  @doc """
+  Formats an integer with thousands separators (e.g. `1234567` -> "1,234,567").
+
+  Decimals are accepted for whole-number aggregates (SQL `SUM` over bigint
+  returns numeric); anything else falls back to `to_string/1`.
+  """
+  def format_number(num) when is_integer(num) do
+    num
+    |> Integer.to_charlist()
+    |> Enum.reverse()
+    |> Enum.chunk_every(3)
+    |> Enum.join(",")
+    |> String.reverse()
+  end
+
+  def format_number(%Decimal{} = num), do: format_number(Decimal.to_integer(Decimal.round(num)))
+  def format_number(num), do: to_string(num)
+
+  @doc """
+  Formats a Decimal cost as a dollar amount, e.g. "$1.2345". `decimals`
+  controls rounding (default 4 — sub-cent LLM costs); nil renders as $0.
+  """
+  def format_cost(cost, decimals \\ 4)
+  def format_cost(nil, decimals), do: format_cost(Decimal.new(0), decimals)
+
+  def format_cost(%Decimal{} = cost, decimals) do
+    "$" <> (cost |> Decimal.round(decimals) |> Decimal.to_string())
+  end
 end

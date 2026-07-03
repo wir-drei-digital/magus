@@ -4,7 +4,12 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { cachedModelPreferences } from '$lib/chat/catalog';
 	import { toggleFavorite } from '$lib/chat/model-preferences';
-	import { groupModels, prefsById, FAVORITES_GROUP, type ModelFilters } from '$lib/chat/model-grouping';
+	import {
+		groupModels,
+		prefsById,
+		FAVORITES_GROUP,
+		type ModelFilters
+	} from '$lib/chat/model-grouping';
 
 	// Shared classic-style model picker: searchable, grouped by provider, mode
 	// filtered. Used by both the active-conversation Composer and the new-chat
@@ -95,7 +100,11 @@
 	/** Approximate cost per request (~16k in + 4k out), from the backend estimate. */
 	function requestCostLabel(cents: number | null): string | null {
 		if (cents == null) return null;
-		return `≈ CHF ${(cents / 100).toFixed(2)}`;
+		const chf = cents / 100;
+		// Sub-cent estimates keep their first significant digits (0.002) instead
+		// of collapsing to 0.00.
+		if (chf > 0 && chf < 0.01) return `≈ CHF ${Number(chf.toPrecision(2))}`;
+		return `≈ CHF ${chf.toFixed(2)}`;
 	}
 
 	// Fixed CHF-cent thresholds — keep in sync with LimitEnforcer.request_cost_tier.
