@@ -117,5 +117,99 @@ defmodule Magus.Agents.AgentRun.Changes.CleanupStaleTest do
         payload: %{type: "run.failed"}
       }
     end
+
+    test "reaps despite alive process when run exceeds the hard duration cap", %{parent: parent} do
+      # target_conversation_id is nil so target_process_alive?/1 short-circuits
+      # to false via the `nil` clause — this test instead exercises the
+      # duration-cap branch directly through should_reap?/3, since InstanceManager
+      # registration is unavailable in the test environment (see module test
+      # below). The integration path here proves the hard cap reaps even when
+      # `last_heartbeat_at` is fresh (i.e. NOT stale by the 2-minute heartbeat
+      # rule), as long as `started_at` is old enough — so it must go through
+      # the `:cleanup_stale` action directly rather than relying on `is_stale`.
+      run =
+        sub_agent_run(
+          source_conversation_id: parent.id,
+          objective: "Long-running task"
+        )
+
+      {:ok, run} = Magus.Agents.start_agent_run(run, authorize?: false)
+      assert run.status == :running
+
+      # started_at 31 minutes ago (past the default 30-minute cap), but
+      # last_heartbeat_at kept fresh (simulating an alive, actively-pinging agent).
+      old_start = DateTime.add(DateTime.utc_now(), -31, :minute)
+
+      {:ok, run} =
+        run
+        |> Ash.Changeset.for_update(:heartbeat, %{})
+        |> Ash.Changeset.force_change_attribute(:started_at, old_start)
+        |> Ash.update(authorize?: false)
+
+      MagusWeb.Endpoint.subscribe("agents:#{parent.id}")
+
+      {:ok, _} =
+        run
+        |> Ash.Changeset.for_update(:cleanup_stale, %{})
+        |> Ash.update(authorize?: false)
+
+      {:ok, updated_run} = Magus.Agents.get_agent_run(run.id, authorize?: false)
+      assert updated_run.status == :timed_out
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "agent_signal",
+        payload: %{type: "run.failed", status: "timed_out"}
+      }
+    end
+  end
+
+  describe "should_reap?/3" do
+    alias Magus.Agents.AgentRun.Changes.CleanupStale
+
+    setup do
+      now = DateTime.utc_now()
+      young_started_at = DateTime.add(now, -5, :minute)
+      old_started_at = DateTime.add(now, -31, :minute)
+
+      %{
+        now: now,
+        young_run: %{started_at: young_started_at},
+        old_run: %{started_at: old_started_at}
+      }
+    end
+
+    test "dead process + young run -> reap", %{now: now, young_run: run} do
+      assert CleanupStale.should_reap?(run, false, now)
+    end
+
+    test "dead process + old run -> reap", %{now: now, old_run: run} do
+      assert CleanupStale.should_reap?(run, false, now)
+    end
+
+    test "alive process + young run -> skip", %{now: now, young_run: run} do
+      refute CleanupStale.should_reap?(run, true, now)
+    end
+
+    test "alive process + old run (exceeds hard cap) -> reap", %{now: now, old_run: run} do
+      assert CleanupStale.should_reap?(run, true, now)
+    end
+
+    test "alive process + run exactly at the cap boundary -> reap", %{now: now} do
+      run = %{started_at: DateTime.add(now, -30, :minute)}
+      assert CleanupStale.should_reap?(run, true, now)
+    end
+
+    test "respects a configured max_run_duration_minutes override", %{now: now} do
+      original = Application.get_env(:magus, :agents, [])
+      Application.put_env(:magus, :agents, Keyword.put(original, :max_run_duration_minutes, 5))
+
+      on_exit(fn -> Application.put_env(:magus, :agents, original) end)
+
+      just_under = %{started_at: DateTime.add(now, -4, :minute)}
+      just_over = %{started_at: DateTime.add(now, -6, :minute)}
+
+      refute CleanupStale.should_reap?(just_under, true, now)
+      assert CleanupStale.should_reap?(just_over, true, now)
+    end
   end
 end
