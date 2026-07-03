@@ -56,9 +56,15 @@ defmodule Magus.Agents.AgentRun.SweepStuckPendingTest do
   end
 
   describe "sweep_stuck_pending" do
-    test "nudges a 20-minute-old pending run without timing it out", %{parent: parent} do
+    test "nudges a 20-minute-old pending run with a real target", %{user: user, parent: parent} do
+      target = generate(conversation(actor: user))
+
       run =
-        sub_agent_run(source_conversation_id: parent.id, objective: "Nudge me")
+        sub_agent_run(
+          source_conversation_id: parent.id,
+          target_conversation_id: target.id,
+          objective: "Nudge me"
+        )
         |> backdate_inserted_at(20)
 
       {:ok, _} =
@@ -68,11 +74,43 @@ defmodule Magus.Agents.AgentRun.SweepStuckPendingTest do
 
       {:ok, updated} = Magus.Agents.get_agent_run(run.id, authorize?: false)
 
-      # Nudge path: not timed out. Without a registered InstanceManager,
-      # maybe_start_next/1 claims the run and then requeues it on
-      # `registry_unavailable`, landing back on :pending.
+      # Nudge path: `maybe_start_next/1` is called with a real target, so it
+      # claims the run (status -> :running, started_at/last_heartbeat_at
+      # set), then `AgentBootstrap.ensure_conversation_agent` fails with
+      # `registry_unavailable` (no InstanceManager registered in tests), and
+      # `RunOrchestrator.requeue_run/1` runs the `:requeue` action, which
+      # resets status to :pending and clears started_at/last_heartbeat_at
+      # (see AgentRun's `:requeue` update). Assert that exact post-state
+      # rather than just "not timed out", so this pins the nudge path
+      # instead of the nil-target no-op.
       refute updated.status == :timed_out
       assert updated.status == :pending
+      assert updated.started_at == nil
+      assert updated.last_heartbeat_at == nil
+    end
+
+    test "nudge with nil target is a no-op", %{parent: parent} do
+      run =
+        sub_agent_run(source_conversation_id: parent.id, objective: "Nudge me")
+        |> backdate_inserted_at(20)
+
+      assert run.target_conversation_id == nil
+
+      {:ok, _} =
+        run
+        |> Ash.Changeset.for_update(:sweep_stuck_pending, %{})
+        |> Ash.update(authorize?: false)
+
+      {:ok, updated} = Magus.Agents.get_agent_run(run.id, authorize?: false)
+
+      # With no target_conversation_id, `maybe_start_next(nil)` short-circuits
+      # to `:ok` immediately, so the run is left exactly as it was: still
+      # :pending, and started_at/last_heartbeat_at untouched (nil, since it
+      # was never claimed).
+      refute updated.status == :timed_out
+      assert updated.status == :pending
+      assert updated.started_at == nil
+      assert updated.last_heartbeat_at == nil
     end
 
     test "times out a 7-hour-old pending run and unlinks a linked inbox event",
