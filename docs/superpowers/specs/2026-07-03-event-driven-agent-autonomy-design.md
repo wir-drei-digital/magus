@@ -143,8 +143,11 @@ In `AgentRunCompletionPlugin`, after completing or failing any autonomous run
 (`:heartbeat`, `:manual_trigger`, `:inbox_urgent`) and before
 `ensure_next_scheduled_at`:
 
-1. Query pending/waiting events for the agent with `urgency == :immediate`
-   and `agent_run_id == nil`.
+1. Query `pending` events for the agent with `urgency == :immediate`
+   and `agent_run_id == nil`. `waiting` events are excluded: a `waiting`
+   event is an approval request the agent raised that is blocked on a human
+   answer, never a wake signal, so draining it would force-resolve it before
+   the user replies.
 2. If any exist, enqueue an `:inbox_urgent` run keyed on the newest such
    event. The per-event idempotency key guarantees an event whose urgent run
    already happened (and failed without resolving it) does not loop: the key

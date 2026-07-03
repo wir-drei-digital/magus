@@ -862,4 +862,142 @@ defmodule Magus.Agents.RunOrchestratorTest do
       assert running_after.status == :running
     end
   end
+
+  # A start-time failure (claim/boot/dispatch) marks the run :error via
+  # `fail_run/2` but never reaches AgentRunCompletionPlugin, so the orchestrator
+  # has to fire the reliability machinery itself. `run_fail_side_effects/1`
+  # holds those effects; driving a real non-registry boot failure end-to-end is
+  # impractical, so we unit-test the extracted function.
+  describe "run_fail_side_effects/1" do
+    setup do
+      user = generate(user())
+      source_conversation = generate(conversation(actor: user))
+      target_conversation = generate(conversation(actor: user, is_task_conversation: true))
+      agent = custom_agent(user, %{heartbeat_enabled: true})
+
+      %{
+        user: user,
+        source_conversation: source_conversation,
+        target_conversation: target_conversation,
+        agent: agent
+      }
+    end
+
+    test "emits run.failed telemetry", %{
+      source_conversation: source_conversation,
+      target_conversation: target_conversation,
+      agent: agent
+    } do
+      failed_run =
+        fail_a_run(source_conversation, target_conversation, agent, source: :heartbeat)
+
+      handler_id = "test-run-failed-#{System.unique_integer([:positive])}"
+      test_pid = self()
+
+      :telemetry.attach(
+        handler_id,
+        [:magus, :agents, :run, :failed],
+        fn _event, _measurements, metadata, _config ->
+          send(test_pid, {:run_failed_telemetry, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      RunOrchestrator.run_fail_side_effects(failed_run)
+
+      assert_receive {:run_failed_telemetry, metadata}
+      assert metadata.run_id == to_string(failed_run.id)
+    end
+
+    test "unlinks inbox events linked to the failed run", %{
+      user: user,
+      source_conversation: source_conversation,
+      target_conversation: target_conversation,
+      agent: agent
+    } do
+      failed_run =
+        fail_a_run(source_conversation, target_conversation, agent, source: :heartbeat)
+
+      {:ok, event} =
+        Magus.Agents.create_inbox_event(
+          %{
+            agent_id: agent.id,
+            event_type: :mention,
+            urgency: :immediate,
+            title: "Linked to a start-failed run",
+            source_type: :conversation,
+            agent_run_id: failed_run.id
+          },
+          actor: user
+        )
+
+      assert event.agent_run_id == failed_run.id
+
+      RunOrchestrator.run_fail_side_effects(failed_run)
+
+      {:ok, reloaded} = Ash.get(Magus.Agents.AgentInboxEvent, event.id, authorize?: false)
+      assert reloaded.agent_run_id == nil
+    end
+
+    test "runs FailureStreak escalation for autonomous sources (pauses after streak)", %{
+      user: user,
+      source_conversation: source_conversation,
+      target_conversation: target_conversation,
+      agent: agent
+    } do
+      # Seed 9 already-failed heartbeat runs so this 10th failure trips the
+      # auto-pause threshold, proving check_and_escalate ran.
+      for _ <- 1..9 do
+        fail_a_run(source_conversation, target_conversation, agent, source: :heartbeat)
+      end
+
+      failed_run =
+        fail_a_run(source_conversation, target_conversation, agent, source: :heartbeat)
+
+      RunOrchestrator.run_fail_side_effects(failed_run)
+
+      {:ok, reloaded_agent} = Ash.get(Magus.Agents.CustomAgent, agent.id, authorize?: false)
+      assert reloaded_agent.is_paused == true
+    end
+
+    test "skips FailureStreak escalation for non-autonomous (:mention) sources", %{
+      user: user,
+      source_conversation: source_conversation,
+      target_conversation: target_conversation,
+      agent: agent
+    } do
+      for _ <- 1..9 do
+        fail_a_run(source_conversation, target_conversation, agent, source: :mention)
+      end
+
+      failed_run =
+        fail_a_run(source_conversation, target_conversation, agent, source: :mention)
+
+      RunOrchestrator.run_fail_side_effects(failed_run)
+
+      {:ok, reloaded_agent} = Ash.get(Magus.Agents.CustomAgent, agent.id, authorize?: false)
+      assert reloaded_agent.is_paused == false
+    end
+  end
+
+  defp fail_a_run(source_conversation, target_conversation, agent, opts) do
+    run =
+      sub_agent_run(
+        Keyword.merge(
+          [
+            source_conversation_id: source_conversation.id,
+            target_conversation_id: target_conversation.id,
+            target_agent_id: agent.id
+          ],
+          opts
+        )
+      )
+
+    {:ok, failed} =
+      Magus.Agents.fail_agent_run(run, %{error_message: "start-time boom"}, authorize?: false)
+
+    failed
+  end
 end

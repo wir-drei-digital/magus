@@ -256,6 +256,52 @@ defmodule Magus.Agents.RetentionTest do
       assert {:error, %Ash.Error.Invalid{}} =
                Ash.get(AgentInboxEvent, event.id, authorize?: false)
     end
+
+    test ":prune destroys an old terminal event still referenced by a run's event_id (FK nilify)",
+         %{agent: agent, user: user, conversation: conversation} do
+      event =
+        Magus.Agents.create_inbox_event!(
+          %{
+            agent_id: agent.id,
+            event_type: :mention,
+            urgency: :deferred,
+            title: "Referenced by a younger run",
+            source_type: :conversation
+          },
+          actor: user
+        )
+
+      {:ok, event} =
+        event
+        |> Ash.Changeset.for_update(:resolve, %{}, authorize?: false)
+        |> Ash.update()
+
+      # A younger run points at this event via `event_id`. With the FK left at
+      # the default ON DELETE RESTRICT this destroy would raise; ON DELETE
+      # SET NULL nilifies the back-reference instead.
+      run =
+        sub_agent_run(
+          source_conversation_id: conversation.id,
+          objective: "Younger run referencing the event",
+          event_id: event.id
+        )
+
+      assert run.event_id == event.id
+
+      backdate_updated_at(AgentInboxEvent, event.id, 31)
+      {:ok, event} = Ash.get(AgentInboxEvent, event.id, authorize?: false)
+
+      :ok =
+        event
+        |> Ash.Changeset.for_destroy(:prune, %{}, authorize?: false)
+        |> Ash.destroy()
+
+      assert {:error, %Ash.Error.Invalid{}} =
+               Ash.get(AgentInboxEvent, event.id, authorize?: false)
+
+      {:ok, reloaded_run} = Magus.Agents.get_agent_run(run.id, authorize?: false)
+      assert reloaded_run.event_id == nil
+    end
   end
 
   describe "AgentRun pruning" do
