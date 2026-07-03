@@ -54,6 +54,10 @@ defmodule Magus.Agents.Plugins.ToolEventPlugin do
     agent = context[:agent]
     conversation_id = Helpers.get_conversation_id(agent)
 
+    if signal.type in ["ai.tool.started", "ai.tool.result"] do
+      Magus.Agents.RunLiveness.touch(conversation_id)
+    end
+
     case signal.type do
       "ai.tool.started" ->
         handle_tool_started(signal, conversation_id)
