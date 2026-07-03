@@ -236,27 +236,42 @@ defmodule MagusWeb.OAuthController do
   end
 
   defp update_existing_credentials(integration, tokens) do
-    case Integrations.get_credential_for_integration(integration.id, authorize?: false) do
-      {:ok, credential} ->
-        Integrations.refresh_credential(
-          credential,
-          %{
-            encrypted_data: tokens,
-            expires_at: parse_expiry(tokens["expires_at"])
-          },
-          authorize?: false
-        )
+    result =
+      case Integrations.get_credential_for_integration(integration.id, authorize?: false) do
+        {:ok, credential} ->
+          Integrations.refresh_credential(
+            credential,
+            %{
+              encrypted_data: tokens,
+              expires_at: parse_expiry(tokens["expires_at"])
+            },
+            authorize?: false
+          )
 
-      {:error, _} ->
-        Integrations.create_credential(
-          %{
-            user_integration_id: integration.id,
-            credential_type: :oauth2,
-            encrypted_data: tokens,
-            expires_at: parse_expiry(tokens["expires_at"])
-          },
-          authorize?: false
-        )
+        {:error, _} ->
+          Integrations.create_credential(
+            %{
+              user_integration_id: integration.id,
+              credential_type: :oauth2,
+              encrypted_data: tokens,
+              expires_at: parse_expiry(tokens["expires_at"])
+            },
+            authorize?: false
+          )
+      end
+
+    with {:ok, credential} <- result do
+      case Integrations.reactivate_if_errored(integration, authorize?: false) do
+        {:ok, _integration} ->
+          {:ok, credential}
+
+        {:error, reason} ->
+          Logger.error(
+            "Failed to reactivate integration #{integration.id} after credential refresh: #{inspect(reason)}"
+          )
+
+          {:ok, credential}
+      end
     end
   end
 

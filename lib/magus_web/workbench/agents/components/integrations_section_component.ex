@@ -290,12 +290,14 @@ defmodule MagusWeb.AgentsLive.Components.IntegrationsSectionComponent do
                %{encrypted_data: %{"api_key" => api_key}, key_hash: key_hash},
                authorize?: false
              ),
-           {:ok, _} <-
+           {:ok, updated_integration} <-
              Integrations.update_integration_config(
                integration,
                %{config: Map.merge(integration.config || %{}, %{"key_prefix" => prefix})},
                authorize?: false
-             ) do
+             ),
+           {:ok, _} <-
+             Integrations.reactivate_if_errored(updated_integration, authorize?: false) do
         socket =
           socket
           |> assign(:regenerated_api_key, api_key)
