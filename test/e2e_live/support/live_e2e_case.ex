@@ -101,11 +101,23 @@ defmodule Magus.LiveE2ECase do
           )
       end
 
-    catalog_entry =
-      Enum.find(Magus.Models.Catalog.all_with_internal(), &(&1.key == @live_model_key)) ||
-        raise "catalog entry missing for #{@live_model_key}"
+    # Open-core builds ship an empty catalog stub (curated data lives in
+    # magus_cloud, see Magus.Models.Catalog moduledoc). Fall back to a minimal
+    # inline metadata map so live E2E stays runnable against the public repo;
+    # CatalogSync builds the runtime LLMDB registry from the DB row either way.
+    llm_metadata =
+      case Enum.find(Magus.Models.Catalog.all_with_internal(), &(&1.key == @live_model_key)) do
+        nil ->
+          %{
+            "context" => 128_000,
+            "output_limit" => 8_192,
+            "input_cost" => 0.04,
+            "output_cost" => 0.04
+          }
 
-    llm_metadata = Magus.Models.Catalog.to_llm_metadata(catalog_entry)
+        catalog_entry ->
+          Magus.Models.Catalog.to_llm_metadata(catalog_entry)
+      end
 
     # Find-or-create by key. A materialized catalog row for the live model can
     # exist outside the Ecto sandbox (e.g. seeded into a real DB); the create
