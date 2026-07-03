@@ -28,6 +28,7 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
   alias Magus.Agents.RunOrchestrator
   alias Magus.Agents.Signals
   alias Magus.Agents.Support.AiAgent
+  alias Magus.Agents.Telemetry
 
   @default_heartbeat_interval_minutes 360
   @autonomous_sources [:heartbeat, :manual_trigger, :inbox_urgent]
@@ -131,6 +132,7 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
 
     case Magus.Agents.complete_agent_run(run, %{result_text: result_text}, authorize?: false) do
       {:ok, completed_run} ->
+        Telemetry.run_event(:completed, completed_run)
         update_spawn_output(completed_run)
         publish_completion(completed_run, result_text)
         RunOrchestrator.maybe_start_next(completed_run.target_conversation_id)
@@ -176,6 +178,7 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
   defp fail_run(run, error_message) do
     case Magus.Agents.fail_agent_run(run, %{error_message: error_message}, authorize?: false) do
       {:ok, failed_run} ->
+        Telemetry.run_event(:failed, failed_run)
         update_spawn_output(failed_run)
         publish_failure(failed_run, error_message)
         RunOrchestrator.maybe_start_next(failed_run.target_conversation_id)

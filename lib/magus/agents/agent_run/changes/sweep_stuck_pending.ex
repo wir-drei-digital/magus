@@ -25,6 +25,7 @@ defmodule Magus.Agents.AgentRun.Changes.SweepStuckPending do
   require Logger
 
   alias Magus.Agents.Support.AutonomyTrace
+  alias Magus.Agents.Telemetry
 
   @stuck_timeout_hours 6
 
@@ -40,6 +41,7 @@ defmodule Magus.Agents.AgentRun.Changes.SweepStuckPending do
             )
 
             Magus.Agents.timeout_agent_run(current, authorize?: false)
+            Telemetry.run_event(:timed_out, current)
             Magus.Agents.AgentRunHelpers.unlink_linked_inbox_events(current)
 
             Magus.Agents.Signals.run_failed(to_string(current.source_conversation_id), %{

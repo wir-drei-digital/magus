@@ -15,6 +15,7 @@ defmodule Magus.Agents.RunOrchestrator do
   alias Magus.Agents.AgentRun
   alias Magus.Agents.Signals
   alias Magus.Agents.Support.AgentBootstrap
+  alias Magus.Agents.Telemetry
   alias Magus.Repo
 
   @type enqueue_outcome :: :created | :existing
@@ -48,6 +49,8 @@ defmodule Magus.Agents.RunOrchestrator do
          :ok <- check_daily_run_budget(attrs),
          :ok <- check_owner_spend_budget(attrs),
          {:ok, outcome, run} <- find_or_create_run(attrs) do
+      if outcome == :created, do: Telemetry.run_event(:enqueued, run)
+
       source_conversation_id = to_string(run.source_conversation_id)
 
       Signals.run_progress(source_conversation_id, %{
@@ -190,6 +193,7 @@ defmodule Magus.Agents.RunOrchestrator do
     with {:ok, boot} <-
            AgentBootstrap.ensure_conversation_agent(run.target_conversation_id, boot_opts),
          :ok <- dispatch_to_target(boot.pid, run) do
+      Telemetry.run_event(:started, run)
       Signals.run_started(to_string(run.source_conversation_id), run_payload(run))
       :ok
     else
