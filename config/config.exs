@@ -155,6 +155,8 @@ config :magus, Oban,
     maintenance: 1,
     # Agent heartbeat scheduler (checks every 5 min via cron)
     heartbeat: 1,
+    # Hourly watchdog: self-heals overdue heartbeat schedules
+    agent_heartbeat_watchdog: 1,
     # Trashed conversation cleanup (daily, deletes after 30 days)
     conversation_cleanup: 1,
     # Context-window compaction (summarize older messages, advance the pointer).

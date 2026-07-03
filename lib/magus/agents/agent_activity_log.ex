@@ -118,7 +118,8 @@ defmodule Magus.Agents.AgentActivityLog do
                     :wake_skipped,
                     :wake_urgent,
                     :run_timed_out,
-                    :recovery
+                    :recovery,
+                    :watchdog_reset
                   ]
 
       allow_nil? false
