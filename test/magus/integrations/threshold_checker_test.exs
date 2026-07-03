@@ -179,4 +179,186 @@ defmodule Magus.Integrations.ThresholdCheckerTest do
       assert {:ok, :below_threshold} = ThresholdChecker.check(integration, [], RssSource)
     end
   end
+
+  describe "urgency" do
+    test "log source with critical entries builds an :immediate event", %{
+      integration: integration,
+      user: user,
+      agent: agent
+    } do
+      now = DateTime.utc_now()
+
+      entries =
+        for i <- 1..3 do
+          severity = if i == 1, do: :critical, else: :error
+
+          {:ok, entry} =
+            Magus.Integrations.create_ingestion_entry(
+              %{
+                user_integration_id: integration.id,
+                user_id: user.id,
+                source_type: :log,
+                severity: severity,
+                content: "Error #{i}: ** (EXIT) killed",
+                occurred_at: DateTime.add(now, -i * 30, :second),
+                content_hash:
+                  :crypto.hash(:sha256, "critical-#{i}-#{System.unique_integer()}")
+                  |> Base.encode16(case: :lower)
+              },
+              authorize?: false
+            )
+
+          entry
+        end
+
+      assert {:ok, :escalated} = ThresholdChecker.check(integration, entries, LogSource)
+
+      {:ok, events} = Magus.Agents.list_pending_events(agent.id, authorize?: false)
+      event = List.first(events)
+      assert event.urgency == :immediate
+    end
+
+    test "log source with only :error entries stays :deferred", %{
+      integration: integration,
+      user: user,
+      agent: agent
+    } do
+      now = DateTime.utc_now()
+
+      entries =
+        for i <- 1..3 do
+          {:ok, entry} =
+            Magus.Integrations.create_ingestion_entry(
+              %{
+                user_integration_id: integration.id,
+                user_id: user.id,
+                source_type: :log,
+                severity: :error,
+                content: "Error #{i}: connection refused",
+                occurred_at: DateTime.add(now, -i * 30, :second),
+                content_hash:
+                  :crypto.hash(:sha256, "deferred-#{i}-#{System.unique_integer()}")
+                  |> Base.encode16(case: :lower)
+              },
+              authorize?: false
+            )
+
+          entry
+        end
+
+      assert {:ok, :escalated} = ThresholdChecker.check(integration, entries, LogSource)
+
+      {:ok, events} = Magus.Agents.list_pending_events(agent.id, authorize?: false)
+      event = List.first(events)
+      assert event.urgency == :deferred
+    end
+
+    test "config urgency_override: 'immediate' promotes an RSS event", %{
+      user: user
+    } do
+      agent = custom_agent(user, %{name: "Feed Monitor"})
+
+      {:ok, integration} =
+        Magus.Integrations.create_user_integration(
+          :rss_source,
+          %{
+            custom_agent_id: agent.id,
+            user_id: user.id,
+            config: %{
+              "feed_urls" => ["https://example.com/feed.xml"],
+              "urgency_override" => "immediate"
+            }
+          },
+          actor: user
+        )
+
+      {:ok, integration} =
+        Magus.Integrations.activate_user_integration(integration, actor: user)
+
+      now = DateTime.utc_now()
+
+      entries =
+        for i <- 1..2 do
+          {:ok, entry} =
+            Magus.Integrations.create_ingestion_entry(
+              %{
+                user_integration_id: integration.id,
+                user_id: user.id,
+                source_type: :rss,
+                severity: :info,
+                title: "Article #{i}",
+                content: "Content for article #{i}",
+                occurred_at: DateTime.add(now, -i * 60, :second),
+                content_hash:
+                  :crypto.hash(:sha256, "override-immediate-#{i}-#{System.unique_integer()}")
+                  |> Base.encode16(case: :lower)
+              },
+              authorize?: false
+            )
+
+          entry
+        end
+
+      assert {:ok, :escalated} = ThresholdChecker.check(integration, entries, RssSource)
+
+      {:ok, events} = Magus.Agents.list_pending_events(agent.id, authorize?: false)
+      event = List.first(events)
+      assert event.urgency == :immediate
+    end
+
+    test "config urgency_override: 'deferred' demotes a critical log event", %{
+      user: user
+    } do
+      agent = custom_agent(user, %{name: "Log Monitor Override"})
+
+      {:ok, integration} =
+        Magus.Integrations.create_user_integration(
+          :log_source,
+          %{
+            custom_agent_id: agent.id,
+            user_id: user.id,
+            config: %{
+              "error_threshold" => 3,
+              "window_minutes" => 5,
+              "urgency_override" => "deferred"
+            }
+          },
+          actor: user
+        )
+
+      {:ok, integration} =
+        Magus.Integrations.activate_user_integration(integration, actor: user)
+
+      now = DateTime.utc_now()
+
+      entries =
+        for i <- 1..3 do
+          severity = if i == 1, do: :critical, else: :error
+
+          {:ok, entry} =
+            Magus.Integrations.create_ingestion_entry(
+              %{
+                user_integration_id: integration.id,
+                user_id: user.id,
+                source_type: :log,
+                severity: severity,
+                content: "Error #{i}: ** (EXIT) killed",
+                occurred_at: DateTime.add(now, -i * 30, :second),
+                content_hash:
+                  :crypto.hash(:sha256, "override-deferred-#{i}-#{System.unique_integer()}")
+                  |> Base.encode16(case: :lower)
+              },
+              authorize?: false
+            )
+
+          entry
+        end
+
+      assert {:ok, :escalated} = ThresholdChecker.check(integration, entries, LogSource)
+
+      {:ok, events} = Magus.Agents.list_pending_events(agent.id, authorize?: false)
+      event = List.first(events)
+      assert event.urgency == :deferred
+    end
+  end
 end

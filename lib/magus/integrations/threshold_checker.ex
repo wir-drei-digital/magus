@@ -18,7 +18,10 @@ defmodule Magus.Integrations.ThresholdChecker do
   def check(integration, new_entries, provider_module) when is_list(new_entries) do
     if implements_inbox_callbacks?(provider_module) and
          provider_module.should_create_inbox_event?(integration, new_entries) do
-      attrs = provider_module.build_inbox_event_attrs(integration, new_entries)
+      attrs =
+        provider_module.build_inbox_event_attrs(integration, new_entries)
+        |> apply_urgency_override(integration)
+
       create_inbox_event(integration, attrs)
     else
       {:ok, :below_threshold}
@@ -29,6 +32,14 @@ defmodule Magus.Integrations.ThresholdChecker do
     function_exported?(module, :should_create_inbox_event?, 2) and
       function_exported?(module, :build_inbox_event_attrs, 2)
   end
+
+  defp apply_urgency_override(attrs, %{config: %{"urgency_override" => "immediate"}}),
+    do: Map.put(attrs, :urgency, :immediate)
+
+  defp apply_urgency_override(attrs, %{config: %{"urgency_override" => "deferred"}}),
+    do: Map.put(attrs, :urgency, :deferred)
+
+  defp apply_urgency_override(attrs, _integration), do: attrs
 
   defp create_inbox_event(integration, attrs) do
     integration = ensure_loaded(integration)
