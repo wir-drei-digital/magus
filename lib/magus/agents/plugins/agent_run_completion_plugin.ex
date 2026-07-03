@@ -28,6 +28,7 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
   alias Magus.Agents.RunOrchestrator
   alias Magus.Agents.Signals
   alias Magus.Agents.Support.AiAgent
+  alias Magus.Agents.Support.FailureStreak
   alias Magus.Agents.Telemetry
 
   @default_heartbeat_interval_minutes 360
@@ -172,6 +173,7 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
     update_spawn_output(run)
     unlink_linked_inbox_events(run)
     drain_urgent_events(run)
+    maybe_check_failure_streak(run)
     :ok
   end
 
@@ -185,6 +187,7 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
         requeue_inbox_event_for_run(failed_run)
         unlink_linked_inbox_events(failed_run)
         drain_urgent_events(failed_run)
+        maybe_check_failure_streak(failed_run)
         Magus.Agents.SubAgent.Resumer.maybe_resume_parent(failed_run)
         Process.put(:activity_log_last_failed_run, failed_run)
         Logger.info("AgentRunCompletion: run #{failed_run.id} failed")
@@ -193,6 +196,17 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
         Logger.warning("AgentRunCompletion: failed to fail run #{run.id}: #{inspect(reason)}")
     end
   end
+
+  # Failure-streak escalation only applies to autonomous runs (heartbeat,
+  # manual trigger, urgent inbox wake) — a failed `:mention` run is a
+  # user-driven conversation turn and shouldn't push an agent toward
+  # auto-pause. FailureStreak itself never raises.
+  defp maybe_check_failure_streak(%{source: source, target_agent_id: agent_id})
+       when source in @autonomous_sources and is_binary(agent_id) do
+    FailureStreak.check_and_escalate(agent_id)
+  end
+
+  defp maybe_check_failure_streak(_run), do: :ok
 
   # Resolves AgentInboxEvents whose `agent_run_id` points at this run, marking
   # them as :resolved with `resolved_by: :run_completed`. This is the new

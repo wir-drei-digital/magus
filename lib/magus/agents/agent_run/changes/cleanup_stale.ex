@@ -30,6 +30,7 @@ defmodule Magus.Agents.AgentRun.Changes.CleanupStale do
   require Logger
 
   alias Magus.Agents.Support.AutonomyTrace
+  alias Magus.Agents.Support.FailureStreak
   alias Magus.Agents.Telemetry
 
   @default_max_run_duration_minutes 30
@@ -125,6 +126,8 @@ defmodule Magus.Agents.AgentRun.Changes.CleanupStale do
         objective: String.slice(run.objective || "", 0, 200)
       }
     )
+
+    if run.target_agent_id, do: FailureStreak.check_and_escalate(run.target_agent_id)
 
     Magus.Agents.RunOrchestrator.maybe_start_next(run.target_conversation_id)
   end

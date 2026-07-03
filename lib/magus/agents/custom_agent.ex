@@ -198,6 +198,33 @@ defmodule Magus.Agents.CustomAgent do
         :heartbeat_default_interval_minutes,
         :next_scheduled_at
       ]
+
+      # Resuming an agent (flipping is_paused to false, e.g. via the SPA kill
+      # switch) should clear any auto-pause reason so a stale escalation
+      # banner doesn't linger after the user has manually resumed it.
+      change fn changeset, _context ->
+        if Ash.Changeset.get_attribute(changeset, :is_paused) == false do
+          Ash.Changeset.force_change_attribute(changeset, :pause_reason, nil)
+        else
+          changeset
+        end
+      end
+    end
+
+    update :pause_for_failures do
+      description """
+      Auto-pause triggered by FailureStreak after 10 consecutive failed
+      autonomous runs. Idempotent: a no-op change set if the agent is
+      already paused.
+      """
+
+      accept []
+      require_atomic? false
+
+      argument :pause_reason, :string, allow_nil?: false
+
+      change set_attribute(:is_paused, true)
+      change set_attribute(:pause_reason, arg(:pause_reason))
     end
 
     update :set_next_scheduled_at do
@@ -929,6 +956,16 @@ defmodule Magus.Agents.CustomAgent do
       default false
       public? true
       description "Kill switch — stops all heartbeats and blocks @mention dispatch"
+    end
+
+    attribute :pause_reason, :string do
+      allow_nil? true
+      public? true
+
+      description """
+      Visible reason the agent was auto-paused (e.g. failure-streak
+      escalation). Cleared whenever the agent is unpaused.
+      """
     end
 
     attribute :max_daily_runs, :integer do

@@ -25,6 +25,7 @@ defmodule Magus.Agents.AgentRun.Changes.SweepStuckPending do
   require Logger
 
   alias Magus.Agents.Support.AutonomyTrace
+  alias Magus.Agents.Support.FailureStreak
   alias Magus.Agents.Telemetry
 
   @stuck_timeout_hours 6
@@ -62,6 +63,9 @@ defmodule Magus.Agents.AgentRun.Changes.SweepStuckPending do
               "Run stuck in pending > #{@stuck_timeout_hours}h",
               %{run_id: current.id, source: current.source}
             )
+
+            if current.target_agent_id,
+              do: FailureStreak.check_and_escalate(current.target_agent_id)
           else
             # Lost maybe_start_next (e.g. node restart between enqueue and
             # claim): nudge the claim loop; it no-ops when capacity is full.

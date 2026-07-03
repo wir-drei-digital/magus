@@ -84,6 +84,10 @@ defmodule Magus.Agents do
       define :set_custom_agent_next_scheduled_at,
         action: :set_next_scheduled_at,
         args: [:next_scheduled_at]
+
+      define :pause_custom_agent_for_failures,
+        action: :pause_for_failures,
+        args: [:pause_reason]
     end
 
     resource Magus.Agents.AgentSecret do
