@@ -30,6 +30,7 @@ defmodule Magus.Agents.AgentRun.Changes.CleanupStale do
   require Logger
 
   alias Magus.Agents.Support.AutonomyTrace
+  alias Magus.Agents.Telemetry
 
   @default_max_run_duration_minutes 30
 
@@ -92,6 +93,7 @@ defmodule Magus.Agents.AgentRun.Changes.CleanupStale do
     )
 
     Magus.Agents.timeout_agent_run(run, authorize?: false)
+    Telemetry.run_event(:timed_out, run)
 
     maybe_cancel_target(run.target_conversation_id)
 
