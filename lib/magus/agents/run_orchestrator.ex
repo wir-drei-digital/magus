@@ -21,6 +21,8 @@ defmodule Magus.Agents.RunOrchestrator do
   @type enqueue_result ::
           {:ok, AgentRun.t()} | {:ok, enqueue_outcome(), AgentRun.t()} | {:error, term()}
   @default_max_parallel_runs_per_target 3
+  @autonomous_sources [:heartbeat, :manual_trigger, :inbox_urgent]
+  @budget_gated_sources [:heartbeat, :inbox_urgent]
 
   @doc """
   Enqueue an `AgentRun`. Returns:
@@ -68,23 +70,26 @@ defmodule Magus.Agents.RunOrchestrator do
   # Autonomous-run / heartbeat enqueue gates
   # ---------------------------------------------------------------------------
   #
-  # `check_no_in_flight_autonomous_run/1` covers both `:heartbeat` and
-  # `:manual_trigger` so a double-clicked "Run now" button can't fire concurrent
-  # autonomous runs alongside a scheduled heartbeat.
+  # `check_no_in_flight_autonomous_run/1` covers `:heartbeat`, `:manual_trigger`,
+  # and `:inbox_urgent` so a double-clicked "Run now" button, a scheduled
+  # heartbeat, and an urgent inbox-event wakeup can't fire concurrent
+  # autonomous runs for the same agent.
   #
   # The remaining two gates (`check_daily_run_budget/1`,
-  # `check_owner_spend_budget/1`) still apply only to `:heartbeat` since they're the
-  # owner-cost / quota gates. `:mention` and `:sub_agent_spawn` runs are
-  # user- or parent-driven and rely on the existing
-  # `max_parallel_runs_per_target` bound for backpressure.
+  # `check_owner_spend_budget/1`) apply to `:heartbeat` and `:inbox_urgent`
+  # since those are the owner-cost / quota gates for unattended wakeups.
+  # `:manual_trigger` is user-initiated and keeps its exemption from the
+  # budget gates. `:mention` and `:sub_agent_spawn` runs are user- or
+  # parent-driven and rely on the existing `max_parallel_runs_per_target`
+  # bound for backpressure.
 
   defp check_no_in_flight_autonomous_run(%{source: source, target_agent_id: agent_id})
-       when source in [:heartbeat, :manual_trigger] and not is_nil(agent_id) do
+       when source in @autonomous_sources and not is_nil(agent_id) do
     in_flight =
       AgentRun
       |> Ash.Query.filter(
         target_agent_id == ^agent_id and
-          source in [:heartbeat, :manual_trigger] and
+          source in ^@autonomous_sources and
           status in [:pending, :running]
       )
       |> Ash.Query.limit(1)
@@ -98,8 +103,8 @@ defmodule Magus.Agents.RunOrchestrator do
 
   defp check_no_in_flight_autonomous_run(_), do: :ok
 
-  defp check_daily_run_budget(%{source: :heartbeat, target_agent_id: agent_id})
-       when not is_nil(agent_id) do
+  defp check_daily_run_budget(%{source: source, target_agent_id: agent_id})
+       when source in @budget_gated_sources and not is_nil(agent_id) do
     case Ash.get(Magus.Agents.CustomAgent, agent_id, authorize?: false) do
       {:ok, agent} -> evaluate_daily_run_budget(agent, agent_id)
       {:error, _} -> :ok
@@ -119,7 +124,7 @@ defmodule Magus.Agents.RunOrchestrator do
       AgentRun
       |> Ash.Query.filter(
         target_agent_id == ^agent_id and
-          source == :heartbeat and
+          source in ^@budget_gated_sources and
           inserted_at >= ^window_start and
           status != :cancelled
       )
@@ -130,8 +135,8 @@ defmodule Magus.Agents.RunOrchestrator do
 
   defp evaluate_daily_run_budget(_agent, _agent_id), do: :ok
 
-  defp check_owner_spend_budget(%{source: :heartbeat, initiator_user_id: user_id})
-       when not is_nil(user_id) do
+  defp check_owner_spend_budget(%{source: source, initiator_user_id: user_id})
+       when source in @budget_gated_sources and not is_nil(user_id) do
     case Magus.Accounts.get_user(user_id, authorize?: false) do
       {:ok, user} ->
         case Magus.Usage.PolicyEnforcer.check_spend_budget(user) do

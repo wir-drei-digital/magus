@@ -625,6 +625,134 @@ defmodule Magus.Agents.RunOrchestratorTest do
     {user, source_conversation, target_conversation, agent}
   end
 
+  describe "inbox_urgent source" do
+    setup %{user: user, source_conversation: source_conversation} do
+      target_conversation = generate(conversation(actor: user, is_task_conversation: true))
+      agent = custom_agent(user)
+
+      free_plan = ensure_free_plan()
+
+      {:ok, _subscription} =
+        Magus.Usage.create_user_subscription(
+          %{user_id: user.id, usage_plan_id: free_plan.id, status: :active},
+          authorize?: false
+        )
+
+      %{
+        user: user,
+        source_conversation: source_conversation,
+        target_conversation: target_conversation,
+        agent: agent
+      }
+    end
+
+    defp inbox_urgent_attrs(ctx, key_suffix, overrides \\ %{}) do
+      base = %{
+        kind: :delegate,
+        source: :inbox_urgent,
+        source_conversation_id: ctx.source_conversation.id,
+        target_conversation_id: ctx.target_conversation.id,
+        target_agent_id: ctx.agent.id,
+        initiator_user_id: ctx.user.id,
+        request_id: "rid-inbox-#{key_suffix}-#{Ash.UUIDv7.generate()}",
+        idempotency_key: "inbox:#{Ash.UUID.generate()}",
+        objective: "test inbox_urgent #{key_suffix}",
+        metadata: %{}
+      }
+
+      Map.merge(base, overrides)
+    end
+
+    test "enqueues an :inbox_urgent run", ctx do
+      assert {:ok, :created, run} =
+               RunOrchestrator.enqueue_with_outcome(inbox_urgent_attrs(ctx, "1"))
+
+      assert run.source == :inbox_urgent
+    end
+
+    test "in-flight gate rejects :inbox_urgent when a :heartbeat run is pending", ctx do
+      heartbeat_attrs = %{
+        kind: :delegate,
+        source: :heartbeat,
+        source_conversation_id: ctx.source_conversation.id,
+        target_conversation_id: ctx.target_conversation.id,
+        target_agent_id: ctx.agent.id,
+        initiator_user_id: ctx.user.id,
+        request_id: "rid-hb-#{Ash.UUIDv7.generate()}",
+        idempotency_key: "key-hb-#{Ash.UUIDv7.generate()}",
+        objective: "pending heartbeat",
+        metadata: %{}
+      }
+
+      {:ok, :created, _hb_run} = RunOrchestrator.enqueue_with_outcome(heartbeat_attrs)
+
+      assert {:error, :already_running} =
+               RunOrchestrator.enqueue_with_outcome(inbox_urgent_attrs(ctx, "2"))
+    end
+
+    test "in-flight gate rejects :heartbeat when an :inbox_urgent run is pending", ctx do
+      {:ok, :created, _inbox_run} =
+        RunOrchestrator.enqueue_with_outcome(inbox_urgent_attrs(ctx, "1"))
+
+      heartbeat_attrs = %{
+        kind: :delegate,
+        source: :heartbeat,
+        source_conversation_id: ctx.source_conversation.id,
+        target_conversation_id: ctx.target_conversation.id,
+        target_agent_id: ctx.agent.id,
+        initiator_user_id: ctx.user.id,
+        request_id: "rid-hb-#{Ash.UUIDv7.generate()}",
+        idempotency_key: "key-hb-#{Ash.UUIDv7.generate()}",
+        objective: "heartbeat blocked by inbox_urgent",
+        metadata: %{}
+      }
+
+      assert {:error, :already_running} =
+               RunOrchestrator.enqueue_with_outcome(heartbeat_attrs)
+    end
+
+    test ":inbox_urgent runs count toward max_daily_runs",
+         %{user: user, source_conversation: source_conversation, target_conversation: target} do
+      agent = custom_agent(user, %{max_daily_runs: 1})
+
+      {:ok, completed_run} =
+        Magus.Agents.create_agent_run(
+          %{
+            kind: :delegate,
+            source: :inbox_urgent,
+            source_conversation_id: source_conversation.id,
+            target_conversation_id: target.id,
+            target_agent_id: agent.id,
+            initiator_user_id: user.id,
+            request_id: "rid-inbox-completed-#{Ash.UUIDv7.generate()}",
+            idempotency_key: "inbox:#{Ash.UUID.generate()}",
+            objective: "already completed inbox_urgent run",
+            metadata: %{}
+          },
+          authorize?: false
+        )
+
+      {:ok, _} =
+        Magus.Agents.complete_agent_run(completed_run, %{result_text: "ok"}, authorize?: false)
+
+      heartbeat_attrs = %{
+        kind: :delegate,
+        source: :heartbeat,
+        source_conversation_id: source_conversation.id,
+        target_conversation_id: target.id,
+        target_agent_id: agent.id,
+        initiator_user_id: user.id,
+        request_id: "rid-hb-#{Ash.UUIDv7.generate()}",
+        idempotency_key: "key-hb-#{Ash.UUIDv7.generate()}",
+        objective: "heartbeat over budget due to inbox_urgent",
+        metadata: %{}
+      }
+
+      assert {:error, :budget_exceeded} =
+               RunOrchestrator.enqueue_with_outcome(heartbeat_attrs)
+    end
+  end
+
   describe "maybe_start_next/1 bounded parallelism" do
     test "does not claim pending runs when per-target running capacity is reached", %{
       user: user,
