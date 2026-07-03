@@ -96,6 +96,9 @@ defmodule Magus.Application do
              false
            )},
         Magus.Agents.Skills.Registry,
+        # Throttled AgentRun liveness pings (ETS-backed); must be up before any
+        # InstanceManager agents start touching it.
+        Magus.Agents.RunLiveness,
         # Integrations infrastructure
         Magus.Integrations.Vault,
         Magus.Integrations.RateLimiter,
