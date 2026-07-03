@@ -13,6 +13,7 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionInboxTest do
   require Ash.Query
 
   alias Magus.Agents.AgentInboxEvent
+  alias Magus.Agents.AgentRun
   alias Magus.Agents.Plugins.AgentRunCompletionPlugin
 
   # ============================================================================
@@ -73,6 +74,23 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionInboxTest do
       )
 
     event
+  end
+
+  # `:inbox_urgent` is a budget-gated source in `RunOrchestrator`: without an
+  # active subscription, `check_owner_spend_budget/1` rejects every enqueue
+  # with `:insufficient_spend_budget` (`get_effective_limits/1` falls back to
+  # a zero spend cap). Give the user a free plan so drain's enqueue can
+  # succeed in tests that expect a new run to be created.
+  defp give_free_plan(user) do
+    free_plan = ensure_free_plan()
+
+    {:ok, _subscription} =
+      Magus.Usage.create_user_subscription(
+        %{user_id: user.id, usage_plan_id: free_plan.id, status: :active},
+        authorize?: false
+      )
+
+    :ok
   end
 
   defp create_run(user, parent_conv, child_conv, agent, opts) do
@@ -324,5 +342,316 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionInboxTest do
       assert failed_run.id == run.id
       assert failed_run.status == :error
     end
+  end
+
+  # ============================================================================
+  # Drain-before-sleep: pending :immediate events get a follow-up run
+  # ============================================================================
+
+  describe "drain-before-sleep" do
+    test "pending :immediate event enqueues follow-up :inbox_urgent run after heartbeat completes" do
+      user = generate(user())
+      :ok = give_free_plan(user)
+      agent = custom_agent(user, %{heartbeat_enabled: true})
+      {parent_conv, child_conv} = create_conversations(user)
+
+      heartbeat_run =
+        create_run(user, parent_conv, child_conv, agent,
+          source: :heartbeat,
+          target_agent_id: agent.id
+        )
+
+      {:ok, running_run} = Magus.Agents.start_agent_run(heartbeat_run.id, authorize?: false)
+
+      # Seed an :immediate event while the heartbeat run is :running so
+      # TriggerUrgentWake's in-flight gate rejects the wake, leaving the
+      # event unlinked (agent_run_id: nil) — exactly the "arrived mid-run"
+      # scenario.
+      {:ok, event} =
+        Magus.Agents.create_inbox_event(
+          %{
+            agent_id: agent.id,
+            event_type: :mention,
+            urgency: :immediate,
+            title: "Urgent thing happened",
+            source_type: :conversation
+          },
+          actor: user
+        )
+
+      assert event.agent_run_id == nil
+
+      {:ok, completed_run} =
+        Magus.Agents.complete_agent_run(running_run, %{result_text: "done"}, authorize?: false)
+
+      AgentRunCompletionPlugin.handle_run_completed(completed_run)
+
+      {:ok, updated_event} = Ash.get(AgentInboxEvent, event.id, authorize?: false)
+      assert updated_event.agent_run_id != nil
+
+      {:ok, new_run} = Ash.get(AgentRun, updated_event.agent_run_id, authorize?: false)
+      assert new_run.source == :inbox_urgent
+      assert new_run.idempotency_key == "inbox:#{event.id}"
+    end
+
+    test "drain does not re-run an event whose urgent run already happened" do
+      user = generate(user())
+      agent = custom_agent(user, %{heartbeat_enabled: true})
+      {parent_conv, child_conv} = create_conversations(user)
+
+      # Seed the event while a heartbeat run is :running so TriggerUrgentWake's
+      # in-flight gate rejects the auto-wake (event stays unlinked).
+      seed_run =
+        create_run(user, parent_conv, child_conv, agent,
+          source: :heartbeat,
+          target_agent_id: agent.id
+        )
+
+      {:ok, running_seed_run} = Magus.Agents.start_agent_run(seed_run.id, authorize?: false)
+
+      {:ok, event} =
+        Magus.Agents.create_inbox_event(
+          %{
+            agent_id: agent.id,
+            event_type: :mention,
+            urgency: :immediate,
+            title: "Urgent thing happened",
+            source_type: :conversation
+          },
+          actor: user
+        )
+
+      assert event.agent_run_id == nil
+
+      # Simulate the event's urgent run already having happened (and
+      # completed) by consuming its idempotency key directly, then clearing
+      # the link the same way `unlink_linked_inbox_events` would.
+      urgent_run =
+        create_run(user, parent_conv, child_conv, agent,
+          source: :inbox_urgent,
+          target_agent_id: agent.id,
+          idempotency_key: "inbox:#{event.id}"
+        )
+
+      {:ok, started} = Magus.Agents.start_agent_run(urgent_run.id, authorize?: false)
+
+      {:ok, _completed} =
+        Magus.Agents.complete_agent_run(started, %{result_text: "handled"}, authorize?: false)
+
+      # Event stays pending and unlinked, as if the run's completion path had
+      # already unlinked/resolved it independently of this drain.
+      {:ok, event} = Ash.get(AgentInboxEvent, event.id, authorize?: false)
+      assert event.status == :pending
+      assert event.agent_run_id == nil
+
+      # Finish the original seed run and let the drain run for it.
+      {:ok, other_completed} =
+        Magus.Agents.complete_agent_run(running_seed_run, %{result_text: "done"},
+          authorize?: false
+        )
+
+      AgentRunCompletionPlugin.handle_run_completed(other_completed)
+
+      matching_runs =
+        AgentRun
+        |> Ash.Query.filter(idempotency_key == ^"inbox:#{event.id}")
+        |> Ash.read!(authorize?: false)
+
+      assert length(matching_runs) == 1
+
+      {:ok, final_event} = Ash.get(AgentInboxEvent, event.id, authorize?: false)
+      assert final_event.status == :pending
+      assert final_event.agent_run_id == nil
+    end
+
+    test "drain ignores :deferred events" do
+      user = generate(user())
+      agent = custom_agent(user, %{heartbeat_enabled: true})
+      {parent_conv, child_conv} = create_conversations(user)
+
+      heartbeat_run =
+        create_run(user, parent_conv, child_conv, agent,
+          source: :heartbeat,
+          target_agent_id: agent.id
+        )
+
+      {:ok, running_run} = Magus.Agents.start_agent_run(heartbeat_run.id, authorize?: false)
+
+      {:ok, event} =
+        Magus.Agents.create_inbox_event(
+          %{
+            agent_id: agent.id,
+            event_type: :mention,
+            urgency: :deferred,
+            title: "Not urgent",
+            source_type: :conversation
+          },
+          actor: user
+        )
+
+      assert event.agent_run_id == nil
+
+      {:ok, completed_run} =
+        Magus.Agents.complete_agent_run(running_run, %{result_text: "done"}, authorize?: false)
+
+      AgentRunCompletionPlugin.handle_run_completed(completed_run)
+
+      {:ok, updated_event} = Ash.get(AgentInboxEvent, event.id, authorize?: false)
+      assert updated_event.agent_run_id == nil
+      assert updated_event.status == :pending
+
+      matching_runs =
+        AgentRun
+        |> Ash.Query.filter(idempotency_key == ^"inbox:#{event.id}")
+        |> Ash.read!(authorize?: false)
+
+      assert matching_runs == []
+    end
+
+    test "drain skips non-autonomous (e.g. :mention) run completions" do
+      user = generate(user())
+      agent = custom_agent(user, %{heartbeat_enabled: true})
+      {parent_conv, child_conv} = create_conversations(user)
+
+      # Seed under a running heartbeat run so the in-flight gate rejects the
+      # auto-wake, leaving the event unlinked.
+      seed_run =
+        create_run(user, parent_conv, child_conv, agent,
+          source: :heartbeat,
+          target_agent_id: agent.id
+        )
+
+      {:ok, _running_seed_run} = Magus.Agents.start_agent_run(seed_run.id, authorize?: false)
+
+      event = create_inbox_event_immediate(user, agent)
+      assert event.agent_run_id == nil
+
+      mention_run =
+        create_run(user, parent_conv, child_conv, agent,
+          source: :mention,
+          target_agent_id: agent.id
+        )
+
+      {:ok, started} = Magus.Agents.start_agent_run(mention_run.id, authorize?: false)
+
+      {:ok, completed} =
+        Magus.Agents.complete_agent_run(started, %{result_text: "done"}, authorize?: false)
+
+      AgentRunCompletionPlugin.handle_run_completed(completed)
+
+      {:ok, updated_event} = Ash.get(AgentInboxEvent, event.id, authorize?: false)
+      assert updated_event.agent_run_id == nil
+
+      matching_runs =
+        AgentRun
+        |> Ash.Query.filter(idempotency_key == ^"inbox:#{event.id}")
+        |> Ash.read!(authorize?: false)
+
+      assert matching_runs == []
+    end
+
+    test "failed autonomous run also drains" do
+      user = generate(user())
+      # heartbeat_enabled: false while seeding avoids racing with
+      # TriggerUrgentWake's own auto-wake attempt for the same idempotency
+      # key; only the plugin's drain path is under test here.
+      agent = custom_agent(user, %{heartbeat_enabled: false})
+      {parent_conv, child_conv} = create_conversations(user)
+
+      # First seed an event with agent_run_id: nil so its idempotency key is
+      # known, then create the very :inbox_urgent run that TriggerUrgentWake
+      # would have created for it (consuming "inbox:#{event.id}"), and link
+      # the event to it directly, simulating a wake that then errors out.
+      {:ok, event} =
+        Magus.Agents.create_inbox_event(
+          %{
+            agent_id: agent.id,
+            event_type: :mention,
+            urgency: :immediate,
+            title: "Urgent thing happened",
+            source_type: :conversation
+          },
+          actor: user
+        )
+
+      urgent_run =
+        create_run(user, parent_conv, child_conv, agent,
+          source: :inbox_urgent,
+          target_agent_id: agent.id,
+          idempotency_key: "inbox:#{event.id}"
+        )
+
+      {:ok, _} = Magus.Agents.link_event_to_run(event, urgent_run.id, authorize?: false)
+      {:ok, event} = Ash.get(AgentInboxEvent, event.id, authorize?: false)
+      assert event.agent_run_id == urgent_run.id
+
+      {:ok, running_run} = Magus.Agents.start_agent_run(urgent_run.id, authorize?: false)
+
+      {:ok, failed_run} =
+        Magus.Agents.fail_agent_run(running_run, %{error_message: "boom"}, authorize?: false)
+
+      AgentRunCompletionPlugin.handle_run_failed(failed_run)
+
+      # unlink_linked_inbox_events runs first and clears agent_run_id, then
+      # drain re-picks the event — but its idempotency key "inbox:#{event.id}"
+      # was already consumed by the failed run itself, so enqueue resolves to
+      # :existing and no second (new) run is created for that key.
+      matching_runs =
+        AgentRun
+        |> Ash.Query.filter(idempotency_key == ^"inbox:#{event.id}")
+        |> Ash.read!(authorize?: false)
+
+      assert length(matching_runs) == 1
+      assert Enum.all?(matching_runs, &(&1.id == failed_run.id))
+
+      {:ok, final_event} = Ash.get(AgentInboxEvent, event.id, authorize?: false)
+      assert final_event.agent_run_id == nil
+    end
+  end
+
+  describe "ensure_next_scheduled_at for :inbox_urgent" do
+    test "completed :inbox_urgent run schedules fallback heartbeat when none set" do
+      user = generate(user())
+      agent = custom_agent(user, %{heartbeat_enabled: true})
+      {parent_conv, child_conv} = create_conversations(user)
+
+      assert agent.next_scheduled_at == nil
+
+      urgent_run =
+        create_run(user, parent_conv, child_conv, agent,
+          source: :inbox_urgent,
+          target_agent_id: agent.id
+        )
+
+      {:ok, started} = Magus.Agents.start_agent_run(urgent_run.id, authorize?: false)
+
+      {:ok, completed} =
+        Magus.Agents.complete_agent_run(started, %{result_text: "handled"}, authorize?: false)
+
+      AgentRunCompletionPlugin.handle_run_completed(completed)
+
+      {:ok, reloaded_agent} =
+        Ash.get(Magus.Agents.CustomAgent, agent.id, authorize?: false)
+
+      assert %DateTime{} = reloaded_agent.next_scheduled_at
+      assert DateTime.compare(reloaded_agent.next_scheduled_at, DateTime.utc_now()) == :gt
+    end
+  end
+
+  defp create_inbox_event_immediate(user, agent) do
+    {:ok, event} =
+      Magus.Agents.create_inbox_event(
+        %{
+          agent_id: agent.id,
+          event_type: :mention,
+          urgency: :immediate,
+          title: "Urgent thing happened",
+          source_type: :conversation,
+          agent_run_id: nil
+        },
+        actor: user
+      )
+
+    event
   end
 end
