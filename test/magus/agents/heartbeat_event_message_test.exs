@@ -60,6 +60,19 @@ defmodule Magus.Agents.HeartbeatEventMessageTest do
     assert msg.metadata["wakeup_stage"] == "running"
   end
 
+  test "creates an :event message with running text for inbox_urgent", %{conv: conv} do
+    run_id = Ash.UUID.generate()
+
+    {:ok, msg} =
+      HeartbeatEventMessage.create(conv.id, run_id: run_id, source: :inbox_urgent)
+
+    assert msg.message_type == :event
+    assert msg.text =~ ~r/urgent/i
+    assert msg.metadata["wakeup_run_id"] == run_id
+    assert msg.metadata["wakeup_stage"] == "running"
+    assert msg.metadata["source"] == "inbox_urgent"
+  end
+
   test "transitions to :complete with dismissed count and next_at", %{conv: conv} do
     {:ok, msg} =
       HeartbeatEventMessage.create(conv.id,

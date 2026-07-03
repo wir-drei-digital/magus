@@ -12,7 +12,7 @@ defmodule Magus.Agents.HeartbeatEventMessage do
       %{
         "wakeup_run_id" => <agent_run_id>,
         "wakeup_stage" => :running | :complete | :skipped | :failed,
-        "source" => :heartbeat | :manual_trigger
+        "source" => :heartbeat | :manual_trigger | :inbox_urgent
       }
 
   The `wakeup_run_id` lets UIs link the visible event message back to
@@ -24,7 +24,8 @@ defmodule Magus.Agents.HeartbeatEventMessage do
 
   @running_text %{
     heartbeat: "Heartbeat started at {time}",
-    manual_trigger: "Manual wake-up triggered by {user_label}"
+    manual_trigger: "Manual wake-up triggered by {user_label}",
+    inbox_urgent: "Woken by urgent inbox event at {time}"
   }
 
   @doc """
@@ -37,7 +38,7 @@ defmodule Magus.Agents.HeartbeatEventMessage do
       link back to the run). Pass `nil` when no run was created (skip
       events emitted before enqueue), in which case the `wakeup_run_id`
       key is omitted from metadata.
-    * `:source` — `:heartbeat` or `:manual_trigger`.
+    * `:source` — `:heartbeat`, `:manual_trigger`, or `:inbox_urgent`.
 
   ## Optional opts
 
