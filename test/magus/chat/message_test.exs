@@ -890,4 +890,29 @@ defmodule Magus.Chat.MessageTest do
                )
     end
   end
+
+  describe "create_draft_event" do
+    # Regression: the export_format constraint once omitted :markdown while the
+    # Draft :export action offered it, so markdown exports failed with a raw
+    # "atom must be one of %{atom_list}" constraint error.
+    test "accepts every draft export format, including markdown" do
+      user = generate(user())
+      {:ok, conversation} = Chat.create_conversation(%{}, actor: user)
+
+      for format <- [:pdf, :docx, :latex, :markdown] do
+        assert {:ok, message} =
+                 Chat.create_draft_event_message(
+                   "Export the draft",
+                   conversation.id,
+                   :export,
+                   Ash.UUID.generate(),
+                   %{export_format: format},
+                   actor: user
+                 )
+
+        assert message.message_type == :draft_event
+        assert message.metadata["export_format"] == to_string(format)
+      end
+    end
+  end
 end

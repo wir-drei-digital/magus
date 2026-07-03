@@ -65,6 +65,7 @@
 		"marked-katex-extension": "^5.1.10",
 		"mermaid": "^11.15.0",
 		"paneforge": "^1.0.2",
+		"pdfjs-dist": "^4.10.38",
 		"phoenix": "^1.7.21",
 		"tailwind-merge": "^3.0.0",
 		"tippy.js": "^6.3.7",

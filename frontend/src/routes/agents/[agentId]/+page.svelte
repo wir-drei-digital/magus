@@ -711,24 +711,26 @@
 			<div class="h-40 animate-pulse rounded-xl bg-muted"></div>
 		</div>
 	{:else}
-		<header class="flex shrink-0 items-center gap-3 border-b py-3 pr-6 pl-14 md:pl-6">
+		<header class="flex min-h-11 shrink-0 items-center gap-2 border-b py-2 pr-6 pl-14 md:pl-6">
 			{#if agent.imageUrl}
 				<img
 					src={agent.imageUrl}
 					alt={agent.name}
-					class="size-9 shrink-0 rounded-full border border-input object-cover"
+					class="size-6 shrink-0 rounded-full border border-input object-cover"
 					data-testid="agent-avatar"
 				/>
 			{:else}
 				<span
-					class="flex size-9 shrink-0 items-center justify-center rounded-full border border-input bg-secondary text-base"
+					class="flex size-6 shrink-0 items-center justify-center rounded-full border border-input bg-secondary text-xs"
 				>
-					{#if agent.icon}{agent.icon}{:else}<Bot class="size-4 text-muted-foreground" />{/if}
+					{#if agent.icon}{agent.icon}{:else}<Bot class="size-3.5 text-muted-foreground" />{/if}
 				</span>
 			{/if}
-			<div class="min-w-0 flex-1">
-				<h1 class="truncate text-base font-semibold" data-testid="agent-title">{agent.name}</h1>
-				<p class="truncate text-xs text-muted-foreground">
+			<div class="flex min-w-0 flex-1 items-baseline gap-2">
+				<h1 class="min-w-0 truncate text-sm font-semibold" data-testid="agent-title">
+					{agent.name}
+				</h1>
+				<p class="min-w-0 truncate text-xs text-muted-foreground max-md:hidden">
 					@{agent.handle}
 					{#if agent.isPaused}· paused{/if}
 					{#if agent.isSharedToWorkspace}· workspace{/if}

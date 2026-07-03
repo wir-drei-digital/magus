@@ -1770,11 +1770,17 @@ export type AttachedResource = { type: 'file'; id: string };
 export function sendUserMessage(
 	conversationId: string,
 	text: string,
-	resources: AttachedResource[] = []
+	resources: AttachedResource[] = [],
+	metadata: Record<string, unknown> | null = null
 ): Promise<RpcResult<ChatMessage>> {
 	return run((opts) =>
 		rpc.sendUserMessage({
-			input: { conversationId, text, ...(resources.length > 0 ? { resources } : {}) },
+			input: {
+				conversationId,
+				text,
+				...(resources.length > 0 ? { resources } : {}),
+				...(metadata ? { metadata } : {})
+			},
 			fields: MESSAGE_FIELDS,
 			...opts
 		})
@@ -1792,11 +1798,12 @@ export function deleteMessage(id: string): Promise<RpcResult<Record<string, neve
  */
 export function enqueueMessage(
 	conversationId: string,
-	text: string
+	text: string,
+	metadata: Record<string, unknown> | null = null
 ): Promise<RpcResult<ChatMessage>> {
 	return run((opts) =>
 		rpc.enqueueMessage({
-			input: { conversationId, text },
+			input: { conversationId, text, ...(metadata ? { metadata } : {}) },
 			fields: MESSAGE_FIELDS as rpc.EnqueueMessageFields,
 			...opts
 		})

@@ -82,6 +82,7 @@
 			draftRevision={store.draftRevision}
 			brainRevision={store.brainRevision}
 			onInsertText={(text) => store?.requestInsertText(text)}
+			onSelection={(selection) => store?.addSelection(selection)}
 		>
 			<ConversationView
 				{store}

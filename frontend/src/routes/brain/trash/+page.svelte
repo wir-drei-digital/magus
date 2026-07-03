@@ -40,9 +40,9 @@
 </svelte:head>
 
 <div class="flex h-full min-h-0 flex-col" data-testid="brain-trash">
-	<header class="border-b py-3 pr-6 pl-14 md:pl-6">
-		<h1 class="text-base font-semibold">Trash</h1>
-		<p class="text-xs text-muted-foreground">
+	<header class="flex min-h-11 items-baseline gap-2 border-b py-2 pr-6 pl-14 md:pl-6">
+		<h1 class="text-sm font-semibold">Trash</h1>
+		<p class="min-w-0 truncate text-xs text-muted-foreground">
 			Trashed pages are deleted permanently after 30 days.
 		</p>
 	</header>

@@ -162,7 +162,7 @@
 		{#if saveError}
 			<p class="border-b bg-destructive/10 px-6 py-1.5 text-xs text-destructive">{saveError}</p>
 		{/if}
-		<header class="flex shrink-0 items-center gap-2.5 border-b py-3 pr-6 pl-14 md:pl-4">
+		<header class="flex min-h-11 shrink-0 items-center gap-2.5 border-b py-2 pr-6 pl-14 md:pl-4">
 			<button
 				type="button"
 				class="wb-pill-btn wb-pill-btn-square shrink-0"
@@ -173,21 +173,23 @@
 				<ArrowLeft class="size-4" />
 			</button>
 			<span
-				class="flex size-8 shrink-0 items-center justify-center rounded-full border border-input bg-secondary"
+				class="flex size-6 shrink-0 items-center justify-center rounded-full border border-input bg-secondary"
 				title={skill.hasExecutableBundle ? 'Runnable skill' : 'Prompt-only skill'}
 			>
 				{#if skill.hasExecutableBundle}
-					<Box class="size-4 text-muted-foreground" />
+					<Box class="size-3.5 text-muted-foreground" />
 				{:else}
-					<FileCode class="size-4 text-muted-foreground" />
+					<FileCode class="size-3.5 text-muted-foreground" />
 				{/if}
 			</span>
-			<div class="min-w-0 flex-1">
-				<h1 class="truncate text-base font-semibold" data-testid="skill-title">
+			<div class="flex min-w-0 flex-1 items-baseline gap-2">
+				<h1 class="min-w-0 truncate text-sm font-semibold" data-testid="skill-title">
 					{skill.displayName ?? skill.name}
 				</h1>
 				{#if skill.description}
-					<p class="truncate text-xs text-muted-foreground">{skill.description}</p>
+					<p class="min-w-0 truncate text-xs text-muted-foreground max-md:hidden">
+						{skill.description}
+					</p>
 				{/if}
 			</div>
 			<div class="flex shrink-0 items-center gap-1.5">

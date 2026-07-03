@@ -124,11 +124,12 @@
 
 			<!-- Floating nav toggle (mobile only). Classic parity: it overlays the
 			     top-left corner so views keep full height; each view's header pads
-			     left (pl-14) on mobile to clear it. Respects the notch via safe-area. -->
+			     left (pl-14) on mobile to clear it. Respects the notch via safe-area.
+			     top 0.25rem centers the 36px button in the 44px (min-h-11) headers. -->
 			<button
 				type="button"
 				class="bg-background/80 hover:bg-background fixed z-30 flex size-9 items-center justify-center rounded-full border text-foreground shadow-sm backdrop-blur-sm md:hidden"
-				style="top: max(0.5rem, env(safe-area-inset-top)); left: max(0.5rem, env(safe-area-inset-left));"
+				style="top: max(0.25rem, env(safe-area-inset-top)); left: max(0.5rem, env(safe-area-inset-left));"
 				aria-label="Open navigation"
 				data-testid="mobile-menu"
 				onclick={() => (drawerOpen = true)}

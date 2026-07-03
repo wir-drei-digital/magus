@@ -32,7 +32,8 @@
 		revision = 0,
 		onClose,
 		onOpenPage,
-		onAsk
+		onAsk,
+		onAskSelection
 	}: {
 		pageId: string;
 		/** Bumped by the conversation store while the agent writes the page. */
@@ -40,8 +41,10 @@
 		onClose: () => void;
 		/** Related-tab click: swap the companion to another page. */
 		onOpenPage: (pageId: string) => void;
-		/** Editor bubble Ask/Refine: drop the selection into the conversation composer. */
+		/** Editor bubble Refine: drop the instruction text into the composer. */
 		onAsk?: (text: string) => void;
+		/** Editor bubble Ask: pin the selection as a composer context pill. */
+		onAskSelection?: (selection: { text: string; title: string | null }) => void;
 	} = $props();
 
 	const TABS = ['outline', 'sources', 'related', 'activity'] as const;
@@ -110,7 +113,12 @@
 
 	function onBubbleAction(event: string, payload: Record<string, unknown>) {
 		const text = bubbleSelectionText(event, payload);
-		if (text) onAsk?.(text);
+		if (!text) return;
+		if (event === 'ask' && onAskSelection) {
+			onAskSelection({ text, title: page?.title ?? null });
+		} else {
+			onAsk?.(text);
+		}
 	}
 
 	function openPageByTitle(title: string) {

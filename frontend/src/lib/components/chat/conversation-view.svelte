@@ -149,9 +149,15 @@
 	});
 
 	// Selecting text inside a message surfaces a floating "Ask chat" button that
-	// drops the quoted selection into the composer (classic MessageTextSelection
-	// parity). Scoped to this conversation's message list via [data-message-id].
-	let askSelection = $state<{ text: string; x: number; y: number } | null>(null);
+	// pins the quoted selection as a composer context pill (classic
+	// MessageTextSelection parity). Scoped via [data-message-id].
+	let askSelection = $state<{
+		text: string;
+		messageId: string;
+		role: string;
+		x: number;
+		y: number;
+	} | null>(null);
 
 	function refreshAskSelection() {
 		const selection = window.getSelection();
@@ -167,13 +173,20 @@
 			askSelection = null;
 			return;
 		}
+		const messageId = messageEl.getAttribute('data-message-id') ?? '';
+		const role = node?.closest('[data-role]')?.getAttribute('data-role') ?? 'agent';
 		const rect = selection.getRangeAt(0).getBoundingClientRect();
-		askSelection = { text, x: rect.left + rect.width / 2, y: rect.top };
+		askSelection = { text, messageId, role, x: rect.left + rect.width / 2, y: rect.top };
 	}
 
 	function askAboutSelection() {
 		if (!askSelection) return;
-		store.requestInsertText(`> ${askSelection.text}\n\n`);
+		store.addSelection({
+			kind: 'message',
+			text: askSelection.text,
+			messageId: askSelection.messageId,
+			role: askSelection.role
+		});
 		window.getSelection()?.removeAllRanges();
 		askSelection = null;
 	}

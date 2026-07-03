@@ -146,7 +146,8 @@
 		draft: FilePen,
 		pdf: FileText,
 		service: Globe,
-		quote: Quote
+		quote: Quote,
+		brain: Brain
 	};
 	const selections = $derived(isUser ? selectionIndicators(message.metadata) : []);
 

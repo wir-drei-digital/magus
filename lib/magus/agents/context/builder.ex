@@ -482,10 +482,11 @@ defmodule Magus.Agents.Context.Builder do
     selected_text = selection["text"] || selection[:text] || ""
     hint_line = selection["hint_line"] || selection[:hint_line]
     title = selection["draft_title"] || selection[:draft_title] || "Draft"
+    location = if hint_line, do: " (near line #{hint_line})", else: ""
 
     if selected_text != "" do
       """
-      [Draft selection from "#{title}" (near line #{hint_line}):
+      [Draft selection from "#{title}"#{location}:
       ---
       #{selected_text}
       ---]

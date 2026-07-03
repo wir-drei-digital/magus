@@ -134,9 +134,11 @@
 <div class="flex h-full min-h-0 flex-col" data-testid="library-gallery">
 	<!-- Single header row: title, search, filters, and actions together. Wraps
 	     on narrow panes (compact master/detail) instead of overflowing. -->
-	<header class="flex shrink-0 flex-wrap items-center gap-2 border-b py-2.5 pr-4 pl-14 md:pl-4">
+	<header
+		class="flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-b py-2 pr-4 pl-14 md:pl-4"
+	>
 		<LibraryBig class="size-4 shrink-0 text-muted-foreground" />
-		<h1 class="shrink-0 text-base font-semibold">Library</h1>
+		<h1 class="shrink-0 text-sm font-semibold">Library</h1>
 
 		<label class="relative flex min-w-[9rem] flex-1 items-center">
 			<Search class="pointer-events-none absolute left-2.5 size-3.5 text-muted-foreground" />
@@ -144,7 +146,7 @@
 				bind:value={query}
 				placeholder="Search library"
 				data-testid="gallery-search"
-				class="w-full rounded-md border border-input bg-secondary py-1.5 pr-2.5 pl-8 text-sm outline-none focus:border-primary/60"
+				class="h-7 w-full rounded-md border border-input bg-secondary pr-2.5 pl-8 text-sm outline-none focus:border-primary/60"
 			/>
 		</label>
 
@@ -152,7 +154,7 @@
 			{#each TYPES as [value, label] (value)}
 				<button
 					type="button"
-					class="rounded px-2 py-1 transition-colors {typeFilter === value
+					class="rounded px-2 py-0.5 transition-colors {typeFilter === value
 						? 'bg-secondary font-medium text-foreground'
 						: 'text-muted-foreground hover:text-foreground'}"
 					onclick={() => setTypeFilter(value)}
@@ -165,7 +167,7 @@
 		<select
 			bind:value={sort}
 			aria-label="Sort library"
-			class="shrink-0 rounded-md border border-input bg-secondary px-2 py-1.5 text-xs text-muted-foreground outline-none focus:border-primary/60"
+			class="h-7 shrink-0 rounded-md border border-input bg-secondary px-2 text-xs text-muted-foreground outline-none focus:border-primary/60"
 		>
 			<option value="used">Most used</option>
 			<option value="name">A-Z</option>

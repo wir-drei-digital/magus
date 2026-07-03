@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { Bot, EllipsisVertical, ListChecks, Star } from '@lucide/svelte';
+	import { Bot, EllipsisVertical, Star } from '@lucide/svelte';
 	import type { AgentSummary, CompanionSpec } from '$lib/ash/api';
 	import { cachedMyAgents } from '$lib/chat/catalog';
 	import type { ConversationStore } from '$lib/chat/conversation-store.svelte';
@@ -78,22 +78,24 @@
 	}
 </script>
 
+<!-- min-h-11 (44px): the shared pane-header height — companions, files,
+     library, and detour pages use the same floor so panes line up. -->
 <div
-	class="flex shrink-0 items-center justify-between gap-3 border-b bg-background/60 py-2.5 pr-4 pl-14 md:pl-4"
+	class="flex min-h-11 shrink-0 items-center justify-between gap-3 border-b bg-background/60 py-2 pr-4 pl-14 md:pl-4"
 	data-testid="conversation-header"
 >
-	<div class="flex min-w-0 items-center gap-3">
+	<div class="flex min-w-0 items-center gap-2">
 		<span
-			class="flex size-8 shrink-0 items-center justify-center rounded-full border border-input bg-secondary text-sm"
+			class="flex size-6 shrink-0 items-center justify-center rounded-full border border-input bg-secondary text-xs"
 			aria-hidden="true"
 		>
 			{#if agent?.icon}
 				{agent.icon}
 			{:else}
-				<Bot class="size-4 text-muted-foreground" />
+				<Bot class="size-3.5 text-muted-foreground" />
 			{/if}
 		</span>
-		<div class="min-w-0">
+		<div class="flex min-w-0 items-baseline gap-2">
 			{#if editing}
 				<input
 					bind:this={titleInput}
@@ -109,7 +111,7 @@
 			{:else}
 				<button
 					type="button"
-					class="block max-w-full truncate text-sm font-semibold hover:underline"
+					class="min-w-0 truncate text-sm font-semibold hover:underline"
 					data-testid="conversation-title"
 					title="Rename conversation"
 					onclick={startRename}
@@ -117,7 +119,7 @@
 					{conversation?.title ?? 'Untitled conversation'}
 				</button>
 			{/if}
-			<p class="truncate text-xs text-muted-foreground">
+			<p class="min-w-0 truncate text-xs text-muted-foreground max-md:hidden">
 				{agent?.name ?? 'Assistant'}{#if conversation?.updatedAt}
 					· {relativeTime(conversation.updatedAt)}{/if}
 			</p>
@@ -138,19 +140,6 @@
 		>
 			<Star class="size-3.5 {conversation?.isFavorited ? 'fill-favorite' : ''}" />
 		</button>
-
-		{#if onCompanionRequest}
-			<button
-				type="button"
-				class="wb-pill-btn wb-pill-btn-square shrink-0"
-				data-testid="conversation-tasks"
-				aria-label="Tasks"
-				title="Tasks"
-				onclick={() => onCompanionRequest?.({ type: 'tasks', id: conversationId })}
-			>
-				<ListChecks class="size-3.5" />
-			</button>
-		{/if}
 
 		<RightRail {store} {onCompanionRequest} />
 

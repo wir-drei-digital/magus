@@ -34,6 +34,23 @@ import { normalizeViewers, type PresenceViewer, type RawPresenceViewer } from '$
 export type TypingUser = { userId: string; userName: string };
 
 /**
+ * Pinned-context selections shown as pills above the composer (classic
+ * selection badges): quoted message text, draft/brain-page selections, and
+ * PDF region screenshots. Serialized into the outgoing message's `metadata`;
+ * the server-side context builder quotes the text into the prompt and
+ * attaches screenshots as image content parts.
+ */
+export type ComposerSelection =
+	| { kind: 'message'; text: string; messageId: string; role: string }
+	| { kind: 'draft'; text: string; title: string | null }
+	| { kind: 'brain'; text: string; title: string | null }
+	| { kind: 'pdf'; image: string; text: string; page: number | null; filename: string | null };
+
+/** Classic caps: 20 quoted messages per send, 5000 chars each. */
+const MAX_MESSAGE_SELECTIONS = 20;
+const MAX_SELECTION_CHARS = 5000;
+
+/**
  * Messages loaded per page (initial render + each scroll-up fetch).
  * Kept close to the classic workbench's 25 (@message_page_size): a smaller
  * first page cuts the cold-open cost that scales with message count: RPC
@@ -155,6 +172,116 @@ export class ConversationStore {
 
 	requestInsertText(text: string): void {
 		this.insertTextRequest = { text, revision: this.insertTextRequest.revision + 1 };
+	}
+
+	/** Context pills pinned to the next send (classic selection-badge assigns). */
+	messageSelections = $state<Array<{ text: string; messageId: string; role: string }>>([]);
+	draftSelection = $state<{ text: string; title: string | null } | null>(null);
+	brainSelection = $state<{ text: string; title: string | null } | null>(null);
+	pdfSelection = $state<{
+		image: string;
+		text: string;
+		page: number | null;
+		filename: string | null;
+	} | null>(null);
+
+	get hasSelections(): boolean {
+		return (
+			this.messageSelections.length > 0 ||
+			this.draftSelection !== null ||
+			this.brainSelection !== null ||
+			this.pdfSelection !== null
+		);
+	}
+
+	addSelection(selection: ComposerSelection): void {
+		if (selection.kind === 'message') {
+			const text = selection.text.slice(0, MAX_SELECTION_CHARS);
+			const duplicate = this.messageSelections.some(
+				(existing) => existing.messageId === selection.messageId && existing.text === text
+			);
+			if (duplicate || this.messageSelections.length >= MAX_MESSAGE_SELECTIONS) return;
+			this.messageSelections = [
+				...this.messageSelections,
+				{ text, messageId: selection.messageId, role: selection.role }
+			];
+		} else if (selection.kind === 'draft') {
+			this.draftSelection = {
+				text: selection.text.slice(0, MAX_SELECTION_CHARS),
+				title: selection.title
+			};
+		} else if (selection.kind === 'brain') {
+			this.brainSelection = {
+				text: selection.text.slice(0, MAX_SELECTION_CHARS),
+				title: selection.title
+			};
+		} else {
+			this.pdfSelection = {
+				image: selection.image,
+				text: selection.text.slice(0, MAX_SELECTION_CHARS),
+				page: selection.page,
+				filename: selection.filename
+			};
+		}
+	}
+
+	removeMessageSelection(index: number): void {
+		this.messageSelections = this.messageSelections.filter((_, i) => i !== index);
+	}
+
+	clearDraftSelection(): void {
+		this.draftSelection = null;
+	}
+
+	clearBrainSelection(): void {
+		this.brainSelection = null;
+	}
+
+	clearPdfSelection(): void {
+		this.pdfSelection = null;
+	}
+
+	/**
+	 * The classic metadata shape the dispatcher/context builder consumes
+	 * (string keys, snake_case), or null when no pills are pinned.
+	 */
+	#selectionMetadata(): Record<string, unknown> | null {
+		const metadata: Record<string, unknown> = {};
+		if (this.pdfSelection) {
+			metadata.pdf_selection = {
+				image: this.pdfSelection.image,
+				text: this.pdfSelection.text,
+				page: this.pdfSelection.page,
+				filename: this.pdfSelection.filename
+			};
+		}
+		if (this.messageSelections.length > 0) {
+			metadata.message_selections = this.messageSelections.map((selection) => ({
+				text: selection.text,
+				message_id: selection.messageId,
+				role: selection.role
+			}));
+		}
+		if (this.draftSelection) {
+			metadata.draft_selection = {
+				text: this.draftSelection.text,
+				draft_title: this.draftSelection.title
+			};
+		}
+		if (this.brainSelection) {
+			metadata.brain_selection = {
+				text: this.brainSelection.text,
+				page_title: this.brainSelection.title
+			};
+		}
+		return Object.keys(metadata).length > 0 ? metadata : null;
+	}
+
+	#clearSelections(): void {
+		this.messageSelections = [];
+		this.draftSelection = null;
+		this.brainSelection = null;
+		this.pdfSelection = null;
 	}
 
 	#channel: Channel | null = null;
@@ -361,6 +488,7 @@ export class ConversationStore {
 		// turn produces will have a server insertedAt >= this.
 		this.#turnBaseline ??= lastInsertedAt(this.messages);
 
+		const metadata = this.#selectionMetadata();
 		const localId = `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 		this.messages = upsertMessage(this.messages, {
 			id: localId,
@@ -374,15 +502,16 @@ export class ConversationStore {
 			toolCallData: null,
 			citations: null,
 			reasoningSummary: null,
-			metadata: {},
+			metadata: metadata ?? {},
 			attachments: resources.map((resource) => resource.id),
 			disabled: false
 		});
 
-		const result = await sendUserMessage(this.conversationId, trimmed, resources);
+		const result = await sendUserMessage(this.conversationId, trimmed, resources, metadata);
 		this.messages = this.messages.filter((message) => message.id !== localId);
 
 		if (result.success) {
+			this.#clearSelections();
 			this.messages = upsertMessage(this.messages, result.data);
 			// The agent is now working even though no signal has streamed yet —
 			// show the thinking dots immediately (classic parity). The first
@@ -414,8 +543,10 @@ export class ConversationStore {
 		this.sendError = null;
 		this.stopTyping();
 
-		const result = await enqueueMessage(this.conversationId, trimmed);
-		if (!result.success) {
+		const result = await enqueueMessage(this.conversationId, trimmed, this.#selectionMetadata());
+		if (result.success) {
+			this.#clearSelections();
+		} else {
 			this.sendError = result.errors[0]?.message ?? 'Message could not be queued';
 		}
 		return result.success;

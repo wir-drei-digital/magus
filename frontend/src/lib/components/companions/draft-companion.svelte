@@ -24,19 +24,27 @@
 		draftId,
 		revision = 0,
 		onClose,
-		onAsk
+		onAsk,
+		onAskSelection
 	}: {
 		draftId: string;
 		/** Bumped by the conversation store on draft.* channel events. */
 		revision?: number;
 		onClose: () => void;
-		/** Editor bubble Ask/Refine: drop the selection into the conversation composer. */
+		/** Editor bubble Refine: drop the instruction text into the composer. */
 		onAsk?: (text: string) => void;
+		/** Editor bubble Ask: pin the selection as a composer context pill. */
+		onAskSelection?: (selection: { text: string; title: string | null }) => void;
 	} = $props();
 
 	function onBubbleAction(event: string, payload: Record<string, unknown>) {
 		const text = bubbleSelectionText(event, payload);
-		if (text) onAsk?.(text);
+		if (!text) return;
+		if (event === 'ask' && onAskSelection) {
+			onAskSelection({ text, title: draft?.title ?? null });
+		} else {
+			onAsk?.(text);
+		}
 	}
 
 	// Live co-viewers on this draft's shared presence topic (SPA + classic).

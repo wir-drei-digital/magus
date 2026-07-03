@@ -4,7 +4,7 @@
  * wakeup/job/draft cards. Pure + tested; the components map the icon keys to
  * lucide glyphs.
  */
-export type SelectionIcon = 'draft' | 'pdf' | 'service' | 'quote';
+export type SelectionIcon = 'draft' | 'pdf' | 'service' | 'quote' | 'brain';
 export type SelectionIndicator = { icon: SelectionIcon; label: string | null; text: string };
 
 type Meta = Record<string, unknown> | null | undefined;
@@ -50,6 +50,15 @@ export function selectionIndicators(metadata: Meta): SelectionIndicator[] {
 		const label = present(pdf.page) ? `${filename} p.${pdf.page}` : filename;
 		if (text !== '') out.push({ icon: 'pdf', label, text: truncate(text) });
 		else out.push({ icon: 'pdf', label: null, text: label });
+	}
+
+	const brain = asObject(m.brain_selection);
+	if (brain && str(brain.text) !== '') {
+		out.push({
+			icon: 'brain',
+			label: str(brain.page_title) || 'Brain page',
+			text: truncate(str(brain.text))
+		});
 	}
 
 	const service = asObject(m.service_selection);

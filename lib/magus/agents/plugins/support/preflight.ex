@@ -436,6 +436,7 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
             active_draft_id: active_draft_id,
             tools: tools,
             draft: data[:draft_selection],
+            brain: data[:brain_selection],
             pdf: data[:pdf_selection],
             service: data[:service_selection],
             message_selections: data[:message_selections],

@@ -423,7 +423,7 @@ defmodule Magus.Chat.Message do
 
       argument :draft_action, :atom, allow_nil?: false, constraints: [one_of: [:review, :export]]
       argument :draft_id, :uuid, allow_nil?: false
-      argument :export_format, :atom, constraints: [one_of: [:pdf, :docx, :latex]]
+      argument :export_format, :atom, constraints: [one_of: [:pdf, :docx, :latex, :markdown]]
 
       change set_attribute(:message_type, :draft_event)
       change set_attribute(:source, :agent)

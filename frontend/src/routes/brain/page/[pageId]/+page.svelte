@@ -356,7 +356,7 @@
 				     the bare editor surface — pulsing skeleton bars flickered on
 				     every navigation since loads are sub-second. -->
 				<header
-					class="flex shrink-0 items-center gap-2 border-b bg-background/80 py-3 pr-6 pl-14 backdrop-blur-sm md:pl-6"
+					class="flex min-h-11 shrink-0 items-center gap-2 border-b bg-background/80 py-2 pr-6 pl-14 backdrop-blur-sm md:pl-6"
 				>
 					{#if navNode?.icon}
 						<span class="shrink-0 text-base leading-none">{navNode.icon}</span>
@@ -379,7 +379,7 @@
 				<div class="min-h-0 flex-1 bg-card"></div>
 			{:else}
 				<header
-					class="flex shrink-0 items-center gap-2 border-b bg-background/80 py-3 pr-6 pl-14 backdrop-blur-sm md:pl-6"
+					class="flex min-h-11 shrink-0 items-center gap-2 border-b bg-background/80 py-2 pr-6 pl-14 backdrop-blur-sm md:pl-6"
 				>
 					{#if pageData.icon}
 						<span class="shrink-0 text-base leading-none">{pageData.icon}</span>

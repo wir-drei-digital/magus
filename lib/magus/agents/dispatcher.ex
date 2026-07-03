@@ -69,6 +69,7 @@ defmodule Magus.Agents.Dispatcher do
       model_keys: Helpers.normalize_model_keys(routed.model_keys),
       conversation_context: conversation,
       draft_selection: metadata["draft_selection"] || metadata[:draft_selection],
+      brain_selection: metadata["brain_selection"] || metadata[:brain_selection],
       pdf_selection: metadata["pdf_selection"] || metadata[:pdf_selection],
       service_selection: metadata["service_selection"] || metadata[:service_selection],
       message_selections: metadata["message_selections"] || metadata[:message_selections],

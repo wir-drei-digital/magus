@@ -5,10 +5,12 @@
 		Bell,
 		Bot,
 		Brain,
+		FilePen,
 		FileText,
 		Film,
 		Globe,
 		Image,
+		MessageSquareQuote,
 		Paperclip,
 		Plus,
 		Square,
@@ -375,6 +377,94 @@
 		<p class="pb-1 text-xs text-warning" role="alert" data-testid="composer-modality-warning">
 			The selected model can't read images. Pick an image-capable model or remove the image.
 		</p>
+	{/if}
+
+	<!-- Pinned-context pills (classic selection badges): quoted messages,
+	     draft/brain selections, PDF screenshots. Ride the message metadata,
+	     not the textarea, and clear once the send succeeds. -->
+	{#if store.hasSelections}
+		<div class="flex flex-wrap gap-1.5 pb-1.5" data-testid="composer-selections">
+			{#if store.pdfSelection}
+				<span
+					class="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs"
+					data-testid="composer-selection-pdf"
+				>
+					<img
+						src={store.pdfSelection.image}
+						alt="PDF selection"
+						class="h-5 w-8 rounded-sm border border-border object-cover"
+					/>
+					<span class="max-w-40 truncate">
+						{store.pdfSelection.filename ?? 'PDF'}{store.pdfSelection.page
+							? ` · p.${store.pdfSelection.page}`
+							: ''}
+					</span>
+					<button
+						type="button"
+						class="-mr-1 inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+						aria-label="Remove PDF selection"
+						onclick={() => store.clearPdfSelection()}
+					>
+						×
+					</button>
+				</span>
+			{/if}
+			{#if store.draftSelection}
+				<span
+					class="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs"
+					data-testid="composer-selection-draft"
+				>
+					<FilePen class="size-3 shrink-0 text-primary" />
+					<span class="max-w-48 truncate">
+						{store.draftSelection.title ?? 'Draft'} · “{store.draftSelection.text}”
+					</span>
+					<button
+						type="button"
+						class="-mr-1 inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+						aria-label="Remove draft selection"
+						onclick={() => store.clearDraftSelection()}
+					>
+						×
+					</button>
+				</span>
+			{/if}
+			{#if store.brainSelection}
+				<span
+					class="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs"
+					data-testid="composer-selection-brain"
+				>
+					<Brain class="size-3 shrink-0 text-primary" />
+					<span class="max-w-48 truncate">
+						{store.brainSelection.title ?? 'Brain page'} · “{store.brainSelection.text}”
+					</span>
+					<button
+						type="button"
+						class="-mr-1 inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+						aria-label="Remove brain selection"
+						onclick={() => store.clearBrainSelection()}
+					>
+						×
+					</button>
+				</span>
+			{/if}
+			{#each store.messageSelections as selection, index (index)}
+				<span
+					class="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs"
+					data-testid="composer-selection-quote"
+				>
+					<MessageSquareQuote class="size-3 shrink-0 text-primary" />
+					<span class="max-w-48 truncate">“{selection.text}”</span>
+					<button
+						type="button"
+						class="-mr-1 inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+						aria-label="Remove quoted selection"
+						onclick={() => store.removeMessageSelection(index)}
+					>
+						×
+					</button>
+				</span>
+			{/each}
+		</div>
 	{/if}
 
 	{#if attachments.length > 0 || uploading > 0}

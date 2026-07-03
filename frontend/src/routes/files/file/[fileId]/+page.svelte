@@ -2,12 +2,14 @@
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
 	import { page } from '$app/state';
-	import { ArrowLeft, Download, MessageSquare, Trash2 } from '@lucide/svelte';
+	import { ArrowLeft, Download, MessageSquare, Trash2, ZoomIn, ZoomOut } from '@lucide/svelte';
 	import { fileDownloadUrl, fileUrl, getFile, trashFile, type FileEntry } from '$lib/ash/api';
 	import { openCompanionChat } from '$lib/ash/api';
+	import type { ComposerSelection } from '$lib/chat/conversation-store.svelte';
 	// Lazy: keeps the chat view stack out of the files route chunk.
 	const loadConversationCompanion = () =>
 		import('$lib/components/companions/conversation-companion.svelte');
+	import PdfViewer from '$lib/components/files/pdf-viewer.svelte';
 	import * as Resizable from '$lib/components/ui/resizable';
 	import { formatFileSize } from '$lib/files/format';
 	import { relativeTime } from '$lib/time';
@@ -61,16 +63,47 @@
 	/** Chat docked beside the file (classic: file primary, chat companion). */
 	let chatConversationId = $state<string | null>(null);
 
-	async function toggleChat() {
-		if (!file || openingChat) return;
-		if (chatConversationId) {
-			chatConversationId = null;
-			return;
-		}
+	async function openChat(): Promise<boolean> {
+		if (!file) return false;
+		if (chatConversationId) return true;
+		if (openingChat) return false;
 		openingChat = true;
 		const result = await openCompanionChat('file', file.id);
 		if (result.success) chatConversationId = result.data.conversationId;
 		openingChat = false;
+		return result.success;
+	}
+
+	async function toggleChat() {
+		if (chatConversationId) {
+			chatConversationId = null;
+			return;
+		}
+		await openChat();
+	}
+
+	// Classic PdfPaneComponent zoom steps; 100 = 1 PDF point per CSS pixel.
+	const ZOOM_STEPS = [25, 50, 75, 100, 125, 150, 200, 300];
+	let zoom = $state(100);
+	function zoomBy(direction: 1 | -1) {
+		const index = ZOOM_STEPS.indexOf(zoom);
+		const next = ZOOM_STEPS[index + direction];
+		if (next) zoom = next;
+	}
+
+	/**
+	 * PDF region capture → docked chat composer pill. Opens the file's
+	 * companion chat first when it isn't docked yet (classic file_view
+	 * pdf:ask_about_selection parity).
+	 */
+	let companionSelection = $state<{ selection: ComposerSelection; revision: number } | null>(null);
+
+	async function onPdfSelection(capture: { image: string; text: string; page: number }) {
+		if (!file || !(await openChat())) return;
+		companionSelection = {
+			selection: { kind: 'pdf', ...capture, filename: file.name },
+			revision: (companionSelection?.revision ?? 0) + 1
+		};
 	}
 
 	async function trash() {
@@ -87,7 +120,7 @@
 <Resizable.PaneGroup direction="horizontal" autoSaveId="magus:file-chat-split">
 	<Resizable.Pane defaultSize={60} minSize={35}>
 		<div class="flex h-full min-h-0 flex-col" data-testid="file-detail">
-			<header class="flex shrink-0 items-center gap-3 border-b py-2.5 pr-4 pl-14 md:pl-4">
+			<header class="flex min-h-11 shrink-0 items-center gap-3 border-b py-2 pr-4 pl-14 md:pl-4">
 				<a
 					href="{base}/files{file?.folderId ? `/folder/${file.folderId}` : ''}"
 					class="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -95,12 +128,12 @@
 				>
 					<ArrowLeft class="size-4" />
 				</a>
-				<div class="min-w-0 flex-1">
-					<h1 class="truncate text-sm font-semibold" data-testid="file-detail-name">
+				<div class="flex min-w-0 flex-1 items-baseline gap-2">
+					<h1 class="min-w-0 truncate text-sm font-semibold" data-testid="file-detail-name">
 						{file?.name ?? '…'}
 					</h1>
 					{#if file}
-						<p class="text-xs text-muted-foreground">
+						<p class="min-w-0 truncate text-xs text-muted-foreground max-md:hidden">
 							{formatFileSize(file.fileSize)} · {file.mimeType} · updated {relativeTime(
 								file.updatedAt
 							)}
@@ -108,6 +141,41 @@
 					{/if}
 				</div>
 				{#if file}
+					{#if isPdf}
+						<div class="flex shrink-0 items-center gap-0.5">
+							<button
+								type="button"
+								class="wb-pill-btn wb-pill-btn-square"
+								aria-label="Zoom out"
+								title="Zoom out"
+								disabled={zoom === ZOOM_STEPS[0]}
+								data-testid="pdf-zoom-out"
+								onclick={() => zoomBy(-1)}
+							>
+								<ZoomOut class="size-3.5" />
+							</button>
+							<button
+								type="button"
+								class="min-w-11 rounded-md px-1 py-0.5 text-center text-xs tabular-nums text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+								title="Reset zoom"
+								data-testid="pdf-zoom-reset"
+								onclick={() => (zoom = 100)}
+							>
+								{zoom}%
+							</button>
+							<button
+								type="button"
+								class="wb-pill-btn wb-pill-btn-square"
+								aria-label="Zoom in"
+								title="Zoom in"
+								disabled={zoom === ZOOM_STEPS[ZOOM_STEPS.length - 1]}
+								data-testid="pdf-zoom-in"
+								onclick={() => zoomBy(1)}
+							>
+								<ZoomIn class="size-3.5" />
+							</button>
+						</div>
+					{/if}
 					<button
 						type="button"
 						class="wb-pill-btn shrink-0 {chatConversationId ? 'wb-pill-btn-active' : ''}"
@@ -152,7 +220,13 @@
 						<img src={fileUrl(file)} alt={file.name} class="max-h-full max-w-full rounded-lg" />
 					</div>
 				{:else if isPdf}
-					<iframe src={fileUrl(file)} title={file.name} class="h-full w-full border-0"></iframe>
+					<div class="flex h-full min-h-0 flex-col">
+						<PdfViewer
+							url={fileUrl(file)}
+							scale={zoom / 100}
+							onSelection={(capture) => void onPdfSelection(capture)}
+						/>
+					</div>
 				{:else if file.type === 'video'}
 					<div class="flex h-full items-center justify-center p-6">
 						<!-- svelte-ignore a11y_media_has_caption — user uploads carry no track -->
@@ -183,6 +257,7 @@
 				<ConversationCompanion
 					conversationId={chatConversationId}
 					onClose={() => (chatConversationId = null)}
+					selection={companionSelection ?? undefined}
 				/>
 			{/await}
 		</Resizable.Pane>
