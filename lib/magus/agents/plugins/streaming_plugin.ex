@@ -2,7 +2,9 @@ defmodule Magus.Agents.Plugins.StreamingPlugin do
   @moduledoc """
   Plugin that translates ReAct streaming signals to Magus PubSub broadcasts.
 
-  Pure signal-to-broadcast translation — NO DB writes, NO state mutations.
+  Pure signal-to-broadcast translation — NO DB writes, NO state mutations, with
+  one exception: a throttled (30s) run-liveness ping on `ai.llm.delta` and
+  `ai.llm.turn.completed` activity (see `Magus.Agents.RunLiveness`).
 
   | ReAct Signal              | Magus PubSub Event                        |
   |---------------------------|--------------------------------------------|
@@ -45,6 +47,10 @@ defmodule Magus.Agents.Plugins.StreamingPlugin do
   def handle_signal(signal, context) do
     agent = context[:agent]
     conversation_id = Helpers.get_conversation_id(agent)
+
+    if signal.type in ["ai.llm.delta", "ai.llm.turn.completed"] do
+      Magus.Agents.RunLiveness.touch(conversation_id)
+    end
 
     case signal.type do
       "ai.llm.delta" ->
