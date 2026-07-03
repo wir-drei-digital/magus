@@ -75,7 +75,7 @@ defmodule Magus.Integrations.IngestionPipelineTest do
       assert length(integration_events) == 1
 
       event = List.first(integration_events)
-      assert event.urgency == :deferred
+      assert event.urgency == :immediate
       assert String.contains?(event.title, "errors")
     end
 

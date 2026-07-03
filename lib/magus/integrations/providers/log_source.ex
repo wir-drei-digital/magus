@@ -213,10 +213,13 @@ defmodule Magus.Integrations.Providers.LogSource do
 
     summary = "Top errors: #{Enum.join(error_summaries, "; ")}"
 
+    urgency =
+      if Enum.any?(new_entries, &(&1.severity == :critical)), do: :immediate, else: :deferred
+
     %{
       agent_id: integration.custom_agent_id,
       event_type: :integration,
-      urgency: :deferred,
+      urgency: urgency,
       title: "#{total_error_count} errors in last #{window_minutes} minutes",
       summary: String.slice(summary, 0, 200),
       source_type: :integration,
