@@ -29,6 +29,8 @@ defmodule Magus.Integrations.Workers.PollDataSource do
   alias Magus.Integrations
   alias Magus.Integrations.ProcessIngestion
 
+  @failure_threshold 10
+
   @doc """
   Enqueue a poll job for the given integration. Idempotent within 5 minutes.
   """
@@ -52,16 +54,14 @@ defmodule Magus.Integrations.Workers.PollDataSource do
     with {:ok, integration} <- load_integration(integration_id),
          :ok <- check_active(integration),
          {:ok, provider_module} <- get_provider(integration),
-         {:ok, credential} <- load_credential(integration),
-         {:ok, raw_entries} <- provider_module.poll(integration, credential) do
-      ProcessIngestion.run_with_entries(provider_module, integration, raw_entries)
+         {:ok, credential} <- load_credential(integration) do
+      case provider_module.poll(integration, credential) do
+        {:ok, raw_entries} ->
+          handle_poll_success(integration_id, integration, provider_module, raw_entries)
 
-      Integrations.record_integration_sync(integration, authorize?: false)
-
-      interval = get_in(integration.config, ["poll_interval_minutes"]) || 30
-      enqueue(integration_id, interval)
-
-      :ok
+        {:error, reason} ->
+          handle_poll_failure(integration_id, integration, reason)
+      end
     else
       {:cancel, reason} ->
         {:cancel, reason}
@@ -69,6 +69,80 @@ defmodule Magus.Integrations.Workers.PollDataSource do
       {:error, reason} ->
         Logger.warning("PollDataSource failed for #{integration_id}: #{inspect(reason)}")
         {:error, reason}
+    end
+  end
+
+  defp handle_poll_success(integration_id, integration, provider_module, raw_entries) do
+    ProcessIngestion.run_with_entries(provider_module, integration, raw_entries)
+
+    Integrations.record_integration_sync(integration, authorize?: false)
+    Integrations.record_integration_poll_success(integration, authorize?: false)
+
+    interval = get_in(integration.config, ["poll_interval_minutes"]) || 30
+    enqueue(integration_id, interval)
+
+    :ok
+  end
+
+  defp handle_poll_failure(integration_id, integration, reason) do
+    Logger.warning("PollDataSource failed for #{integration_id}: #{inspect(reason)}")
+
+    {:ok, updated} =
+      Integrations.record_integration_poll_failure(integration, %{last_error: inspect(reason)},
+        authorize?: false
+      )
+
+    if updated.consecutive_failures >= @failure_threshold do
+      handle_threshold_reached(integration_id, updated)
+    else
+      interval = get_in(integration.config, ["poll_interval_minutes"]) || 30
+      enqueue(integration_id, interval)
+    end
+
+    {:error, reason}
+  end
+
+  defp handle_threshold_reached(integration_id, integration) do
+    already_errored? = integration.status == :error
+
+    {:ok, errored} = Integrations.mark_integration_errored(integration, authorize?: false)
+
+    unless already_errored? do
+      notify_owner_of_error(errored)
+    end
+
+    Logger.warning(
+      "PollDataSource: integration #{integration_id} hit #{@failure_threshold} " <>
+        "consecutive failures, marking :error and stopping re-enqueue"
+    )
+  end
+
+  defp notify_owner_of_error(integration) do
+    case Magus.Notifications.create_notification(
+           %{
+             user_id: integration.user_id,
+             notification_type: :system,
+             title: "Integration disabled after repeated failures",
+             body:
+               "An integration failed to poll #{@failure_threshold} times in a row and has " <>
+                 "been paused. Last error: #{integration.last_error || "unknown"}",
+             metadata: %{
+               user_integration_id: integration.id,
+               provider_key: integration.provider_key,
+               consecutive_failures: integration.consecutive_failures
+             }
+           },
+           authorize?: false
+         ) do
+      {:ok, _notification} ->
+        :ok
+
+      {:error, error} ->
+        Logger.warning(
+          "PollDataSource: failed to notify owner for integration #{integration.id}: #{inspect(error)}"
+        )
+
+        :ok
     end
   end
 

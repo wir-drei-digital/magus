@@ -67,8 +67,15 @@ defmodule Magus.Integrations.ProcessIngestion do
             {[entry | ok], skip}
 
           {:error, error} ->
-            # Log non-duplicate errors for debugging
-            Logger.warning("Ingestion entry insert failed: #{inspect(error)}")
+            if dedup_or_constraint_error?(error) do
+              # Expected: re-polling the same feed/log source re-parses
+              # entries we've already ingested; the content_hash unique
+              # identity rejects the duplicate. Not worth a warning.
+              Logger.debug("Ingestion entry skipped (duplicate): #{inspect(error)}")
+            else
+              Logger.warning("Ingestion entry insert failed: #{inspect(error)}")
+            end
+
             {ok, [attrs | skip]}
         end
       end)
@@ -88,4 +95,18 @@ defmodule Magus.Integrations.ProcessIngestion do
       _ -> :log
     end
   end
+
+  # Re-polling a feed/log source re-parses entries already ingested; the
+  # (user_integration_id, content_hash) unique identity rejects the
+  # duplicate. Expected and noisy at :warning, so it's downgraded here.
+  defp dedup_or_constraint_error?(%Ash.Error.Invalid{errors: errors}) do
+    Enum.any?(errors, &dedup_or_constraint_error?/1)
+  end
+
+  defp dedup_or_constraint_error?(%Ash.Error.Changes.InvalidAttribute{private_vars: vars})
+       when is_list(vars) do
+    Keyword.get(vars, :constraint_type) == :unique
+  end
+
+  defp dedup_or_constraint_error?(_), do: false
 end
