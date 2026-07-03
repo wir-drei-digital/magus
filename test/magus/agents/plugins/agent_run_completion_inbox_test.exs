@@ -550,12 +550,151 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionInboxTest do
       assert matching_runs == []
     end
 
+    test "drain skips paused agents (single-opt-in)" do
+      user = generate(user())
+      :ok = give_free_plan(user)
+      # Paused agent: even a pending :immediate event must NOT get a follow-up
+      # run when an autonomous run completes.
+      agent = custom_agent(user, %{heartbeat_enabled: true, is_paused: true})
+      {parent_conv, child_conv} = create_conversations(user)
+
+      heartbeat_run =
+        create_run(user, parent_conv, child_conv, agent,
+          source: :heartbeat,
+          target_agent_id: agent.id
+        )
+
+      {:ok, running_run} = Magus.Agents.start_agent_run(heartbeat_run.id, authorize?: false)
+
+      # Seed a pending :immediate event. Because the agent is paused,
+      # TriggerUrgentWake also skips, so it stays unlinked and pending.
+      {:ok, event} =
+        Magus.Agents.create_inbox_event(
+          %{
+            agent_id: agent.id,
+            event_type: :mention,
+            urgency: :immediate,
+            title: "Urgent thing happened",
+            source_type: :conversation
+          },
+          actor: user
+        )
+
+      assert event.agent_run_id == nil
+
+      {:ok, completed_run} =
+        Magus.Agents.complete_agent_run(running_run, %{result_text: "done"}, authorize?: false)
+
+      AgentRunCompletionPlugin.handle_run_completed(completed_run)
+
+      {:ok, updated_event} = Ash.get(AgentInboxEvent, event.id, authorize?: false)
+      assert updated_event.agent_run_id == nil
+      assert updated_event.status == :pending
+
+      matching_runs =
+        AgentRun
+        |> Ash.Query.filter(idempotency_key == ^"inbox:#{event.id}")
+        |> Ash.read!(authorize?: false)
+
+      assert matching_runs == []
+    end
+
+    test "drain leaves a :waiting approval event untouched" do
+      user = generate(user())
+      :ok = give_free_plan(user)
+      agent = custom_agent(user, %{heartbeat_enabled: true})
+      {parent_conv, child_conv} = create_conversations(user)
+
+      heartbeat_run =
+        create_run(user, parent_conv, child_conv, agent,
+          source: :heartbeat,
+          target_agent_id: agent.id
+        )
+
+      {:ok, running_run} = Magus.Agents.start_agent_run(heartbeat_run.id, authorize?: false)
+
+      # A :waiting approval REQUEST the agent raised, blocked on a human.
+      # source_id is the conversation the approval was requested in.
+      {:ok, waiting_event} =
+        Magus.Agents.create_waiting_inbox_event(
+          %{
+            agent_id: agent.id,
+            event_type: :approval_response,
+            urgency: :immediate,
+            title: "Waiting for approval",
+            source_type: :conversation,
+            source_id: parent_conv.id,
+            payload: %{"options" => ["Approve", "Reject"], "question" => "Deploy to prod?"}
+          },
+          actor: user
+        )
+
+      assert waiting_event.status == :waiting
+      assert waiting_event.agent_run_id == nil
+
+      {:ok, completed_run} =
+        Magus.Agents.complete_agent_run(running_run, %{result_text: "done"}, authorize?: false)
+
+      AgentRunCompletionPlugin.handle_run_completed(completed_run)
+
+      # Drain must NOT touch the waiting event: it stays :waiting and unlinked.
+      {:ok, reloaded} = Ash.get(AgentInboxEvent, waiting_event.id, authorize?: false)
+      assert reloaded.status == :waiting
+      assert reloaded.agent_run_id == nil
+
+      # And no urgent run was enqueued for it.
+      matching_runs =
+        AgentRun
+        |> Ash.Query.filter(idempotency_key == ^"inbox:#{waiting_event.id}")
+        |> Ash.read!(authorize?: false)
+
+      assert matching_runs == []
+
+      # Now the user answers via the InboxEventPlugin approval-matching path:
+      # the waiting event resolves and a new :immediate :approval_response
+      # :pending event is created (mirrors inbox_event_plugin_test).
+      plugin_agent = %{
+        id: "conv:#{parent_conv.id}",
+        state: %{
+          user_id: user.id,
+          conversation_id: parent_conv.id,
+          mode: :chat,
+          model_keys: %{chat: "test-model"}
+        }
+      }
+
+      signal =
+        Jido.Signal.new!("message.user", %{
+          text: "Approve: let's ship it",
+          conversation_id: parent_conv.id,
+          message_id: Ash.UUIDv7.generate()
+        })
+
+      Magus.Agents.Plugins.InboxEventPlugin.handle_signal(signal, %{agent: plugin_agent})
+
+      {:ok, resolved} = Ash.get(AgentInboxEvent, waiting_event.id, authorize?: false)
+      assert resolved.status == :resolved
+
+      new_event =
+        AgentInboxEvent
+        |> Ash.Query.filter(
+          agent_id == ^agent.id and event_type == :approval_response and status == :pending
+        )
+        |> Ash.read_one!(authorize?: false)
+
+      assert new_event.urgency == :immediate
+      assert new_event.idempotency_key == "approval_response:#{waiting_event.id}"
+      assert new_event.payload["chosen_option"] == "Approve"
+    end
+
     test "failed autonomous run also drains" do
       user = generate(user())
-      # heartbeat_enabled: false while seeding avoids racing with
-      # TriggerUrgentWake's own auto-wake attempt for the same idempotency
-      # key; only the plugin's drain path is under test here.
-      agent = custom_agent(user, %{heartbeat_enabled: false})
+      # Create the agent heartbeat_enabled but paused while seeding: paused
+      # makes TriggerUrgentWake skip its own auto-wake for the same idempotency
+      # key, avoiding a race. We unpause before handle_run_failed so drain's
+      # `heartbeat_enabled and not is_paused` gate is satisfied and only the
+      # plugin's drain path is under test.
+      agent = custom_agent(user, %{heartbeat_enabled: true, is_paused: true})
       {parent_conv, child_conv} = create_conversations(user)
 
       # First seed an event with agent_run_id: nil so its idempotency key is
@@ -589,6 +728,10 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionInboxTest do
 
       {:ok, failed_run} =
         Magus.Agents.fail_agent_run(running_run, %{error_message: "boom"}, authorize?: false)
+
+      # Unpause so drain's autonomy gate (`heartbeat_enabled and not is_paused`)
+      # is satisfied for the failure-path drain under test.
+      {:ok, _} = Magus.Agents.update_custom_agent(agent, %{is_paused: false}, actor: user)
 
       AgentRunCompletionPlugin.handle_run_failed(failed_run)
 

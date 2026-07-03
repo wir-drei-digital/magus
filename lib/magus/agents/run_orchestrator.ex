@@ -238,12 +238,45 @@ defmodule Magus.Agents.RunOrchestrator do
           error: formatted
         })
 
+        run_fail_side_effects(failed_run)
+
       {:error, fail_reason} ->
         Logger.warning(
           "RunOrchestrator: failed to mark run #{run.id} as failed: #{inspect(fail_reason)}"
         )
     end
   end
+
+  @autonomous_fail_sources [:heartbeat, :manual_trigger, :inbox_urgent]
+
+  @doc false
+  # Reliability machinery for a run that failed to claim/boot/dispatch. The
+  # AgentRunCompletionPlugin runs these same effects when a run fails *during*
+  # execution (an `ai.request.failed` signal), but a start-time failure never
+  # reaches that plugin, so we mirror them here:
+  #
+  #   1. `run.failed` telemetry — observability parity with in-flight failures.
+  #   2. Unlink linked inbox events — clears `agent_run_id` so the next
+  #      heartbeat reconsiders the event instead of it staying stuck.
+  #   3. FailureStreak escalation for autonomous sources — a start-time failure
+  #      still counts toward the auto-pause streak.
+  #
+  # Each effect is defensive: FailureStreak/unlink never raise, and telemetry
+  # is best-effort.
+  def run_fail_side_effects(failed_run) do
+    Telemetry.run_event(:failed, failed_run)
+    Magus.Agents.AgentRunHelpers.unlink_linked_inbox_events(failed_run)
+    maybe_check_failure_streak(failed_run)
+    :ok
+  end
+
+  defp maybe_check_failure_streak(%{source: source, target_agent_id: agent_id})
+       when source in @autonomous_fail_sources and is_binary(agent_id) do
+    Magus.Agents.Support.FailureStreak.check_and_escalate(agent_id)
+    :ok
+  end
+
+  defp maybe_check_failure_streak(_run), do: :ok
 
   defp dispatch_to_target(pid, run) do
     signal = Jido.Signal.new!("message.user", build_run_signal_payload(run))

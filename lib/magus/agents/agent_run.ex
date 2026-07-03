@@ -20,6 +20,15 @@ defmodule Magus.Agents.AgentRun do
     table "agent_runs"
     repo Magus.Repo
 
+    references do
+      # `event_id` -> agent_inbox_events was created with a plain FK (default
+      # ON DELETE RESTRICT). The daily prune job destroys terminal inbox events
+      # older than 30 days; a younger run still referencing such an event via
+      # `event_id` would otherwise make the destroy raise a FK violation.
+      # Nilify so pruning an old event just clears the stale back-reference.
+      reference :triggering_event, on_delete: :nilify
+    end
+
     identity_wheres_to_sql unique_idempotency_key: "idempotency_key IS NOT NULL"
   end
 

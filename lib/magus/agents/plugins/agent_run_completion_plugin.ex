@@ -246,23 +246,40 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
   # per-event idempotency key caps this at one urgent run per event ever:
   # an event whose run already happened resolves to :existing and stays
   # pending for the next heartbeat.
+  #
+  # Only `:pending` events are drained. A `:waiting` event is an approval
+  # REQUEST the agent itself raised (RequestApproval → create_waiting_inbox_event)
+  # that is blocked on a human answer; it is never a wake signal. Draining a
+  # `:waiting` event would link it to a fresh `:inbox_urgent` run whose
+  # completion force-resolves it, so the user's later answer would find no
+  # waiting event and the agent would never learn the decision.
+  #
+  # Drain also respects the same single-opt-in gates as TriggerUrgentWake: it
+  # never enqueues a follow-up run for a paused or heartbeat-disabled agent.
+  # `fail_run` calls drain BEFORE FailureStreak's auto-pause check, and drain
+  # can fire again on each later terminal run, so without this gate a
+  # just-auto-paused agent could keep running urgent work.
   defp drain_urgent_events(%{source: source, target_agent_id: agent_id} = run)
        when source in @autonomous_sources and is_binary(agent_id) do
-    events =
-      Magus.Agents.AgentInboxEvent
-      |> Ash.Query.filter(
-        agent_id == ^agent_id and
-          urgency == :immediate and
-          status in [:pending, :waiting] and
-          is_nil(agent_run_id)
-      )
-      |> Ash.Query.sort(inserted_at: :desc)
-      |> Ash.Query.limit(1)
-      |> Ash.read!(authorize?: false)
+    if autonomy_active?(agent_id) do
+      events =
+        Magus.Agents.AgentInboxEvent
+        |> Ash.Query.filter(
+          agent_id == ^agent_id and
+            urgency == :immediate and
+            status == :pending and
+            is_nil(agent_run_id)
+        )
+        |> Ash.Query.sort(inserted_at: :desc)
+        |> Ash.Query.limit(1)
+        |> Ash.read!(authorize?: false)
 
-    case events do
-      [event] -> enqueue_urgent_followup(event, run)
-      [] -> :ok
+      case events do
+        [event] -> enqueue_urgent_followup(event, run)
+        [] -> :ok
+      end
+    else
+      :ok
     end
   rescue
     e ->
@@ -271,6 +288,16 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
   end
 
   defp drain_urgent_events(_run), do: :ok
+
+  # Drain only wakes agents that are opted into autonomy: heartbeat enabled
+  # and not paused. Mirrors TriggerUrgentWake's `agent.heartbeat_enabled and
+  # not agent.is_paused` gate. A missing/unreadable agent means no drain.
+  defp autonomy_active?(agent_id) do
+    case Ash.get(Magus.Agents.CustomAgent, agent_id, authorize?: false) do
+      {:ok, agent} -> agent.heartbeat_enabled and not agent.is_paused
+      _ -> false
+    end
+  end
 
   defp enqueue_urgent_followup(event, run) do
     attrs = %{
