@@ -303,6 +303,63 @@ defmodule Magus.Agents.Plugins.InboxEventPluginTest do
   end
 
   # ============================================================================
+  # Approval response wakes the requesting agent
+  # ============================================================================
+
+  describe "handle_signal/2 with approval responses" do
+    test "resolves the waiting event and creates an :immediate approval_response event" do
+      user = generate(user())
+      {:ok, conversation} = Magus.Chat.create_conversation(%{}, actor: user)
+      agent_record = custom_agent(user, %{is_paused: false})
+
+      {:ok, waiting_event} =
+        Magus.Agents.create_waiting_inbox_event(
+          %{
+            agent_id: agent_record.id,
+            event_type: :approval_response,
+            urgency: :deferred,
+            title: "Waiting for approval",
+            source_type: :conversation,
+            source_id: conversation.id,
+            payload: %{"options" => ["Approve", "Reject"], "question" => "Deploy to prod?"}
+          },
+          actor: user
+        )
+
+      agent = build_agent(user.id, conversation.id)
+      context = build_context(agent)
+
+      signal =
+        make_message_user_signal(
+          "Approve: let's ship it",
+          conversation.id,
+          Ash.UUIDv7.generate()
+        )
+
+      InboxEventPlugin.handle_signal(signal, context)
+
+      resolved =
+        Magus.Agents.AgentInboxEvent
+        |> Ash.get!(waiting_event.id, authorize?: false)
+
+      assert resolved.status == :resolved
+
+      new_event =
+        Magus.Agents.AgentInboxEvent
+        |> Ash.Query.filter(
+          agent_id == ^agent_record.id and event_type == :approval_response and
+            status == :pending
+        )
+        |> Ash.read_one!(authorize?: false)
+
+      assert new_event.urgency == :immediate
+      assert new_event.idempotency_key == "approval_response:#{waiting_event.id}"
+      assert new_event.payload["chosen_option"] == "Approve"
+      assert new_event.payload["response_text"] =~ "Approve:"
+    end
+  end
+
+  # ============================================================================
   # Error resilience
   # ============================================================================
 
