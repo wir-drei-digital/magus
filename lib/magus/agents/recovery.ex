@@ -126,6 +126,8 @@ defmodule Magus.Agents.Recovery do
       _ -> true
     end
   rescue
+    # Fail open toward dispatching: a duplicated turn is recoverable, a
+    # silently dropped one is not.
     _ -> false
   end
 
