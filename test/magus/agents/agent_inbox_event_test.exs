@@ -579,5 +579,29 @@ defmodule Magus.Agents.AgentInboxEventTest do
       assert resolved.resolved_by == :run_completed
       assert resolved.resolved_at != nil
     end
+
+    test "link_to_run rejects a terminal (resolved) event", %{
+      event: event,
+      run: run,
+      user: user
+    } do
+      {:ok, resolved} =
+        Magus.Agents.resolve_event(event, %{resolved_by: :agent}, actor: user)
+
+      updated_at_before = resolved.updated_at
+
+      assert {:error, _} = Magus.Agents.link_event_to_run(resolved, run.id, actor: user)
+
+      reloaded = Ash.get!(Magus.Agents.AgentInboxEvent, resolved.id, actor: user)
+      assert reloaded.agent_run_id == nil
+      assert DateTime.compare(reloaded.updated_at, updated_at_before) == :eq
+    end
+
+    test "link_to_run still works on a pending event", %{event: event, run: run, user: user} do
+      assert event.status == :pending
+      {:ok, linked} = Magus.Agents.link_event_to_run(event, run.id, actor: user)
+      assert linked.agent_run_id == run.id
+      assert linked.status == :pending
+    end
   end
 end

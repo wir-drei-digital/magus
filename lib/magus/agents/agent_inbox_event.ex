@@ -190,6 +190,7 @@ defmodule Magus.Agents.AgentInboxEvent do
     update :link_to_run do
       require_atomic? false
       argument :run_id, :uuid, allow_nil?: false
+      validate attribute_in(:status, [:pending, :waiting, :processing])
       change set_attribute(:agent_run_id, arg(:run_id))
     end
 

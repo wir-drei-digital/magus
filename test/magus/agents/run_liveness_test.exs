@@ -121,4 +121,24 @@ defmodule Magus.Agents.RunLivenessTest do
     assert :ok = RunLiveness.touch(nil)
     assert :ok = RunLiveness.touch(Ash.UUID.generate())
   end
+
+  describe "periodic sweep" do
+    test "sweep evicts entries older than the sweep interval and keeps fresh ones" do
+      table = :agent_run_liveness
+      now_ms = System.monotonic_time(:millisecond)
+
+      stale_id = "stale-#{Ash.UUID.generate()}"
+      fresh_id = "fresh-#{Ash.UUID.generate()}"
+
+      :ets.insert(table, {stale_id, now_ms - :timer.minutes(11)})
+      :ets.insert(table, {fresh_id, now_ms})
+
+      pid = Process.whereis(RunLiveness)
+      send(pid, :sweep)
+      :sys.get_state(pid)
+
+      assert :ets.lookup(table, stale_id) == []
+      assert :ets.lookup(table, fresh_id) == [{fresh_id, now_ms}]
+    end
+  end
 end
