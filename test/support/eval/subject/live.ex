@@ -34,20 +34,47 @@ defmodule Magus.Eval.Subject.Live do
     {:ok, Map.put(ctx, :conversation, conversation)}
   end
 
-  # Production extraction batches all turns accumulated during a debounce
-  # window into one call; approximate that burst size with chunks of 5.
-  @turns_per_extraction 5
-
   @impl true
   def ingest(ctx, items) do
     items
-    |> pair_turns()
-    |> Enum.map(fn {user_text, agent_text} -> %{"user" => user_text, "agent" => agent_text} end)
-    |> Enum.chunk_every(@turns_per_extraction)
-    |> Enum.each(fn turns -> force_extract(ctx, turns) end)
+    |> to_windows()
+    |> Enum.each(fn pairs -> extract_window(ctx, pairs) end)
 
     settle_extraction()
     {:ok, ctx}
+  end
+
+  # Group ingest items into extraction windows, then pair user->agent turns
+  # within each window. Items carrying a :session tag (LongMemEval) become one
+  # window per session; untagged items (small benchmarks) form a single window.
+  # A session replayed instantly is one production debounce window, so this
+  # mirrors production: extraction runs once per window over all its turns, and
+  # it keeps the same window shape the recorded baseline used.
+  defp to_windows(items) do
+    if Enum.any?(items, &Map.has_key?(&1, :session)) do
+      items
+      |> Enum.chunk_by(&Map.get(&1, :session))
+      |> Enum.map(&pair_turns/1)
+      |> Enum.reject(&(&1 == []))
+    else
+      case pair_turns(items) do
+        [] -> []
+        pairs -> [pairs]
+      end
+    end
+  end
+
+  # Windowed extraction (post-hardening): pass every turn-pair of the window as
+  # `turns`, matching production's "extract all turns since the watermark". The
+  # pre-hardening baseline passed only the window's last pair (mirroring the old
+  # load_last_turn); that difference is exactly the extraction-window fix under test.
+  defp extract_window(ctx, pairs) do
+    turns =
+      Enum.map(pairs, fn {user_text, agent_text} ->
+        %{"user" => user_text, "agent" => agent_text}
+      end)
+
+    force_extract(ctx, turns)
   end
 
   @impl true
