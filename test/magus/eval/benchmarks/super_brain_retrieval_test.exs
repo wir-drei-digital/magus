@@ -20,8 +20,9 @@ defmodule Magus.Eval.Benchmarks.SuperBrainRetrievalTest do
     {:ok, dataset} = SuperBrainRetrieval.load_dataset([])
     det = SuperBrainRetrieval.cases(dataset, subject_kind: :deterministic)
 
-    # 4 cases include "deterministic" in subjects (local_lookup, contradiction, attribution, multi_hop)
-    assert length(det) == 4
+    # 6 cases include "deterministic" in subjects (local_lookup, contradiction,
+    # attribution, multi_hop, claim_recall, temporal)
+    assert length(det) == 6
     refute Enum.any?(det, fn c -> c.meta.category == "same_name_fusion" end)
   end
 

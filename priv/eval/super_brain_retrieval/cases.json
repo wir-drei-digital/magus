@@ -108,5 +108,52 @@
       "edges": [],
       "sources": []
     }
+  },
+  {
+    "id": "claim_recall_aurora_wrapper",
+    "category": "claim_recall",
+    "supported": true,
+    "target": "claims",
+    "subjects": ["deterministic", "live"],
+    "query": "does Aurora ship with the npm wrapper",
+    "query_embedding": [0,0,0,0,0,0,0,0],
+    "claim_query_embedding": {"hot": 5},
+    "k": 5,
+    "expected": [{"subject": "Aurora", "predicate": "excludes", "object": "npm wrapper"}],
+    "fixture": {
+      "entities": [
+        {"key": "aurora", "name": "Aurora", "type": "project", "embedding": [1,0,0,0,0,0,0,0]},
+        {"key": "wrapper", "name": "npm wrapper", "type": "concept", "embedding": [0,1,0,0,0,0,0,0]}
+      ],
+      "edges": [],
+      "sources": [],
+      "claims": [
+        {"subject": "Aurora", "predicate": "excludes", "object": "npm wrapper",
+         "claim_text": "Aurora ships without the npm wrapper.", "embedding": {"hot": 5}}
+      ]
+    }
+  },
+  {
+    "id": "temporal_ship_quarter",
+    "category": "temporal",
+    "supported": false,
+    "target": "claims",
+    "subjects": ["deterministic"],
+    "query": "when does Aurora ship",
+    "query_embedding": [0,0,0,0,0,0,0,0],
+    "claim_query_embedding": {"hot": 7},
+    "k": 1,
+    "expected": [{"subject": "Aurora", "predicate": "occurs_at", "object": "Q4"}],
+    "fixture": {
+      "entities": [{"key": "aurora", "name": "Aurora", "type": "project", "embedding": [1,0,0,0,0,0,0,0]}],
+      "edges": [],
+      "sources": [],
+      "claims": [
+        {"subject": "Aurora", "predicate": "occurs_at", "object": "Q4",
+         "claim_text": "Aurora now ships in Q4.", "embedding": {"hot": 9}, "asserted_at": "2026-06-01T00:00:00Z"},
+        {"subject": "Aurora", "predicate": "occurs_at", "object": "Q3",
+         "claim_text": "Aurora ships in Q3.", "embedding": {"hot": 7}, "asserted_at": "2026-05-01T00:00:00Z"}
+      ]
+    }
   }
 ]

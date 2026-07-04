@@ -60,7 +60,11 @@ defmodule Magus.Eval.Benchmarks.SuperBrainRetrieval do
   end
 
   defp to_case(c) do
-    fixture_payload = %{"fixture" => c["fixture"], "query_embedding" => c["query_embedding"]}
+    fixture_payload = %{
+      "fixture" => c["fixture"],
+      "query_embedding" => c["query_embedding"],
+      "claim_query_embedding" => c["claim_query_embedding"]
+    }
 
     %{
       id: c["id"],
@@ -71,7 +75,8 @@ defmodule Magus.Eval.Benchmarks.SuperBrainRetrieval do
         expected: c["expected"],
         category: c["category"],
         k: c["k"] || 5,
-        supported: c["supported"] == true
+        supported: c["supported"] == true,
+        target: c["target"] || "entities"
       }
     }
   end
