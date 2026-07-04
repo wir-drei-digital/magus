@@ -27,7 +27,6 @@ defmodule Magus.SuperBrain.TelemetryHandler do
   | `drift.detected` | `:info` | Normal during workspace membership changes. |
   | `migration.progress` (stale > 0) | `:info` | Migration is in progress. |
   | `migration.progress` (stale = 0) | `:debug` | Steady-state no-op. |
-  | `extraction.sparse_edges` | `:debug` | Observability for tuning the prompt. |
   | `sanitizer.*` | `:debug` | Observability for ontology coverage. |
 
   ## Detach
@@ -57,7 +56,6 @@ defmodule Magus.SuperBrain.TelemetryHandler do
     [:super_brain, :sanitizer, :ambiguous_edge_endpoint],
     [:super_brain, :budget, :exhausted],
     [:super_brain, :drift, :detected],
-    [:super_brain, :extraction, :sparse_edges],
     [:super_brain, :migration, :progress]
   ]
 
@@ -157,16 +155,6 @@ defmodule Magus.SuperBrain.TelemetryHandler do
     Logger.info(
       "super_brain.drift.detected",
       Map.put(metadata_for_log(metadata), :super_brain_event, "drift.detected")
-    )
-  end
-
-  def handle_event([:super_brain, :extraction, :sparse_edges], measurements, metadata, _config) do
-    Logger.debug(
-      "super_brain.extraction.sparse_edges entities=#{Map.get(measurements, :entity_count)} " <>
-        "edges=#{Map.get(measurements, :edge_count)}",
-      metadata_for_log(metadata)
-      |> Map.merge(measurements)
-      |> Map.put(:super_brain_event, "extraction.sparse_edges")
     )
   end
 

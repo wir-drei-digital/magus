@@ -17,6 +17,7 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
   require Ash.Query
 
   alias Magus.Files.EmbeddingModel
+  alias Magus.SuperBrain.Naming
   alias Magus.SuperBrain.Retrieval
 
   @max_results 8
@@ -116,11 +117,11 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
     claims = Enum.take(claims, @max_claims)
     titles = resolve_titles_for_claims(claims)
     by_subject = Enum.group_by(claims, & &1.subject_key)
-    entity_keys = entities |> Enum.map(&entity_key(Map.get(&1, :name))) |> MapSet.new()
+    entity_keys = entities |> Enum.map(&Naming.key(Map.get(&1, :name))) |> MapSet.new()
 
     entity_sections =
       Enum.map(entities, fn e ->
-        key = e |> Map.get(:name) |> entity_key()
+        key = e |> Map.get(:name) |> Naming.key()
         entity_claims = Map.get(by_subject, key, []) |> Enum.take(@max_claims_per_entity)
         render_entity_section(e, entity_claims, titles)
       end)
@@ -200,11 +201,6 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
   end
 
   defp cite(_, _), do: "source"
-
-  defp entity_key(nil), do: nil
-
-  defp entity_key(name),
-    do: name |> String.downcase() |> String.replace(~r/\s+/, " ") |> String.trim()
 
   @doc false
   # Normalize a legacy fan-out candidate (`%{entity: %{name:, type:}, ...}`,

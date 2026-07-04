@@ -44,14 +44,14 @@ defmodule Magus.SuperBrain.Retrieval do
 
   ## Options
 
-    * `:query` (required) — the natural-language query. Kept for future
+    * `:query` (required): the natural-language query. Kept for future
       reranking phases; the embedding does the recall today.
-    * `:query_embedding` (required) — the dense embedding for the query.
-    * `:workspace_context` — workspace id when searching from a workspace
+    * `:query_embedding` (required): the dense embedding for the query.
+    * `:workspace_context`: workspace id when searching from a workspace
       surface, `nil` for personal.
-    * `:trust_tiers` — list of trust tiers to include. Defaults to
+    * `:trust_tiers`: list of trust tiers to include. Defaults to
       `[:instruction, :evidence]` (noise is excluded).
-    * `:limit` — max candidates to return after ranking. Defaults to 25.
+    * `:limit`: max candidates to return after ranking. Defaults to 25.
 
   Super-graph-first dispatch:
 
@@ -79,14 +79,14 @@ defmodule Magus.SuperBrain.Retrieval do
 
   ## Options
 
-    * `:query_embedding` (required) — the dense embedding for the query.
-    * `:workspace_context` — workspace id when searching from a workspace
+    * `:query_embedding` (required): the dense embedding for the query.
+    * `:workspace_context`: workspace id when searching from a workspace
       surface, `nil` for personal. Only consulted when `:accessible_graphs`
       is absent.
-    * `:trust_tiers` — list of trust tiers to include. Defaults to
+    * `:trust_tiers`: list of trust tiers to include. Defaults to
       `[:instruction, :evidence]` (noise is excluded).
-    * `:limit` — max claims to return. Defaults to 10.
-    * `:accessible_graphs` — precomputed allow-list of graph names. Callers
+    * `:limit`: max claims to return. Defaults to 10.
+    * `:accessible_graphs`: precomputed allow-list of graph names. Callers
       (e.g. the per-turn context builder) may compute this once and pass it
       to both `search/2` and `search_claims/2` to avoid recomputing it
       twice. Defaults to `AccessibleGraphs.for_actor/2` with the super

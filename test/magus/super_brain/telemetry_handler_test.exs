@@ -87,14 +87,6 @@ defmodule Magus.SuperBrain.TelemetryHandlerTest do
       )
     end
 
-    test "extraction.sparse_edges" do
-      :telemetry.execute(
-        [:super_brain, :extraction, :sparse_edges],
-        %{entity_count: 5, edge_count: 1},
-        %{user_id: "u1"}
-      )
-    end
-
     test "sanitizer.*" do
       for kind <- [:predicate_fallback, :type_fallback, :ambiguous_edge_endpoint] do
         :telemetry.execute(
