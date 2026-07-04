@@ -86,9 +86,9 @@ defmodule Magus.SuperBrain.Extraction.Sanitizer do
   with graceful nil.
   """
   def sanitize_claim(claim) do
-    sub = claim |> fetch(:subject_name) |> strip_control() |> String.trim()
-    obj = claim |> fetch(:object_name) |> strip_control() |> String.trim()
-    text = claim |> fetch(:claim_text) |> strip_control() |> String.trim()
+    sub = claim |> fetch(:subject_name) |> to_string() |> strip_control() |> String.trim()
+    obj = claim |> fetch(:object_name) |> to_string() |> strip_control() |> String.trim()
+    text = claim |> fetch(:claim_text) |> to_string() |> strip_control() |> String.trim()
 
     if sub == "" or obj == "" or text == "" do
       :skip
@@ -99,7 +99,7 @@ defmodule Magus.SuperBrain.Extraction.Sanitizer do
         predicate: predicate_string(fetch(claim, :predicate)),
         polarity: polarity(fetch(claim, :polarity)),
         claim_text: clip(text, @max_claim_text),
-        confidence: clamp(fetch(claim, :confidence) || 0.0, 0.0, 1.0),
+        confidence: claim |> fetch(:confidence) |> number_or(0.0) |> clamp(0.0, 1.0),
         valid_from: parse_date(fetch(claim, :valid_from)),
         valid_to: parse_date(fetch(claim, :valid_to))
       }
@@ -119,6 +119,9 @@ defmodule Magus.SuperBrain.Extraction.Sanitizer do
 
   defp polarity(p) when p in [:negates, "negates"], do: :negates
   defp polarity(_), do: :affirms
+
+  defp number_or(v, _default) when is_number(v), do: v
+  defp number_or(_v, default), do: default
 
   defp parse_date(nil), do: nil
 
