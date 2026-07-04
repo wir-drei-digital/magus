@@ -64,10 +64,26 @@ defmodule Magus.Agents.Actions.DistillUserProfile do
   # `not_found_error?: true`, so a bucket with no row yet returns
   # `{:error, %Ash.Error.Query.NotFound{}}` rather than `{:ok, nil}`. Treat any
   # non-success as "no profile yet" and create the (empty-document) row.
+  #
+  # `unique_bucket` (`user_id`, `workspace_id`) makes this racy: if another
+  # caller (e.g. the UpdateProfile tool, or a concurrent Oban retry) wins a
+  # concurrent create for the same brand-new bucket, ours comes back as an
+  # `{:error, %Ash.Error.Invalid{}}` unique-index violation. Re-read once
+  # rather than aborting, so we use the row that now exists instead of
+  # silently dropping this distillation.
   defp get_or_create_profile(user_id, workspace_id) do
     case Memory.get_user_profile(user_id, workspace_id, actor: @actor) do
-      {:ok, profile} when not is_nil(profile) -> {:ok, profile}
-      _ -> Memory.create_user_profile(user_id, workspace_id, %{document: ""}, actor: @actor)
+      {:ok, profile} when not is_nil(profile) ->
+        {:ok, profile}
+
+      _ ->
+        case Memory.create_user_profile(user_id, workspace_id, %{document: ""}, actor: @actor) do
+          {:ok, profile} ->
+            {:ok, profile}
+
+          {:error, _} ->
+            Memory.get_user_profile(user_id, workspace_id, actor: @actor)
+        end
     end
   end
 
