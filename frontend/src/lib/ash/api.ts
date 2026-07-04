@@ -5703,3 +5703,11 @@ export function favoriteSkill(skillId: string): Promise<RpcResult<SkillFavoriteE
 export function unfavoriteSkill(favoriteId: string): Promise<RpcResult<Record<string, never>>> {
 	return run((opts) => rpc.unfavoriteSkill({ identity: favoriteId, ...opts }));
 }
+
+export function trustSkill(skillId: string): Promise<RpcResult<{ id: string }>> {
+	return run((opts) => rpc.trustSkill({ input: { skillId }, fields: ['id'], ...opts }));
+}
+
+export function untrustSkill(trustId: string): Promise<RpcResult<Record<string, never>>> {
+	return run((opts) => rpc.untrustSkill({ identity: trustId, ...opts }));
+}
