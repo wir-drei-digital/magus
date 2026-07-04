@@ -35,4 +35,13 @@ defmodule Magus.Agents.Config do
 
   @doc "Model for memory extraction (should be fast/cheap)."
   def extraction_model, do: Magus.Models.Roles.resolve(:memory_extraction)
+
+  @doc """
+  Feature flag for the distilled user profile layer (Hermes-style working
+  memory). Env var wins so eval A/B runs can toggle it per process.
+  """
+  def profile_enabled? do
+    System.get_env("MAGUS_MEMORY_PROFILE") == "1" or
+      Application.get_env(:magus, :memory_profile_enabled, false)
+  end
 end

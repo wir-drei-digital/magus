@@ -7,6 +7,8 @@ defmodule Magus.Agents.Actions.ConsolidateMemories do
   1. **Decay**: Deactivate memories that haven't been accessed in 90+ days
   2. **Promote**: Identify local memories that should become global (via PromoteMemoryCandidates)
   3. **Merge**: Cluster related memories into consolidated groups (via MergeMemories)
+  4. **Distill**: Rewrite the Hermes-style user profile document per workspace
+     bucket (via DistillUserProfile), behind the `MAGUS_MEMORY_PROFILE` flag
 
   ## Usage
 
@@ -156,14 +158,47 @@ defmodule Magus.Agents.Actions.ConsolidateMemories do
         end)
       end
 
+    # Step 4: Distill the Hermes-style user profile per workspace bucket,
+    # behind the feature flag. A failure for one bucket logs and continues;
+    # decay/promote/merge results above are already committed.
+    profiles_distilled =
+      if Magus.Agents.Config.profile_enabled?() do
+        distill_profiles(user_id, buckets)
+      else
+        0
+      end
+
     {:ok,
      %{
        decayed_count: decayed_count,
        promoted_count: promoted_count,
        merged_count: merged_count,
+       profiles_distilled: profiles_distilled,
        user_id: user_id,
        completed_at: DateTime.utc_now()
      }}
+  end
+
+  defp distill_profiles(user_id, buckets) do
+    Enum.count(buckets, fn workspace_id ->
+      case Magus.Agents.Actions.DistillUserProfile.run(
+             %{
+               user_id: to_string(user_id),
+               workspace_id: workspace_id && to_string(workspace_id)
+             },
+             %{}
+           ) do
+        {:ok, _} ->
+          true
+
+        {:error, reason} ->
+          Logger.warning(
+            "ConsolidateMemories: profile distillation failed for bucket #{inspect(workspace_id)}: #{inspect(reason)}"
+          )
+
+          false
+      end
+    end)
   end
 
   # Returns distinct workspace_id values across the user's active memories.
