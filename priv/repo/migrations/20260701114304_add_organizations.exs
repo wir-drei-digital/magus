@@ -34,7 +34,8 @@ defmodule Magus.Repo.Migrations.AddOrganizations do
             name: "organizations_owner_id_fkey",
             type: :uuid,
             prefix: "public"
-          ), null: false
+          ),
+          null: false
     end
 
     create unique_index(:organizations, [:slug], name: "organizations_unique_slug_index")
@@ -50,7 +51,8 @@ defmodule Magus.Repo.Migrations.AddOrganizations do
             name: "organizations_versions_version_source_id_fkey",
             type: :uuid,
             prefix: "public"
-          ), null: false
+          ),
+          null: false
 
       add :changes, :map
 

@@ -21,9 +21,7 @@ export type MemberLike = {
  * none of the above.
  */
 export function memberDisplayName(member: MemberLike): string {
-	return (
-		member.user?.displayName || member.user?.email || member.inviteEmail || 'Unknown'
-	);
+	return member.user?.displayName || member.user?.email || member.inviteEmail || 'Unknown';
 }
 
 /**
