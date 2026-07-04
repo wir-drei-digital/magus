@@ -96,6 +96,9 @@ config :magus, :super_brain_extraction_embedder, Magus.Embeddings.BatchEmbedderM
 # Use test sandbox provider to prevent provisioning real services
 config :magus, Magus.Sandbox, provider: :test
 
+# Overridden per-test to a Bypass endpoint; unset in prod so the real URL is used.
+config :magus, :google_token_url, "https://oauth2.googleapis.com/token"
+
 # Req.Test plug so the Daytona control-plane client can be HTTP-stubbed in its
 # own unit test (all other tests dispatch to the :test provider above).
 config :magus, Magus.Sandbox.Clients.Daytona,

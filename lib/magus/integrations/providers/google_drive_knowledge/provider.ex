@@ -22,12 +22,18 @@ defmodule Magus.Integrations.Providers.GoogleDriveKnowledge do
 
   @impl true
   def oauth_config do
+    {client_id, client_secret} =
+      case Magus.Knowledge.OAuth.google_credentials() do
+        {:ok, creds} -> creds
+        {:error, _} -> {nil, nil}
+      end
+
     %{
       authorize_url: "https://accounts.google.com/o/oauth2/v2/auth",
       token_url: "https://oauth2.googleapis.com/token",
       scopes: ["https://www.googleapis.com/auth/drive.readonly"],
-      client_id: System.get_env("GOOGLE_CLIENT_ID"),
-      client_secret: System.get_env("GOOGLE_CLIENT_SECRET")
+      client_id: client_id,
+      client_secret: client_secret
     }
   end
 
