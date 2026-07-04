@@ -115,16 +115,54 @@ defmodule Magus.Application do
         # Reset collections stuck in :syncing after restart
         Magus.Knowledge.SyncRecovery,
         {DNSCluster, query: Application.get_env(:magus, :dns_cluster_query) || :ignore},
-        {Oban,
-         AshOban.config(
-           Application.fetch_env!(:magus, :ash_domains),
-           Application.fetch_env!(:magus, Oban)
-         )},
+        {Oban, oban_config()},
         {Phoenix.PubSub, name: Magus.PubSub},
         Magus.Presence,
         # Jido instance for agent execution
         Magus.Jido
       ]
+  end
+
+  # Oban config with every AshOban trigger queue guaranteed present.
+  defp oban_config do
+    domains = Application.fetch_env!(:magus, :ash_domains)
+    base = Application.fetch_env!(:magus, Oban)
+    AshOban.config(domains, ensure_trigger_queues(base, domains))
+  end
+
+  # Registers every AshOban trigger queue (and scheduler queue) that isn't already
+  # configured, at a conservative `limit: 1`.
+  #
+  # `AshOban.config/2` aborts boot (`require_queues!`) if a trigger's queue is
+  # missing from the Oban config. Hand-listing every trigger queue means the list
+  # drifts whenever a trigger is added — and an edition that redefines the whole
+  # `queues:` list (the cloud wrapper) crashloops on the next release when it lags
+  # behind core. Deriving the queues from the domains removes that failure mode:
+  # callers only declare NON-trigger queues (`default`, `chat_responses`, custom
+  # limits). Explicit config wins via `Keyword.put_new`, so tuned limits survive.
+  # Public only so the invariant can be unit-tested.
+  @doc false
+  def ensure_trigger_queues(base, domains) do
+    trigger_queues =
+      domains
+      |> List.wrap()
+      |> Enum.flat_map(&Ash.Domain.Info.resources/1)
+      |> Enum.flat_map(&AshOban.Info.oban_triggers_and_scheduled_actions/1)
+      # `.queue` is always present; `.scheduler_queue` only on triggers with a
+      # scheduler, so read it with Map.get and drop the nils.
+      |> Enum.flat_map(fn trigger -> [trigger.queue, Map.get(trigger, :scheduler_queue)] end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    case Keyword.get(base, :queues) do
+      queues when is_list(queues) ->
+        merged = Enum.reduce(trigger_queues, queues, &Keyword.put_new(&2, &1, 1))
+        Keyword.put(base, :queues, merged)
+
+      # `queues: false` (or unset) — this node runs no queues; leave it alone.
+      _ ->
+        base
+    end
   end
 
   # Jido Agent InstanceManager - disabled in tests (agent processes can't access Ecto sandbox)

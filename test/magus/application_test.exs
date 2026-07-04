@@ -80,5 +80,69 @@ defmodule Magus.ApplicationTest do
     end
   end
 
+  describe "ensure_trigger_queues/2 (Oban queue drift guard)" do
+    # The set of queues every AshOban trigger in the real domains needs present,
+    # derived the same way AshOban's require_queues! checks them.
+    defp required_trigger_queues do
+      Application.fetch_env!(:magus, :ash_domains)
+      |> Enum.flat_map(&Ash.Domain.Info.resources/1)
+      |> Enum.flat_map(&AshOban.Info.oban_triggers_and_scheduled_actions/1)
+      |> Enum.flat_map(fn trigger -> [trigger.queue, Map.get(trigger, :scheduler_queue)] end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+    end
+
+    test "registers every trigger queue even when the base config declares none" do
+      domains = Application.fetch_env!(:magus, :ash_domains)
+      # A base that mirrors nothing — the worst case an edition can drift into.
+      base = [queues: [default: 10]]
+
+      merged = Magus.Application.ensure_trigger_queues(base, domains)
+      queues = Keyword.fetch!(merged, :queues)
+
+      missing = Enum.reject(required_trigger_queues(), &Keyword.has_key?(queues, &1))
+      assert missing == [], "trigger queues absent after derivation: #{inspect(missing)}"
+    end
+
+    test "auto-registered queues default to limit 1" do
+      domains = Application.fetch_env!(:magus, :ash_domains)
+      merged = Magus.Application.ensure_trigger_queues([queues: []], domains)
+      queues = Keyword.fetch!(merged, :queues)
+
+      # agent_heartbeat_watchdog is a real trigger queue (the one that took prod
+      # down on 2026-07-04); it must be present at the conservative default.
+      assert queues[:agent_heartbeat_watchdog] == 1
+    end
+
+    test "explicit limits win over the derived default (put_new semantics)" do
+      domains = Application.fetch_env!(:magus, :ash_domains)
+      base = [queues: [agent_heartbeat_watchdog: 7, default: 10]]
+
+      merged = Magus.Application.ensure_trigger_queues(base, domains)
+      queues = Keyword.fetch!(merged, :queues)
+
+      assert queues[:agent_heartbeat_watchdog] == 7
+      assert queues[:default] == 10
+    end
+
+    test "leaves a queues: false config untouched (queue-less node)" do
+      domains = Application.fetch_env!(:magus, :ash_domains)
+      assert Magus.Application.ensure_trigger_queues([queues: false], domains) == [queues: false]
+    end
+
+    test "the real assembled Oban config satisfies require_queues! for every trigger" do
+      # AshOban.config/2 raises if any trigger queue is missing; building it from
+      # the real base config proves the running app boots without queue drift.
+      domains = Application.fetch_env!(:magus, :ash_domains)
+      base = Application.fetch_env!(:magus, Oban)
+
+      config = AshOban.config(domains, Magus.Application.ensure_trigger_queues(base, domains))
+      queues = Keyword.fetch!(config, :queues)
+
+      missing = Enum.reject(required_trigger_queues(), &Keyword.has_key?(queues, &1))
+      assert missing == []
+    end
+  end
+
   defp index_of(list, value), do: Enum.find_index(list, &(&1 == value))
 end
