@@ -445,21 +445,34 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
     previews? = Keyword.get(opts, :previews, true)
     profile_document = Keyword.get(opts, :profile_document)
 
-    sections = [
-      format_profile_section(profile_document),
-      format_important_section(important, previews?),
-      format_semantic_section(semantic),
-      format_global_note(global_enabled, important ++ semantic)
-    ]
+    profile_section = format_profile_section(profile_document)
+    important_section = format_important_section(important, previews?)
+    semantic_section = format_semantic_section(semantic)
 
-    content =
-      sections
-      |> Enum.reject(&(&1 == "" or is_nil(&1)))
-      |> Enum.join("\n")
+    real_sections = [profile_section, important_section, semantic_section]
 
-    if content == "" do
+    if Enum.all?(real_sections, &(&1 == "" or is_nil(&1))) do
+      # No real memory content anywhere (no profile, no important memories,
+      # no semantic hits). The global note is a tip/disabled-notice only, it
+      # must never be the sole reason this block renders, so bail out here
+      # instead of falling through to the note-only content check below.
       ""
     else
+      # A profile document already tells the user global memory is active
+      # and populated, so the "create/enable global memories" note would be
+      # actively wrong here. Only show the note when there's no profile.
+      global_note =
+        if is_nil(profile_document) do
+          format_global_note(global_enabled, important ++ semantic)
+        else
+          ""
+        end
+
+      content =
+        [profile_section, important_section, semantic_section, global_note]
+        |> Enum.reject(&(&1 == "" or is_nil(&1)))
+        |> Enum.join("\n")
+
       """
 
       ## Your Memory
