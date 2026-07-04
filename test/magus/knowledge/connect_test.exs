@@ -100,4 +100,30 @@ defmodule Magus.Knowledge.ConnectTest do
       assert "/dav/folderA" in Enum.map(collections, & &1.external_id)
     end
   end
+
+  describe "reconnect_or_create/3" do
+    test "updates the existing source for the provider instead of creating a duplicate" do
+      user = generate(user())
+
+      {:ok, first} = Connect.connect_and_create("nextcloud", @nextcloud, actor: user)
+
+      {:ok, second} =
+        Connect.reconnect_or_create(
+          "nextcloud",
+          Map.put(@nextcloud, "password", "rotated-token"),
+          actor: user
+        )
+
+      assert second.id == first.id
+      assert {:ok, [_only_one]} = Knowledge.list_sources_for_user(actor: user)
+    end
+
+    test "creates a source when none exists for the provider" do
+      user = generate(user())
+
+      assert {:ok, source} = Connect.reconnect_or_create("nextcloud", @nextcloud, actor: user)
+      assert source.provider == :nextcloud
+      assert source.status == :active
+    end
+  end
 end
