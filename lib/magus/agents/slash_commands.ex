@@ -135,4 +135,50 @@ defmodule Magus.Agents.SlashCommands do
   end
 
   def parse(text, _agent_commands), do: {nil, text}
+
+  @doc """
+  Resolve a leading slash command against agent commands, then the actor's
+  runnable skills, then globals.
+
+  Returns `{result, remaining_text}` where result is:
+    * `{:command, instruction_string}` for a matched agent/global command
+    * `{:skill, ref}` for a matched runnable user skill ("user:<id>")
+    * `:none` when nothing matched (remaining_text is the original text)
+  """
+  def resolve(text, agent_commands, opts \\ [])
+
+  def resolve("/" <> rest, agent_commands, opts) do
+    {command_name, remaining} =
+      case String.split(rest, ~r/\s/, parts: 2) do
+        [name] -> {name, ""}
+        [name, tail] -> {name, String.trim(tail)}
+      end
+
+    cond do
+      command = Enum.find(agent_commands, &(to_string(&1.name) == command_name)) ->
+        {{:command, "<instruction>#{command.instruction}</instruction>"}, remaining}
+
+      ref = skill_ref(command_name, opts[:actor]) ->
+        {{:skill, ref}, remaining}
+
+      command = Enum.find(@global_commands, &(&1.name == command_name)) ->
+        {{:command, "<instruction>#{command.instruction}</instruction>"}, remaining}
+
+      true ->
+        {:none, "/" <> rest}
+    end
+  end
+
+  def resolve(text, _agent_commands, _opts), do: {:none, text || ""}
+
+  defp skill_ref(_name, nil), do: nil
+
+  defp skill_ref(name, actor) do
+    Magus.Skills.Discovery.list_for_actor(actor)
+    |> Enum.find(fn view -> view.source == :user and view.runnable and view.name == name end)
+    |> case do
+      nil -> nil
+      view -> view.ref
+    end
+  end
 end
