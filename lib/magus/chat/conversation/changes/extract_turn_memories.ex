@@ -11,7 +11,6 @@ defmodule Magus.Chat.Conversation.Changes.ExtractTurnMemories do
   """
 
   use Ash.Resource.Change
-  require Logger
 
   alias Magus.Agents.Actions.ExtractTurnMemories, as: ExtractAction
 
@@ -71,6 +70,10 @@ defmodule Magus.Chat.Conversation.Changes.ExtractTurnMemories do
     end
   end
 
+  # If extraction succeeds but this watermark update (or the job itself)
+  # later fails, Oban retries and the whole window re-extracts. That is
+  # safe: name-match + semantic dedup in the extraction action prevent
+  # duplicate memory rows (at-least-once, idempotent).
   defp advance_watermark(conversation, turns) do
     last = turns |> List.last() |> Map.fetch!(:last_inserted_at)
 

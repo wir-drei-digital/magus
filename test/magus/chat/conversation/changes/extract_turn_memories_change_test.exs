@@ -119,6 +119,10 @@ defmodule Magus.Chat.Conversation.Changes.ExtractTurnMemoriesChangeTest do
         String.duplicate("Understood, Elixir it is for everything we build. ", 3)
       )
 
+      # Ensure the second turn sorts strictly after the first: inserted_at
+      # is microsecond precision and consecutive seeds can collide.
+      Process.sleep(1)
+
       seed_turn!(
         conv,
         String.duplicate("Second fact: deploys go to Fly.io. ", 3),
@@ -152,6 +156,10 @@ defmodule Magus.Chat.Conversation.Changes.ExtractTurnMemoriesChangeTest do
       end)
 
       assert {:ok, _} = run_extract_action(conv)
+
+      # Ensure the new turn sorts strictly after the watermark: inserted_at
+      # is microsecond precision and consecutive seeds can collide.
+      Process.sleep(1)
 
       seed_turn!(
         conv,
