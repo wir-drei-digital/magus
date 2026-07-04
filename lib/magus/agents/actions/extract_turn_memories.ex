@@ -15,9 +15,13 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
       {:ok, result} = ExtractTurnMemories.run(%{
         user_id: user.id,
         conversation_id: conversation.id,
-        user_message: "My preferred IDE is VS Code",
-        agent_response: "I'll remember that..."
+        turns: [
+          %{"user" => "My preferred IDE is VS Code", "agent" => "I'll remember that..."}
+        ]
       }, %{})
+
+  The legacy single-turn `user_message`/`agent_response` pair is still
+  accepted and is converted internally into a one-element `turns` list.
 
   ## Scope Heuristics
 
@@ -31,8 +35,21 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
     schema: [
       user_id: [type: :string, required: true, doc: "User ID"],
       conversation_id: [type: :string, required: true, doc: "Conversation ID"],
-      user_message: [type: :string, required: true, doc: "User's message text"],
-      agent_response: [type: :string, required: true, doc: "Agent's response text"],
+      user_message: [
+        type: {:or, [:string, nil]},
+        default: nil,
+        doc: "Legacy single-turn user text (use turns instead)"
+      ],
+      agent_response: [
+        type: {:or, [:string, nil]},
+        default: nil,
+        doc: "Legacy single-turn agent text (use turns instead)"
+      ],
+      turns: [
+        type: {:or, [{:list, :map}, nil]},
+        default: nil,
+        doc: ~s(List of turn pairs: [%{"user" => text, "agent" => text}])
+      ],
       model: [type: {:or, [:string, nil]}, default: nil, doc: "Model key override"],
       allow_global_memories: [
         type: :boolean,
@@ -100,13 +117,18 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
     params = normalize_keys(params)
     user_id = params["user_id"]
     conversation_id = params["conversation_id"]
-    user_message = params["user_message"] || ""
-    agent_response = params["agent_response"] || ""
     model = params["model"] || Config.extraction_model()
+
+    turns = resolve_turns(params)
+
+    transcript_chars =
+      Enum.reduce(turns, 0, fn t, acc ->
+        acc + String.length(t["user"] || "") + String.length(t["agent"] || "")
+      end)
 
     Logger.debug(
       "ExtractTurnMemories: user_id=#{inspect(user_id)}, conv_id=#{inspect(conversation_id)}, " <>
-        "msg_len=#{String.length(user_message)}, resp_len=#{String.length(agent_response)}, model=#{inspect(model)}"
+        "turns=#{length(turns)}, transcript_chars=#{transcript_chars}, model=#{inspect(model)}"
     )
 
     # Validate required params
@@ -119,9 +141,9 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
         Logger.warning("ExtractTurnMemories: conversation_id is required")
         {:error, "conversation_id is required"}
 
-      # Skip if messages are too short to contain extractable info
-      String.length(user_message) < 50 or String.length(agent_response) < 100 ->
-        Logger.debug("ExtractTurnMemories: Messages too short, skipping")
+      # Skip if there is nothing worth an LLM call
+      turns == [] or transcript_chars < 80 ->
+        Logger.debug("ExtractTurnMemories: Transcript too short, skipping")
         {:ok, %{extractions_applied: 0, extractions_skipped: 0}}
 
       true ->
@@ -130,8 +152,7 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
         case extract_and_apply(
                user_id,
                conversation_id,
-               user_message,
-               agent_response,
+               turns,
                model,
                allow_global
              ) do
@@ -153,11 +174,32 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
     Map.new(params, fn {key, value} -> {to_string(key), value} end)
   end
 
+  defp resolve_turns(params) do
+    case params["turns"] do
+      turns when is_list(turns) and turns != [] ->
+        Enum.map(turns, fn t ->
+          %{
+            "user" => to_string(t["user"] || t[:user] || ""),
+            "agent" => to_string(t["agent"] || t[:agent] || "")
+          }
+        end)
+
+      _ ->
+        user_message = params["user_message"] || ""
+        agent_response = params["agent_response"] || ""
+
+        if user_message == "" and agent_response == "" do
+          []
+        else
+          [%{"user" => user_message, "agent" => agent_response}]
+        end
+    end
+  end
+
   defp extract_and_apply(
          user_id,
          conversation_id,
-         user_message,
-         agent_response,
+         turns,
          model,
          allow_global
        ) do
@@ -173,7 +215,7 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
       "ExtractTurnMemories: Loaded #{length(local_memories)} local, #{length(user_memories)} user memories"
     )
 
-    prompt = build_prompt(local_memories, user_memories, user_message, agent_response)
+    prompt = build_prompt(local_memories, user_memories, turns)
 
     Logger.debug("ExtractTurnMemories: Calling LLM with model #{inspect(model)}")
 
@@ -412,7 +454,7 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
     }
   end
 
-  defp build_prompt(local_memories, global_memories, user_message, agent_response) do
+  defp build_prompt(local_memories, global_memories, turns) do
     local_text = format_memories(local_memories, "Local")
     global_text = format_memories(global_memories, "Global")
 
@@ -425,15 +467,13 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
     ### Global (user preferences)
     #{global_text}
 
-    ## Current Turn
+    ## Current Turns
 
-    **User**: #{user_message}
-
-    **Assistant**: #{agent_response}
+    #{format_turns(turns)}
 
     ## Instructions
 
-    Extract any information worth remembering from this turn:
+    Extract any information worth remembering from these turns:
 
     1. **Facts**: Names, dates, preferences explicitly stated
     2. **Decisions**: Choices the user made or confirmed
@@ -448,6 +488,12 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
 
     Keep extractions minimal - only persist genuinely useful information.
     """
+  end
+
+  defp format_turns(turns) do
+    Enum.map_join(turns, "\n\n---\n\n", fn t ->
+      "**User**: #{t["user"]}\n\n**Assistant**: #{t["agent"]}"
+    end)
   end
 
   defp format_memories([], _label), do: "None"

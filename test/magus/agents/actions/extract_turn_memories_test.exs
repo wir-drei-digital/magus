@@ -123,6 +123,39 @@ defmodule Magus.Agents.Actions.ExtractTurnMemoriesTest do
       assert applied == 2
       assert skipped == 0
     end
+
+    test "extracts from a multi-turn window" do
+      user = generate(user())
+      conv = generate(conversation(actor: user))
+
+      expect(LLMMock, :generate_object, fn _model, prompt, _schema, _opts ->
+        assert prompt =~ "turn one about the Magus project"
+        assert prompt =~ "turn two about preferring Elixir"
+
+        MockResponses.generate_object_response(%{"extractions" => []})
+      end)
+
+      result =
+        ExtractTurnMemories.run(
+          %{
+            user_id: user.id,
+            conversation_id: conv.id,
+            turns: [
+              %{
+                "user" => "This is turn one about the Magus project and its goals in detail.",
+                "agent" => "Understood, the Magus project goals are noted here."
+              },
+              %{
+                "user" => "This is turn two about preferring Elixir for everything we do.",
+                "agent" => "Elixir preference recorded for future work sessions."
+              }
+            ]
+          },
+          %{}
+        )
+
+      assert {:ok, %{extractions_applied: 0}} = result
+    end
   end
 
   describe "schema validation" do

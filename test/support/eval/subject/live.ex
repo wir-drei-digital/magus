@@ -34,44 +34,20 @@ defmodule Magus.Eval.Subject.Live do
     {:ok, Map.put(ctx, :conversation, conversation)}
   end
 
+  # Production extraction batches all turns accumulated during a debounce
+  # window into one call; approximate that burst size with chunks of 5.
+  @turns_per_extraction 5
+
   @impl true
   def ingest(ctx, items) do
     items
-    |> to_windows()
-    |> Enum.each(fn pairs -> extract_window(ctx, pairs) end)
+    |> pair_turns()
+    |> Enum.map(fn {user_text, agent_text} -> %{"user" => user_text, "agent" => agent_text} end)
+    |> Enum.chunk_every(@turns_per_extraction)
+    |> Enum.each(fn turns -> force_extract(ctx, turns) end)
 
     settle_extraction()
     {:ok, ctx}
-  end
-
-  # Group ingest items into extraction windows, then pair user->agent turns
-  # within each window. Items carrying a :session tag (LongMemEval) become one
-  # window per session; untagged items (small benchmarks) form a single window.
-  # This mirrors production, where a debounce window is extracted once rather
-  # than once per turn-pair, and it cuts LongMemEval extraction calls ~10x.
-  defp to_windows(items) do
-    if Enum.any?(items, &Map.has_key?(&1, :session)) do
-      items
-      |> Enum.chunk_by(&Map.get(&1, :session))
-      |> Enum.map(&pair_turns/1)
-      |> Enum.reject(&(&1 == []))
-    else
-      case pair_turns(items) do
-        [] -> []
-        pairs -> [pairs]
-      end
-    end
-  end
-
-  # Baseline production (load_last_turn) extracts only the last (user, agent)
-  # pair of a debounce window. A replayed session is one window, so extract its
-  # last pair. The windowed-extraction hardening (memory hardening plan, Task 3)
-  # changes this to pass every pair in the window.
-  defp extract_window(ctx, pairs) do
-    case List.last(pairs) do
-      {user_text, agent_text} -> force_extract(ctx, user_text, agent_text)
-      _ -> :ok
-    end
   end
 
   @impl true
@@ -116,13 +92,12 @@ defmodule Magus.Eval.Subject.Live do
   # ExtractTurnMemories exposes run/2 (params, context); context is unused, so
   # we pass an empty map. It runs synchronously inline (no Task spawn) and
   # persists memories before returning. Wrap so one failure does not abort ingest.
-  defp force_extract(ctx, user_text, agent_text) do
+  defp force_extract(ctx, turns) do
     Magus.Agents.Actions.ExtractTurnMemories.run(
       %{
         user_id: to_string(ctx.user.id),
         conversation_id: to_string(ctx.conversation.id),
-        user_message: user_text,
-        agent_response: agent_text,
+        turns: turns,
         allow_global_memories: true
       },
       %{}

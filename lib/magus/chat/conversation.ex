@@ -187,6 +187,10 @@ defmodule Magus.Chat.Conversation do
       require_atomic? false
     end
 
+    update :mark_extracted do
+      accept [:last_extracted_message_at]
+    end
+
     update :extract_turn_memories do
       accept []
       transaction? false
@@ -695,6 +699,10 @@ defmodule Magus.Chat.Conversation do
       authorize_if always()
     end
 
+    bypass action(:mark_extracted) do
+      authorize_if always()
+    end
+
     # Generic actions - bypass since they're read-only
     # and called from already-authorized contexts (chat view, respond change)
     bypass action(:build_message_history) do
@@ -842,6 +850,13 @@ defmodule Magus.Chat.Conversation do
     attribute :extraction_due_at, :utc_datetime_usec do
       allow_nil? true
       public? true
+    end
+
+    attribute :last_extracted_message_at, :utc_datetime_usec do
+      allow_nil? true
+      public? true
+
+      description "Watermark: inserted_at of the newest message already covered by turn memory extraction"
     end
 
     attribute :last_memory_consolidation_at, :utc_datetime_usec do
