@@ -293,6 +293,108 @@ export function updateTimezone(userId: string, timezone: string): Promise<RpcRes
 	);
 }
 
+// ─── Memory & profile settings ───────────────────────────────────────────────
+
+/**
+ * These two toggles feed `session.user` (typed `CurrentUser`), so they select
+ * `CURRENT_USER_FIELDS` and return `RpcResult<CurrentUser>` rather than the
+ * richer `USER_SETTINGS_FIELDS` the other settings wrappers above use.
+ */
+export function updateMemorySetting(
+	userId: string,
+	enabled: boolean
+): Promise<RpcResult<CurrentUser>> {
+	return run((opts) =>
+		rpc.updateGlobalMemorySetting({
+			identity: userId,
+			input: { globalMemoryEnabled: enabled },
+			fields: CURRENT_USER_FIELDS,
+			...opts
+		})
+	);
+}
+
+export function updateProfileSetting(
+	userId: string,
+	enabled: boolean
+): Promise<RpcResult<CurrentUser>> {
+	return run((opts) =>
+		rpc.updateProfileSetting({
+			identity: userId,
+			input: { profileEnabled: enabled },
+			fields: CURRENT_USER_FIELDS,
+			...opts
+		})
+	);
+}
+
+export type UserMemory = {
+	id: string;
+	name: string;
+	summary: string | null;
+	kind: string | null;
+	updatedAt: string | null;
+};
+
+const USER_MEMORY_FIELDS: rpc.ListUserMemoriesFields = [
+	'id',
+	'name',
+	'summary',
+	'kind',
+	'updatedAt'
+];
+
+export async function listUserMemories(
+	workspaceId: string | null
+): Promise<RpcResult<UserMemory[]>> {
+	const result = await run<Array<Record<string, unknown>> | null>((opts) =>
+		rpc.listUserMemories({ input: { workspaceId }, fields: USER_MEMORY_FIELDS, ...opts })
+	);
+	if (!result.success) return result;
+	return { success: true, data: (result.data ?? []) as UserMemory[] };
+}
+
+export async function deactivateUserMemory(memoryId: string): Promise<RpcResult<{ id: string }>> {
+	const result = await run<Record<string, unknown> | null>((opts) =>
+		rpc.deactivateUserMemory({ identity: memoryId, fields: ['id'], ...opts })
+	);
+	if (!result.success) return result;
+	return { success: true, data: { id: String((result.data ?? {}).id ?? memoryId) } };
+}
+
+export type UserProfileDoc = {
+	id: string;
+	document: string;
+	tokenEstimate: number;
+	lastDistilledAt: string | null;
+};
+
+const USER_PROFILE_FIELDS: rpc.GetUserProfileFields = [
+	'id',
+	'document',
+	'tokenEstimate',
+	'lastDistilledAt'
+];
+
+export async function getUserProfile(
+	userId: string,
+	workspaceId: string | null
+): Promise<RpcResult<UserProfileDoc | null>> {
+	const result = await run<Record<string, unknown> | null>((opts) =>
+		rpc.getUserProfile({ input: { userId, workspaceId }, fields: USER_PROFILE_FIELDS, ...opts })
+	);
+	if (!result.success) return result;
+	return { success: true, data: (result.data ?? null) as UserProfileDoc | null };
+}
+
+export async function clearUserProfile(profileId: string): Promise<RpcResult<{ id: string }>> {
+	const result = await run<Record<string, unknown> | null>((opts) =>
+		rpc.clearUserProfile({ identity: profileId, fields: ['id'], ...opts })
+	);
+	if (!result.success) return result;
+	return { success: true, data: { id: String((result.data ?? {}).id ?? profileId) } };
+}
+
 // ─── Settings controllers (non-RPC endpoints) ───────────────────────────────
 
 /**
