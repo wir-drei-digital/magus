@@ -70,3 +70,6 @@ priv/native
 
 # Eval harness dataset cache (results are committed; cache is not)
 /eval/cache/
+
+# Eval run artifacts (regenerable; baselines doc is the committed record)
+eval/results/
