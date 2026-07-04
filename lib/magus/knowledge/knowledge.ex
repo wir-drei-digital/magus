@@ -26,6 +26,8 @@ defmodule Magus.Knowledge do
       define :list_sources_for_user, action: :for_user
       define :list_sources_for_workspace, action: :for_workspace, args: [:workspace_id]
       define :update_source_auth_config, action: :update_auth_config
+      define :mark_source_needs_reauth, action: :mark_needs_reauth
+      define :clear_source_reauth, action: :clear_reauth
       define :destroy_source, action: :destroy
     end
 
