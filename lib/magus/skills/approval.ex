@@ -1,9 +1,11 @@
 defmodule Magus.Skills.Approval do
   @moduledoc """
   First-run approval for bundled skills. Requesting creates a notification and
-  an action-card message; the user's "Approve skill: <id>" reply is recorded
-  onto the conversation by the approval matcher. Materialization gates on
-  `approved?/2`.
+  an action-card message. Consent is recorded as a `ConversationSkillApproval`
+  join row (by the inbox approval matcher, a slash invocation, or a trust
+  grant), each bound to the approved bundle_sha. Materialization gates on
+  `approved?/2`, which requires a row whose sha still matches the skill's
+  current bundle (a content change re-prompts).
   """
 
   require Logger
@@ -26,6 +28,20 @@ defmodule Magus.Skills.Approval do
     |> case do
       [] -> false
       [row | _] -> is_nil(current_sha) or row.bundle_sha == current_sha
+    end
+  end
+
+  @spec trusted?(Ecto.UUID.t(), map()) :: boolean()
+  @doc "True when the user trusts this skill and the trusted sha still matches."
+  def trusted?(user_id, skill) do
+    current_sha = Map.get(skill, :bundle_sha)
+
+    Magus.Skills.SkillTrust
+    |> Ash.Query.filter(user_id == ^user_id and skill_id == ^skill.id)
+    |> Ash.read!(authorize?: false)
+    |> case do
+      [] -> false
+      [row | _] -> is_nil(current_sha) or row.bundle_sha_at_grant == current_sha
     end
   end
 
