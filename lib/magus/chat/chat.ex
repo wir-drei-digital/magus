@@ -273,6 +273,7 @@ defmodule Magus.Chat do
       define :set_conversation_skill, action: :set_skill
       define :set_conversation_loaded_tools, action: :set_loaded_tools
       define :schedule_extraction, action: :schedule_extraction
+      define :mark_conversation_extracted, action: :mark_extracted
       define :mark_memory_consolidated, action: :mark_memory_consolidated
 
       define :build_message_history,

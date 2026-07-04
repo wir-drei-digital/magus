@@ -31,31 +31,56 @@ defmodule Magus.Chat.Conversation.Changes.ExtractTurnMemories do
     end)
   end
 
+  # First extraction on a conversation with no watermark: cap the bootstrap
+  # window so we do not extract an entire long history in one call.
+  @max_bootstrap_messages 20
+  # Below this many characters across all pending turns there is nothing
+  # worth an LLM call; advance the watermark and move on.
+  @min_transcript_chars 80
+
   defp run_extraction(conversation) do
-    case load_last_turn(conversation.id) do
-      {:ok, user_message, agent_response} ->
-        if String.length(user_message) > 50 and String.length(agent_response) > 100 do
-          allow_global = agent_allows_global_writes?(conversation)
+    turns = load_turns_since(conversation)
 
-          case ExtractAction.run(
-                 %{
-                   user_id: to_string(conversation.user_id),
-                   conversation_id: to_string(conversation.id),
-                   user_message: user_message,
-                   agent_response: agent_response,
-                   allow_global_memories: allow_global
-                 },
-                 %{}
-               ) do
-            {:ok, _result} -> :ok
-            {:error, reason} -> {:error, reason}
-          end
-        else
-          :ok
-        end
+    transcript_chars =
+      Enum.reduce(turns, 0, fn t, acc ->
+        acc + String.length(t.user) + String.length(t.agent)
+      end)
 
-      :skip ->
+    cond do
+      turns == [] ->
         :ok
+
+      transcript_chars < @min_transcript_chars ->
+        advance_watermark(conversation, turns)
+
+      true ->
+        allow_global = agent_allows_global_writes?(conversation)
+
+        case ExtractAction.run(
+               %{
+                 user_id: to_string(conversation.user_id),
+                 conversation_id: to_string(conversation.id),
+                 turns: Enum.map(turns, fn t -> %{"user" => t.user, "agent" => t.agent} end),
+                 allow_global_memories: allow_global
+               },
+               %{}
+             ) do
+          {:ok, _result} -> advance_watermark(conversation, turns)
+          {:error, reason} -> {:error, reason}
+        end
+    end
+  end
+
+  defp advance_watermark(conversation, turns) do
+    last = turns |> List.last() |> Map.fetch!(:last_inserted_at)
+
+    case Magus.Chat.mark_conversation_extracted(
+           conversation,
+           %{last_extracted_message_at: last},
+           authorize?: false
+         ) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -68,26 +93,54 @@ defmodule Magus.Chat.Conversation.Changes.ExtractTurnMemories do
     end
   end
 
-  defp load_last_turn(conversation_id) do
+  defp load_turns_since(conversation) do
     require Ash.Query
 
-    case Magus.Chat.Message
-         |> Ash.Query.filter(conversation_id == ^conversation_id and role in [:user, :agent])
-         |> Ash.Query.sort(inserted_at: :desc)
-         |> Ash.Query.limit(10)
-         |> Ash.read(authorize?: false) do
-      {:ok, messages} ->
-        agent_msg = Enum.find(messages, fn m -> m.role == :agent and (m.text || "") != "" end)
-        user_msg = Enum.find(messages, fn m -> m.role == :user and (m.text || "") != "" end)
+    query =
+      Magus.Chat.Message
+      |> Ash.Query.filter(conversation_id == ^conversation.id and role in [:user, :agent])
+      |> Ash.Query.sort(inserted_at: :asc)
 
-        if agent_msg && user_msg do
-          {:ok, user_msg.text, agent_msg.text}
-        else
-          :skip
-        end
+    query =
+      case conversation.last_extracted_message_at do
+        nil -> query
+        watermark -> Ash.Query.filter(query, inserted_at > ^watermark)
+      end
+
+    case Ash.read(query, authorize?: false) do
+      {:ok, messages} ->
+        messages
+        |> bootstrap_cap(conversation.last_extracted_message_at)
+        |> Enum.map(&%{role: &1.role, text: &1.text || "", inserted_at: &1.inserted_at})
+        |> pair_turns()
 
       {:error, _} ->
-        :skip
+        []
     end
   end
+
+  defp bootstrap_cap(messages, nil), do: Enum.take(messages, -@max_bootstrap_messages)
+  defp bootstrap_cap(messages, _watermark), do: messages
+
+  @doc """
+  Pairs each user message with the next non-empty agent message. Input must
+  be sorted ascending by inserted_at. Returns complete pairs only: a trailing
+  user message without a response stays before the watermark and is picked up
+  by the next run. Public for unit testing.
+  """
+  def pair_turns(messages), do: do_pair(messages, [])
+
+  defp do_pair([], acc), do: Enum.reverse(acc)
+
+  defp do_pair([%{role: :user, text: user_text} | rest], acc) when user_text != "" do
+    case Enum.split_while(rest, fn m -> m.role != :agent or m.text == "" end) do
+      {_skipped, [%{role: :agent, text: agent_text, inserted_at: at} | tail]} ->
+        do_pair(tail, [%{user: user_text, agent: agent_text, last_inserted_at: at} | acc])
+
+      {_skipped, []} ->
+        Enum.reverse(acc)
+    end
+  end
+
+  defp do_pair([_other | rest], acc), do: do_pair(rest, acc)
 end
