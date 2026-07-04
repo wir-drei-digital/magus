@@ -45,7 +45,7 @@ defmodule Magus.SuperBrain.E2ETest do
       {:ok,
        %{
          content:
-           ~s({"entities":[{"name":"Daniel","type":"person","subtype":null,"confidence":0.9},{"name":"Project X","type":"project","subtype":null,"confidence":0.8}],"edges":[{"subject_name":"Daniel","object_name":"Project X","predicate":"works_on","confidence":0.85}]}),
+           ~s({"entities":[{"name":"Daniel","type":"person","subtype":null,"confidence":0.9},{"name":"Project X","type":"project","subtype":null,"confidence":0.8}],"claims":[{"subject_name":"Daniel","object_name":"Project X","predicate":"works_on","polarity":"affirms","claim_text":"Daniel works on Project X.","confidence":0.85}]}),
          usage: %Magus.SuperBrain.Usage{
            model_name: "test",
            prompt_tokens: 100,

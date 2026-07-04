@@ -87,7 +87,7 @@ defmodule Magus.SuperBrain.Iter3E2ETest do
       {:ok,
        %{
          content:
-           ~s({"entities":[{"name":"Daniel","type":"person","subtype":"user","confidence":0.9}],"edges":[]}),
+           ~s({"entities":[{"name":"Daniel","type":"person","subtype":"user","confidence":0.9}],"claims":[]}),
          usage: %Magus.SuperBrain.Usage{
            model_name: "test",
            prompt_tokens: 10,
