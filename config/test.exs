@@ -108,6 +108,10 @@ config :magus, :http_request_req_options,
 # Use Req.Test plug for Brain source ingestion in tests
 config :magus, :brain_source_req_options, plug: {Req.Test, Magus.Brain.Source.IngestWorker}
 
+# Req.Test plug so the OpenRouter providers sync can be HTTP-stubbed.
+config :magus, :openrouter_providers_req_options,
+  plug: {Req.Test, Magus.Models.OpenRouterProviderSync}
+
 # Disable LLM-based classification in tests (use heuristic fallback)
 config :magus, :agents, classification_model: nil
 
