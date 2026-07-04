@@ -4,6 +4,14 @@ defmodule Magus.Providers.RoutingAllowListTest do
   alias Magus.Models
   alias Magus.Providers.Routing
 
+  # The seed migration commits US/EU/CH provider rows (allowed: true) into the
+  # shared test DB. Clear them (transaction-local, rolled back) so each test
+  # controls the allow-list it exercises.
+  setup do
+    Magus.DataCase.clear_open_router_providers!()
+    :ok
+  end
+
   defp allow(slug) do
     # upsert/set_allowed are admin-gated; the seed path bypasses like the sync module.
     {:ok, p} = Models.upsert_open_router_provider(%{slug: slug, name: slug}, authorize?: false)

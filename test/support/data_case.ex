@@ -55,6 +55,20 @@ defmodule Magus.DataCase do
     Magus.Repo.delete_all(Magus.Chat.RoutingSlot)
     Magus.Repo.delete_all(Magus.Chat.Model)
     Magus.Repo.delete_all(Magus.Models.Provider)
+    Magus.Repo.delete_all(Magus.Models.OpenRouterProvider)
+  end
+
+  @doc """
+  Clears all OpenRouter provider rows.
+
+  The `seed_allowed_open_router_providers` data migration commits the US/EU/CH
+  provider slugs (`allowed: true`) into the base (non-sandbox) connection.
+  Tests that assert on a controlled OpenRouter provider table clear those rows
+  inside the test transaction (rolled back after the test, so the committed
+  seed rows stay intact for other tests).
+  """
+  def clear_open_router_providers! do
+    Magus.Repo.delete_all(Magus.Models.OpenRouterProvider)
   end
 
   @doc """
