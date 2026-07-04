@@ -386,6 +386,11 @@ defmodule Magus.Accounts.User do
       accept [:global_memory_enabled]
     end
 
+    update :update_profile_setting do
+      description "Enable or disable the distilled user profile"
+      accept [:profile_enabled]
+    end
+
     update :clear_selected_plan do
       description "Clear the selected_plan_key after successful checkout"
       change set_attribute(:selected_plan_key, nil)
@@ -1023,6 +1028,10 @@ defmodule Magus.Accounts.User do
       authorize_if expr(id == ^actor(:id))
     end
 
+    policy action(:update_profile_setting) do
+      authorize_if expr(id == ^actor(:id))
+    end
+
     policy action(:update_timezone) do
       authorize_if expr(id == ^actor(:id))
     end
@@ -1187,6 +1196,13 @@ defmodule Magus.Accounts.User do
       allow_nil? false
       public? true
       description "Whether to include global memories in conversation context"
+    end
+
+    attribute :profile_enabled, :boolean do
+      default false
+      allow_nil? false
+      public? true
+      description "Whether the distilled Hermes-style profile is used for this user"
     end
 
     attribute :context_strategy, :atom do
