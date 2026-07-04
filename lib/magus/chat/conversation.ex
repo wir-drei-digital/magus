@@ -30,6 +30,7 @@ defmodule Magus.Chat.Conversation do
         worker_module_name Magus.Chat.Conversation.Workers.ExtractTurnMemories
         scheduler_module_name Magus.Chat.Conversation.Schedulers.ExtractTurnMemories
         where expr(needs_extraction and not is_task_conversation)
+        max_attempts 5
       end
 
       trigger :cleanup_trashed do
