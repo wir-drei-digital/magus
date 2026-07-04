@@ -66,3 +66,49 @@ MIX_TEST_PARTITION=_eval MIX_ENV=test mix magus.eval longmemeval --limit 18 --ou
 # If the inline aggregate is 0.0 (judge burst rate-limited), re-score from the saved
 # eval/results/longmemeval.hyp.jsonl with a paced judge (see scratchpad rescore script).
 ```
+
+---
+
+# Plan B: profile_distill (Hermes profile)
+
+Direct quality eval of the `DistillUserProfile` action: 6 hand-authored fixture
+cases (`priv/eval/profile_distill/cases.json`) covering contradiction resolution,
+completed-work exclusion, one-off-noise exclusion, open-thread retention,
+behavioral-pattern capture, and multi-project capture. Each case seeds user-scope
+memories (with backdated `updated_at` for recency ordering), runs the distiller,
+and an LLM judge grades: are the gold facts present, are the forbidden (stale/noise)
+facts absent, and is the document within the ~800-token cap.
+
+`MIX_TEST_PARTITION=_eval MIX_ENV=test mix magus.eval profile_distill`
+
+## Result
+
+**Aggregate 1.0 (6/6), every case within the token cap.**
+
+| case | score | within cap |
+|---|---|---|
+| contradiction_preference | 1.0 | yes |
+| completed_work_dropped | 1.0 | yes |
+| one_off_fact_dropped | 1.0 | yes |
+| open_thread_kept | 1.0 | yes |
+| behavioral_patterns | 1.0 | yes |
+| multi_project | 1.0 | yes |
+
+The distiller does exactly what the Hermes design asks: resolves contradictions in
+favor of the most recent source, drops completed work and one-off facts, retains
+open threads / behavioral patterns / active projects, and stays under the cap. The
+judge here uses the retry-hardened path (commit `83a073ec`), so this is a real
+score, not a rate-limit artifact.
+
+## LongMemEval flag on/off A/B (deferred)
+
+The plan also specifies a LongMemEval-S A/B (profile flag off vs on) as input to a
+future flag-flip decision. It is **deferred as an optional follow-up**, because:
+- The profile ships **flag-off** (`MAGUS_MEMORY_PROFILE` unset); nothing is
+  user-visible by default, so the A/B is not a gate for landing Plan B.
+- `profile_distill = 1.0` already validates the distiller directly (the plan's
+  ship gate was `profile_distill >= 0.8`, met).
+- A flag-on LongMemEval run is a ~90-minute job and, at `--limit 18`
+  (3/ability), the delta vs the noisy 3/18 flag-off baseline would not be
+  statistically meaningful. Run it at `--limit 60`+ when the flag-flip is actually
+  being decided.
