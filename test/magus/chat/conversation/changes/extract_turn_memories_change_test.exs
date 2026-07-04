@@ -177,4 +177,25 @@ defmodule Magus.Chat.Conversation.Changes.ExtractTurnMemoriesChangeTest do
       assert {:ok, _} = run_extract_action(reloaded)
     end
   end
+
+  test "extraction is skipped when the conversation owner has memory disabled" do
+    user =
+      generate(user())
+      |> Ash.Changeset.for_update(:update_global_memory_setting, %{global_memory_enabled: false},
+        authorize?: false
+      )
+      |> Ash.update!()
+
+    conv = generate(conversation(actor: user))
+
+    seed_turn!(
+      conv,
+      String.duplicate("I strongly prefer tabs over spaces in every project. ", 3),
+      String.duplicate("Understood, tabs it is going forward for all your code. ", 3)
+    )
+
+    # No LLM mock expectation: extraction must not call the LLM at all.
+    assert {:ok, _} = run_extract_action(conv)
+    assert {:ok, []} = Magus.Memory.list_memories_for_conversation(conv.id, authorize?: false)
+  end
 end
