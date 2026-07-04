@@ -97,6 +97,12 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
               "enum" => ["local", "user"],
               "description" => "local=this conversation, user=all conversations"
             },
+            "update_mode" => %{
+              "type" => "string",
+              "enum" => ["merge", "replace"],
+              "description" =>
+                "merge (default): add fields into the existing memory. replace: the new content supersedes the old entirely."
+            },
             "reason" => %{
               "type" => "string",
               "description" => "Why this was extracted"
@@ -248,7 +254,7 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
 
   defp load_local_memories(conversation_id) do
     case Memory.list_memories_for_conversation(conversation_id, actor: @actor) do
-      {:ok, memories} -> Enum.take(memories, 10)
+      {:ok, memories} -> Enum.take(memories, 100)
       _ -> []
     end
   end
@@ -258,7 +264,7 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
     actor = %Magus.Accounts.User{id: user_id}
 
     case Memory.list_user_memories(workspace_id, actor: actor) do
-      {:ok, memories} -> Enum.take(memories, 10)
+      {:ok, memories} -> Enum.take(memories, 100)
       _ -> []
     end
   end
@@ -277,6 +283,7 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
     scope = extraction["scope"]
     content = extraction["content"]
     summary = extraction["summary"]
+    update_mode = extraction["update_mode"]
 
     case scope do
       "user" when not allow_global ->
@@ -284,26 +291,25 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
           "ExtractTurnMemories: Downgrading user extraction '#{name}' to local (agent isolation)"
         )
 
-        apply_local_extraction(name, content, summary, conversation_id, user_id)
+        apply_local_extraction(name, content, summary, conversation_id, user_id, update_mode)
 
       "user" ->
-        apply_user_extraction(name, content, summary, user_id, workspace_id)
+        apply_user_extraction(name, content, summary, user_id, workspace_id, update_mode)
 
       _ ->
-        apply_local_extraction(name, content, summary, conversation_id, user_id)
+        apply_local_extraction(name, content, summary, conversation_id, user_id, update_mode)
     end
   end
 
-  defp apply_user_extraction(name, content, summary, user_id, workspace_id) do
+  defp apply_user_extraction(name, content, summary, user_id, workspace_id, update_mode) do
     # Use a User struct as actor for functions that use actor(:id) for filtering
     actor = %Magus.Accounts.User{id: user_id}
 
     case Memory.get_user_memory_by_name(workspace_id, name, actor: actor) do
       {:ok, memory} ->
-        # Merge new content into existing rather than overwriting
-        merged = merge_content(memory.content, content)
+        new_content = resolve_content(memory.content, content, update_mode)
 
-        case Memory.set_memory(memory, merged, %{summary: summary}, actor: @actor) do
+        case Memory.set_memory(memory, new_content, %{summary: summary}, actor: @actor) do
           {:ok, _updated} ->
             Logger.debug("ExtractTurnMemories: Updated user memory '#{name}'")
             :applied
@@ -316,12 +322,12 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
 
       {:error, %Ash.Error.Query.NotFound{}} ->
         # Memory not found, create new one
-        create_user_memory(name, content, summary, user_id, workspace_id)
+        create_user_memory(name, content, summary, user_id, workspace_id, update_mode)
 
       {:error, %Ash.Error.Invalid{errors: errors}} ->
         # Check if it's a not found error wrapped in Invalid
         if Enum.any?(errors, &match?(%Ash.Error.Query.NotFound{}, &1)) do
-          create_user_memory(name, content, summary, user_id, workspace_id)
+          create_user_memory(name, content, summary, user_id, workspace_id, update_mode)
         else
           Logger.warning("ExtractTurnMemories: Error looking up user memory: #{inspect(errors)}")
 
@@ -333,14 +339,13 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
     end
   end
 
-  defp create_user_memory(name, content, summary, user_id, workspace_id) do
+  defp create_user_memory(name, content, summary, user_id, workspace_id, update_mode) do
     # Semantic dedup: check if a similar memory already exists
     case find_similar_existing_user(summary, user_id, workspace_id) do
       {:ok, existing} ->
-        # Merge new content into existing rather than overwriting
-        merged = merge_content(existing.content, content)
+        new_content = resolve_content(existing.content, content, update_mode)
 
-        case Memory.set_memory(existing, merged, %{summary: summary}, actor: @actor) do
+        case Memory.set_memory(existing, new_content, %{summary: summary}, actor: @actor) do
           {:ok, _} ->
             Logger.debug("ExtractTurnMemories: Deduped user memory, updated '#{existing.name}'")
             :applied
@@ -369,13 +374,12 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
     end
   end
 
-  defp apply_local_extraction(name, content, summary, conversation_id, user_id) do
+  defp apply_local_extraction(name, content, summary, conversation_id, user_id, update_mode) do
     case Memory.get_memory_by_name(conversation_id, name, actor: @actor) do
       {:ok, memory} ->
-        # Merge new content into existing rather than overwriting
-        merged = merge_content(memory.content, content)
+        new_content = resolve_content(memory.content, content, update_mode)
 
-        case Memory.set_memory(memory, merged, %{summary: summary}, actor: @actor) do
+        case Memory.set_memory(memory, new_content, %{summary: summary}, actor: @actor) do
           {:ok, _updated} ->
             Logger.debug("ExtractTurnMemories: Updated local memory '#{name}'")
             :applied
@@ -390,12 +394,12 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
 
       {:error, %Ash.Error.Query.NotFound{}} ->
         # Memory not found, create new one
-        create_local_memory(name, content, summary, conversation_id, user_id)
+        create_local_memory(name, content, summary, conversation_id, user_id, update_mode)
 
       {:error, %Ash.Error.Invalid{errors: errors}} ->
         # Check if it's a not found error wrapped in Invalid
         if Enum.any?(errors, &match?(%Ash.Error.Query.NotFound{}, &1)) do
-          create_local_memory(name, content, summary, conversation_id, user_id)
+          create_local_memory(name, content, summary, conversation_id, user_id, update_mode)
         else
           Logger.warning("ExtractTurnMemories: Error looking up local memory: #{inspect(errors)}")
 
@@ -407,13 +411,13 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
     end
   end
 
-  defp create_local_memory(name, content, summary, conversation_id, user_id) do
+  defp create_local_memory(name, content, summary, conversation_id, user_id, update_mode) do
     # Semantic dedup: check if a similar memory already exists in this conversation
     case find_similar_existing_local(summary, conversation_id) do
       {:ok, existing} ->
-        merged = merge_content(existing.content, content)
+        new_content = resolve_content(existing.content, content, update_mode)
 
-        case Memory.set_memory(existing, merged, %{summary: summary}, actor: @actor) do
+        case Memory.set_memory(existing, new_content, %{summary: summary}, actor: @actor) do
           {:ok, _} ->
             Logger.debug("ExtractTurnMemories: Deduped local memory, updated '#{existing.name}'")
             :applied
@@ -450,9 +454,14 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
       "summary" => to_string(extraction["summary"] || extraction[:summary] || ""),
       "content" => extraction["content"] || extraction[:content] || %{},
       "scope" => to_string(extraction["scope"] || extraction[:scope] || "local"),
+      "update_mode" =>
+        normalize_update_mode(extraction["update_mode"] || extraction[:update_mode]),
       "reason" => to_string(extraction["reason"] || extraction[:reason] || "")
     }
   end
+
+  defp normalize_update_mode("replace"), do: "replace"
+  defp normalize_update_mode(_), do: "merge"
 
   defp build_prompt(local_memories, global_memories, turns) do
     local_text = format_memories(local_memories, "Local")
@@ -484,6 +493,13 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
     - **local**: Project context, current task, conversation-specific details
 
     If information updates an existing memory, use the exact same name.
+
+    Set update_mode when updating an existing memory:
+    - "merge" (default): new fields are added to the memory
+    - "replace": the new content fully supersedes the old. Use this when the
+      new information contradicts or reverses what the memory currently says
+      (changed preference, reversed decision, corrected fact).
+
     If nothing meaningful to extract, return empty extractions list.
 
     Keep extractions minimal - only persist genuinely useful information.
@@ -515,6 +531,7 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
     - Explicit statements of fact or preference
     - Decisions and commitments
     - Important context for future conversations
+    - Contradictions of existing memories (extract with update_mode "replace")
 
     Avoid extracting:
     - Hypotheticals or questions
@@ -540,6 +557,13 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
   # ============================================================================
   # Content Merging
   # ============================================================================
+
+  # Resolves how new content combines with the existing memory content based
+  # on the extraction's update_mode. "replace" lets a contradiction fully
+  # supersede stale content instead of deep-merging forever; anything else
+  # (including nil/unrecognized values) falls back to the merge behavior.
+  defp resolve_content(_old, new, "replace"), do: new
+  defp resolve_content(old, new, _merge), do: merge_content(old, new)
 
   # Deep-merges new content into existing content. New keys are added,
   # existing map values are recursively merged, and scalar values are

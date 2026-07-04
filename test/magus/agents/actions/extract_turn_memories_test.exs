@@ -156,6 +156,96 @@ defmodule Magus.Agents.Actions.ExtractTurnMemoriesTest do
 
       assert {:ok, %{extractions_applied: 0}} = result
     end
+
+    test "replace mode overwrites content instead of merging" do
+      user = generate(user())
+      conv = generate(conversation(actor: user))
+
+      {:ok, existing} =
+        Magus.Memory.create_memory(
+          conv.id,
+          user.id,
+          "Editor Preference",
+          %{content: %{"editor" => "vim", "reason" => "muscle memory"}, summary: "Prefers vim"},
+          actor: user
+        )
+
+      expect(LLMMock, :generate_object, fn _model, _prompt, _schema, _opts ->
+        MockResponses.generate_object_response(%{
+          "extractions" => [
+            %{
+              "name" => "Editor Preference",
+              "summary" => "Prefers VS Code now",
+              "content" => %{"editor" => "vscode"},
+              "scope" => "local",
+              "update_mode" => "replace",
+              "reason" => "User switched editors, superseding the old preference"
+            }
+          ]
+        })
+      end)
+
+      assert {:ok, %{extractions_applied: 1}} =
+               ExtractTurnMemories.run(
+                 %{
+                   user_id: user.id,
+                   conversation_id: conv.id,
+                   turns: [
+                     %{
+                       "user" =>
+                         "Actually I switched to VS Code full time, forget the vim setup entirely.",
+                       "agent" =>
+                         "Noted, VS Code is your editor from now on, replacing the vim preference."
+                     }
+                   ]
+                 },
+                 %{}
+               )
+
+      {:ok, reloaded} = Magus.Memory.get_memory(existing.id, actor: user)
+      assert reloaded.content == %{"editor" => "vscode"}
+      refute Map.has_key?(reloaded.content, "reason")
+    end
+
+    test "shows more than 10 existing memory names to the extractor" do
+      user = generate(user())
+      conv = generate(conversation(actor: user))
+
+      for i <- 1..15 do
+        {:ok, _} =
+          Magus.Memory.create_memory(
+            conv.id,
+            user.id,
+            "Fact #{i}",
+            %{content: %{}, summary: "Summary #{i}"},
+            actor: user
+          )
+      end
+
+      expect(LLMMock, :generate_object, fn _model, prompt, _schema, _opts ->
+        assert prompt =~ "Fact 1"
+        # With the old take(10) recency cap, the oldest names fell out.
+        assert Enum.all?(1..15, fn i -> prompt =~ "Fact #{i}" end)
+        MockResponses.generate_object_response(%{"extractions" => []})
+      end)
+
+      assert {:ok, _} =
+               ExtractTurnMemories.run(
+                 %{
+                   user_id: user.id,
+                   conversation_id: conv.id,
+                   turns: [
+                     %{
+                       "user" =>
+                         "Here is a sufficiently long user message about ongoing project work.",
+                       "agent" =>
+                         "Here is a sufficiently long agent response acknowledging the project work."
+                     }
+                   ]
+                 },
+                 %{}
+               )
+    end
   end
 
   describe "schema validation" do
