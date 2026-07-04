@@ -41,5 +41,7 @@ defmodule Magus.SuperBrain do
       define :get_super_graph, action: :read, get_by: [:id]
       define :create_super_graph, action: :create
     end
+
+    resource Magus.SuperBrain.Claim
   end
 end
