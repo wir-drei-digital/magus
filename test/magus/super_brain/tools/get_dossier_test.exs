@@ -55,6 +55,70 @@ defmodule Magus.SuperBrain.Tools.GetDossierTest do
     assert Map.has_key?(result, :fallback)
   end
 
+  test "entity_type disambiguates between same-named entities of different types" do
+    user = generate(user())
+    graph = "memories:user:#{user.id}"
+
+    # Two same-named ("Apple") subjects of DIFFERENT types in the same
+    # accessible graph. entity_type should keep only the matching-type claim.
+    seed_claim_attrs(graph, user.id, %{
+      subject_name: "Apple",
+      subject_key: "apple",
+      subject_type: "organization",
+      object_name: "iPhone",
+      object_key: "iphone",
+      predicate: "makes",
+      claim_text: "Apple makes the iPhone."
+    })
+
+    seed_claim_attrs(graph, user.id, %{
+      subject_name: "Apple",
+      subject_key: "apple",
+      subject_type: "concept",
+      object_name: "fruit",
+      object_key: "fruit",
+      predicate: "is_a",
+      claim_text: "Apple is a fruit."
+    })
+
+    assert {:ok, %{facts: facts}} =
+             GetDossier.run(
+               %{entity_name: "Apple", entity_type: "organization"},
+               %{user_id: user.id}
+             )
+
+    texts = Enum.flat_map(facts, & &1.texts)
+    assert "Apple makes the iPhone." in texts
+    refute "Apple is a fruit." in texts
+  end
+
+  test "limit caps the number of returned fact groups" do
+    user = generate(user())
+    graph = "memories:user:#{user.id}"
+
+    # Three fact groups for one entity: same subject, distinct object
+    # endpoints (each becomes its own group in Dossier.build).
+    for {obj_key, obj_name, text} <- [
+          {"q1", "Q1", "Aurora targets Q1."},
+          {"q2", "Q2", "Aurora targets Q2."},
+          {"q3", "Q3", "Aurora targets Q3."}
+        ] do
+      seed_claim_attrs(graph, user.id, %{
+        subject_name: "Aurora",
+        subject_key: "aurora",
+        object_name: obj_name,
+        object_key: obj_key,
+        predicate: "occurs_at",
+        claim_text: text
+      })
+    end
+
+    assert {:ok, %{facts: facts}} =
+             GetDossier.run(%{entity_name: "Aurora", limit: 1}, %{user_id: user.id})
+
+    assert length(facts) == 1
+  end
+
   # Claim.episode_id is a hard DB foreign key (belongs_to :episode,
   # allow_nil? false), so a fabricated UUID violates the constraint on insert.
   # Create a real Episode first and use its id (mirrors
@@ -76,25 +140,38 @@ defmodule Magus.SuperBrain.Tools.GetDossierTest do
   end
 
   defp seed_claim(graph, uid, text) do
+    seed_claim_attrs(graph, uid, %{claim_text: text})
+  end
+
+  # Seeds one FK-safe claim (real episode) whose subject/object/type/predicate
+  # fields come from `overrides`. Defaults describe the "Aurora targets Q3"
+  # claim so callers only override what a given test cares about.
+  defp seed_claim_attrs(graph, uid, overrides) do
     ep = seed_episode(graph, uid)
+
+    attrs =
+      Map.merge(
+        %{
+          graph_name: graph,
+          episode_id: ep.id,
+          source_user_id: uid,
+          subject_name: "Aurora",
+          subject_key: "aurora",
+          object_name: "Q3",
+          object_key: "q3",
+          predicate: "occurs_at",
+          polarity: :affirms,
+          claim_text: "Aurora targets Q3.",
+          confidence: 0.8,
+          trust_tier: :evidence,
+          asserted_at: DateTime.utc_now()
+        },
+        overrides
+      )
 
     {:ok, claim} =
       Claim
-      |> Ash.Changeset.for_create(:create, %{
-        graph_name: graph,
-        episode_id: ep.id,
-        source_user_id: uid,
-        subject_name: "Aurora",
-        subject_key: "aurora",
-        object_name: "Q3",
-        object_key: "q3",
-        predicate: "occurs_at",
-        polarity: :affirms,
-        claim_text: text,
-        confidence: 0.8,
-        trust_tier: :evidence,
-        asserted_at: DateTime.utc_now()
-      })
+      |> Ash.Changeset.for_create(:create, attrs)
       |> Ash.create(authorize?: false)
 
     claim

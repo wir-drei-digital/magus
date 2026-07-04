@@ -24,7 +24,7 @@ defmodule Magus.SuperBrain.Tools.GetDossier do
 
   alias Magus.SuperBrain.{AccessibleGraphs, Claim, Dossier, Naming, Retrieval}
 
-  import Magus.Agents.Tools.Helpers, only: [get_param: 2]
+  import Magus.Agents.Tools.Helpers, only: [get_param: 2, get_param: 3]
 
   def display_name, do: "Building dossier..."
 
@@ -43,11 +43,11 @@ defmodule Magus.SuperBrain.Tools.GetDossier do
     cond do
       is_nil(user_id) -> {:ok, %{error: "Missing user_id in context"}}
       is_nil(name) or name == "" -> {:ok, %{error: "Missing entity_name"}}
-      true -> build_dossier(name, user_id, context)
+      true -> build_dossier(name, user_id, params, context)
     end
   end
 
-  defp build_dossier(name, user_id, context) do
+  defp build_dossier(name, user_id, params, context) do
     with {:ok, user} <- Magus.Accounts.get_user(user_id, authorize?: false) do
       key = Naming.key(name)
       graphs = accessible_graphs(user, context)
@@ -58,15 +58,47 @@ defmodule Magus.SuperBrain.Tools.GetDossier do
         |> Ash.Query.load(:episode)
         |> Ash.read(authorize?: false)
 
-      if claims == [] do
+      # `entity_type`, when supplied, disambiguates which same-named entity is
+      # meant: keep only the claims where THIS entity (as subject or object)
+      # carries the requested type. subject_type/object_type are stored as
+      # strings on Claim and entity_type is a string, so `==` compares strings.
+      # Filtering runs on the raw Claim structs (which carry subject_type /
+      # object_type), before mapping to the reduced dossier-claim shape.
+      filtered = filter_by_type(claims, key, get_param(params, :entity_type))
+
+      if filtered == [] do
         fallback(name, user, context)
       else
-        d = Dossier.build(key, Enum.map(claims, &to_dossier_claim/1))
+        limit = get_param(params, :limit, 20)
+        d = Dossier.build(key, Enum.map(filtered, &to_dossier_claim/1))
+
+        # Cap the returned fact / referenced_by groups to `limit`. Both lists
+        # are already ordered newest-first by Dossier.build, so this keeps the
+        # most recent groups. `conflicts` is intentionally left uncapped: it is
+        # the conflict summary and should surface every conflicting triple.
+        d = %{
+          d
+          | facts: Enum.take(d.facts, limit),
+            referenced_by: Enum.take(d.referenced_by, limit)
+        }
+
         {:ok, Map.put(d, :entity, name)}
       end
     else
-      _ -> {:ok, %{error: "Dossier unavailable"}}
+      {:error, reason} ->
+        Logger.warning("get_dossier: get_user failed: #{inspect(reason)}")
+        {:ok, %{error: "Dossier unavailable"}}
     end
+  end
+
+  defp filter_by_type(claims, _key, nil), do: claims
+  defp filter_by_type(claims, _key, ""), do: claims
+
+  defp filter_by_type(claims, key, type) do
+    Enum.filter(claims, fn c ->
+      (c.subject_key == key and c.subject_type == type) or
+        (c.object_key == key and c.object_type == type)
+    end)
   end
 
   defp fallback(name, user, context) do
@@ -83,9 +115,15 @@ defmodule Magus.SuperBrain.Tools.GetDossier do
 
   defp fallback_embedding(name) do
     case Magus.SuperBrain.EmbeddingConfig.embedder().embed(name, []) do
-      {:ok, %{embedding: e}} -> e
-      {:ok, e} when is_list(e) -> e
-      _ -> []
+      {:ok, %{embedding: e}} ->
+        e
+
+      {:ok, e} when is_list(e) ->
+        e
+
+      other ->
+        Logger.warning("get_dossier: fallback embedding failed: #{inspect(other)}")
+        []
     end
   end
 
