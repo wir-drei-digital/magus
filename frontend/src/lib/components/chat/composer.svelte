@@ -32,10 +32,14 @@
 		type ChatFeatureLimits,
 		type ChatMode,
 		type ModelSummary,
-		type SlashCommandEntry,
 		type UploadedFile
 	} from '$lib/ash/api';
-	import { cachedActiveModels, cachedMyAgents, cachedSlashCommands } from '$lib/chat/catalog';
+	import {
+		cachedActiveModels,
+		cachedMyAgents,
+		cachedSlashCommands,
+		cachedUserSkills
+	} from '$lib/chat/catalog';
 	import { imageModalityMismatch } from '$lib/chat/composer-guards';
 	import type { ConversationStore } from '$lib/chat/conversation-store.svelte';
 	import { isConversationOwner } from '$lib/chat/ownership';
@@ -106,8 +110,14 @@
 	// get a read-only donut, mirroring the classic is_owner gate. Server enforces.
 	const isOwner = $derived(isConversationOwner(conversation, session.user?.id));
 
-	// Plus-menu slash commands: globals merged with the active agent's own.
-	let slashCommands = $state<SlashCommandEntry[]>([]);
+	// Plus-menu slash rows: agent/global commands plus the user's own skills.
+	// Skills carry a `sandbox` flag (= hasExecutableBundle) that renders a badge;
+	// the backend resolve/3 matches the typed /name to the skill server-side.
+	type SlashRow = { name: string; title: string; icon: string | null; sandbox?: boolean };
+
+	let slashCommandRows = $state<SlashRow[]>([]);
+	let skillRows = $state<SlashRow[]>([]);
+	const slashCommands = $derived<SlashRow[]>([...slashCommandRows, ...skillRows]);
 
 	const SLASH_ICONS: Record<string, typeof Globe> = {
 		'lucide-globe': Globe,
@@ -120,7 +130,19 @@
 	$effect(() => {
 		const agentId = conversation?.customAgentId ?? null;
 		void cachedSlashCommands(agentId).then((result) => {
-			if (result.success) slashCommands = result.data;
+			if (result.success) slashCommandRows = result.data;
+		});
+	});
+
+	$effect(() => {
+		void cachedUserSkills().then((result) => {
+			if (!result.success) return;
+			skillRows = result.data.map((skill) => ({
+				name: skill.name,
+				title: skill.displayName ?? skill.name,
+				icon: 'lucide-square-slash',
+				sandbox: skill.hasExecutableBundle
+			}));
 		});
 	});
 
@@ -616,6 +638,14 @@
 								>
 									<Icon class="size-4" />
 									<span class="flex-1">{command.title}</span>
+									{#if command.sandbox}
+										<span
+											class="ml-1 rounded bg-amber-100 px-1 py-px text-[9px] font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-400"
+											data-testid="slash-sandbox-badge"
+										>
+											sandbox
+										</span>
+									{/if}
 									<span class="ml-2 text-xs font-normal text-muted-foreground">/{command.name}</span
 									>
 								</DropdownMenu.Item>
