@@ -153,7 +153,9 @@
 		{#if memLoading}
 			<div class="h-10 animate-pulse rounded-lg bg-muted/60"></div>
 		{:else if memories.length === 0}
-			<p class="text-xs text-muted-foreground" data-testid="user-memories-empty">No memories yet.</p>
+			<p class="text-xs text-muted-foreground" data-testid="user-memories-empty">
+				No memories yet.
+			</p>
 		{:else}
 			<div class="flex flex-col gap-1.5" data-testid="user-memories">
 				{#each memories as m (m.id)}
@@ -198,7 +200,8 @@
 			</p>
 		{:else}
 			<div class="space-y-2" data-testid="profile-card">
-				<pre class="whitespace-pre-wrap rounded-lg bg-secondary/60 p-3 text-xs">{profile.document}</pre>
+				<pre
+					class="whitespace-pre-wrap rounded-lg bg-secondary/60 p-3 text-xs">{profile.document}</pre>
 				{#if profile.lastDistilledAt}
 					<p class="text-xs text-muted-foreground">
 						Last updated {relativeTime(profile.lastDistilledAt)}

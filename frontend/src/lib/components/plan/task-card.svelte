@@ -133,7 +133,9 @@
 				<span></span>
 			{/if}
 			{#if !stale && expiresInMinutes !== null}
-				<span class="shrink-0 text-[10px] text-muted-foreground">expires in {expiresInMinutes}m</span>
+				<span class="shrink-0 text-[10px] text-muted-foreground"
+					>expires in {expiresInMinutes}m</span
+				>
 			{:else if claimedLabel}
 				<span class="shrink-0 text-[10px] text-muted-foreground">{relativeTime(claimedLabel)}</span>
 			{/if}
