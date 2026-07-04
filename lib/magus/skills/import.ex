@@ -31,6 +31,7 @@ defmodule Magus.Skills.Import do
           bundle_path: bundle_path,
           bundle_backend: Magus.Files.Storage.backend_name(),
           bundle_byte_size: byte_size(zip_bytes),
+          bundle_sha: sha,
           file_manifest: build_manifest(files),
           has_executable_bundle:
             Enum.any?(files, fn {p, _} -> String.starts_with?(p, "scripts/") end),
