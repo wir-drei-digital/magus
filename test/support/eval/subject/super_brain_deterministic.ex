@@ -27,8 +27,17 @@ defmodule Magus.Eval.Subject.SuperBrainDeterministic do
   def reset(ctx) do
     super_graph = "super:user:#{ctx.user.id}"
     # Drop the FalkorDB graph if it exists from a prior ingest in this run.
-    # No Postgres row exists for a fresh user, so no DB cleanup is needed.
     Magus.Graph.drop(super_graph)
+
+    # Claims persist in Postgres; drop this user's claim rows so a prior case
+    # cannot leak into the next case's search_claims KNN (the FalkorDB super
+    # graph is already dropped above; this restores the same per-case isolation
+    # for the claim layer). No other Postgres cleanup is needed: a fresh user
+    # has no SuperGraph row, and seed_super_row/2 upserts the one it needs.
+    Claim
+    |> Ash.Query.filter(source_user_id == ^ctx.user.id)
+    |> Ash.bulk_destroy(:destroy, %{}, authorize?: false, return_errors?: false)
+
     {:ok, Map.put(ctx, :super_graph, super_graph)}
   end
 
