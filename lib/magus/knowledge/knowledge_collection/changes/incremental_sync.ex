@@ -3,9 +3,9 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
   Ash change that performs an incremental sync of a KnowledgeCollection.
 
   Uses two strategies:
-  1. **Delta API** — calls `connector.detect_changes/3` to get created/updated/deleted
+  1. **Delta API**: calls `connector.detect_changes/3` to get created/updated/deleted
      items since `last_synced_at`.
-  2. **Fallback** — when the connector returns `:not_supported`, performs a full listing
+  2. **Fallback**: when the connector returns `:not_supported`, performs a full listing
      and compares etags against existing files to detect changes.
   """
 
