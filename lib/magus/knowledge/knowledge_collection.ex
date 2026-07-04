@@ -23,7 +23,11 @@ defmodule Magus.Knowledge.KnowledgeCollection do
         read_action :read
         worker_module_name __MODULE__.Workers.IncrementalSync
         scheduler_module_name __MODULE__.Schedulers.IncrementalSync
-        where expr(sync_status != :pending and sync_strategy != :manual)
+
+        where expr(
+                sync_status != :pending and sync_strategy != :manual and
+                  knowledge_source.needs_reauth == false
+              )
       end
     end
   end

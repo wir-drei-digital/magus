@@ -16,6 +16,7 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
   alias Magus.Knowledge.Connector
   alias Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers
   alias Magus.Knowledge.KnowledgeCollection.Changes.SyncLogger
+  alias Magus.Knowledge.TokenManager
 
   @impl true
   def change(changeset, _opts, _context) do
@@ -59,6 +60,10 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
         Logger.error("FullSync failed for collection #{cid}: #{inspect(reason)}")
         SyncLogger.error(cid, "Full sync failed: #{inspect(reason)}")
 
+        if reason == :reauth_required do
+          TokenManager.mark_source_reauth_required(collection.knowledge_source)
+        end
+
         Magus.Knowledge.update_sync_status(
           collection,
           %{
@@ -81,23 +86,29 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
         {:error, :rate_limited}
 
       :ok ->
-        case Connector.connector_for(source.provider) do
-          {:error, _} = error ->
-            SyncLogger.error(cid, "Unsupported provider: #{source.provider}")
-            {:error, error}
+        case TokenManager.ensure_fresh(source) do
+          {:error, :reauth_required} ->
+            {:error, :reauth_required}
 
-          connector ->
-            SyncLogger.info(cid, "Connecting to #{source.provider}")
+          {:ok, source} ->
+            case Connector.connector_for(source.provider) do
+              {:error, _} = error ->
+                SyncLogger.error(cid, "Unsupported provider: #{source.provider}")
+                {:error, error}
 
-            case apply(connector, :connect, [source.auth_config]) do
-              {:ok, conn} ->
-                result = sync_all_items(conn, connector, collection, source)
-                SyncHelpers.maybe_persist_refreshed_token(conn, connector, source)
-                result
+              connector ->
+                SyncLogger.info(cid, "Connecting to #{source.provider}")
 
-              {:error, reason} ->
-                SyncLogger.error(cid, "Connection failed: #{inspect(reason)}")
-                {:error, reason}
+                case apply(connector, :connect, [source.auth_config]) do
+                  {:ok, conn} ->
+                    result = sync_all_items(conn, connector, collection, source)
+                    SyncHelpers.maybe_persist_refreshed_token(conn, connector, source)
+                    result
+
+                  {:error, reason} ->
+                    SyncLogger.error(cid, "Connection failed: #{inspect(reason)}")
+                    {:error, reason}
+                end
             end
         end
     end
