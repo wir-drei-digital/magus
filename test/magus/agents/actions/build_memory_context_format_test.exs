@@ -3,7 +3,7 @@ defmodule Magus.Agents.Actions.BuildMemoryContextFormatTest do
 
   alias Magus.Agents.Actions.BuildMemoryContext
 
-  defp mem(name, opts \\ []) do
+  defp mem(name, opts) do
     %{
       name: name,
       summary: Keyword.get(opts, :summary, "summary of #{name}"),
