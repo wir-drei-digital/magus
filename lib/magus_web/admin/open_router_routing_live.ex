@@ -103,7 +103,7 @@ defmodule MagusWeb.Admin.OpenRouterRoutingLive do
         <div data-testid="or-mode-banner" class="text-sm">
           <%= if @allowed_count == 0 do %>
             <span class="text-warning">
-              No providers allowed yet. Toggle providers below to route requests to them.
+              No providers allowed. OpenRouter routing is unrestricted (any provider may serve; data collection still denied).
             </span>
           <% else %>
             <span class="text-base-content/70">{@allowed_count} providers allowed.</span>
