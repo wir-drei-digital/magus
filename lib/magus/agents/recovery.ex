@@ -14,6 +14,7 @@ defmodule Magus.Agents.Recovery do
   require Ash.Query
 
   alias Magus.Agents.Signals
+  alias Magus.Agents.Support.AutonomyTrace
 
   @doc """
   Check if the agent needs recovery and trigger auto-retry if so.
@@ -73,6 +74,13 @@ defmodule Magus.Agents.Recovery do
         cleanup_interrupted_messages(conversation_id)
 
         Signals.state_change(conversation_id, :idle)
+
+        trace_recovery(
+          conversation_id,
+          "Recovery aborted: agent never became ready",
+          %{conversation_id: conversation_id}
+        )
+
         :aborted_not_ready
     end
   rescue
@@ -94,6 +102,12 @@ defmodule Magus.Agents.Recovery do
             "Recovery: newer user message supersedes #{message.id} in #{conversation_id}; skipping re-dispatch"
           )
 
+          trace_recovery(
+            conversation_id,
+            "Recovery skipped: a newer user message superseded the interrupted turn",
+            %{conversation_id: conversation_id, message_id: message.id}
+          )
+
           :skipped_newer
         else
           Logger.info(
@@ -101,6 +115,12 @@ defmodule Magus.Agents.Recovery do
           )
 
           Magus.Agents.Dispatcher.dispatch_user_message(message)
+
+          trace_recovery(
+            conversation_id,
+            "Recovery re-dispatched the interrupted turn",
+            %{conversation_id: conversation_id, message_id: message.id}
+          )
 
           {:dispatched, message.id}
         end
@@ -110,6 +130,21 @@ defmodule Magus.Agents.Recovery do
 
         Signals.state_change(conversation_id, :idle)
         :no_message
+    end
+  end
+
+  # Best-effort activity-log trace of the recovery outcome. Only traces
+  # conversations owned by a custom agent (plain user conversations have
+  # nothing to attribute the entry to and are skipped entirely).
+  # AutonomyTrace.log/5 already never raises, so no rescue is added here.
+  defp trace_recovery(conversation_id, summary, metadata) do
+    case Ash.get(Magus.Chat.Conversation, conversation_id, authorize?: false) do
+      {:ok, %{custom_agent_id: custom_agent_id, user_id: user_id}}
+      when not is_nil(custom_agent_id) ->
+        AutonomyTrace.log(custom_agent_id, user_id, :recovery, summary, metadata)
+
+      _ ->
+        :ok
     end
   end
 

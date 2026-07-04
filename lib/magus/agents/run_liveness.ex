@@ -23,13 +23,29 @@ defmodule Magus.Agents.RunLiveness do
 
   @table :agent_run_liveness
   @touch_interval_ms 30_000
+  @sweep_interval_ms :timer.minutes(10)
 
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
 
   @impl true
   def init(_opts) do
     :ets.new(@table, [:named_table, :public, :set, read_concurrency: true])
+    schedule_sweep()
     {:ok, %{}}
+  end
+
+  @impl true
+  def handle_info(:sweep, state) do
+    cutoff_ms = System.monotonic_time(:millisecond) - @sweep_interval_ms
+
+    :ets.select_delete(@table, [{{:_, :"$1"}, [{:<, :"$1", cutoff_ms}], [true]}])
+
+    schedule_sweep()
+    {:noreply, state}
+  end
+
+  defp schedule_sweep do
+    Process.send_after(self(), :sweep, @sweep_interval_ms)
   end
 
   @doc "Throttled: updates last_heartbeat_at on :running runs targeting the conversation."

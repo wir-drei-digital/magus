@@ -3,6 +3,8 @@ defmodule Magus.Agents.RecoveryTest do
 
   import Magus.Generators
 
+  require Ash.Query
+
   alias Magus.Agents.Recovery
 
   setup do
@@ -189,6 +191,47 @@ defmodule Magus.Agents.RecoveryTest do
       result = Recovery.recover_interrupted_turn(conversation_id, m1.id)
 
       assert result == {:dispatched, m1.id}
+    end
+  end
+
+  describe "activity trace" do
+    test "recovery on a conversation with custom_agent_id writes exactly one :recovery activity row",
+         %{user: user} do
+      agent = custom_agent(user, %{heartbeat_enabled: true, is_paused: false})
+      conversation = generate(conversation(actor: user, custom_agent_id: agent.id))
+      conversation_id = to_string(conversation.id)
+
+      m1 = generate(message(actor: user, conversation_id: conversation.id, text: "Only message"))
+
+      register_fake_agent(conversation_id)
+
+      result = Recovery.recover_interrupted_turn(conversation_id, m1.id)
+      assert result == {:dispatched, m1.id}
+
+      {:ok, logs} = Magus.Agents.list_agent_activity(agent.id, authorize?: false)
+
+      recovery_logs = Enum.filter(logs, &(&1.activity_type == :recovery))
+      assert length(recovery_logs) == 1
+    end
+
+    test "recovery on a plain user conversation (no custom_agent_id) writes zero activity rows",
+         %{user: user, conversation: conversation} do
+      conversation_id = to_string(conversation.id)
+      assert conversation.custom_agent_id == nil
+
+      m1 = generate(message(actor: user, conversation_id: conversation.id, text: "Only message"))
+
+      register_fake_agent(conversation_id)
+
+      result = Recovery.recover_interrupted_turn(conversation_id, m1.id)
+      assert result == {:dispatched, m1.id}
+
+      logs =
+        Magus.Agents.AgentActivityLog
+        |> Ash.Query.filter(details["conversation_id"] == ^conversation_id)
+        |> Ash.read!(authorize?: false)
+
+      assert logs == []
     end
   end
 
