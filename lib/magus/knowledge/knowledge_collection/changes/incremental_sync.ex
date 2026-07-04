@@ -19,6 +19,7 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
   alias Magus.Knowledge.KnowledgeCollection.Changes.FullSync
   alias Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers
   alias Magus.Knowledge.KnowledgeCollection.Changes.SyncLogger
+  alias Magus.Knowledge.TokenManager
 
   @impl true
   def change(changeset, _opts, _context) do
@@ -60,27 +61,41 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
         {:ok, collection}
 
       :ok ->
-        case Connector.connector_for(source.provider) do
-          {:error, _} = error ->
-            update_sync_error(collection, error)
+        case TokenManager.ensure_fresh(source) do
+          {:error, :reauth_required} ->
+            TokenManager.mark_source_reauth_required(source)
+            update_sync_error(collection, :reauth_required)
 
-          connector ->
-            SyncLogger.info(cid, "Connecting to #{source.provider}")
+          {:ok, source} ->
+            case Connector.connector_for(source.provider) do
+              {:error, _} = error ->
+                update_sync_error(collection, error)
 
-            case apply(connector, :connect, [source.auth_config]) do
-              {:ok, conn} ->
-                actor = Ash.get!(Magus.Accounts.User, source.user_id, authorize?: false)
-                result = do_sync(conn, connector, collection, source, actor)
-                SyncHelpers.maybe_persist_refreshed_token(conn, connector, source)
-                result
+              connector ->
+                SyncLogger.info(cid, "Connecting to #{source.provider}")
 
-              {:error, reason} ->
-                SyncLogger.error(cid, "Connection failed: #{inspect(reason)}")
-                update_sync_error(collection, reason)
+                case apply(connector, :connect, [source.auth_config]) do
+                  {:ok, conn} ->
+                    actor = Ash.get!(Magus.Accounts.User, source.user_id, authorize?: false)
+                    result = do_sync(conn, connector, collection, source, actor)
+                    SyncHelpers.maybe_persist_refreshed_token(conn, connector, source)
+                    maybe_flag_reauth(result, source)
+                    result
+
+                  {:error, reason} ->
+                    SyncLogger.error(cid, "Connection failed: #{inspect(reason)}")
+                    update_sync_error(collection, reason)
+                end
             end
         end
     end
   end
+
+  # A mid-sync reactive refresh can also surface :reauth_required.
+  defp maybe_flag_reauth({:error, :reauth_required}, source),
+    do: TokenManager.mark_source_reauth_required(source)
+
+  defp maybe_flag_reauth(_result, _source), do: :ok
 
   defp do_sync(conn, connector, collection, source, actor) do
     cid = collection.id
@@ -98,6 +113,10 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
       {:error, :not_supported} ->
         SyncLogger.info(cid, "Delta not supported, using fallback etag sync")
         fallback_sync(conn, connector, collection, source, actor)
+
+      {:error, :reauth_required} ->
+        update_sync_error(collection, :reauth_required)
+        {:error, :reauth_required}
 
       {:error, reason} ->
         SyncLogger.error(cid, "detect_changes failed: #{inspect(reason)}")

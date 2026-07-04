@@ -185,4 +185,56 @@ defmodule Magus.Knowledge.KnowledgeCollectionTest do
       assert length(collections) == 2
     end
   end
+
+  describe "sync reauth handling" do
+    setup do
+      bypass = Bypass.open()
+      prev = Application.get_env(:magus, :google_token_url)
+      Application.put_env(:magus, :google_token_url, "http://localhost:#{bypass.port}/token")
+      System.put_env("GOOGLE_CLIENT_ID", "id")
+      System.put_env("GOOGLE_CLIENT_SECRET", "secret")
+      on_exit(fn -> Application.put_env(:magus, :google_token_url, prev) end)
+      {:ok, bypass: bypass}
+    end
+
+    test "a dead refresh token during full sync flags the source for reauth", %{bypass: bypass} do
+      user = generate(user())
+      expired = DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.to_iso8601()
+
+      {:ok, source} =
+        Magus.Knowledge.create_source(
+          %{
+            name: "GD",
+            provider: :google_drive,
+            auth_config: %{
+              "access_token" => "old",
+              "refresh_token" => "dead",
+              "expires_at" => expired
+            }
+          },
+          actor: user
+        )
+
+      {:ok, source} =
+        Magus.Knowledge.update_source_status(source, %{status: :active}, actor: user)
+
+      {:ok, collection} =
+        Magus.Knowledge.create_collection(
+          source.id,
+          %{name: "Folder", external_id: "root", external_path: "/root"},
+          actor: user
+        )
+
+      Bypass.expect(bypass, "POST", "/token", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(400, Jason.encode!(%{"error" => "invalid_grant"}))
+      end)
+
+      Magus.Knowledge.KnowledgeCollection.Changes.FullSync.do_full_sync(collection)
+
+      {:ok, reloaded} = Magus.Knowledge.get_source(source.id, actor: user)
+      assert reloaded.needs_reauth == true
+    end
+  end
 end
