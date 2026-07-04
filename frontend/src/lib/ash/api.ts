@@ -68,10 +68,6 @@ export type CurrentUser = {
 	currentWorkspaceId: string | null;
 	isAdmin: boolean;
 	uiPreferences: Record<string, unknown>;
-	/** Allowed data regions for provider routing (e.g. ['US','EU']). */
-	dataRegionPreference: string[];
-	/** Region code → ISO8601 consent timestamp, for consent-gated regions. */
-	dataRegionConsents: Record<string, string>;
 	/** Resolved avatar URL (null when no avatar is set). */
 	avatarUrl: string | null;
 };
@@ -83,8 +79,6 @@ const CURRENT_USER_FIELDS: rpc.CurrentUserFields = [
 	'currentWorkspaceId',
 	'isAdmin',
 	'uiPreferences',
-	'dataRegionPreference',
-	'dataRegionConsents',
 	'avatarUrl'
 ];
 
@@ -100,36 +94,6 @@ export function updateUiPreferences(
 		rpc.updateUiPreferences({
 			identity: userId,
 			input: { uiPreferences },
-			fields: CURRENT_USER_FIELDS,
-			...opts
-		})
-	);
-}
-
-/** Set the user's allowed data regions (consent-gated regions must already be granted). */
-export function updateDataRegionPreference(
-	userId: string,
-	regions: string[]
-): Promise<RpcResult<CurrentUser>> {
-	return run((opts) =>
-		rpc.updateDataRegionPreference({
-			identity: userId,
-			input: { regions },
-			fields: CURRENT_USER_FIELDS,
-			...opts
-		})
-	);
-}
-
-/** Record consent for a consent-gated region and add it to the allowed regions. */
-export function grantDataRegionConsent(
-	userId: string,
-	region: string
-): Promise<RpcResult<CurrentUser>> {
-	return run((opts) =>
-		rpc.grantDataRegionConsent({
-			identity: userId,
-			input: { region },
 			fields: CURRENT_USER_FIELDS,
 			...opts
 		})

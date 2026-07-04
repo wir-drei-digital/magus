@@ -13,7 +13,7 @@ export type UtcDateTimeUsec = string;
 // User Schema
 export type UserResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "email" | "displayName" | "currentWorkspaceId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "imageGenerationSettings" | "videoGenerationSettings" | "isAdmin" | "language" | "avatarPath" | "pendingEmail" | "uiPreferences" | "timezone" | "lastTimezoneChangeAt" | "dataRegionPreference" | "dataRegionConsents" | "selectedPlanKey" | "globalMemoryEnabled" | "contextStrategy" | "name" | "acceptedTerms" | "acceptedAgeRequirement" | "hasPassword" | "avatarUrl";
+  __primitiveFields: "id" | "email" | "displayName" | "currentWorkspaceId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "imageGenerationSettings" | "videoGenerationSettings" | "isAdmin" | "language" | "avatarPath" | "pendingEmail" | "uiPreferences" | "timezone" | "lastTimezoneChangeAt" | "selectedPlanKey" | "globalMemoryEnabled" | "contextStrategy" | "name" | "acceptedTerms" | "acceptedAgeRequirement" | "hasPassword" | "avatarUrl";
   id: UUID;
   email: string;
   displayName: string | null;
@@ -30,8 +30,6 @@ export type UserResourceSchema = {
   uiPreferences: Record<string, any>;
   timezone: string | null;
   lastTimezoneChangeAt: UtcDateTimeUsec | null;
-  dataRegionPreference: Array<string>;
-  dataRegionConsents: Record<string, any>;
   selectedPlanKey: string | null;
   globalMemoryEnabled: boolean;
   contextStrategy: "compact" | "rolling" | null;
@@ -46,7 +44,7 @@ export type UserResourceSchema = {
 
 export type UserAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "email" | "displayName" | "currentWorkspaceId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "imageGenerationSettings" | "videoGenerationSettings" | "isAdmin" | "language" | "avatarPath" | "pendingEmail" | "uiPreferences" | "timezone" | "lastTimezoneChangeAt" | "dataRegionPreference" | "dataRegionConsents" | "selectedPlanKey" | "globalMemoryEnabled" | "contextStrategy" | "name" | "acceptedTerms" | "acceptedAgeRequirement";
+  __primitiveFields: "id" | "email" | "displayName" | "currentWorkspaceId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "imageGenerationSettings" | "videoGenerationSettings" | "isAdmin" | "language" | "avatarPath" | "pendingEmail" | "uiPreferences" | "timezone" | "lastTimezoneChangeAt" | "selectedPlanKey" | "globalMemoryEnabled" | "contextStrategy" | "name" | "acceptedTerms" | "acceptedAgeRequirement";
   id: UUID;
   email: string;
   displayName: string | null;
@@ -63,8 +61,6 @@ export type UserAttributesOnlySchema = {
   uiPreferences: Record<string, any>;
   timezone: string | null;
   lastTimezoneChangeAt: UtcDateTimeUsec | null;
-  dataRegionPreference: Array<string>;
-  dataRegionConsents: Record<string, any>;
   selectedPlanKey: string | null;
   globalMemoryEnabled: boolean;
   contextStrategy: "compact" | "rolling" | null;
@@ -2081,18 +2077,6 @@ export type UserFilterInput = {
     lessThanOrEqual?: UtcDateTimeUsec;
     in?: Array<UtcDateTimeUsec>;
     isNil?: boolean;
-  };
-
-  dataRegionPreference?: {
-    eq?: Array<string>;
-    notEq?: Array<string>;
-    in?: Array<Array<string>>;
-  };
-
-  dataRegionConsents?: {
-    eq?: Record<string, any>;
-    notEq?: Record<string, any>;
-    in?: Array<Record<string, any>>;
   };
 
   selectedPlanKey?: {
@@ -6718,7 +6702,7 @@ export type WorkspaceMemberFilterInput = {
 };
 
 
-export const userFilterFields = ["id", "email", "displayName", "currentWorkspaceId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "imageGenerationSettings", "videoGenerationSettings", "isAdmin", "language", "avatarPath", "pendingEmail", "uiPreferences", "timezone", "lastTimezoneChangeAt", "dataRegionPreference", "dataRegionConsents", "selectedPlanKey", "globalMemoryEnabled", "contextStrategy", "name", "acceptedTerms", "acceptedAgeRequirement", "hasPassword", "avatarUrl"] as const;
+export const userFilterFields = ["id", "email", "displayName", "currentWorkspaceId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "imageGenerationSettings", "videoGenerationSettings", "isAdmin", "language", "avatarPath", "pendingEmail", "uiPreferences", "timezone", "lastTimezoneChangeAt", "selectedPlanKey", "globalMemoryEnabled", "contextStrategy", "name", "acceptedTerms", "acceptedAgeRequirement", "hasPassword", "avatarUrl"] as const;
 export type UserFilterField = (typeof userFilterFields)[number];
 
 export const agentActivityLogFilterFields = ["id", "agentId", "userId", "activityType", "summary", "eventId", "runId", "taskId", "conversationId", "details", "modelUsed", "tokensUsed", "estimatedCostUsd", "durationMs", "insertedAt"] as const;
@@ -6872,7 +6856,7 @@ export const workspaceMemberFilterFields = ["id", "role", "status", "isActive", 
 export type WorkspaceMemberFilterField = (typeof workspaceMemberFilterFields)[number];
 
 
-export const userSortFields = ["id", "email", "displayName", "currentWorkspaceId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "imageGenerationSettings", "videoGenerationSettings", "isAdmin", "language", "avatarPath", "pendingEmail", "uiPreferences", "timezone", "lastTimezoneChangeAt", "dataRegionPreference", "dataRegionConsents", "selectedPlanKey", "globalMemoryEnabled", "contextStrategy", "name", "acceptedTerms", "acceptedAgeRequirement", "hasPassword", "avatarUrl"] as const;
+export const userSortFields = ["id", "email", "displayName", "currentWorkspaceId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "imageGenerationSettings", "videoGenerationSettings", "isAdmin", "language", "avatarPath", "pendingEmail", "uiPreferences", "timezone", "lastTimezoneChangeAt", "selectedPlanKey", "globalMemoryEnabled", "contextStrategy", "name", "acceptedTerms", "acceptedAgeRequirement", "hasPassword", "avatarUrl"] as const;
 export type UserSortField = (typeof userSortFields)[number];
 
 export const agentActivityLogSortFields = ["id", "agentId", "userId", "activityType", "summary", "eventId", "runId", "taskId", "conversationId", "details", "modelUsed", "tokensUsed", "estimatedCostUsd", "durationMs", "insertedAt"] as const;

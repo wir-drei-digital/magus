@@ -252,91 +252,6 @@ defmodule Magus.Accounts.User do
       accept [:display_name, :language, :name, :context_strategy]
     end
 
-    update :update_data_region_preference do
-      description "Update user's allowed data regions"
-      argument :regions, {:array, :string}, allow_nil?: false
-      require_atomic? false
-
-      validate fn changeset, _ ->
-        regions = Ash.Changeset.get_argument(changeset, :regions)
-        valid = Map.keys(Magus.Providers.Registry.all_regions())
-        invalid = Enum.reject(regions, &(&1 in valid))
-
-        if invalid == [] do
-          :ok
-        else
-          {:error, field: :regions, message: "invalid regions: #{Enum.join(invalid, ", ")}"}
-        end
-      end
-
-      validate fn changeset, _ ->
-        regions = Ash.Changeset.get_argument(changeset, :regions)
-
-        if regions == [] do
-          {:error, field: :regions, message: "at least one data region must be enabled"}
-        else
-          :ok
-        end
-      end
-
-      validate fn changeset, _ ->
-        regions = Ash.Changeset.get_argument(changeset, :regions)
-        consents = changeset.data.data_region_consents || %{}
-        consent_regions = Magus.Providers.Registry.regions_requiring_consent()
-
-        missing =
-          regions
-          |> Enum.filter(&(&1 in consent_regions))
-          |> Enum.reject(&Map.has_key?(consents, &1))
-
-        if missing == [] do
-          :ok
-        else
-          {:error,
-           field: :regions, message: "consent required for regions: #{Enum.join(missing, ", ")}"}
-        end
-      end
-
-      change set_attribute(:data_region_preference, arg(:regions))
-    end
-
-    update :grant_data_region_consent do
-      description "Grant consent for a data region and add it to preferences"
-      argument :region, :string, allow_nil?: false
-      require_atomic? false
-
-      validate fn changeset, _ ->
-        region = Ash.Changeset.get_argument(changeset, :region)
-
-        cond do
-          not Map.has_key?(Magus.Providers.Registry.all_regions(), region) ->
-            {:error, field: :region, message: "unknown region: #{region}"}
-
-          not Magus.Providers.Registry.requires_consent?(region) ->
-            {:error, field: :region, message: "region #{region} does not require consent"}
-
-          true ->
-            :ok
-        end
-      end
-
-      change fn changeset, _ ->
-        region = Ash.Changeset.get_argument(changeset, :region)
-        consents = changeset.data.data_region_consents || %{}
-        prefs = changeset.data.data_region_preference || []
-
-        changeset
-        |> Ash.Changeset.force_change_attribute(
-          :data_region_consents,
-          Map.put(consents, region, DateTime.utc_now() |> DateTime.to_iso8601())
-        )
-        |> Ash.Changeset.force_change_attribute(
-          :data_region_preference,
-          Enum.uniq(prefs ++ [region])
-        )
-      end
-    end
-
     update :complete_profile do
       description "Complete user profile after magic link sign-in (name + consent)"
       require_atomic? false
@@ -999,14 +914,6 @@ defmodule Magus.Accounts.User do
       authorize_if expr(id == ^actor(:id))
     end
 
-    policy action(:update_data_region_preference) do
-      authorize_if expr(id == ^actor(:id))
-    end
-
-    policy action(:grant_data_region_consent) do
-      authorize_if expr(id == ^actor(:id))
-    end
-
     policy action(:update_avatar) do
       authorize_if expr(id == ^actor(:id))
     end
@@ -1159,20 +1066,6 @@ defmodule Magus.Accounts.User do
       public? true
 
       description "When the user last changed their timezone (rate limited to prevent daily limit exploits)"
-    end
-
-    attribute :data_region_preference, {:array, :string} do
-      allow_nil? false
-      default ["US", "EU", "CH"]
-      public? true
-      description "Allowed data regions for model provider routing"
-    end
-
-    attribute :data_region_consents, :map do
-      allow_nil? false
-      default %{}
-      public? true
-      description "Tracks consent timestamps for regions requiring consent"
     end
 
     attribute :selected_plan_key, :string do
