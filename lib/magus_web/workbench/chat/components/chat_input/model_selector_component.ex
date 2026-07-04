@@ -133,12 +133,6 @@ defmodule MagusWeb.ChatLive.Components.ChatInput.ModelSelectorComponent do
               <div class="text-[10px] text-base-content/50 font-medium uppercase tracking-wider px-2">
                 {provider}
               </div>
-              <% model_needs_consent = fn model ->
-                region_data = @model_region_data[model.id] || %{available: true, missing_consents: []}
-
-                not Map.get(region_data, :available, true) and
-                  Map.get(region_data, :missing_consents, []) != []
-              end %>
               <button
                 :for={model <- models}
                 type="button"
@@ -153,25 +147,11 @@ defmodule MagusWeb.ChatLive.Components.ChatInput.ModelSelectorComponent do
                     do: "bg-primary/10 ring-1 ring-primary",
                     else: "bg-base-100"
                   ),
-                  cond do
-                    model_needs_consent.(model) -> "opacity-70 cursor-pointer"
-                    true -> "hover:bg-base-300"
-                  end
+                  "hover:bg-base-300"
                 ]}
               >
                 <div class="flex items-center gap-1 w-full">
                   <span class="font-medium text-xs truncate">{model.name}</span>
-                  <div class="flex gap-0.5 shrink-0">
-                    <span
-                      :for={region <- Map.get(@model_region_data[model.id] || %{}, :regions, [])}
-                      class={[
-                        "text-[8px] px-1 rounded font-medium leading-relaxed",
-                        region_badge_class(region)
-                      ]}
-                    >
-                      {region}
-                    </span>
-                  </div>
                   <% cost = request_cost_display(model) %>
                   <span
                     :if={cost}
@@ -548,51 +528,6 @@ defmodule MagusWeb.ChatLive.Components.ChatInput.ModelSelectorComponent do
           }
         }
       </script>
-
-      <%!-- Region Consent Modal --%>
-      <div
-        :if={@show_region_consent}
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-        phx-click="dismiss_region_consent"
-        phx-target={@myself}
-      >
-        <div
-          class="bg-base-100 rounded-xl shadow-xl max-w-md w-full mx-4 p-6"
-          phx-click-away="dismiss_region_consent"
-          phx-target={@myself}
-        >
-          <h3 class="text-lg font-semibold mb-3">
-            {gettext("Data Region Consent")}
-          </h3>
-          <p class="text-sm text-base-content/70 mb-4">
-            {gettext(
-              "The model you selected may process your data on servers located in %{regions}. By enabling these regions, you acknowledge that your conversations may be processed under those regions' data protection laws.",
-              regions:
-                Enum.map_join(@consent_regions, ", ", fn r ->
-                  (Magus.Providers.Registry.region_config(r) || %{label: r}).label
-                end)
-            )}
-          </p>
-          <div class="flex justify-end gap-2">
-            <button
-              type="button"
-              class="btn btn-ghost btn-sm"
-              phx-click="dismiss_region_consent"
-              phx-target={@myself}
-            >
-              {gettext("Cancel")}
-            </button>
-            <button
-              type="button"
-              class="btn btn-primary btn-sm"
-              phx-click="accept_region_consent"
-              phx-target={@myself}
-            >
-              {gettext("Accept")}
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
     """
   end
@@ -665,16 +600,6 @@ defmodule MagusWeb.ChatLive.Components.ChatInput.ModelSelectorComponent do
       |> assign(:search_query, search_query)
       |> assign(:selected_model, selected_model)
       |> assign(:models_by_provider, Enum.group_by(filtered_models, & &1.provider))
-      |> assign(
-        :model_region_data,
-        compute_model_region_data(
-          filtered_models,
-          assigns[:current_user] || socket.assigns[:current_user]
-        )
-      )
-      |> assign_new(:show_region_consent, fn -> false end)
-      |> assign_new(:consent_regions, fn -> [] end)
-      |> assign_new(:consent_pending_model_id, fn -> nil end)
       |> assign(:aspect_ratios, ImageGenerationConfig.aspect_ratios())
       |> assign(:image_sizes, ImageGenerationConfig.image_sizes())
       |> assign(:image_aspect_ratio, image_settings["aspect_ratio"] || "1:1")
@@ -733,72 +658,7 @@ defmodule MagusWeb.ChatLive.Components.ChatInput.ModelSelectorComponent do
   end
 
   def handle_event("select_model", %{"model_id" => model_id}, socket) do
-    region_data =
-      socket.assigns.model_region_data[model_id] || %{available: true, missing_consents: []}
-
-    cond do
-      # Model not available and needs consent
-      not Map.get(region_data, :available, true) and
-          Map.get(region_data, :missing_consents, []) != [] ->
-        {:noreply,
-         socket
-         |> assign(:show_region_consent, true)
-         |> assign(:consent_regions, region_data.missing_consents)
-         |> assign(:consent_pending_model_id, model_id)}
-
-      # Model not available for other reasons
-      not Map.get(region_data, :available, true) ->
-        {:noreply, socket}
-
-      # Model available — proceed with selection
-      true ->
-        do_select_model(socket, model_id)
-    end
-  end
-
-  def handle_event("accept_region_consent", _params, socket) do
-    user = socket.assigns.current_user
-    model_id = socket.assigns.consent_pending_model_id
-
-    # Grant consent for each required region sequentially, with error handling
-    result =
-      Enum.reduce_while(socket.assigns.consent_regions, {:ok, user}, fn region,
-                                                                        {:ok, current_user} ->
-        case Magus.Accounts.grant_data_region_consent(current_user, region, actor: current_user) do
-          {:ok, updated} -> {:cont, {:ok, updated}}
-          {:error, _} = error -> {:halt, error}
-        end
-      end)
-
-    case result do
-      {:ok, updated_user} ->
-        model_region_data = compute_model_region_data(socket.assigns.models, updated_user)
-
-        socket =
-          socket
-          |> assign(:current_user, updated_user)
-          |> assign(:model_region_data, model_region_data)
-          |> assign(:show_region_consent, false)
-          |> assign(:consent_regions, [])
-          |> assign(:consent_pending_model_id, nil)
-
-        do_select_model(socket, model_id)
-
-      {:error, _} ->
-        {:noreply,
-         socket
-         |> assign(:show_region_consent, false)
-         |> assign(:consent_regions, [])
-         |> assign(:consent_pending_model_id, nil)}
-    end
-  end
-
-  def handle_event("dismiss_region_consent", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_region_consent, false)
-     |> assign(:consent_regions, [])
-     |> assign(:consent_pending_model_id, nil)}
+    do_select_model(socket, model_id)
   end
 
   def handle_event("search_models", %{"query" => query}, socket) do
@@ -974,24 +834,6 @@ defmodule MagusWeb.ChatLive.Components.ChatInput.ModelSelectorComponent do
 
     {:noreply, socket}
   end
-
-  defp compute_model_region_data(_models, nil), do: %{}
-
-  defp compute_model_region_data(models, user) do
-    Map.new(models, fn model ->
-      regions = Magus.Providers.Registry.regions_for_model(model)
-      available = Magus.Providers.Routing.model_available_for_user?(model, user)
-      missing_consents = Magus.Providers.Routing.missing_consent_regions(model, user)
-      {model.id, %{regions: regions, available: available, missing_consents: missing_consents}}
-    end)
-  end
-
-  defp region_badge_class("US"), do: "bg-blue-500/15 text-blue-600"
-  defp region_badge_class("EU"), do: "bg-green-500/15 text-green-600"
-  defp region_badge_class("CH"), do: "bg-red-500/15 text-red-600"
-  defp region_badge_class("CN"), do: "bg-amber-500/15 text-amber-600"
-  defp region_badge_class("SG"), do: "bg-purple-500/15 text-purple-600"
-  defp region_badge_class(_), do: "bg-base-300 text-base-content/60"
 
   defp get_selected_model(models, selected_id) do
     Enum.find(models, fn m -> m.id == selected_id end)
