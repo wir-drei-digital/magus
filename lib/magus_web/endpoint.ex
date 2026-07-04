@@ -8,6 +8,7 @@ defmodule MagusWeb.Endpoint do
     store: :cookie,
     key: "_magus_key",
     signing_salt: "2nsWBZN0",
+    encryption_salt: "kn0wl3dg3-oauth-enc",
     same_site: "Lax"
   ]
 
