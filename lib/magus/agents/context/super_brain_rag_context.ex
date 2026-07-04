@@ -57,7 +57,7 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
                  limit: @max_results
                ) do
             {:ok, %{entities: es}} -> es
-            {:ok, list} when is_list(list) -> list
+            {:ok, list} when is_list(list) -> Enum.map(list, &normalize_legacy_entity/1)
             _ -> []
           end
 
@@ -108,17 +108,29 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
   # entities plus semantically-recalled claims (Task 5's
   # `Retrieval.search_claims/2`). Claims are grouped under their subject
   # entity's header; an entity with no claims falls back to the
-  # name+type/refs rendering in `format_super_entity/2`.
+  # name+type/refs rendering in `format_super_entity/2`. Claims whose
+  # subject_key matches no retrieved entity ("orphans") are still surfaced
+  # under their own subject header so claim-text recall is never silently
+  # dropped when the vector-recalled subject is not among the top entities.
   def format_with_claims(entities, claims) do
+    claims = Enum.take(claims, @max_claims)
     titles = resolve_titles_for_claims(claims)
     by_subject = Enum.group_by(claims, & &1.subject_key)
+    entity_keys = entities |> Enum.map(&entity_key(Map.get(&1, :name))) |> MapSet.new()
 
-    sections =
-      Enum.map_join(entities, "\n\n", fn e ->
+    entity_sections =
+      Enum.map(entities, fn e ->
         key = e |> Map.get(:name) |> entity_key()
         entity_claims = Map.get(by_subject, key, []) |> Enum.take(@max_claims_per_entity)
         render_entity_section(e, entity_claims, titles)
       end)
+
+    orphan_sections =
+      by_subject
+      |> Enum.reject(fn {k, _group} -> MapSet.member?(entity_keys, k) end)
+      |> Enum.map(fn {_k, group} -> render_orphan_section(group, titles) end)
+
+    sections = Enum.join(entity_sections ++ orphan_sections, "\n\n")
 
     """
     <super_brain>
@@ -127,6 +139,23 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
     #{sections}
     </super_brain>\
     """
+  end
+
+  # A claim group whose subject was NOT among the retrieved entities. Render it
+  # under its own header (from the claim's own subject_name/subject_type) so the
+  # recalled claim text still reaches the model.
+  defp render_orphan_section(group, titles) do
+    first = hd(group)
+    name = first.subject_name
+    type = Map.get(first, :subject_type) || "?"
+
+    lines =
+      group
+      |> Enum.take(@max_claims_per_entity)
+      |> group_conflicts()
+      |> Enum.map(&claim_line(&1, titles))
+
+    "## #{name} [#{type}]\n" <> Enum.join(lines, "\n")
   end
 
   defp render_entity_section(e, [], _titles), do: format_super_entity(e, %{})
@@ -176,6 +205,18 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
 
   defp entity_key(name),
     do: name |> String.downcase() |> String.replace(~r/\s+/, " ") |> String.trim()
+
+  @doc false
+  # Normalize a legacy fan-out candidate (`%{entity: %{name:, type:}, ...}`,
+  # produced by `Retrieval`'s iter2 cold-start/drift path) into the bare entity
+  # shape `format_with_claims/2` reads (`%{name:, primary_type:, sources:}`).
+  # Without this the top-level `:name`/`:primary_type` lookups return nil and
+  # the entity renders as "- ? [?]". Public so `do_build/3`'s normalization is
+  # unit-testable without a live FalkorDB fan-out.
+  def normalize_legacy_entity(candidate) do
+    e = Map.get(candidate, :entity, %{})
+    %{name: Map.get(e, :name), primary_type: Map.get(e, :type), sources: []}
+  end
 
   # Batch-resolve brain-page / draft titles from the claims' episodes.
   defp resolve_titles_for_claims(claims) do
@@ -359,29 +400,4 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
   defp short_source(%{graph_name: g}) when is_binary(g), do: g
   defp short_source(%{"graph_name" => g}) when is_binary(g), do: g
   defp short_source(_), do: "?"
-
-  @doc false
-  # No longer called by `do_build/3` (the legacy fan-out's bare-list shape now
-  # feeds `format_with_claims/2` like every other entity list), but kept as a
-  # public passthrough so the pre-claims rendering stays available and
-  # compiles clean without a caller, mirroring `format/1`'s "exposed for
-  # tests" convention above.
-  def format_legacy(results) do
-    entries =
-      Enum.map_join(results, "\n", fn r ->
-        entity = Map.get(r, :entity) || %{}
-        name = Map.get(entity, :name) || "?"
-        type = Map.get(entity, :type) || "?"
-        graph = Map.get(r, :graph_name) || "?"
-        "- #{name} [#{type}] (from #{graph})"
-      end)
-
-    """
-    <super_brain>
-    Relevant entities from your accumulated knowledge graph:
-
-    #{entries}
-    </super_brain>\
-    """
-  end
 end

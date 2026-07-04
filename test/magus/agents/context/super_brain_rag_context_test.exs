@@ -345,6 +345,53 @@ defmodule Magus.Agents.Context.SuperBrainRagContextTest do
 
       assert length(rendered) == 3
     end
+
+    test "surfaces an orphan claim (subject not among entities) under its own header" do
+      # Only "Aurora" is a retrieved entity; the claim is about "Beacon", whose
+      # subject_key matches no entity. It must still render under a Beacon
+      # header so claim-text recall is not silently dropped.
+      entities = [%{name: "Aurora", primary_type: "project", sources: []}]
+
+      claims = [
+        %{
+          subject_name: "Beacon",
+          subject_key: "beacon",
+          subject_type: "project",
+          predicate: "depends_on",
+          object_name: "Aurora",
+          object_key: "aurora",
+          polarity: :affirms,
+          claim_text: "Beacon depends on Aurora.",
+          confidence: 0.9,
+          episode: %{resource_type: :brain_page, resource_id: Ash.UUID.generate()}
+        }
+      ]
+
+      block = SuperBrainRagContext.format_with_claims(entities, claims)
+
+      assert block =~ "Beacon"
+      assert block =~ "Beacon depends on Aurora."
+    end
+
+    test "a normalized legacy-shape entity renders its name and type, not '?'" do
+      # The legacy fan-out candidate `%{entity: %{name:, type:}}` is normalized
+      # by `normalize_legacy_entity/1` in `do_build/3` into this bare shape
+      # BEFORE reaching the formatter; verify it renders concretely.
+      normalized =
+        SuperBrainRagContext.normalize_legacy_entity(%{
+          entity: %{name: "Legacy Co", type: "organization"},
+          graph_name: "memories:user:abc",
+          similarity: 0.8
+        })
+
+      assert normalized == %{name: "Legacy Co", primary_type: "organization", sources: []}
+
+      block = SuperBrainRagContext.format_with_claims([normalized], [])
+
+      assert block =~ "Legacy Co"
+      assert block =~ "organization"
+      refute block =~ "- ? [?]"
+    end
   end
 
   # ---------------------------------------------------------------------------
