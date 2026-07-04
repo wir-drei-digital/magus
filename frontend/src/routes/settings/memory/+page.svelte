@@ -13,25 +13,26 @@
 		type UserProfileDoc
 	} from '$lib/ash/api';
 	import { bucketOptions } from '$lib/settings/memory-buckets';
+	import { relativeTime } from '$lib/time';
 
 	let memoryEnabled = $state(session.user?.globalMemoryEnabled ?? true);
 	let profileEnabled = $state(session.user?.profileEnabled ?? false);
 
 	async function toggleMemory(next: boolean) {
-		const prev = memoryEnabled;
-		memoryEnabled = next;
 		const userId = session.user?.id;
 		if (!userId) return;
+		const prev = memoryEnabled;
+		memoryEnabled = next;
 		const result = await updateMemorySetting(userId, next);
 		if (!result.success) memoryEnabled = prev;
 		else session.user = result.data;
 	}
 
 	async function toggleProfile(next: boolean) {
-		const prev = profileEnabled;
-		profileEnabled = next;
 		const userId = session.user?.id;
 		if (!userId) return;
+		const prev = profileEnabled;
+		profileEnabled = next;
 		const result = await updateProfileSetting(userId, next);
 		if (!result.success) profileEnabled = prev;
 		else session.user = result.data;
@@ -159,8 +160,16 @@
 					<div class="flex items-start justify-between gap-2 rounded-lg bg-secondary/60 px-3 py-2">
 						<span class="min-w-0">
 							<span class="text-sm font-medium">{m.name}</span>
+							{#if m.kind}
+								<span class="ml-1.5 text-xs text-muted-foreground">{m.kind}</span>
+							{/if}
 							{#if m.summary}
 								<span class="mt-0.5 block truncate text-xs text-muted-foreground">{m.summary}</span>
+							{/if}
+							{#if m.updatedAt}
+								<span class="mt-0.5 block text-xs text-muted-foreground"
+									>Updated {relativeTime(m.updatedAt)}</span
+								>
 							{/if}
 						</span>
 						<button
@@ -177,7 +186,10 @@
 		{/if}
 	</SettingsSection>
 
-	<SettingsSection title="Profile" description="The distilled summary for the selected workspace.">
+	<SettingsSection
+		title="Profile summary"
+		description="The distilled summary for the selected workspace."
+	>
 		{#if profileLoading}
 			<div class="h-16 animate-pulse rounded-lg bg-muted/60"></div>
 		{:else if !profile || profile.document === ''}
@@ -187,6 +199,11 @@
 		{:else}
 			<div class="space-y-2" data-testid="profile-card">
 				<pre class="whitespace-pre-wrap rounded-lg bg-secondary/60 p-3 text-xs">{profile.document}</pre>
+				{#if profile.lastDistilledAt}
+					<p class="text-xs text-muted-foreground">
+						Last updated {relativeTime(profile.lastDistilledAt)}
+					</p>
+				{/if}
 				<button
 					type="button"
 					class="rounded px-2 py-1 text-xs text-destructive hover:bg-destructive/10"

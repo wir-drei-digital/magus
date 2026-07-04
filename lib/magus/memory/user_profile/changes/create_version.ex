@@ -1,5 +1,5 @@
 defmodule Magus.Memory.UserProfile.Changes.CreateVersion do
-  @moduledoc "Snapshots the profile document after every set_document."
+  @moduledoc "Snapshots the profile document after every set_document or clear."
   use Ash.Resource.Change
 
   @impl true
