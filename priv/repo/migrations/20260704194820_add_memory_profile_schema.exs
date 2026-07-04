@@ -1,4 +1,4 @@
-defmodule Magus.Repo.Migrations.AddUserProfiles do
+defmodule Magus.Repo.Migrations.AddMemoryProfileSchema do
   @moduledoc """
   Updates resources based on their most recent snapshots.
 
@@ -19,6 +19,10 @@ defmodule Magus.Repo.Migrations.AddUserProfiles do
         default: fragment("(now() AT TIME ZONE 'utc')")
 
       add :user_profile_id, :uuid, null: false
+    end
+
+    alter table(:conversations) do
+      add :last_extracted_message_at, :utc_datetime_usec
     end
 
     create table(:user_profiles, primary_key: false) do
@@ -70,9 +74,17 @@ defmodule Magus.Repo.Migrations.AddUserProfiles do
              name: "user_profiles_unique_bucket_index",
              nulls_distinct: false
            )
+
+    alter table(:users) do
+      add :profile_enabled, :boolean, null: false, default: false
+    end
   end
 
   def down do
+    alter table(:users) do
+      remove :profile_enabled
+    end
+
     drop constraint(:user_profiles, "user_profiles_user_id_fkey")
 
     drop constraint(:user_profiles, "user_profiles_workspace_id_fkey")
@@ -99,6 +111,10 @@ defmodule Magus.Repo.Migrations.AddUserProfiles do
     end
 
     drop table(:user_profiles)
+
+    alter table(:conversations) do
+      remove :last_extracted_message_at
+    end
 
     drop table(:user_profile_versions)
   end

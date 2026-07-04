@@ -116,21 +116,6 @@
     },
     {
       "allow_nil?": true,
-      "default": "[]",
-      "generated?": false,
-      "precision": null,
-      "primary_key?": false,
-      "references": null,
-      "scale": null,
-      "size": null,
-      "source": "approved_skill_ids",
-      "type": [
-        "array",
-        "uuid"
-      ]
-    },
-    {
-      "allow_nil?": true,
       "default": "nil",
       "generated?": false,
       "precision": null,
@@ -621,7 +606,7 @@
   "custom_indexes": [],
   "custom_statements": [],
   "has_create_action": true,
-  "hash": "5FC97791D677413D2DC8E46C818203C3863C61B40553D9E0226A8E3444D6AFC8",
+  "hash": "46FF5E75B56AAF032D01622E769282BFBF71614E31123FB0E40C0CD24983C3AF",
   "identities": [],
   "multitenancy": {
     "attribute": null,
