@@ -35,6 +35,7 @@ defmodule Magus.SuperBrain.Extraction.Sanitizer do
 
   @max_name_length 200
   @max_predicate_length 60
+  @max_claim_text 500
 
   @doc """
   Sanitises an extracted entity map.
@@ -77,6 +78,58 @@ defmodule Magus.SuperBrain.Extraction.Sanitizer do
       }
     end
   end
+
+  @doc """
+  Sanitises an extracted claim map. Returns `:skip` when subject, object, or
+  claim text is empty after trimming. Predicate is normalised like edges;
+  polarity is whitelisted (default `:affirms`); dates are parsed as ISO 8601
+  with graceful nil.
+  """
+  def sanitize_claim(claim) do
+    sub = claim |> fetch(:subject_name) |> strip_control() |> String.trim()
+    obj = claim |> fetch(:object_name) |> strip_control() |> String.trim()
+    text = claim |> fetch(:claim_text) |> strip_control() |> String.trim()
+
+    if sub == "" or obj == "" or text == "" do
+      :skip
+    else
+      %{
+        subject_name: clip(sub, @max_name_length),
+        object_name: clip(obj, @max_name_length),
+        predicate: predicate_string(fetch(claim, :predicate)),
+        polarity: polarity(fetch(claim, :polarity)),
+        claim_text: clip(text, @max_claim_text),
+        confidence: clamp(fetch(claim, :confidence) || 0.0, 0.0, 1.0),
+        valid_from: parse_date(fetch(claim, :valid_from)),
+        valid_to: parse_date(fetch(claim, :valid_to))
+      }
+    end
+  end
+
+  defp fetch(map, key), do: Map.get(map, key) || Map.get(map, to_string(key))
+
+  # Reuse edge predicate normalization, but keep the result a STRING (claims
+  # store predicate as text) instead of an atom.
+  defp predicate_string(p) do
+    case normalize_predicate(p) do
+      atom when is_atom(atom) -> Atom.to_string(atom)
+      other -> to_string(other)
+    end
+  end
+
+  defp polarity(p) when p in [:negates, "negates"], do: :negates
+  defp polarity(_), do: :affirms
+
+  defp parse_date(nil), do: nil
+
+  defp parse_date(s) when is_binary(s) do
+    case DateTime.from_iso8601(s) do
+      {:ok, dt, _offset} -> dt
+      _ -> nil
+    end
+  end
+
+  defp parse_date(_), do: nil
 
   defp normalize_type(t) when is_atom(t) do
     if Ontology.valid_entity_type?(t) do
