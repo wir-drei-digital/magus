@@ -26,6 +26,18 @@ defmodule Magus.LiveE2ECase do
 
   @live_model_key "openrouter:mistralai/ministral-3b-2512"
 
+  # The curated catalog is empty in the open-core build (`Magus.Models.Catalog`
+  # has `@models []`; the data lives in the commercial repo), so the live
+  # model's LLMDB metadata is defined inline here in the string-keyed shape
+  # `Magus.Models.Catalog.to_llm_metadata/1` produces. CatalogSync reads this
+  # from the DB row when registering the model in the LLMDB :custom registry.
+  @live_model_metadata %{
+    "context" => 131_072,
+    "output_limit" => 8_192,
+    "input_cost" => 0.04,
+    "output_cost" => 0.04
+  }
+
   using do
     quote do
       import Magus.Generators
@@ -58,6 +70,15 @@ defmodule Magus.LiveE2ECase do
     Application.put_env(:magus, :llm_client, Magus.Agents.Clients.LLM)
     on_exit(fn -> Application.put_env(:magus, :llm_client, original_client) end)
 
+    # Swap in the real sandbox provider when SANDBOX_PROVIDER is set.
+    # config/test.exs pins provider :test and stubs the Daytona client
+    # (Req.Test plug + .invalid control URL) so ordinary tests never provision
+    # real services; runtime.exs skips the SANDBOX_PROVIDER override in test
+    # env. Live E2E honors the env var here instead — :sandbox-tagged tests
+    # hit the real control plane, and still skip gracefully via their setup
+    # probe when the provider has no working credentials.
+    setup_live_sandbox_provider()
+
     # Start test-scoped InstanceManager (same pattern as PlaywrightCase)
     store = {Magus.Agents.Persistence.PostgresStore, []}
 
@@ -80,13 +101,47 @@ defmodule Magus.LiveE2ECase do
     %{model: model, user: user}
   end
 
+  defp setup_live_sandbox_provider do
+    case System.get_env("SANDBOX_PROVIDER") do
+      provider_str when provider_str in ["sprites", "daytona"] ->
+        provider = String.to_existing_atom(provider_str)
+
+        original_sandbox = Application.get_env(:magus, Magus.Sandbox)
+        original_daytona = Application.get_env(:magus, Magus.Sandbox.Clients.Daytona)
+
+        Application.put_env(
+          :magus,
+          Magus.Sandbox,
+          Keyword.put(original_sandbox || [], :provider, provider)
+        )
+
+        # Strip the test stub (plug + invalid control URL) so the client
+        # falls back to its real production base URLs; api_key and sizing
+        # come through from runtime.exs untouched.
+        Application.put_env(
+          :magus,
+          Magus.Sandbox.Clients.Daytona,
+          Keyword.drop(original_daytona || [], [:req_options, :control_base_url])
+        )
+
+        on_exit(fn ->
+          Application.put_env(:magus, Magus.Sandbox, original_sandbox)
+          Application.put_env(:magus, Magus.Sandbox.Clients.Daytona, original_daytona)
+        end)
+
+      _ ->
+        :ok
+    end
+  end
+
   @doc """
   Create the model record pointing to the real OpenRouter model.
 
   Since LLMDB is synced from DB rows (CatalogSync), the fixture must mirror
-  production shape: a Provider row, the model linked to it with the catalog's
-  llm_metadata (tools capability, limits), then a synchronous catalog reload
-  so ReqLLM resolves the spec with the same metadata as a deployed instance.
+  production shape: a Provider row, the model linked to it with llm_metadata
+  (tools capability, limits; see @live_model_metadata), then a synchronous
+  catalog reload so ReqLLM resolves the spec with the same metadata as a
+  deployed instance.
   """
   def create_live_model do
     provider =
@@ -101,23 +156,7 @@ defmodule Magus.LiveE2ECase do
           )
       end
 
-    # Open-core builds ship an empty catalog stub (curated data lives in
-    # magus_cloud, see Magus.Models.Catalog moduledoc). Fall back to a minimal
-    # inline metadata map so live E2E stays runnable against the public repo;
-    # CatalogSync builds the runtime LLMDB registry from the DB row either way.
-    llm_metadata =
-      case Enum.find(Magus.Models.Catalog.all_with_internal(), &(&1.key == @live_model_key)) do
-        nil ->
-          %{
-            "context" => 128_000,
-            "output_limit" => 8_192,
-            "input_cost" => 0.04,
-            "output_cost" => 0.04
-          }
-
-        catalog_entry ->
-          Magus.Models.Catalog.to_llm_metadata(catalog_entry)
-      end
+    llm_metadata = @live_model_metadata
 
     # Find-or-create by key. A materialized catalog row for the live model can
     # exist outside the Ecto sandbox (e.g. seeded into a real DB); the create
