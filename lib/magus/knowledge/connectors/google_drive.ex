@@ -164,10 +164,15 @@ defmodule Magus.Knowledge.Connectors.GoogleDrive do
         # Use rotated refresh token if Google issued one, otherwise keep original
         effective_refresh = Process.get({:gdrive_refreshed_refresh_token, rt}) || rt
 
-        %{
+        base = %{
           "access_token" => new_access_token,
           "refresh_token" => effective_refresh
         }
+
+        case Process.get({:gdrive_refreshed_expires_at, rt}) do
+          nil -> base
+          expires_at -> Map.put(base, "expires_at", expires_at)
+        end
     end
   end
 
@@ -425,8 +430,8 @@ defmodule Magus.Knowledge.Connectors.GoogleDrive do
     case do_get(url, token, params, max_size, timeout) do
       {:error, {:drive_api_error, 401, _}} when is_binary(refresh_token) ->
         case Magus.Knowledge.OAuth.refresh_google_token(refresh_token) do
-          {:ok, %{"access_token" => new_token, "refresh_token" => new_refresh}} ->
-            cache_refreshed_token(refresh_token, new_token, new_refresh)
+          {:ok, %{"access_token" => new_token, "refresh_token" => new_refresh} = new_auth} ->
+            cache_refreshed_token(refresh_token, new_token, new_refresh, new_auth["expires_at"])
             do_get(url, new_token, params, max_size, timeout)
 
           {:error, :reauth_required} ->
@@ -472,11 +477,15 @@ defmodule Magus.Knowledge.Connectors.GoogleDrive do
 
   defp get_current_token(%__MODULE__{access_token: token}), do: token
 
-  defp cache_refreshed_token(refresh_token, new_access_token, new_refresh_token) do
+  defp cache_refreshed_token(refresh_token, new_access_token, new_refresh_token, expires_at) do
     Process.put({:gdrive_refreshed_token, refresh_token}, new_access_token)
 
     if new_refresh_token do
       Process.put({:gdrive_refreshed_refresh_token, refresh_token}, new_refresh_token)
+    end
+
+    if expires_at do
+      Process.put({:gdrive_refreshed_expires_at, refresh_token}, expires_at)
     end
   end
 

@@ -35,9 +35,14 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers do
           :ok
 
         new_auth_config ->
+          # `:update_auth_config` REPLACES the whole attribute, so merge here
+          # (mirrors TokenManager.persist/2's proactive-path merge) to keep any
+          # keys the reactive refresh didn't touch, such as expires_at.
+          merged_auth_config = Map.merge(source.auth_config || %{}, new_auth_config)
+
           case Magus.Knowledge.update_source_auth_config(
                  source,
-                 %{auth_config: new_auth_config},
+                 %{auth_config: merged_auth_config},
                  authorize?: false
                ) do
             {:ok, _} ->

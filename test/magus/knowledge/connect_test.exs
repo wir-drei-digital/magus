@@ -125,5 +125,40 @@ defmodule Magus.Knowledge.ConnectTest do
       assert source.provider == :nextcloud
       assert source.status == :active
     end
+
+    test "heals the source flagged needs_reauth when multiple sources exist for the provider" do
+      user = generate(user())
+
+      {:ok, healthy} = Connect.connect_and_create("nextcloud", @nextcloud, actor: user)
+
+      {:ok, broken} =
+        Connect.connect_and_create(
+          "nextcloud",
+          Map.put(@nextcloud, "username", "bob"),
+          actor: user
+        )
+
+      {:ok, broken} =
+        Magus.Knowledge.mark_source_needs_reauth(
+          broken,
+          %{last_error: "reauth_required"},
+          authorize?: false
+        )
+
+      assert broken.needs_reauth == true
+      assert healthy.needs_reauth == false
+
+      {:ok, healed} =
+        Connect.reconnect_or_create(
+          "nextcloud",
+          Map.put(@nextcloud, "password", "rotated-token"),
+          actor: user
+        )
+
+      assert healed.id == broken.id
+      assert healed.needs_reauth == false
+
+      assert {:ok, [_source_a, _source_b]} = Knowledge.list_sources_for_user(actor: user)
+    end
   end
 end

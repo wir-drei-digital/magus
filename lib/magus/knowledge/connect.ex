@@ -75,10 +75,19 @@ defmodule Magus.Knowledge.Connect do
     end
   end
 
+  # Assumes a single source per provider per actor. If more than one exists
+  # (shouldn't normally happen, but reconnect is best-effort healing, not an
+  # invariant enforcer), prefer the one flagged `needs_reauth` since that is
+  # the source actually broken and waiting to be healed, falling back to the
+  # first match otherwise.
   defp existing_source(provider_atom, actor) do
     case Knowledge.list_sources_for_user(actor: actor) do
-      {:ok, sources} -> Enum.find(sources, &(&1.provider == provider_atom))
-      _ -> nil
+      {:ok, sources} ->
+        provider_matches = Enum.filter(sources, &(&1.provider == provider_atom))
+        Enum.find(provider_matches, & &1.needs_reauth) || List.first(provider_matches)
+
+      _ ->
+        nil
     end
   end
 
