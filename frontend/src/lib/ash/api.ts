@@ -74,6 +74,10 @@ export type CurrentUser = {
 	dataRegionConsents: Record<string, string>;
 	/** Resolved avatar URL (null when no avatar is set). */
 	avatarUrl: string | null;
+	/** Global memory toggle: whether Magus may write/read memories at all. */
+	globalMemoryEnabled: boolean;
+	/** Whether the distilled living-summary profile is enabled (requires memory on). */
+	profileEnabled: boolean;
 };
 
 const CURRENT_USER_FIELDS: rpc.CurrentUserFields = [
@@ -85,7 +89,9 @@ const CURRENT_USER_FIELDS: rpc.CurrentUserFields = [
 	'uiPreferences',
 	'dataRegionPreference',
 	'dataRegionConsents',
-	'avatarUrl'
+	'avatarUrl',
+	'globalMemoryEnabled',
+	'profileEnabled'
 ];
 
 export function currentUser(): Promise<RpcResult<CurrentUser>> {
