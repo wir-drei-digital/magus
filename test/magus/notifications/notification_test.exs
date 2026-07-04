@@ -27,6 +27,36 @@ defmodule Magus.Notifications.NotificationTest do
     end
   end
 
+  describe "pub_sub :create payload" do
+    # The SPA bell renders live-arriving notifications from this payload alone.
+    # The skill-approval card needs metadata.approve_phrase; without it the
+    # card silently degrades to a plain row (regression: metadata was dropped).
+    test "transform carries metadata and inserted_at" do
+      publication =
+        Magus.Notifications.Notification
+        |> Ash.Notifier.PubSub.Info.publications()
+        |> Enum.find(&(&1.action == :create))
+
+      payload =
+        publication.transform.(%Ash.Notifier.Notification{
+          resource: Magus.Notifications.Notification,
+          data: %{
+            id: Ash.UUIDv7.generate(),
+            title: "Skill approval needed",
+            body: "Allow?",
+            notification_type: :approval_request,
+            target_conversation_id: nil,
+            user_id: Ash.UUIDv7.generate(),
+            metadata: %{"approve_phrase" => "Approve skill: x"},
+            inserted_at: DateTime.utc_now()
+          }
+        })
+
+      assert payload.metadata == %{"approve_phrase" => "Approve skill: x"}
+      assert %DateTime{} = payload.inserted_at
+    end
+  end
+
   describe "list_unread_notifications" do
     test "returns only unread notifications for the actor" do
       user = generate(user())

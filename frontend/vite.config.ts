@@ -40,6 +40,9 @@ export default defineConfig({
 			'/api': 'http://localhost:4000',
 			'/uploads': 'http://localhost:4000',
 			'/fonts': 'http://localhost:4000',
+			// Skill bundle downloads are served by Phoenix. Only the download
+			// path is proxied: /skills and /skills/:id remain SPA redirects.
+			'^/skills/[^/]+/download$': 'http://localhost:4000',
 			// Phoenix-rendered auth pages (sign-in/register are LiveViews, so they
 			// also need /live and the classic /assets bundle). Cookies ignore the
 			// port, so a session created here is visible to the SPA origin too.

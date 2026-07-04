@@ -105,7 +105,12 @@ defmodule Magus.Notifications.Notification do
           body: notification.body,
           notification_type: notification.notification_type,
           target_conversation_id: notification.target_conversation_id,
-          user_id: notification.user_id
+          user_id: notification.user_id,
+          # The SPA bell renders live items from this payload alone; without
+          # metadata the skill-approval card (approve_phrase) degrades to a
+          # plain row until the next full refetch.
+          metadata: notification.metadata,
+          inserted_at: notification.inserted_at
         }
       end
     end
