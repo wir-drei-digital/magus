@@ -35,4 +35,39 @@ defmodule Magus.Agents.Actions.BuildMemoryContextFormatTest do
     refute out =~ "```json"
     assert out =~ "search_memories"
   end
+
+  describe "empty-context regression (no real memory content)" do
+    test "no memories + global disabled returns empty string, not a disabled-note block" do
+      out = BuildMemoryContext.format_context([], [], false)
+      assert out == ""
+      refute out =~ "## Your Memory"
+      refute out =~ "Global memory is disabled"
+    end
+
+    test "no memories + global enabled returns empty string, not a tip block" do
+      out = BuildMemoryContext.format_context([], [], true)
+      assert out == ""
+      refute out =~ "## Your Memory"
+      refute out =~ "Create global memories"
+    end
+
+    test "profile document with empty important/semantic renders the profile section without the global-memory tip" do
+      out =
+        BuildMemoryContext.format_context([], [], true,
+          profile_document: "## Preferences\nConcise answers."
+        )
+
+      assert out =~ "## Your Memory"
+      assert out =~ "### User Profile"
+      assert out =~ "Concise answers."
+      refute out =~ "Create global memories"
+      refute out =~ "Global memory is disabled"
+    end
+
+    test "a non-empty important memory (no profile) still renders the block as before" do
+      out = BuildMemoryContext.format_context([mem("A", [])], [], false)
+      assert out =~ "## Your Memory"
+      assert out =~ "### Key Memories"
+    end
+  end
 end
