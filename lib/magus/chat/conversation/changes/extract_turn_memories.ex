@@ -38,6 +38,27 @@ defmodule Magus.Chat.Conversation.Changes.ExtractTurnMemories do
   @min_transcript_chars 80
 
   defp run_extraction(conversation) do
+    if memory_disabled?(conversation) do
+      :ok
+    else
+      do_run_extraction(conversation)
+    end
+  end
+
+  defp memory_disabled?(conversation) do
+    require Ash.Query
+
+    Magus.Accounts.User
+    |> Ash.Query.filter(id == ^conversation.user_id)
+    |> Ash.Query.select([:global_memory_enabled])
+    |> Ash.read_one(authorize?: false)
+    |> case do
+      {:ok, %{global_memory_enabled: false}} -> true
+      _ -> false
+    end
+  end
+
+  defp do_run_extraction(conversation) do
     turns = load_turns_since(conversation)
 
     transcript_chars =
