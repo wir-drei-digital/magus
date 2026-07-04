@@ -24,6 +24,7 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
       context.important    # => List of key memories
       context.semantic     # => List of semantically relevant memories
       context.associated   # => List of association-expanded memories
+      context.profile_document # => Distilled profile doc (string) or nil
   """
 
   require Logger
@@ -92,6 +93,13 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
     actor = %User{id: user_id}
     workspace_id = Magus.Memory.workspace_id_for_conversation(conversation_id)
 
+    # Distilled profile document (Hermes-style top layer). When present, it
+    # replaces the global top-3-recency key-memory layer below.
+    profile_document =
+      if global_enabled and Magus.Agents.Config.profile_enabled?() do
+        load_profile_document(user_id, workspace_id)
+      end
+
     # Layer 1: Key memories (most recently updated)
     important_local = load_important_local(conversation_id, actor)
 
@@ -103,7 +111,7 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
       end
 
     important_global =
-      if global_enabled do
+      if global_enabled and is_nil(profile_document) do
         load_important_global(workspace_id, actor)
       else
         []
@@ -144,13 +152,19 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
     reinforce_co_retrieved(all_memory_ids)
 
     # Build formatted context
-    formatted = format_context(important, semantic ++ associated, global_enabled)
+    formatted =
+      format_context(important, semantic ++ associated, global_enabled,
+        profile_document: profile_document
+      )
 
     # Whole-block budget: if full previews blow past the cap, re-render
     # summary-only. Full content stays reachable via the search_memories tool.
     formatted =
       if String.length(formatted) > @max_block_chars do
-        format_context(important, semantic ++ associated, global_enabled, previews: false)
+        format_context(important, semantic ++ associated, global_enabled,
+          previews: false,
+          profile_document: profile_document
+        )
       else
         formatted
       end
@@ -167,7 +181,8 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
       semantic: semantic,
       associated: associated,
       formatted: formatted,
-      global_enabled: global_enabled
+      global_enabled: global_enabled,
+      profile_document: profile_document
     }
   end
 
@@ -211,6 +226,20 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
       _ ->
         []
     end
+  end
+
+  # Distilled profile document (Hermes-style working memory). Returns the
+  # document string when a non-empty profile exists for the bucket, nil
+  # otherwise (no profile row, empty document, or lookup failure).
+  defp load_profile_document(user_id, workspace_id) do
+    case Magus.Memory.get_user_profile(user_id, workspace_id, authorize?: false) do
+      {:ok, %{document: doc}} when is_binary(doc) and doc != "" -> doc
+      _ -> nil
+    end
+  rescue
+    e ->
+      Logger.warning("Failed to load user profile: #{Exception.message(e)}")
+      nil
   end
 
   # ============================================================================
@@ -412,12 +441,12 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
   @doc false
   def format_context(important, semantic, global_enabled, opts \\ [])
 
-  def format_context([], [], _global_enabled, _opts), do: ""
-
   def format_context(important, semantic, global_enabled, opts) do
     previews? = Keyword.get(opts, :previews, true)
+    profile_document = Keyword.get(opts, :profile_document)
 
     sections = [
+      format_profile_section(profile_document),
       format_important_section(important, previews?),
       format_semantic_section(semantic),
       format_global_note(global_enabled, important ++ semantic)
@@ -440,6 +469,15 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
       You can search for more context with `search_memories`.
       """
     end
+  end
+
+  defp format_profile_section(nil), do: ""
+
+  defp format_profile_section(document) do
+    """
+    ### User Profile
+    #{document}
+    """
   end
 
   defp format_important_section([], _previews?), do: ""
