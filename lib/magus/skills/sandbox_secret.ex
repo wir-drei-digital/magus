@@ -32,11 +32,6 @@ defmodule Magus.Skills.SandboxSecret do
       filter expr(user_id == ^actor(:id))
     end
 
-    read :for_user do
-      argument :user_id, :uuid, allow_nil?: false
-      filter expr(user_id == ^arg(:user_id))
-    end
-
     create :create do
       accept [:key, :value, :description]
       change relate_actor(:user)

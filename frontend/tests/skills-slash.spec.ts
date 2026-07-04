@@ -222,3 +222,36 @@ test('clicking a skill row injects its /name into the composer', async ({ page }
 
 	await expect(page.getByTestId('composer-input')).toHaveValue('/bash-runner ');
 });
+
+test('a skill whose name collides with a command yields a single row (command wins)', async ({
+	page
+}) => {
+	// A skill named `web-search` collides with the global command of the same
+	// name. Two rows sharing the keyed-each key (command.name) would crash the
+	// composer in Svelte 5; the skill row must be filtered out (command wins).
+	const collidingSkill = {
+		...bundledSkill,
+		id: 'skill-collide-0000-0000-0000-000000000003',
+		name: 'web-search',
+		displayName: 'Web Search (skill)',
+		hasExecutableBundle: false
+	};
+
+	await mockRpc(page, {
+		respond: {
+			merged_slash_commands: () => [
+				{ name: 'web-search', title: 'Search the web', icon: 'lucide-globe' }
+			],
+			my_skills: () => [collidingSkill]
+		}
+	});
+	await page.goto(`/chat/${conversation.id}`);
+
+	await page.getByTestId('composer-actions').click();
+
+	// Exactly one row exists for the colliding name: the command, not the skill.
+	const commands = page.getByTestId('composer-slash-command');
+	await expect(commands).toHaveCount(1);
+	await expect(commands.filter({ hasText: 'Search the web' })).toHaveCount(1);
+	await expect(commands.filter({ hasText: 'Web Search (skill)' })).toHaveCount(0);
+});

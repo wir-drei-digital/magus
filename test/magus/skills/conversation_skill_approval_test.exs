@@ -58,6 +58,37 @@ defmodule Magus.Skills.ConversationSkillApprovalTest do
     refute Approval.approved?(c2, changed)
   end
 
+  test "deleting a non-owner approver nilifies approved_by_id, keeping the row",
+       %{user: owner, conversation: c, skill: s} do
+    approver = generate(user())
+
+    {:ok, approval} =
+      Magus.Skills.record_conversation_approval(
+        %{
+          conversation_id: c.id,
+          skill_id: s.id,
+          bundle_sha: s.bundle_sha,
+          approved_by_id: approver.id,
+          source: :approval_card
+        },
+        authorize?: false
+      )
+
+    assert approval.approved_by_id == approver.id
+    # Sanity: the approver is a different user than the conversation owner.
+    refute approver.id == owner.id
+
+    # Mirror the account-deletion flow (Magus.Accounts.AccountDeletion drops the
+    # User row directly via Ecto). A missing on_delete on approved_by_id would
+    # abort this transaction; :nilify keeps the approval and forgets the approver.
+    Magus.Repo.delete!(approver)
+
+    {:ok, reloaded} =
+      Ash.get(Magus.Skills.ConversationSkillApproval, approval.id, authorize?: false)
+
+    assert reloaded.approved_by_id == nil
+  end
+
   defp build_zip(entries) do
     files = Enum.map(entries, fn {p, c} -> {String.to_charlist(p), c} end)
     {:ok, {_n, bytes}} = :zip.create(~c"b.zip", files, [:memory])
