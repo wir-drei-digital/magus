@@ -57,6 +57,15 @@ defmodule Magus.Skills.Approval do
   def request(conversation_id, skill, user_id) do
     question = "Allow the skill \"#{skill.name}\" to run its bundled code in the sandbox?"
 
+    declared_keys =
+      (Map.get(skill, :required_secrets) || [])
+      |> Enum.map(fn
+        %{"key" => k} -> k
+        %{key: k} -> k
+        _ -> nil
+      end)
+      |> Enum.reject(&is_nil/1)
+
     # system-created notification: the user_id is the recipient, no acting user
     case Magus.Notifications.create_notification(
            %{
@@ -68,6 +77,7 @@ defmodule Magus.Skills.Approval do
              metadata: %{
                skill_id: skill.id,
                approve_phrase: approve_phrase(skill.id),
+               declared_secret_keys: declared_keys,
                options: ["Approve", "Reject"]
              }
            },

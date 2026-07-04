@@ -21,7 +21,7 @@
 	import { notificationFeed } from '$lib/stores/notifications.svelte';
 	import { relativeTime } from '$lib/time';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { sendUserMessage } from '$lib/ash/api';
+	import { sendUserMessage, trustSkill } from '$lib/ash/api';
 
 	onMount(() => {
 		void notificationFeed.loadInitial();
@@ -59,6 +59,8 @@
 
 	// Per-notification busy guard — maps notification id to approving state.
 	let approving = $state<Record<string, boolean>>({});
+	// "Always allow this skill" checkbox state, keyed by notification id.
+	let trustChecked = $state<Record<string, boolean>>({});
 
 	async function approve(item: NotificationItem) {
 		if (approving[item.id]) return;
@@ -69,6 +71,10 @@
 		}
 		approving = { ...approving, [item.id]: true };
 		try {
+			const skillId = item.metadata?.skill_id;
+			if (trustChecked[item.id] && skillId) {
+				await trustSkill(String(skillId));
+			}
 			if (item.targetConversationId && phrase) {
 				await sendUserMessage(item.targetConversationId, phrase, []);
 			} else {
@@ -152,6 +158,24 @@
 										<span class="text-primary">+{group.count - 1} more</span>
 									{/if}
 								</span>
+								{#if Array.isArray(group.head.metadata?.declared_secret_keys) && group.head.metadata.declared_secret_keys.length > 0}
+									<div class="mt-1 flex flex-wrap gap-1" data-testid="approval-declared-keys">
+										{#each group.head.metadata.declared_secret_keys as key (key)}
+											<span
+												class="rounded bg-secondary px-1 py-px font-mono text-[9px] text-secondary-foreground"
+												>{key}</span
+											>
+										{/each}
+									</div>
+								{/if}
+								<label class="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+									<input
+										type="checkbox"
+										bind:checked={trustChecked[group.head.id]}
+										data-testid="approval-trust"
+									/>
+									Always allow this skill
+								</label>
 								<div class="mt-1.5 flex gap-1.5">
 									<button
 										type="button"
