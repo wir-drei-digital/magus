@@ -19,6 +19,20 @@ defmodule Magus.Memory.MemoryAssociation do
 
   require Ash.Query
 
+  @half_life_days 30.0
+
+  @doc """
+  Time-decayed effective weight: the stored weight halves for every
+  #{trunc(@half_life_days)} days since the edge was last reinforced. Decay is
+  computed at read time; the stored weight is never rewritten. Clock skew
+  (future last_reinforced_at) is clamped so the result never exceeds the
+  stored weight.
+  """
+  def effective_weight(%{weight: weight, last_reinforced_at: at}, now \\ DateTime.utc_now()) do
+    days = max(DateTime.diff(now, at, :second), 0) / 86_400
+    weight * :math.pow(0.5, days / @half_life_days)
+  end
+
   postgres do
     table "memory_associations"
     repo Magus.Repo

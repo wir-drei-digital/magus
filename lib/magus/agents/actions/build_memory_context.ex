@@ -35,6 +35,7 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
   @max_semantic_results 5
   @max_associated_results 3
   @max_reinforcement_pairs 10
+  @min_effective_assoc_weight 0.05
 
   @doc """
   Builds memory context for inclusion in the system prompt.
@@ -321,12 +322,17 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
            |> Ash.Query.filter(memory_a_id in ^memory_id_list or memory_b_id in ^memory_id_list)
            |> Ash.read(authorize?: false) do
         {:ok, assocs} ->
+          now = DateTime.utc_now()
+
           assocs
           |> Enum.flat_map(fn a ->
+            ew = Magus.Memory.MemoryAssociation.effective_weight(a, now)
+
             cond do
-              MapSet.member?(memory_ids, a.memory_a_id) -> [{a.memory_b_id, a.weight}]
-              MapSet.member?(memory_ids, a.memory_b_id) -> [{a.memory_a_id, a.weight}]
-              true -> [{a.memory_b_id, a.weight}, {a.memory_a_id, a.weight}]
+              ew < @min_effective_assoc_weight -> []
+              MapSet.member?(memory_ids, a.memory_a_id) -> [{a.memory_b_id, ew}]
+              MapSet.member?(memory_ids, a.memory_b_id) -> [{a.memory_a_id, ew}]
+              true -> []
             end
           end)
           |> Enum.reject(fn {id, _w} -> MapSet.member?(memory_ids, id) end)
@@ -367,9 +373,11 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
     Task.Supervisor.start_child(Magus.AgentLoopTaskSupervisor, fn ->
       pairs = for a <- memory_ids, b <- memory_ids, a < b, do: {a, b}
 
-      # Only reinforce a reasonable number of pairs (avoid N^2 explosion)
+      # Only reinforce a reasonable number of pairs (avoid N^2 explosion).
+      # take_random instead of take: with >10 pairs, a deterministic prefix
+      # systematically reinforces the same low-UUID pairs every turn.
       pairs
-      |> Enum.take(@max_reinforcement_pairs)
+      |> Enum.take_random(@max_reinforcement_pairs)
       |> Enum.each(fn {a, b} ->
         case Magus.Memory.get_association_between(a, b, authorize?: false) do
           {:ok, assoc} when not is_nil(assoc) ->
