@@ -38,6 +38,14 @@ defmodule Magus.Models do
       define :list_remote_models, action: :list_remote_models, args: [:provider_id]
     end
 
+    resource Magus.Models.OpenRouterProvider do
+      define :list_open_router_providers, action: :read
+      define :list_allowed_open_router_providers, action: :allowed
+      define :get_open_router_provider_by_slug, action: :by_slug, args: [:slug]
+      define :upsert_open_router_provider, action: :upsert
+      define :set_open_router_provider_allowed, action: :set_allowed, args: [:allowed]
+    end
+
     resource Magus.Models.RoleAssignment do
       define :assign_role, action: :assign
       define :list_role_assignments, action: :read
