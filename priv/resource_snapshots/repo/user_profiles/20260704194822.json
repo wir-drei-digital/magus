@@ -26,6 +26,21 @@
     },
     {
       "allow_nil?": false,
+      "default": "[]",
+      "generated?": false,
+      "precision": null,
+      "primary_key?": false,
+      "references": null,
+      "scale": null,
+      "size": null,
+      "source": "pending_notes",
+      "type": [
+        "array",
+        "text"
+      ]
+    },
+    {
+      "allow_nil?": false,
       "default": "0",
       "generated?": false,
       "precision": null,
@@ -38,15 +53,15 @@
     },
     {
       "allow_nil?": true,
-      "default": "\"system\"",
+      "default": "nil",
       "generated?": false,
       "precision": null,
       "primary_key?": false,
       "references": null,
       "scale": null,
       "size": null,
-      "source": "changed_by",
-      "type": "text"
+      "source": "last_distilled_at",
+      "type": "utc_datetime_usec"
     },
     {
       "allow_nil?": false,
@@ -58,6 +73,18 @@
       "scale": null,
       "size": null,
       "source": "inserted_at",
+      "type": "utc_datetime_usec"
+    },
+    {
+      "allow_nil?": false,
+      "default": "fragment(\"(now() AT TIME ZONE 'utc')\")",
+      "generated?": false,
+      "precision": null,
+      "primary_key?": false,
+      "references": null,
+      "scale": null,
+      "size": null,
+      "source": "updated_at",
       "type": "utc_datetime_usec"
     },
     {
@@ -79,16 +106,47 @@
           "global": null,
           "strategy": null
         },
-        "name": "user_profile_versions_user_profile_id_fkey",
+        "name": "user_profiles_user_id_fkey",
         "on_delete": null,
         "on_update": null,
         "primary_key?": true,
         "schema": "public",
-        "table": "user_profiles"
+        "table": "users"
       },
       "scale": null,
       "size": null,
-      "source": "user_profile_id",
+      "source": "user_id",
+      "type": "uuid"
+    },
+    {
+      "allow_nil?": true,
+      "default": "nil",
+      "generated?": false,
+      "precision": null,
+      "primary_key?": false,
+      "references": {
+        "deferrable": false,
+        "destination_attribute": "id",
+        "destination_attribute_default": null,
+        "destination_attribute_generated": null,
+        "index?": false,
+        "match_type": null,
+        "match_with": null,
+        "multitenancy": {
+          "attribute": null,
+          "global": null,
+          "strategy": null
+        },
+        "name": "user_profiles_workspace_id_fkey",
+        "on_delete": null,
+        "on_update": null,
+        "primary_key?": true,
+        "schema": "public",
+        "table": "workspaces"
+      },
+      "scale": null,
+      "size": null,
+      "source": "workspace_id",
       "type": "uuid"
     }
   ],
@@ -98,8 +156,27 @@
   "custom_indexes": [],
   "custom_statements": [],
   "has_create_action": true,
-  "hash": "0A71F07BACC57F5AF92EEAD6D3AA0A3464BFCA3729FEBD68F5FD63AD3371031D",
-  "identities": [],
+  "hash": "D6C0898E2E5B3CCC60C599FE3B51B7D3400AB3B131ECFA32384B79976F65ABE3",
+  "identities": [
+    {
+      "all_tenants?": false,
+      "base_filter": null,
+      "index_name": "user_profiles_unique_bucket_index",
+      "keys": [
+        {
+          "type": "atom",
+          "value": "user_id"
+        },
+        {
+          "type": "atom",
+          "value": "workspace_id"
+        }
+      ],
+      "name": "unique_bucket",
+      "nils_distinct?": false,
+      "where": null
+    }
+  ],
   "multitenancy": {
     "attribute": null,
     "global": null,
@@ -107,5 +184,5 @@
   },
   "repo": "Elixir.Magus.Repo",
   "schema": null,
-  "table": "user_profile_versions"
+  "table": "user_profiles"
 }

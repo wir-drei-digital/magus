@@ -13,7 +13,7 @@ export type UtcDateTimeUsec = string;
 // User Schema
 export type UserResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "email" | "displayName" | "currentWorkspaceId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "imageGenerationSettings" | "videoGenerationSettings" | "isAdmin" | "language" | "avatarPath" | "pendingEmail" | "uiPreferences" | "timezone" | "lastTimezoneChangeAt" | "dataRegionPreference" | "dataRegionConsents" | "selectedPlanKey" | "globalMemoryEnabled" | "contextStrategy" | "name" | "acceptedTerms" | "acceptedAgeRequirement" | "hasPassword" | "avatarUrl";
+  __primitiveFields: "id" | "email" | "displayName" | "currentWorkspaceId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "imageGenerationSettings" | "videoGenerationSettings" | "isAdmin" | "language" | "avatarPath" | "pendingEmail" | "uiPreferences" | "timezone" | "lastTimezoneChangeAt" | "dataRegionPreference" | "dataRegionConsents" | "selectedPlanKey" | "globalMemoryEnabled" | "profileEnabled" | "contextStrategy" | "name" | "acceptedTerms" | "acceptedAgeRequirement" | "hasPassword" | "avatarUrl";
   id: UUID;
   email: string;
   displayName: string | null;
@@ -34,6 +34,7 @@ export type UserResourceSchema = {
   dataRegionConsents: Record<string, any>;
   selectedPlanKey: string | null;
   globalMemoryEnabled: boolean;
+  profileEnabled: boolean;
   contextStrategy: "compact" | "rolling" | null;
   name: string | null;
   acceptedTerms: boolean;
@@ -46,7 +47,7 @@ export type UserResourceSchema = {
 
 export type UserAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "email" | "displayName" | "currentWorkspaceId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "imageGenerationSettings" | "videoGenerationSettings" | "isAdmin" | "language" | "avatarPath" | "pendingEmail" | "uiPreferences" | "timezone" | "lastTimezoneChangeAt" | "dataRegionPreference" | "dataRegionConsents" | "selectedPlanKey" | "globalMemoryEnabled" | "contextStrategy" | "name" | "acceptedTerms" | "acceptedAgeRequirement";
+  __primitiveFields: "id" | "email" | "displayName" | "currentWorkspaceId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "imageGenerationSettings" | "videoGenerationSettings" | "isAdmin" | "language" | "avatarPath" | "pendingEmail" | "uiPreferences" | "timezone" | "lastTimezoneChangeAt" | "dataRegionPreference" | "dataRegionConsents" | "selectedPlanKey" | "globalMemoryEnabled" | "profileEnabled" | "contextStrategy" | "name" | "acceptedTerms" | "acceptedAgeRequirement";
   id: UUID;
   email: string;
   displayName: string | null;
@@ -67,6 +68,7 @@ export type UserAttributesOnlySchema = {
   dataRegionConsents: Record<string, any>;
   selectedPlanKey: string | null;
   globalMemoryEnabled: boolean;
+  profileEnabled: boolean;
   contextStrategy: "compact" | "rolling" | null;
   name: string | null;
   acceptedTerms: boolean;
@@ -506,7 +508,7 @@ export type context_windowAttributesOnlySchema = {
 // Conversation Schema
 export type ConversationResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "isMultiplayer" | "visibility" | "chatMode" | "systemPrompt" | "skillContext" | "skillTools" | "loadedTools" | "samplingSettings" | "imageGenerationSettings" | "videoGenerationSettings" | "isTaskConversation" | "isThread" | "branchedAt" | "deletedAt" | "extractionDueAt" | "insertedAt" | "updatedAt" | "userId" | "folderId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "systemPromptId" | "customAgentId" | "workspaceId" | "parentConversationId" | "sandboxConversationId" | "branchedAtMessageId" | "messageCount" | "lastMessageAt" | "isFavorited" | "isSharedToWorkspace";
+  __primitiveFields: "id" | "title" | "isMultiplayer" | "visibility" | "chatMode" | "systemPrompt" | "skillContext" | "skillTools" | "loadedTools" | "samplingSettings" | "imageGenerationSettings" | "videoGenerationSettings" | "isTaskConversation" | "isThread" | "branchedAt" | "deletedAt" | "extractionDueAt" | "lastExtractedMessageAt" | "insertedAt" | "updatedAt" | "userId" | "folderId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "systemPromptId" | "customAgentId" | "workspaceId" | "parentConversationId" | "sandboxConversationId" | "branchedAtMessageId" | "messageCount" | "lastMessageAt" | "isFavorited" | "isSharedToWorkspace";
   id: UUIDv7;
   title: string | null;
   isMultiplayer: boolean;
@@ -524,6 +526,7 @@ export type ConversationResourceSchema = {
   branchedAt: UtcDateTimeUsec | null;
   deletedAt: UtcDateTimeUsec | null;
   extractionDueAt: UtcDateTimeUsec | null;
+  lastExtractedMessageAt: UtcDateTimeUsec | null;
   insertedAt: UtcDateTimeUsec;
   updatedAt: UtcDateTimeUsec;
   userId: UUID;
@@ -559,13 +562,14 @@ export type ConversationResourceSchema = {
   branchedAtMessage: { __type: "Relationship"; __resource: MessageResourceSchema | null; };
   childConversations: { __type: "Relationship"; __array: true; __resource: ConversationResourceSchema; };
   favorites: { __type: "Relationship"; __array: true; __resource: ConversationFavoriteResourceSchema; };
+  memories: { __type: "Relationship"; __array: true; __resource: MemoryResourceSchema; };
 };
 
 
 
 export type ConversationAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "isMultiplayer" | "visibility" | "chatMode" | "systemPrompt" | "skillContext" | "skillTools" | "loadedTools" | "samplingSettings" | "imageGenerationSettings" | "videoGenerationSettings" | "isTaskConversation" | "isThread" | "branchedAt" | "deletedAt" | "extractionDueAt" | "insertedAt" | "updatedAt" | "userId" | "folderId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "systemPromptId" | "customAgentId" | "workspaceId" | "parentConversationId" | "sandboxConversationId" | "branchedAtMessageId";
+  __primitiveFields: "id" | "title" | "isMultiplayer" | "visibility" | "chatMode" | "systemPrompt" | "skillContext" | "skillTools" | "loadedTools" | "samplingSettings" | "imageGenerationSettings" | "videoGenerationSettings" | "isTaskConversation" | "isThread" | "branchedAt" | "deletedAt" | "extractionDueAt" | "lastExtractedMessageAt" | "insertedAt" | "updatedAt" | "userId" | "folderId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "systemPromptId" | "customAgentId" | "workspaceId" | "parentConversationId" | "sandboxConversationId" | "branchedAtMessageId";
   id: UUIDv7;
   title: string | null;
   isMultiplayer: boolean;
@@ -583,6 +587,7 @@ export type ConversationAttributesOnlySchema = {
   branchedAt: UtcDateTimeUsec | null;
   deletedAt: UtcDateTimeUsec | null;
   extractionDueAt: UtcDateTimeUsec | null;
+  lastExtractedMessageAt: UtcDateTimeUsec | null;
   insertedAt: UtcDateTimeUsec;
   updatedAt: UtcDateTimeUsec;
   userId: UUID;
@@ -1438,6 +1443,63 @@ export type MCPServerCredentialAttributesOnlySchema = {
 };
 
 
+// Memory Schema
+export type MemoryResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "name" | "summary" | "content" | "scope" | "confidence" | "kind" | "structuredData" | "updatedAt" | "workspaceId";
+  id: UUIDv7;
+  name: string;
+  summary: string | null;
+  content: Record<string, any> | null;
+  scope: "agent" | "local" | "user";
+  confidence: number;
+  kind: "fact" | "general" | "goal" | "habit" | "hypothesis" | "observation" | "preference" | "reflection" | "summary" | "topic";
+  structuredData: Record<string, any> | null;
+  updatedAt: UtcDateTimeUsec;
+  workspaceId: UUID | null;
+  workspace: { __type: "Relationship"; __resource: WorkspaceResourceSchema | null; };
+};
+
+
+
+export type MemoryAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "name" | "summary" | "content" | "scope" | "confidence" | "kind" | "structuredData" | "updatedAt" | "workspaceId";
+  id: UUIDv7;
+  name: string;
+  summary: string | null;
+  content: Record<string, any> | null;
+  scope: "agent" | "local" | "user";
+  confidence: number;
+  kind: "fact" | "general" | "goal" | "habit" | "hypothesis" | "observation" | "preference" | "reflection" | "summary" | "topic";
+  structuredData: Record<string, any> | null;
+  updatedAt: UtcDateTimeUsec;
+  workspaceId: UUID | null;
+};
+
+
+// UserProfile Schema
+export type UserProfileResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "document" | "tokenEstimate" | "lastDistilledAt";
+  id: UUIDv7;
+  document: string;
+  tokenEstimate: number;
+  lastDistilledAt: UtcDateTimeUsec | null;
+};
+
+
+
+export type UserProfileAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "document" | "tokenEstimate" | "lastDistilledAt";
+  id: UUIDv7;
+  document: string;
+  tokenEstimate: number;
+  lastDistilledAt: UtcDateTimeUsec | null;
+};
+
+
 // ModelProvider Schema
 export type ModelProviderResourceSchema = {
   __type: "Resource";
@@ -2144,6 +2206,11 @@ export type UserFilterInput = {
   };
 
   globalMemoryEnabled?: {
+    eq?: boolean;
+    notEq?: boolean;
+  };
+
+  profileEnabled?: {
     eq?: boolean;
     notEq?: boolean;
   };
@@ -3377,6 +3444,17 @@ export type ConversationFilterInput = {
     isNil?: boolean;
   };
 
+  lastExtractedMessageAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
   insertedAt?: {
     eq?: UtcDateTimeUsec;
     notEq?: UtcDateTimeUsec;
@@ -3542,6 +3620,8 @@ export type ConversationFilterInput = {
   childConversations?: ConversationFilterInput;
 
   favorites?: ConversationFavoriteFilterInput;
+
+  memories?: MemoryFilterInput;
 
 };
 export type ConversationCompanionFilterInput = {
@@ -5480,6 +5560,128 @@ export type MCPServerCredentialFilterInput = {
   user?: UserFilterInput;
 
 };
+export type MemoryFilterInput = {
+  and?: Array<MemoryFilterInput>;
+  or?: Array<MemoryFilterInput>;
+  not?: Array<MemoryFilterInput>;
+
+  id?: {
+    eq?: UUIDv7;
+    notEq?: UUIDv7;
+    in?: Array<UUIDv7>;
+  };
+
+  name?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  summary?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  content?: {
+    eq?: Record<string, any>;
+    notEq?: Record<string, any>;
+    in?: Array<Record<string, any>>;
+    isNil?: boolean;
+  };
+
+  scope?: {
+    eq?: "agent" | "local" | "user";
+    notEq?: "agent" | "local" | "user";
+    in?: Array<"agent" | "local" | "user">;
+  };
+
+  confidence?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+  };
+
+  kind?: {
+    eq?: "fact" | "general" | "goal" | "habit" | "hypothesis" | "observation" | "preference" | "reflection" | "summary" | "topic";
+    notEq?: "fact" | "general" | "goal" | "habit" | "hypothesis" | "observation" | "preference" | "reflection" | "summary" | "topic";
+    in?: Array<"fact" | "general" | "goal" | "habit" | "hypothesis" | "observation" | "preference" | "reflection" | "summary" | "topic">;
+  };
+
+  structuredData?: {
+    eq?: Record<string, any>;
+    notEq?: Record<string, any>;
+    in?: Array<Record<string, any>>;
+    isNil?: boolean;
+  };
+
+  updatedAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+  };
+
+  workspaceId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+
+  workspace?: WorkspaceFilterInput;
+
+};
+export type UserProfileFilterInput = {
+  and?: Array<UserProfileFilterInput>;
+  or?: Array<UserProfileFilterInput>;
+  not?: Array<UserProfileFilterInput>;
+
+  id?: {
+    eq?: UUIDv7;
+    notEq?: UUIDv7;
+    in?: Array<UUIDv7>;
+  };
+
+  document?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  tokenEstimate?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+  };
+
+  lastDistilledAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
+
+
+};
 export type ModelProviderFilterInput = {
   and?: Array<ModelProviderFilterInput>;
   or?: Array<ModelProviderFilterInput>;
@@ -6818,7 +7020,7 @@ export type WorkspaceMemberFilterInput = {
 };
 
 
-export const userFilterFields = ["id", "email", "displayName", "currentWorkspaceId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "imageGenerationSettings", "videoGenerationSettings", "isAdmin", "language", "avatarPath", "pendingEmail", "uiPreferences", "timezone", "lastTimezoneChangeAt", "dataRegionPreference", "dataRegionConsents", "selectedPlanKey", "globalMemoryEnabled", "contextStrategy", "name", "acceptedTerms", "acceptedAgeRequirement", "hasPassword", "avatarUrl"] as const;
+export const userFilterFields = ["id", "email", "displayName", "currentWorkspaceId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "imageGenerationSettings", "videoGenerationSettings", "isAdmin", "language", "avatarPath", "pendingEmail", "uiPreferences", "timezone", "lastTimezoneChangeAt", "dataRegionPreference", "dataRegionConsents", "selectedPlanKey", "globalMemoryEnabled", "profileEnabled", "contextStrategy", "name", "acceptedTerms", "acceptedAgeRequirement", "hasPassword", "avatarUrl"] as const;
 export type UserFilterField = (typeof userFilterFields)[number];
 
 export const agentActivityLogFilterFields = ["id", "agentId", "userId", "activityType", "summary", "eventId", "runId", "taskId", "conversationId", "details", "modelUsed", "tokensUsed", "estimatedCostUsd", "durationMs", "insertedAt"] as const;
@@ -6854,7 +7056,7 @@ export type BrainSourceFilterField = (typeof brainSourceFilterFields)[number];
 export const context_windowFilterFields = ["id", "strategy", "windowStartAt", "summary", "summaryMessageCount", "lastBreakdown", "lastTotalTokens", "lastActualInputTokens", "lastCachedTokens", "lastModelKey", "lastMaxContext", "compactionStatus"] as const;
 export type context_windowFilterField = (typeof context_windowFilterFields)[number];
 
-export const conversationFilterFields = ["id", "title", "isMultiplayer", "visibility", "chatMode", "systemPrompt", "skillContext", "skillTools", "loadedTools", "samplingSettings", "imageGenerationSettings", "videoGenerationSettings", "isTaskConversation", "isThread", "branchedAt", "deletedAt", "extractionDueAt", "insertedAt", "updatedAt", "userId", "folderId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "systemPromptId", "customAgentId", "workspaceId", "parentConversationId", "sandboxConversationId", "branchedAtMessageId", "isFavorited", "isSharedToWorkspace", "messageCount", "lastMessageAt", "messages", "members", "inviteLinks", "invitations", "shareLinks", "user", "folder", "selectedModel", "selectedImageModel", "selectedVideoModel", "activeSystemPrompt", "customAgent", "workspace", "parentConversation", "sandboxConversation", "branchedAtMessage", "childConversations", "favorites", "memories"] as const;
+export const conversationFilterFields = ["id", "title", "isMultiplayer", "visibility", "chatMode", "systemPrompt", "skillContext", "skillTools", "loadedTools", "samplingSettings", "imageGenerationSettings", "videoGenerationSettings", "isTaskConversation", "isThread", "branchedAt", "deletedAt", "extractionDueAt", "lastExtractedMessageAt", "insertedAt", "updatedAt", "userId", "folderId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "systemPromptId", "customAgentId", "workspaceId", "parentConversationId", "sandboxConversationId", "branchedAtMessageId", "isFavorited", "isSharedToWorkspace", "messageCount", "lastMessageAt", "messages", "members", "inviteLinks", "invitations", "shareLinks", "user", "folder", "selectedModel", "selectedImageModel", "selectedVideoModel", "activeSystemPrompt", "customAgent", "workspace", "parentConversation", "sandboxConversation", "branchedAtMessage", "childConversations", "favorites", "memories"] as const;
 export type ConversationFilterField = (typeof conversationFilterFields)[number];
 
 export const conversationCompanionFilterFields = ["id", "resourceType", "resourceId", "conversationId", "conversation"] as const;
@@ -6926,6 +7128,12 @@ export type MCPServerFilterField = (typeof mCPServerFilterFields)[number];
 export const mCPServerCredentialFilterFields = ["id", "authKind", "oauthExpiresAt", "status", "mcpServerId", "userId", "mcpServer", "user"] as const;
 export type MCPServerCredentialFilterField = (typeof mCPServerCredentialFilterFields)[number];
 
+export const memoryFilterFields = ["id", "name", "summary", "content", "scope", "confidence", "kind", "structuredData", "updatedAt", "workspaceId", "workspace"] as const;
+export type MemoryFilterField = (typeof memoryFilterFields)[number];
+
+export const userProfileFilterFields = ["id", "document", "tokenEstimate", "lastDistilledAt"] as const;
+export type UserProfileFilterField = (typeof userProfileFilterFields)[number];
+
 export const modelProviderFilterFields = ["id", "name", "slug", "reqLlmId", "baseUrl", "enabled", "validationStatus", "lastValidatedAt"] as const;
 export type ModelProviderFilterField = (typeof modelProviderFilterFields)[number];
 
@@ -6978,7 +7186,7 @@ export const workspaceMemberFilterFields = ["id", "role", "status", "isActive", 
 export type WorkspaceMemberFilterField = (typeof workspaceMemberFilterFields)[number];
 
 
-export const userSortFields = ["id", "email", "displayName", "currentWorkspaceId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "imageGenerationSettings", "videoGenerationSettings", "isAdmin", "language", "avatarPath", "pendingEmail", "uiPreferences", "timezone", "lastTimezoneChangeAt", "dataRegionPreference", "dataRegionConsents", "selectedPlanKey", "globalMemoryEnabled", "contextStrategy", "name", "acceptedTerms", "acceptedAgeRequirement", "hasPassword", "avatarUrl"] as const;
+export const userSortFields = ["id", "email", "displayName", "currentWorkspaceId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "imageGenerationSettings", "videoGenerationSettings", "isAdmin", "language", "avatarPath", "pendingEmail", "uiPreferences", "timezone", "lastTimezoneChangeAt", "dataRegionPreference", "dataRegionConsents", "selectedPlanKey", "globalMemoryEnabled", "profileEnabled", "contextStrategy", "name", "acceptedTerms", "acceptedAgeRequirement", "hasPassword", "avatarUrl"] as const;
 export type UserSortField = (typeof userSortFields)[number];
 
 export const agentActivityLogSortFields = ["id", "agentId", "userId", "activityType", "summary", "eventId", "runId", "taskId", "conversationId", "details", "modelUsed", "tokensUsed", "estimatedCostUsd", "durationMs", "insertedAt"] as const;
@@ -7014,7 +7222,7 @@ export type BrainSourceSortField = (typeof brainSourceSortFields)[number];
 export const context_windowSortFields = ["id", "strategy", "windowStartAt", "summary", "summaryMessageCount", "lastBreakdown", "lastTotalTokens", "lastActualInputTokens", "lastCachedTokens", "lastModelKey", "lastMaxContext", "compactionStatus"] as const;
 export type context_windowSortField = (typeof context_windowSortFields)[number];
 
-export const conversationSortFields = ["id", "title", "isMultiplayer", "visibility", "chatMode", "systemPrompt", "skillContext", "skillTools", "loadedTools", "samplingSettings", "imageGenerationSettings", "videoGenerationSettings", "isTaskConversation", "isThread", "branchedAt", "deletedAt", "extractionDueAt", "insertedAt", "updatedAt", "userId", "folderId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "systemPromptId", "customAgentId", "workspaceId", "parentConversationId", "sandboxConversationId", "branchedAtMessageId", "isFavorited", "isSharedToWorkspace", "messageCount", "lastMessageAt"] as const;
+export const conversationSortFields = ["id", "title", "isMultiplayer", "visibility", "chatMode", "systemPrompt", "skillContext", "skillTools", "loadedTools", "samplingSettings", "imageGenerationSettings", "videoGenerationSettings", "isTaskConversation", "isThread", "branchedAt", "deletedAt", "extractionDueAt", "lastExtractedMessageAt", "insertedAt", "updatedAt", "userId", "folderId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "systemPromptId", "customAgentId", "workspaceId", "parentConversationId", "sandboxConversationId", "branchedAtMessageId", "isFavorited", "isSharedToWorkspace", "messageCount", "lastMessageAt"] as const;
 export type ConversationSortField = (typeof conversationSortFields)[number];
 
 export const conversationCompanionSortFields = ["id", "resourceType", "resourceId", "conversationId"] as const;
@@ -7085,6 +7293,12 @@ export type MCPServerSortField = (typeof mCPServerSortFields)[number];
 
 export const mCPServerCredentialSortFields = ["id", "authKind", "oauthExpiresAt", "status", "mcpServerId", "userId"] as const;
 export type MCPServerCredentialSortField = (typeof mCPServerCredentialSortFields)[number];
+
+export const memorySortFields = ["id", "name", "summary", "content", "scope", "confidence", "kind", "structuredData", "updatedAt", "workspaceId"] as const;
+export type MemorySortField = (typeof memorySortFields)[number];
+
+export const userProfileSortFields = ["id", "document", "tokenEstimate", "lastDistilledAt"] as const;
+export type UserProfileSortField = (typeof userProfileSortFields)[number];
 
 export const modelProviderSortFields = ["id", "name", "slug", "reqLlmId", "baseUrl", "enabled", "validationStatus", "lastValidatedAt"] as const;
 export type ModelProviderSortField = (typeof modelProviderSortFields)[number];

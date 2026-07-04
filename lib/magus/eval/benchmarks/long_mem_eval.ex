@@ -17,8 +17,7 @@ defmodule Magus.Eval.Benchmarks.LongMemEval do
 
   @impl true
   def cases(dataset, _opts) do
-    dataset
-    |> Enum.map(fn e ->
+    Enum.map(dataset, fn e ->
       id = e["question_id"] || ""
 
       %{
@@ -29,33 +28,6 @@ defmodule Magus.Eval.Benchmarks.LongMemEval do
         ingest_items: build_items(e)
       }
     end)
-    |> stratify_by_type()
-  end
-
-  # The upstream dataset is blocked by question_type (all single-session-user
-  # first, etc.), so a plain `--limit N` would only exercise one ability.
-  # Round-robin the cases across question_type so any prefix of length N is a
-  # balanced stratified sample. Deterministic (groups sorted by type name).
-  defp stratify_by_type(cases) do
-    cases
-    |> Enum.group_by(& &1.meta.question_type)
-    |> Enum.sort_by(fn {type, _} -> type end)
-    |> Enum.map(fn {_type, group} -> group end)
-    |> round_robin([])
-  end
-
-  defp round_robin(groups, acc) do
-    groups = Enum.reject(groups, &(&1 == []))
-
-    case groups do
-      [] ->
-        Enum.reverse(acc)
-
-      _ ->
-        heads = Enum.map(groups, &hd/1)
-        tails = Enum.map(groups, &tl/1)
-        round_robin(tails, Enum.reverse(heads) ++ acc)
-    end
   end
 
   @impl true
@@ -135,12 +107,9 @@ defmodule Magus.Eval.Benchmarks.LongMemEval do
     sessions
     |> Enum.with_index()
     |> Enum.sort_by(fn {_session, i} -> Enum.at(dates, i) || "" end)
-    |> Enum.with_index()
-    |> Enum.flat_map(fn {{session, _orig_i}, session_order} ->
+    |> Enum.flat_map(fn {session, _i} ->
       session
-      |> Enum.map(fn t ->
-        %{role: role(t["role"]), text: t["content"], session: session_order}
-      end)
+      |> Enum.map(fn t -> %{role: role(t["role"]), text: t["content"]} end)
       |> Enum.filter(&(&1.role != nil and is_binary(&1.text)))
     end)
   end

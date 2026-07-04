@@ -37,44 +37,13 @@ defmodule Magus.Eval.Subject.Live do
   @impl true
   def ingest(ctx, items) do
     items
-    |> to_windows()
-    |> Enum.each(fn pairs -> extract_window(ctx, pairs) end)
+    |> pair_turns()
+    |> Enum.each(fn {user_text, agent_text} ->
+      force_extract(ctx, user_text, agent_text)
+    end)
 
     settle_extraction()
     {:ok, ctx}
-  end
-
-  # Group ingest items into extraction windows, then pair user->agent turns
-  # within each window. Items carrying a :session tag (LongMemEval) become one
-  # window per session; untagged items (small benchmarks) form a single window.
-  # A session replayed instantly is one production debounce window, so this
-  # mirrors production: extraction runs once per window over all its turns, and
-  # it keeps the same window shape the recorded baseline used.
-  defp to_windows(items) do
-    if Enum.any?(items, &Map.has_key?(&1, :session)) do
-      items
-      |> Enum.chunk_by(&Map.get(&1, :session))
-      |> Enum.map(&pair_turns/1)
-      |> Enum.reject(&(&1 == []))
-    else
-      case pair_turns(items) do
-        [] -> []
-        pairs -> [pairs]
-      end
-    end
-  end
-
-  # Windowed extraction (post-hardening): pass every turn-pair of the window as
-  # `turns`, matching production's "extract all turns since the watermark". The
-  # pre-hardening baseline passed only the window's last pair (mirroring the old
-  # load_last_turn); that difference is exactly the extraction-window fix under test.
-  defp extract_window(ctx, pairs) do
-    turns =
-      Enum.map(pairs, fn {user_text, agent_text} ->
-        %{"user" => user_text, "agent" => agent_text}
-      end)
-
-    force_extract(ctx, turns)
   end
 
   @impl true
@@ -119,12 +88,13 @@ defmodule Magus.Eval.Subject.Live do
   # ExtractTurnMemories exposes run/2 (params, context); context is unused, so
   # we pass an empty map. It runs synchronously inline (no Task spawn) and
   # persists memories before returning. Wrap so one failure does not abort ingest.
-  defp force_extract(ctx, turns) do
+  defp force_extract(ctx, user_text, agent_text) do
     Magus.Agents.Actions.ExtractTurnMemories.run(
       %{
         user_id: to_string(ctx.user.id),
         conversation_id: to_string(ctx.conversation.id),
-        turns: turns,
+        user_message: user_text,
+        agent_response: agent_text,
         allow_global_memories: true
       },
       %{}
