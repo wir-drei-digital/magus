@@ -617,7 +617,11 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 **Files:**
 - Modify: `lib/magus/super_brain/extraction/prompt.ex`
 - Modify: `lib/magus/super_brain/extraction.ex`
+- Modify: `lib/magus/super_brain/telemetry.ex` (claims_emitted/claims_dropped helpers, Step 4a)
 - Modify: `test/magus/super_brain/extraction_test.exs` (create if absent)
+- Modify (fixture migration, Step 6a): every `test/magus/super_brain/` test that mocks the extraction LLM with an old `{"entities", "edges"}` payload, plus `test/magus/super_brain/extraction/prompt_test.exs`. The current set (discover the live list with `grep -rl '"edges"' test/magus/super_brain/`): `extraction_test.exs`, `extract_base_test.exs`, `extract_memory_test.exs`, `extract_brain_page_test.exs`, `extract_brain_source_test.exs`, `extract_draft_test.exs`, `extract_file_chunk_test.exs`, `inline_canonicalize_test.exs`, `build_super_full_test.exs`, `build_super_incremental_test.exs`, `retrieval_test.exs`, `authorization_test.exs`, `prompt_test.exs`.
+
+**SCOPE NOTE (why this task is large):** switching the extraction output contract from `edges` to `claims` breaks EVERY test whose mocked LLM `content:` returns `{"entities":..., "edges":...}`, because the parser now requires `"claims"`. Most are `"edges":[]` (rename the key to `"claims":[]`). The few carrying real edges (e.g. `{"subject_name":"Daniel","object_name":"Project X","predicate":"supports","confidence":0.8}`) become a claim by adding `"polarity":"affirms"` and a `"claim_text"` sentence (e.g. `"Daniel supports Project X."`). `prompt_test.exs` asserts the old prompt schema and must be updated to the claims schema. Any test asserting the removed sparse-edges telemetry (`[:super_brain, :extraction, :sparse_edges]`) must be deleted or repurposed. This is discovery-driven: after the code changes, run the full `test/magus/super_brain/` suite and fix every failure that stems from the shape change. Do NOT touch `"edges"` references that are FalkorDB RELATES_TO graph fixtures/assertions rather than LLM-mock output (those do not flow through the parser and must keep working; the derived edges preserve them).
 
 **Interfaces:**
 - Consumes: `Sanitizer.sanitize_claim/1` (Task 2).
@@ -827,19 +831,36 @@ Remove the `maybe_emit_sparse_edges(payload, user_id)` line so `extract/2` reads
         end
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [ ] **Step 6: Run the new extraction test**
 
-Run: `MIX_ENV=test mix test test/magus/super_brain/extraction_test.exs`
+Run: `MIX_ENV=test MIX_TEST_PARTITION=_wtclaims mix test test/magus/super_brain/extraction_test.exs`
 Expected: PASS.
+
+- [ ] **Step 6a: Migrate the broken LLM-mock fixtures + prompt test (the large part)**
+
+Run the FULL super_brain suite to surface every test broken by the shape change:
+`set -a && source .env && set +a && MIX_ENV=test MIX_TEST_PARTITION=_wtclaims mix test test/magus/super_brain/`
+
+For each failure, fix the cause:
+- **LLM-mock `content:` with `"edges"`**: rename `"edges"` to `"claims"`. If the array is `[]`, done. If it has entries, convert each `{"subject_name","object_name","predicate","confidence"}` to a claim by adding `"polarity":"affirms"` and a `"claim_text"` sentence built from the endpoints (e.g. `"<subject> <predicate> <object>."`). Endpoint names must still match entities in the same mock (the parser drops non-matching claims), so preserve them exactly.
+- **`prompt_test.exs`**: update assertions from the old edges schema to the new claims schema (the prompt now describes a `claims` array and no edge-density quota).
+- **sparse-edges telemetry test** (if any asserts `[:super_brain, :extraction, :sparse_edges]`): delete it; that telemetry was removed with the quota.
+- **Do not** alter `"edges"` that are FalkorDB graph fixtures/assertions (RELATES_TO), not LLM-mock output. Derived edges keep those green; if such a test fails, the cause is elsewhere, investigate before editing.
+
+Re-run the full super_brain suite until it is green with pristine output. This is the bulk of the task.
 
 - [ ] **Step 7: Compile check + commit**
 
+Stage the code files, the new/updated extraction test, telemetry.ex, and every fixture file you touched. List them explicitly (use `git status` to enumerate, then `git commit -- <each path>`; never `git add -A`).
+
 ```bash
 MIX_ENV=test mix compile --warnings-as-errors
-git commit -- lib/magus/super_brain/extraction/prompt.ex lib/magus/super_brain/extraction.ex test/magus/super_brain/extraction_test.exs -m "feat(super-brain): extraction emits claims, derives edges
-
-Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
+# git commit -- lib/magus/super_brain/extraction/prompt.ex lib/magus/super_brain/extraction.ex \
+#   lib/magus/super_brain/telemetry.ex test/magus/super_brain/extraction_test.exs \
+#   <every migrated test fixture file> \
+#   -m "feat(super-brain): extraction emits claims, derives edges"
 ```
+Commit message body: "Replace the extraction edge output with claims (subject/predicate/object, polarity, claim_text); derive L1 edges from claims so the builders are unchanged; remove the edge-density quota and its sparse-edges telemetry; migrate all extraction-LLM-mock fixtures to the claims shape." End with the Co-Authored-By line.
 
 ---
 
