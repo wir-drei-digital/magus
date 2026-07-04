@@ -36,6 +36,8 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
   @max_associated_results 3
   @max_reinforcement_pairs 10
   @min_effective_assoc_weight 0.05
+  @max_preview_chars 600
+  @max_block_chars 6000
 
   @doc """
   Builds memory context for inclusion in the system prompt.
@@ -143,6 +145,15 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
 
     # Build formatted context
     formatted = format_context(important, semantic ++ associated, global_enabled)
+
+    # Whole-block budget: if full previews blow past the cap, re-render
+    # summary-only. Full content stays reachable via the search_memories tool.
+    formatted =
+      if String.length(formatted) > @max_block_chars do
+        format_context(important, semantic ++ associated, global_enabled, previews: false)
+      else
+        formatted
+      end
 
     # Bump last_accessed_at only for semantically retrieved memories: they
     # were selected by relevance to the actual query, which is a real usage
@@ -398,11 +409,16 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
   # Context Formatting
   # ============================================================================
 
-  defp format_context([], [], _global_enabled), do: ""
+  @doc false
+  def format_context(important, semantic, global_enabled, opts \\ [])
 
-  defp format_context(important, semantic, global_enabled) do
+  def format_context([], [], _global_enabled, _opts), do: ""
+
+  def format_context(important, semantic, global_enabled, opts) do
+    previews? = Keyword.get(opts, :previews, true)
+
     sections = [
-      format_important_section(important),
+      format_important_section(important, previews?),
       format_semantic_section(semantic),
       format_global_note(global_enabled, important ++ semantic)
     ]
@@ -426,12 +442,12 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
     end
   end
 
-  defp format_important_section([]), do: ""
+  defp format_important_section([], _previews?), do: ""
 
-  defp format_important_section(memories) do
+  defp format_important_section(memories, previews?) do
     items =
       memories
-      |> Enum.map(&format_important_memory/1)
+      |> Enum.map(&format_important_memory(&1, previews?))
       |> Enum.join("\n")
 
     """
@@ -440,21 +456,16 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
     """
   end
 
-  defp format_important_memory(memory) do
+  defp format_important_memory(memory, previews?) do
     scope_label = scope_display(memory.display_scope)
 
     kind_label =
       if Map.get(memory, :kind) && memory.kind != :general, do: " [#{memory.kind}]", else: ""
 
-    confidence = Map.get(memory, :confidence, 1.0)
-
-    confidence_label =
-      if confidence < 1.0, do: " (#{round(confidence * 100)}% confidence)", else: ""
-
-    content_preview = format_content_preview(memory.content)
+    content_preview = if previews?, do: format_content_preview(memory.content), else: ""
 
     """
-    #### #{memory.name}#{scope_label}#{kind_label}#{confidence_label}
+    #### #{memory.name}#{scope_label}#{kind_label}
     #{memory.summary || "(no summary)"}
     #{content_preview}
     """
@@ -470,8 +481,8 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
     content_json = Jason.encode!(content, pretty: true)
 
     truncated =
-      if String.length(content_json) > 2000 do
-        String.slice(content_json, 0, 1900) <> "\n... (truncated)"
+      if String.length(content_json) > @max_preview_chars do
+        String.slice(content_json, 0, @max_preview_chars - 100) <> "\n... (truncated)"
       else
         content_json
       end
