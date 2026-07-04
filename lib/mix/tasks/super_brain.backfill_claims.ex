@@ -59,17 +59,25 @@ defmodule Mix.Tasks.SuperBrain.BackfillClaims do
 
   # Only the latest `:extracted` row per resource matters (D7 append-only
   # Episodes may have many `:superseded` rows for the same resource_id). A
-  # resource whose latest Episode is nil (never extracted) or already
-  # current is correctly excluded here - this task is forward-only, not a
-  # general backfill of never-extracted content (that is
-  # `mix super_brain.backfill`'s job).
+  # resource with no `:extracted` Episode at all is correctly excluded -
+  # this task is forward-only, not a general backfill of never-extracted
+  # content (that is `mix super_brain.backfill`'s job).
+  #
+  # The `is_nil(extractor_version)` branch is load-bearing: Ash `!=`
+  # simplifies to `NOT (extractor_version = ^current)` (three-valued SQL
+  # logic), which is NULL and thus EXCLUDED when the column is NULL, rather
+  # than the null-safe `IS DISTINCT FROM`. `Episode.extractor_version` is
+  # nullable and the OLDEST pre-claims episodes are exactly the ones most
+  # likely to carry a nil version, so a bare `!=` would silently miss them.
+  # Explicitly OR-ing `is_nil(...)` treats nil as stale (any versioned
+  # extractor postdates the unversioned era).
   defp stale_episodes(user_id, resource_type, current_version) do
     Episode
     |> Ash.Query.filter(
       source_user_id == ^user_id and
         resource_type == ^resource_type and
         status == :extracted and
-        extractor_version != ^current_version
+        (is_nil(extractor_version) or extractor_version != ^current_version)
     )
     |> Ash.read!(authorize?: false)
   end

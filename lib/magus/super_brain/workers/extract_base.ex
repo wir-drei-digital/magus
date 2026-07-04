@@ -340,7 +340,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBase do
     {:error, reason}
   end
 
-  # Persistence (`persist_extraction/5`) runs inside a manual
+  # Persistence (`persist_extraction/6`) runs inside a manual
   # `Repo.transaction/1` so the Episode swap + graph writes commit atomically.
   # Ash mutations executed inside that transaction (the Episode lifecycle
   # transitions and the `MessageUsage` write) produce notifications Ash cannot

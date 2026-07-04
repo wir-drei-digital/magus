@@ -54,6 +54,21 @@ defmodule Mix.Tasks.SuperBrain.BackfillClaimsTest do
     })
   end
 
+  # The oldest pre-claims episodes may carry a nil extractor_version (the
+  # attribute is nullable and predates versioned extractors). Omitting the
+  # key entirely leaves it nil through `:create` (no default; mark_extracted
+  # does not set it).
+  defp nil_version_brain_page_episode(user_id, resource_id) do
+    extracted_episode(%{
+      resource_type: :brain_page,
+      resource_id: resource_id,
+      graph_name: "brain:#{Ash.UUID.generate()}",
+      raw_text: "unversioned pre-claims content",
+      source_user_id: user_id,
+      source_weight: 1.0
+    })
+  end
+
   defp stale_memory_episode(user_id, resource_id) do
     extracted_episode(%{
       resource_type: :memory,
@@ -134,6 +149,27 @@ defmodule Mix.Tasks.SuperBrain.BackfillClaimsTest do
       BackfillClaims.run(["--user", user.id])
 
       refute_enqueued(worker: ExtractBrainPage, args: %{"resource_id" => resource_id})
+    end
+
+    test "enqueues for a resource whose latest episode has a nil extractor_version" do
+      # Regression: Ash `!=` compiles to `NOT (extractor_version = ^current)`
+      # (three-valued SQL logic), which is NULL and thus EXCLUDED when the
+      # column is NULL. A bare `!=` filter silently misses these oldest,
+      # unversioned pre-claims episodes. `stale_episodes/3` explicitly ORs
+      # `is_nil(extractor_version)` so nil counts as stale and gets a forced
+      # re-extraction.
+      user = generate(user())
+      resource_id = Ash.UUID.generate()
+
+      episode = nil_version_brain_page_episode(user.id, resource_id)
+      assert episode.extractor_version == nil
+
+      BackfillClaims.run(["--user", user.id])
+
+      assert_enqueued(
+        worker: ExtractBrainPage,
+        args: %{"resource_id" => resource_id, "force" => true}
+      )
     end
 
     test "resolves the user by email as well as by id" do
