@@ -43,6 +43,20 @@ defmodule Magus.Knowledge.KnowledgeSource do
       require_atomic? false
     end
 
+    update :mark_needs_reauth do
+      accept [:last_error]
+      require_atomic? false
+      change set_attribute(:needs_reauth, true)
+      change set_attribute(:status, :error)
+    end
+
+    update :clear_reauth do
+      accept []
+      require_atomic? false
+      change set_attribute(:needs_reauth, false)
+      change set_attribute(:status, :active)
+    end
+
     read :for_user do
       filter expr(user_id == ^actor(:id))
     end
@@ -176,6 +190,14 @@ defmodule Magus.Knowledge.KnowledgeSource do
 
     attribute :last_error, :string do
       public? true
+    end
+
+    attribute :needs_reauth, :boolean do
+      allow_nil? false
+      default false
+      public? true
+
+      description "Set when the OAuth refresh token is dead and the user must reconnect. Pauses scheduling."
     end
 
     attribute :connected_at, :utc_datetime_usec do

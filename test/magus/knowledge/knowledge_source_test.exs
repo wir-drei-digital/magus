@@ -111,6 +111,35 @@ defmodule Magus.Knowledge.KnowledgeSourceTest do
     end
   end
 
+  describe "reauth state" do
+    test "mark_needs_reauth flags the source and records the error" do
+      user = generate(user())
+
+      {:ok, source} =
+        Magus.Knowledge.create_source(
+          %{name: "GD", provider: :google_drive, auth_config: %{"access_token" => "a"}},
+          actor: user
+        )
+
+      {:ok, source} =
+        Magus.Knowledge.update_source_status(source, %{status: :active}, actor: user)
+
+      {:ok, flagged} =
+        Magus.Knowledge.mark_source_needs_reauth(
+          source,
+          %{last_error: "reauth_required"},
+          authorize?: false
+        )
+
+      assert flagged.needs_reauth == true
+      assert flagged.status == :error
+
+      {:ok, cleared} = Magus.Knowledge.clear_source_reauth(flagged, authorize?: false)
+      assert cleared.needs_reauth == false
+      assert cleared.status == :active
+    end
+  end
+
   describe "workspace reads" do
     test "workspace member can list workspace-scoped sources" do
       owner = generate(user())

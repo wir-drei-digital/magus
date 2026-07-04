@@ -1231,13 +1231,14 @@ export type KnowledgeCollectionAttributesOnlySchema = {
 // KnowledgeSource Schema
 export type KnowledgeSourceResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "provider" | "status" | "settings" | "lastError" | "connectedAt" | "workspaceId";
+  __primitiveFields: "id" | "name" | "provider" | "status" | "settings" | "lastError" | "needsReauth" | "connectedAt" | "workspaceId";
   id: UUIDv7;
   name: string;
   provider: "affine" | "confluence" | "github" | "gitlab" | "google_drive" | "nextcloud" | "notion" | "obsidian" | "onedrive" | "web";
   status: "active" | "disabled" | "error" | "pending";
   settings: Record<string, any> | null;
   lastError: string | null;
+  needsReauth: boolean;
   connectedAt: UtcDateTimeUsec | null;
   workspaceId: UUID | null;
   workspace: { __type: "Relationship"; __resource: WorkspaceResourceSchema | null; };
@@ -1247,13 +1248,14 @@ export type KnowledgeSourceResourceSchema = {
 
 export type KnowledgeSourceAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "provider" | "status" | "settings" | "lastError" | "connectedAt" | "workspaceId";
+  __primitiveFields: "id" | "name" | "provider" | "status" | "settings" | "lastError" | "needsReauth" | "connectedAt" | "workspaceId";
   id: UUIDv7;
   name: string;
   provider: "affine" | "confluence" | "github" | "gitlab" | "google_drive" | "nextcloud" | "notion" | "obsidian" | "onedrive" | "web";
   status: "active" | "disabled" | "error" | "pending";
   settings: Record<string, any> | null;
   lastError: string | null;
+  needsReauth: boolean;
   connectedAt: UtcDateTimeUsec | null;
   workspaceId: UUID | null;
 };
@@ -5104,6 +5106,11 @@ export type KnowledgeSourceFilterInput = {
     isNil?: boolean;
   };
 
+  needsReauth?: {
+    eq?: boolean;
+    notEq?: boolean;
+  };
+
   connectedAt?: {
     eq?: UtcDateTimeUsec;
     notEq?: UtcDateTimeUsec;
@@ -7064,7 +7071,7 @@ export type UserIntegrationFilterField = (typeof userIntegrationFilterFields)[nu
 export const knowledgeCollectionFilterFields = ["id", "name", "externalId", "externalPath", "syncStatus", "syncStrategy", "syncIntervalMinutes", "lastSyncedAt", "contentUpdatedAt", "syncCursor", "itemCount", "errorCount", "lastError", "settings", "syncLog", "workspaceId", "isSharedToWorkspace", "workspace"] as const;
 export type KnowledgeCollectionFilterField = (typeof knowledgeCollectionFilterFields)[number];
 
-export const knowledgeSourceFilterFields = ["id", "name", "provider", "status", "settings", "lastError", "connectedAt", "workspaceId", "workspace"] as const;
+export const knowledgeSourceFilterFields = ["id", "name", "provider", "status", "settings", "lastError", "needsReauth", "connectedAt", "workspaceId", "workspace"] as const;
 export type KnowledgeSourceFilterField = (typeof knowledgeSourceFilterFields)[number];
 
 export const promptFilterFields = ["id", "name", "content", "type", "chatMode", "isPublic", "publishedAt", "isHighlighted", "copyCount", "useCount", "description", "userMessageTemplate", "additionalInformation", "language", "modelId", "workspaceId", "isSharedToWorkspace", "isFavorited", "model", "tags", "workspace"] as const;
@@ -7230,7 +7237,7 @@ export type UserIntegrationSortField = (typeof userIntegrationSortFields)[number
 export const knowledgeCollectionSortFields = ["id", "name", "externalId", "externalPath", "syncStatus", "syncStrategy", "syncIntervalMinutes", "lastSyncedAt", "contentUpdatedAt", "syncCursor", "itemCount", "errorCount", "lastError", "settings", "syncLog", "workspaceId", "isSharedToWorkspace"] as const;
 export type KnowledgeCollectionSortField = (typeof knowledgeCollectionSortFields)[number];
 
-export const knowledgeSourceSortFields = ["id", "name", "provider", "status", "settings", "lastError", "connectedAt", "workspaceId"] as const;
+export const knowledgeSourceSortFields = ["id", "name", "provider", "status", "settings", "lastError", "needsReauth", "connectedAt", "workspaceId"] as const;
 export type KnowledgeSourceSortField = (typeof knowledgeSourceSortFields)[number];
 
 export const promptSortFields = ["id", "name", "content", "type", "chatMode", "isPublic", "publishedAt", "isHighlighted", "copyCount", "useCount", "description", "userMessageTemplate", "additionalInformation", "language", "modelId", "workspaceId", "isSharedToWorkspace", "isFavorited"] as const;
