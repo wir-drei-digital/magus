@@ -734,7 +734,7 @@
 				</h1>
 				<p class="min-w-0 truncate text-xs text-muted-foreground max-md:hidden">
 					@{agent.handle}
-					{#if agent.isPaused}· paused{/if}
+					{#if agent.isPaused}<span title={agent.pauseReason ?? undefined}>· paused</span>{/if}
 					{#if agent.isSharedToWorkspace}· workspace{/if}
 					{#if readonly}· view only{/if}
 				</p>
@@ -1348,6 +1348,9 @@
 				>
 					<div class="flex flex-col divide-y divide-border">
 						{@render toggleRow('Paused', agent.isPaused, (next) => void patch({ isPaused: next }))}
+						{#if agent.isPaused && agent.pauseReason}
+							<p class="py-2 text-xs text-muted-foreground">{agent.pauseReason}</p>
+						{/if}
 						{@render toggleRow(
 							'Heartbeat enabled',
 							agent.heartbeatEnabled,

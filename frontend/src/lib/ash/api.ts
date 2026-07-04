@@ -3148,6 +3148,7 @@ export type AgentDetail = {
 	preLoadedSkills: string[];
 	isDefault: boolean;
 	isPaused: boolean;
+	pauseReason: string | null;
 	isSharedToWorkspace: boolean;
 	canReadGlobalMemories: boolean;
 	canWriteGlobalMemories: boolean;
@@ -3181,6 +3182,7 @@ const AGENT_DETAIL_FIELDS: rpc.GetCustomAgentFields = [
 	'preLoadedSkills',
 	'isDefault',
 	'isPaused',
+	'pauseReason',
 	'isSharedToWorkspace',
 	'canReadGlobalMemories',
 	'canWriteGlobalMemories',
