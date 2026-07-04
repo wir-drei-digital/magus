@@ -40,13 +40,22 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
       end
 
     agent_slash_commands = get_agent_slash_commands(conversation)
-    {slash_instruction, parsed_text} = SlashCommands.parse(raw_text, agent_slash_commands)
+    actor = load_actor(conversation)
 
     text =
-      if slash_instruction do
-        slash_instruction <> "\n" <> parsed_text
-      else
-        parsed_text
+      case SlashCommands.resolve(raw_text, agent_slash_commands,
+             actor: actor,
+             conversation: conversation
+           ) do
+        {{:command, instruction}, remaining} ->
+          instruction <> "\n" <> remaining
+
+        {{:skill, ref}, remaining} ->
+          load_slash_skill(ref, conversation_id, actor)
+          remaining
+
+        {:none, remaining} ->
+          remaining
       end
 
     # Resolve :auto via AutoRouter when no explicit model is set.
@@ -837,6 +846,36 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
       %Ash.NotLoaded{} -> []
       nil -> []
       agent -> Map.get(agent, :slash_commands, [])
+    end
+  end
+
+  @doc false
+  # Test seam: resolve + load a slash skill, returning the residual user text.
+  def apply_slash_skill(raw_text, conversation_id, actor) do
+    case SlashCommands.resolve(raw_text, [], actor: actor, conversation: nil) do
+      {{:skill, ref}, remaining} ->
+        load_slash_skill(ref, conversation_id, actor)
+        remaining
+
+      {_other, remaining} ->
+        remaining
+    end
+  end
+
+  defp load_slash_skill(ref, conversation_id, actor) do
+    Magus.Skills.Loader.load(
+      ref,
+      %{conversation_id: conversation_id, user_id: actor && actor.id, user: actor},
+      source: :slash_command
+    )
+  end
+
+  defp load_actor(nil), do: nil
+
+  defp load_actor(conversation) do
+    case Magus.Accounts.get_user(conversation.user_id, authorize?: false) do
+      {:ok, user} -> user
+      _ -> nil
     end
   end
 
