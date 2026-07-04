@@ -118,8 +118,11 @@ Migration notes:
   cascade behavior is load-bearing; declare `on_delete: :delete` for
   hygiene.
 
-Authorization: `Claim` is an internal resource with no policies, like
-`Episode` and `SuperGraph`. Every read path filters
+Authorization: `Claim` is an internal resource, like `SuperGraph` (which
+declares no policies at all) and `Episode` (whose policy block Claim's
+mirrors in shape: an AI-agent read bypass plus an actor-scoped human read
+policy, with writes forbidden outright since only the extraction pipeline
+writes claims). Every read path additionally filters
 `graph_name in accessible_graphs` where the allow-list comes from
 `Magus.SuperBrain.AccessibleGraphs.for_actor/2`, the exact trust model
 FalkorDB queries use today (authorization lives in `AccessibleGraphs`,
