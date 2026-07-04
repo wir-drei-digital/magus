@@ -31,7 +31,7 @@ defmodule Magus.Models.Catalog do
   # in this list is dropped by `to_db_attrs/1`, including the `llmdb_*`
   # internal fields and any forward-compatible keys we add to entries.
   @db_attrs ~w(
-    name key provider api_provider allowed_providers context_window
+    name key provider api_provider denied_providers context_window
     input_cost output_cost input_cost_value output_cost_value
     input_cost_unit output_cost_unit
     active? settings
