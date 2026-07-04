@@ -1,11 +1,10 @@
 defmodule Magus.Agents.Actions.ConsolidateMemoriesProfileTest do
   @moduledoc """
   Tests for the profile distillation step wired into ConsolidateMemories,
-  behind the `MAGUS_MEMORY_PROFILE` / `:memory_profile_enabled` flag.
+  gated by the user's `profile_enabled` setting.
   """
 
-  # async: false because it mutates global app config for the flag.
-  use Magus.ResourceCase, async: false
+  use Magus.ResourceCase, async: true
 
   import Mox
 
@@ -19,14 +18,13 @@ defmodule Magus.Agents.Actions.ConsolidateMemoriesProfileTest do
 
   @ai %AiAgent{}
 
-  setup do
-    Application.put_env(:magus, :memory_profile_enabled, true)
-    on_exit(fn -> Application.delete_env(:magus, :memory_profile_enabled) end)
-    :ok
-  end
-
   test "daily consolidation distills the profile for each bucket" do
-    user = generate(user())
+    user =
+      generate(user())
+      |> Ash.Changeset.for_update(:update_profile_setting, %{profile_enabled: true},
+        authorize?: false
+      )
+      |> Ash.update!()
 
     {:ok, _} =
       Magus.Memory.create_user_memory(
@@ -62,10 +60,9 @@ defmodule Magus.Agents.Actions.ConsolidateMemoriesProfileTest do
     assert profile.document =~ "Concise answers"
   end
 
-  test "flag off (default) does not distill a profile" do
-    Application.delete_env(:magus, :memory_profile_enabled)
-
+  test "profile disabled (default) does not distill a profile" do
     user = generate(user())
+    refute user.profile_enabled
 
     assert {:ok, result} = ConsolidateMemories.run(%{user_id: to_string(user.id)}, %{})
     assert result.profiles_distilled == 0
@@ -74,7 +71,12 @@ defmodule Magus.Agents.Actions.ConsolidateMemoriesProfileTest do
   end
 
   test "a distillation failure for one bucket logs and does not fail the run" do
-    user = generate(user())
+    user =
+      generate(user())
+      |> Ash.Changeset.for_update(:update_profile_setting, %{profile_enabled: true},
+        authorize?: false
+      )
+      |> Ash.update!()
 
     stub(LLMMock, :generate_object, fn _model, _prompt, schema, _opts ->
       if schema["required"] == ["document"] do

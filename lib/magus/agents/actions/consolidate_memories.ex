@@ -8,7 +8,8 @@ defmodule Magus.Agents.Actions.ConsolidateMemories do
   2. **Promote**: Identify local memories that should become global (via PromoteMemoryCandidates)
   3. **Merge**: Cluster related memories into consolidated groups (via MergeMemories)
   4. **Distill**: Rewrite the Hermes-style user profile document per workspace
-     bucket (via DistillUserProfile), behind the `MAGUS_MEMORY_PROFILE` flag
+     bucket (via DistillUserProfile), gated by the user's `profile_enabled`
+     setting
 
   ## Usage
 
@@ -159,10 +160,11 @@ defmodule Magus.Agents.Actions.ConsolidateMemories do
       end
 
     # Step 4: Distill the Hermes-style user profile per workspace bucket,
-    # behind the feature flag. A failure for one bucket logs and continues;
-    # decay/promote/merge results above are already committed.
+    # gated by the user's profile_enabled setting. A failure for one bucket
+    # logs and continues; decay/promote/merge results above are already
+    # committed.
     profiles_distilled =
-      if Magus.Agents.Config.profile_enabled?() do
+      if Magus.Agents.Config.profile_enabled?(to_string(user_id)) do
         distill_profiles(user_id, buckets)
       else
         0

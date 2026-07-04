@@ -96,7 +96,7 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
     # Distilled profile document (Hermes-style top layer). When present, it
     # replaces the global top-3-recency key-memory layer below.
     profile_document =
-      if global_enabled and Magus.Agents.Config.profile_enabled?() do
+      if global_enabled and Magus.Agents.Config.profile_enabled?(to_string(user_id)) do
         load_profile_document(user_id, workspace_id)
       end
 

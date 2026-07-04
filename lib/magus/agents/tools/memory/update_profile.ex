@@ -6,9 +6,9 @@ defmodule Magus.Agents.Tools.Memory.UpdateProfile do
   pass; the tool never edits the document directly, which keeps the
   document a single-writer artifact of DistillUserProfile.
 
-  Registered unconditionally: with `MAGUS_MEMORY_PROFILE` off, notes queue
-  harmlessly onto `pending_notes` and are simply never distilled (nothing
-  reads them until DistillUserProfile runs).
+  Registered unconditionally: with the user's `profile_enabled` setting off,
+  notes queue harmlessly onto `pending_notes` and are simply never distilled
+  (nothing reads them until DistillUserProfile runs).
   """
 
   use Jido.Action,
