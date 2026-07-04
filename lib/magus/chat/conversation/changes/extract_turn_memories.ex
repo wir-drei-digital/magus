@@ -45,6 +45,10 @@ defmodule Magus.Chat.Conversation.Changes.ExtractTurnMemories do
     end
   end
 
+  # Deliberately fails open: a lookup error or missing user falls through to
+  # `false` (memory not disabled, extraction proceeds), mirroring
+  # `Config.profile_enabled?/1`'s shape. The failure window is a degenerate
+  # case (deleted user / DB blip), not a security boundary.
   defp memory_disabled?(conversation) do
     require Ash.Query
 
