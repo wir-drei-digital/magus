@@ -143,8 +143,12 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
     # Build formatted context
     formatted = format_context(important, semantic ++ associated, global_enabled)
 
-    # Bump last_accessed_at for all memories loaded into context
-    touch_accessed_memories(all_memory_ids)
+    # Bump last_accessed_at only for semantically retrieved memories: they
+    # were selected by relevance to the actual query, which is a real usage
+    # signal. Key (recency) and associated memories are injected ambiently
+    # every turn; touching them would make the 90-day decay in
+    # ConsolidateMemories self-refreshing and unreachable.
+    touch_accessed_memories(Enum.map(semantic, & &1.id))
 
     %{
       important: important,
