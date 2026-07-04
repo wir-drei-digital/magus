@@ -238,6 +238,115 @@ defmodule Magus.Agents.Context.SuperBrainRagContextTest do
     end
   end
 
+  describe "format_with_claims/2" do
+    test "renders claims grouped under subjects with citations and conflicts" do
+      entities = [%{name: "Aurora", primary_type: "project", sources: []}]
+
+      claims = [
+        %{
+          subject_name: "Aurora",
+          subject_key: "aurora",
+          predicate: "occurs_at",
+          object_name: "Q3",
+          object_key: "q3",
+          polarity: :affirms,
+          claim_text: "Aurora targets Q3.",
+          confidence: 0.9,
+          episode: %{resource_type: :brain_page, resource_id: Ash.UUID.generate()}
+        },
+        %{
+          subject_name: "Aurora",
+          subject_key: "aurora",
+          predicate: "occurs_at",
+          object_name: "Q4",
+          object_key: "q4",
+          polarity: :affirms,
+          claim_text: "Aurora moved to Q4.",
+          confidence: 0.9,
+          episode: %{resource_type: :draft, resource_id: Ash.UUID.generate()}
+        }
+      ]
+
+      block = SuperBrainRagContext.format_with_claims(entities, claims)
+
+      assert block =~ "<super_brain>"
+      assert block =~ "Aurora targets Q3."
+      assert block =~ "Aurora"
+    end
+
+    test "renders a CONFLICT line for opposite-polarity claims on the same triple" do
+      entities = [%{name: "Aurora", primary_type: "project", sources: []}]
+
+      claims = [
+        %{
+          subject_name: "Aurora",
+          subject_key: "aurora",
+          predicate: "ships_in",
+          object_name: "Q3",
+          object_key: "q3",
+          polarity: :affirms,
+          claim_text: "Aurora ships in Q3.",
+          confidence: 0.9,
+          episode: %{resource_type: :brain_page, resource_id: Ash.UUID.generate()}
+        },
+        %{
+          subject_name: "Aurora",
+          subject_key: "aurora",
+          predicate: "ships_in",
+          object_name: "Q3",
+          object_key: "q3",
+          polarity: :negates,
+          claim_text: "Aurora does not ship in Q3.",
+          confidence: 0.9,
+          episode: %{resource_type: :draft, resource_id: Ash.UUID.generate()}
+        }
+      ]
+
+      block = SuperBrainRagContext.format_with_claims(entities, claims)
+
+      assert block =~ "CONFLICT"
+      assert block =~ "Aurora ships in Q3."
+      assert block =~ "Aurora does not ship in Q3."
+    end
+
+    test "an entity with no claims renders the name + type line" do
+      block =
+        SuperBrainRagContext.format_with_claims(
+          [%{name: "Daniel", primary_type: "person", sources: []}],
+          []
+        )
+
+      assert block =~ "Daniel"
+      assert block =~ "person"
+    end
+
+    test "caps rendered claims per entity at @max_claims_per_entity" do
+      entities = [%{name: "Aurora", primary_type: "project", sources: []}]
+
+      claims =
+        for i <- 1..5 do
+          %{
+            subject_name: "Aurora",
+            subject_key: "aurora",
+            predicate: "relates_to",
+            object_name: "Topic #{i}",
+            object_key: "topic_#{i}",
+            polarity: :affirms,
+            claim_text: "Aurora claim number #{i}.",
+            confidence: 0.9,
+            episode: %{resource_type: :brain_page, resource_id: Ash.UUID.generate()}
+          }
+        end
+
+      block = SuperBrainRagContext.format_with_claims(entities, claims)
+
+      rendered =
+        for i <- 1..5, block =~ "Aurora claim number #{i}.", do: i
+
+      assert length(rendered) == 3
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Helpers
   # ---------------------------------------------------------------------------

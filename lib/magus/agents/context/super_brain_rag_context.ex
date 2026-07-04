@@ -26,6 +26,11 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
   @max_refs_per_entity 5
   # Cap relation lines per entity so the per-message block stays bounded.
   @max_relation_lines 2
+  # Cap total claims fetched from Retrieval.search_claims/2 per turn.
+  @max_claims 10
+  # Cap claim lines rendered per entity section so the block stays bounded
+  # when a subject accumulates many claims.
+  @max_claims_per_entity 3
 
   @spec build(map()) :: String.t() | nil
   def build(%{query: query, user: %{} = user} = opts)
@@ -44,20 +49,29 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
 
     case EmbeddingModel.embed(query) do
       {:ok, embedding} ->
-        case Retrieval.search(user,
-               query: query,
-               query_embedding: embedding,
-               workspace_context: workspace_context,
-               limit: @max_results
-             ) do
-          {:ok, %{entities: entities}} when entities != [] ->
-            format(entities)
+        entities =
+          case Retrieval.search(user,
+                 query: query,
+                 query_embedding: embedding,
+                 workspace_context: workspace_context,
+                 limit: @max_results
+               ) do
+            {:ok, %{entities: es}} -> es
+            {:ok, list} when is_list(list) -> list
+            _ -> []
+          end
 
-          {:ok, results} when is_list(results) and results != [] ->
-            format_legacy(results)
+        {:ok, claims} =
+          Retrieval.search_claims(user,
+            query_embedding: embedding,
+            workspace_context: workspace_context,
+            limit: @max_claims
+          )
 
-          _ ->
-            nil
+        if entities == [] and claims == [] do
+          nil
+        else
+          format_with_claims(entities, claims)
         end
 
       _ ->
@@ -87,6 +101,112 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
     #{entries}
     </super_brain>\
     """
+  end
+
+  @doc false
+  # Exposed for tests: render the `<super_brain>` block from retrieval
+  # entities plus semantically-recalled claims (Task 5's
+  # `Retrieval.search_claims/2`). Claims are grouped under their subject
+  # entity's header; an entity with no claims falls back to the
+  # name+type/refs rendering in `format_super_entity/2`.
+  def format_with_claims(entities, claims) do
+    titles = resolve_titles_for_claims(claims)
+    by_subject = Enum.group_by(claims, & &1.subject_key)
+
+    sections =
+      Enum.map_join(entities, "\n\n", fn e ->
+        key = e |> Map.get(:name) |> entity_key()
+        entity_claims = Map.get(by_subject, key, []) |> Enum.take(@max_claims_per_entity)
+        render_entity_section(e, entity_claims, titles)
+      end)
+
+    """
+    <super_brain>
+    Distilled knowledge from your sources relevant to this query (each line cites its source).
+
+    #{sections}
+    </super_brain>\
+    """
+  end
+
+  defp render_entity_section(e, [], _titles), do: format_super_entity(e, %{})
+
+  defp render_entity_section(e, entity_claims, titles) do
+    name = Map.get(e, :name) || "?"
+    type = Map.get(e, :primary_type) || Map.get(e, :type) || "?"
+    header = "## #{name} [#{type}]"
+    lines = entity_claims |> group_conflicts() |> Enum.map(&claim_line(&1, titles))
+    header <> "\n" <> Enum.join(lines, "\n")
+  end
+
+  # Group claims on the same (subject_key, predicate, object_key) that carry
+  # opposite polarities into a single :conflict tuple; others stay :single.
+  defp group_conflicts(claims) do
+    claims
+    |> Enum.group_by(fn c -> {c.subject_key, c.predicate, c.object_key} end)
+    |> Enum.flat_map(fn {_triple, group} ->
+      polarities = group |> Enum.map(& &1.polarity) |> Enum.uniq()
+
+      if length(polarities) > 1 do
+        [{:conflict, group}]
+      else
+        Enum.map(group, &{:single, &1})
+      end
+    end)
+  end
+
+  defp claim_line({:single, c}, titles) do
+    "- \"#{c.claim_text}\" (#{cite(c, titles)})"
+  end
+
+  defp claim_line({:conflict, [a, b | _]}, titles) do
+    "- CONFLICT: \"#{a.claim_text}\" (#{cite(a, titles)}) vs \"#{b.claim_text}\" (#{cite(b, titles)})"
+  end
+
+  defp cite(%{episode: %{resource_type: rt, resource_id: id}}, titles) do
+    case Map.get(titles, id) do
+      nil -> "#{rt}"
+      title -> "#{rt} \"#{title}\""
+    end
+  end
+
+  defp cite(_, _), do: "source"
+
+  defp entity_key(nil), do: nil
+
+  defp entity_key(name),
+    do: name |> String.downcase() |> String.replace(~r/\s+/, " ") |> String.trim()
+
+  # Batch-resolve brain-page / draft titles from the claims' episodes.
+  defp resolve_titles_for_claims(claims) do
+    refs =
+      claims
+      |> Enum.map(fn c -> Map.get(c, :episode) end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(fn ep -> {ep.resource_type, ep.resource_id} end)
+
+    page_ids = for {:brain_page, id} <- refs, do: id
+    draft_ids = for {:draft, id} <- refs, do: id
+
+    Map.merge(page_titles(page_ids), draft_titles(draft_ids))
+  end
+
+  defp page_titles([]), do: %{}
+
+  defp page_titles(ids) do
+    case Magus.Brain.Page |> Ash.Query.filter(id in ^ids) |> Ash.read(authorize?: false) do
+      {:ok, pages} -> Map.new(pages, &{&1.id, &1.title})
+      _ -> %{}
+    end
+  end
+
+  defp draft_titles([]), do: %{}
+
+  defp draft_titles(ids) do
+    case Magus.Drafts.Draft |> Ash.Query.filter(id in ^ids) |> Ash.read(authorize?: false) do
+      {:ok, drafts} -> Map.new(drafts, &{&1.id, &1.title})
+      _ -> %{}
+    end
   end
 
   defp format_super_entity(e, titles) do
@@ -240,7 +360,13 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
   defp short_source(%{"graph_name" => g}) when is_binary(g), do: g
   defp short_source(_), do: "?"
 
-  defp format_legacy(results) do
+  @doc false
+  # No longer called by `do_build/3` (the legacy fan-out's bare-list shape now
+  # feeds `format_with_claims/2` like every other entity list), but kept as a
+  # public passthrough so the pre-claims rendering stays available and
+  # compiles clean without a caller, mirroring `format/1`'s "exposed for
+  # tests" convention above.
+  def format_legacy(results) do
     entries =
       Enum.map_join(results, "\n", fn r ->
         entity = Map.get(r, :entity) || %{}
