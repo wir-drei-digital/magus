@@ -20,6 +20,7 @@
 - **Super Brain internal writes** use `authorize?: false` (documented pattern; the auth boundary is `Magus.SuperBrain.AccessibleGraphs`, not Ash policy).
 - **German localization** (not used in this plan) stays informal (du), if any copy is added.
 - **Concurrency:** a concurrent session may hold `lib/magus/application.ex` and other files uncommitted in the working tree. Only stage the exact paths each task lists.
+- **One shared name-key helper.** Name-key normalization (downcase, collapse whitespace, trim) lives in exactly one place: `Magus.SuperBrain.Naming.key/1` (created in Task 1). Every task below that shows a local `entity_key/1`, `key/1`, or `claim_key/1` helper is a placeholder for a call to `Magus.SuperBrain.Naming.key/1`: use the shared function, do not redefine the logic per file. A subject_key / object_key is always `Naming.key(name)`.
 
 ## Test setup conventions
 
@@ -64,6 +65,7 @@ Several test files below use `user_fixture()`, a `:user`-scoped `Memory`, brains
 
 **Files:**
 - Create: `lib/magus/super_brain/claim.ex`
+- Create: `lib/magus/super_brain/naming.ex`
 - Modify: `lib/magus/super_brain.ex` (register resource)
 - Create: `priv/repo/migrations/<generated>_add_super_brain_claims.exs` (via codegen + hand-edit)
 - Create: `test/magus/super_brain/claim_test.exs`
@@ -250,7 +252,7 @@ defmodule Magus.SuperBrain.Claim do
   end
 
   policies do
-    bypass action_type([:read, :create]) do
+    bypass action_type(:read) do
       authorize_if Magus.Checks.IsAiAgent
     end
 
@@ -351,6 +353,28 @@ defmodule Magus.SuperBrain.Claim do
 end
 ```
 
+- [ ] **Step 3a: Create the shared name-key helper**
+
+`lib/magus/super_brain/naming.ex`:
+
+```elixir
+defmodule Magus.SuperBrain.Naming do
+  @moduledoc """
+  Shared name-key normalization for claims. A key is the downcased,
+  whitespace-collapsed, trimmed form of an entity name, used as `subject_key` /
+  `object_key` and for grouping claims by entity. Defined once so every call
+  site (extraction, retrieval, dossier, context, eval subjects) agrees.
+  """
+
+  @spec key(term()) :: String.t()
+  def key(name) when is_binary(name) do
+    name |> String.downcase() |> String.replace(~r/\s+/, " ") |> String.trim()
+  end
+
+  def key(_), do: ""
+end
+```
+
 - [ ] **Step 4: Register the resource in the domain**
 
 In `lib/magus/super_brain.ex`, inside the `resources do ... end` block, after the `resource Magus.SuperBrain.SuperGraph do ... end` block, add:
@@ -402,8 +426,7 @@ Expected: PASS (3 tests).
 
 ```bash
 MIX_ENV=test mix compile --warnings-as-errors
-git add lib/magus/super_brain/claim.ex lib/magus/super_brain.ex test/magus/super_brain/claim_test.exs priv/repo/migrations priv/resource_snapshots
-git commit -- lib/magus/super_brain/claim.ex lib/magus/super_brain.ex test/magus/super_brain/claim_test.exs priv/repo/migrations priv/resource_snapshots -m "feat(super-brain): Claim resource + pgvector table
+git commit -- lib/magus/super_brain/claim.ex lib/magus/super_brain/naming.ex lib/magus/super_brain.ex test/magus/super_brain/claim_test.exs priv/repo/migrations priv/resource_snapshots -m "feat(super-brain): Claim resource + pgvector table
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
