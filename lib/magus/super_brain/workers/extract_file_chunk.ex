@@ -22,7 +22,7 @@ defmodule Magus.SuperBrain.Workers.ExtractFileChunk do
 
   use Magus.SuperBrain.Workers.ExtractBase, queue: :super_brain_extraction
 
-  @extractor_version "file_chunk_extract_worker@2026-05-21"
+  @extractor_version "file_chunk_extract_worker@2026-07-04-claims"
   @extractable_file_types [:document, :text, :email]
 
   @impl true

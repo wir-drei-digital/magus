@@ -67,12 +67,14 @@ defmodule Magus.SuperBrain.Workers.ExtractBase do
   alias Magus.Repo
 
   alias Magus.SuperBrain.{
+    Claim,
     EmbeddingConfig,
     Episode,
     Extraction,
     ExtractionBudget,
     FalkorValues,
     Migration,
+    Naming,
     Ontology,
     Usage
   }
@@ -296,6 +298,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBase do
            {:ok, episode} <- mark_processing(episode),
            :ok <- record_budget_and_usage(input.user_id, extraction),
            :ok <- write_to_graph(input, episode, extraction, worker_module),
+           :ok <- write_claims(input, episode, extraction),
            {:ok, _} <- mark_extracted(episode, extraction) do
         :ok
       else
@@ -471,6 +474,13 @@ defmodule Magus.SuperBrain.Workers.ExtractBase do
           # transactional but `delete_prior_extraction` is idempotent so
           # re-running is safe.
           _ = delete_prior_extraction(graph_name, extractor_version, prior.id)
+
+          # Claims mirror the current extraction per source: drop the prior
+          # episode's claim rows so the fresh episode's claims replace them.
+          _ =
+            Claim
+            |> Ash.Query.filter(episode_id == ^prior.id)
+            |> Ash.bulk_destroy(:destroy, %{}, authorize?: false, return_errors?: false)
 
           _ =
             Ash.update(prior, %{},
@@ -771,6 +781,70 @@ defmodule Magus.SuperBrain.Workers.ExtractBase do
       end
     else
       {:error, _} = err -> err
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Claim persistence (Postgres, propositional layer over the entity graph)
+  # ---------------------------------------------------------------------------
+
+  # Persist claims to Postgres. Trust tier mirrors the entity pathway
+  # (`compute_trust_tier` with the worker's ontology source). Claim texts are
+  # embedded via the batch extraction embedder; embedding failure logs and
+  # leaves `embedding` nil (backfillable) rather than failing the extraction.
+  defp write_claims(_input, _episode, %{claims: []}), do: :ok
+
+  defp write_claims(input, %Episode{id: episode_id}, %{claims: claims}) do
+    ontology_source = Map.get(input, :ontology_source, :llm_extract)
+    embeddings = embed_claim_texts(claims)
+    now = DateTime.utc_now()
+
+    rows =
+      claims
+      |> Enum.zip(embeddings)
+      |> Enum.map(fn {c, embedding} ->
+        %{
+          graph_name: input.graph_name,
+          episode_id: episode_id,
+          source_user_id: input.user_id,
+          subject_name: c.subject_name,
+          subject_key: Naming.key(c.subject_name),
+          object_name: c.object_name,
+          object_key: Naming.key(c.object_name),
+          predicate: c.predicate,
+          polarity: c.polarity,
+          claim_text: c.claim_text,
+          confidence: c.confidence,
+          trust_tier: Ontology.compute_trust_tier(c.confidence, source: ontology_source),
+          asserted_at: now,
+          valid_from: c.valid_from,
+          valid_to: c.valid_to,
+          embedding: embedding
+        }
+      end)
+
+    SBTelemetry.claims_emitted(length(rows))
+
+    case Ash.bulk_create(rows, Claim, :bulk_create,
+           authorize?: false,
+           return_errors?: true,
+           stop_on_error?: true
+         ) do
+      %Ash.BulkResult{status: :success} -> :ok
+      %Ash.BulkResult{errors: errors} -> {:error, {:claim_write_failed, errors}}
+    end
+  end
+
+  defp write_claims(_input, _episode, _extraction), do: :ok
+
+  # Batch-embed claim texts. On any failure, return a list of nils the same
+  # length as `claims` so persistence proceeds with null embeddings.
+  defp embed_claim_texts(claims) do
+    texts = Enum.map(claims, & &1.claim_text)
+
+    case extraction_embedder().embed_many(texts) do
+      {:ok, embeddings} when length(embeddings) == length(texts) -> embeddings
+      _ -> List.duplicate(nil, length(texts))
     end
   end
 

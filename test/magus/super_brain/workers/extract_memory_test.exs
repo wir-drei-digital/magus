@@ -58,7 +58,7 @@ defmodule Magus.SuperBrain.Workers.ExtractMemoryTest do
 
       assert episode.status == :extracted
       assert episode.graph_name == graph
-      assert episode.extractor_version == "memory_extract_worker@2026-05-21"
+      assert episode.extractor_version == "memory_extract_worker@2026-07-04-claims"
 
       {:ok, result} =
         Magus.Graph.query(

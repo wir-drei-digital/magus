@@ -15,7 +15,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPage do
 
   use Magus.SuperBrain.Workers.ExtractBase, queue: :super_brain_extraction
 
-  @extractor_version "brain_extract_worker@2026-05-21"
+  @extractor_version "brain_extract_worker@2026-07-04-claims"
 
   @impl true
   def extractor_version, do: @extractor_version

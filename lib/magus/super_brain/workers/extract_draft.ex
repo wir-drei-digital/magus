@@ -34,7 +34,7 @@ defmodule Magus.SuperBrain.Workers.ExtractDraft do
 
   alias Magus.Drafts.ProseMirrorConverter
 
-  @extractor_version "draft_extract_worker@2026-05-22"
+  @extractor_version "draft_extract_worker@2026-07-04-claims"
 
   @impl true
   def extractor_version, do: @extractor_version

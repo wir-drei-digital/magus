@@ -70,7 +70,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPageTest do
         |> Ash.read_one(authorize?: false)
 
       assert episode.status == :extracted
-      assert episode.extractor_version == "brain_extract_worker@2026-05-21"
+      assert episode.extractor_version == "brain_extract_worker@2026-07-04-claims"
 
       {:ok, result} =
         Magus.Graph.query(
@@ -251,7 +251,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPageTest do
       {:ok, extracted_result} =
         Magus.Graph.query(
           graph,
-          "MATCH (e:Entity {name: 'X', extractor: 'brain_extract_worker@2026-05-21'}) RETURN e.name"
+          "MATCH (e:Entity {name: 'X', extractor: 'brain_extract_worker@2026-07-04-claims'}) RETURN e.name"
         )
 
       assert length(extracted_result.rows) == 1

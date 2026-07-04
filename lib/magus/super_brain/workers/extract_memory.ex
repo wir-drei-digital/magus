@@ -20,7 +20,7 @@ defmodule Magus.SuperBrain.Workers.ExtractMemory do
 
   use Magus.SuperBrain.Workers.ExtractBase, queue: :super_brain_extraction
 
-  @extractor_version "memory_extract_worker@2026-05-21"
+  @extractor_version "memory_extract_worker@2026-07-04-claims"
 
   @impl true
   def extractor_version, do: @extractor_version
