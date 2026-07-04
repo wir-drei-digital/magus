@@ -67,4 +67,22 @@ defmodule Magus.Eval.SuperBrain.MetricsTest do
 
     assert Metrics.score(results, []).aggregate == 1.0
   end
+
+  test "grades claim-target cases by (subject, predicate, object) triples" do
+    results = [
+      %{
+        id: "c1",
+        meta: %{
+          target: "claims",
+          supported: true,
+          category: "claim_recall",
+          k: 5,
+          expected: [%{"subject" => "Aurora", "predicate" => "occurs_at", "object" => "Q3"}],
+          retrieved: [%{"subject" => "aurora", "predicate" => "occurs_at", "object" => "q3"}]
+        }
+      }
+    ]
+
+    assert %{aggregate: 1.0} = Metrics.score(results, [])
+  end
 end

@@ -6,16 +6,22 @@ defmodule Magus.Eval.SuperBrain.Fixture do
   live subject seeds them into a Layer 1 graph and runs the real builder.
   """
 
-  defstruct entities: [], edges: [], sources: []
+  defstruct entities: [], edges: [], sources: [], claims: []
 
-  @type t :: %__MODULE__{entities: [map()], edges: [map()], sources: [map()]}
+  @type t :: %__MODULE__{
+          entities: [map()],
+          edges: [map()],
+          sources: [map()],
+          claims: [map()]
+        }
 
   @spec parse(map()) :: t()
   def parse(raw) when is_map(raw) do
     %__MODULE__{
       entities: Enum.map(Map.get(raw, "entities", []), &entity/1),
       edges: Enum.map(Map.get(raw, "edges", []), &edge/1),
-      sources: Enum.map(Map.get(raw, "sources", []), &source/1)
+      sources: Enum.map(Map.get(raw, "sources", []), &source/1),
+      claims: Enum.map(Map.get(raw, "claims", []), &claim/1)
     }
   end
 
@@ -47,5 +53,23 @@ defmodule Magus.Eval.SuperBrain.Fixture do
       resource_type: Map.fetch!(s, "resource_type"),
       resource_id: Map.fetch!(s, "resource_id")
     }
+  end
+
+  defp claim(c) do
+    %{
+      subject: Map.fetch!(c, "subject"),
+      predicate: Map.fetch!(c, "predicate"),
+      object: Map.fetch!(c, "object"),
+      claim_text: Map.fetch!(c, "claim_text"),
+      polarity: Map.get(c, "polarity", "affirms"),
+      embedding: Map.get(c, "embedding"),
+      trust_tier: Map.get(c, "trust_tier", "evidence"),
+      confidence: Map.get(c, "confidence", 0.8)
+    }
+  end
+
+  @doc "Expands a basis spec `%{\"hot\" => i}` to a `dim`-length one-hot vector."
+  def expand_basis(%{"hot" => i}, dim \\ 1536) do
+    List.duplicate(0.0, dim) |> List.replace_at(i, 1.0)
   end
 end

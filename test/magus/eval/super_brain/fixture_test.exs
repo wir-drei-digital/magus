@@ -41,4 +41,24 @@ defmodule Magus.Eval.SuperBrain.FixtureTest do
     assert s.entity == "daniel"
     assert s.resource_type == "brain_page"
   end
+
+  test "parses claims and expands basis vectors" do
+    f =
+      Fixture.parse(%{
+        "claims" => [
+          %{
+            "subject" => "Aurora",
+            "predicate" => "occurs_at",
+            "object" => "Q3",
+            "claim_text" => "Aurora targets Q3.",
+            "embedding" => %{"hot" => 2}
+          }
+        ]
+      })
+
+    assert [%{subject: "Aurora"}] = f.claims
+    vec = Fixture.expand_basis(%{"hot" => 2})
+    assert length(vec) == 1536
+    assert Enum.at(vec, 2) == 1.0
+  end
 end

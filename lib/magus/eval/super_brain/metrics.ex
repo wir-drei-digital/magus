@@ -28,8 +28,9 @@ defmodule Magus.Eval.SuperBrain.Metrics do
   end
 
   defp grade(%{id: id, meta: meta}) do
-    expected = normalize_set(get(meta, :expected) || [])
-    retrieved = Enum.map(get(meta, :retrieved) || [], &normalize_one/1)
+    target = get(meta, :target) || "entities"
+    expected = normalize_expected(target, get(meta, :expected) || [])
+    retrieved = normalize_retrieved(target, get(meta, :retrieved) || [])
     k = get(meta, :k) || 5
     topk = Enum.take(retrieved, k)
     recall = recall_at_k(expected, topk)
@@ -44,6 +45,15 @@ defmodule Magus.Eval.SuperBrain.Metrics do
       correct?: recall == 1.0
     }
   end
+
+  defp normalize_expected("claims", list), do: Enum.map(list, &triple/1)
+  defp normalize_expected(_entities, list), do: Enum.map(list, &normalize_one/1)
+
+  defp normalize_retrieved("claims", list), do: Enum.map(list, &triple/1)
+  defp normalize_retrieved(_entities, list), do: Enum.map(list, &normalize_one/1)
+
+  defp triple(%{} = m),
+    do: {down(get(m, :subject)), down(get(m, :predicate)), down(get(m, :object))}
 
   @doc false
   def recall_at_k([], _topk), do: 0.0
@@ -81,8 +91,6 @@ defmodule Magus.Eval.SuperBrain.Metrics do
       {cat, "#{passing}/#{length(items)}"}
     end)
   end
-
-  defp normalize_set(list), do: Enum.map(list, &normalize_one/1)
 
   defp normalize_one(%{} = m) do
     name = get(m, :name)
