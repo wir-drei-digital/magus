@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-	memberDisplayName,
-	sortMembers,
-	isValidInviteEmail,
-	canConfirmArchive
-} from './members';
+import { memberDisplayName, sortMembers, isValidInviteEmail, canConfirmArchive } from './members';
 
 describe('members helpers', () => {
 	it('renders a display name', () => {
@@ -15,9 +10,9 @@ describe('members helpers', () => {
 	});
 
 	it('falls back to the user email, then to a placeholder', () => {
-		expect(memberDisplayName({ user: { displayName: null, email: 'b@x.io' }, inviteEmail: null })).toBe(
-			'b@x.io'
-		);
+		expect(
+			memberDisplayName({ user: { displayName: null, email: 'b@x.io' }, inviteEmail: null })
+		).toBe('b@x.io');
 		expect(memberDisplayName({ user: null, inviteEmail: null })).toBe('Unknown');
 	});
 

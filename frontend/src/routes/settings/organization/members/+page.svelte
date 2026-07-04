@@ -364,12 +364,7 @@
 								data-testid="org-member-cap-input"
 							/>
 							<Button type="submit" size="sm" data-testid="org-member-cap-save">Save</Button>
-							<Button
-								type="button"
-								size="sm"
-								variant="ghost"
-								onclick={() => (capEditingId = null)}
-							>
+							<Button type="button" size="sm" variant="ghost" onclick={() => (capEditingId = null)}>
 								Cancel
 							</Button>
 						</form>

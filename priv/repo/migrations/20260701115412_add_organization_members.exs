@@ -75,7 +75,8 @@ defmodule Magus.Repo.Migrations.AddOrganizationMembers do
             name: "organization_members_organization_id_fkey",
             type: :uuid,
             prefix: "public"
-          ), null: false
+          ),
+          null: false
 
       add :user_id,
           references(:users,
