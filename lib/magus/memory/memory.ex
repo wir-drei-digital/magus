@@ -123,5 +123,17 @@ defmodule Magus.Memory do
         args: [:memory_a_id, :memory_b_id],
         get?: true
     end
+
+    resource Magus.Memory.UserProfile do
+      define :create_user_profile, action: :create, args: [:user_id, :workspace_id]
+      define :get_user_profile, action: :for_bucket, args: [:user_id, :workspace_id]
+      define :set_profile_document, action: :set_document
+      define :add_profile_note, action: :add_note, args: [:note]
+    end
+
+    resource Magus.Memory.UserProfileVersion do
+      define :create_profile_version, action: :create
+      define :list_profile_versions, action: :for_profile, args: [:user_profile_id]
+    end
   end
 end
