@@ -17,6 +17,9 @@ defmodule Magus.Skills.ConversationSkillApproval do
     references do
       reference :conversation, on_delete: :delete
       reference :skill, on_delete: :delete
+      # Nullable attribution: when the approver is deleted, keep the approval
+      # row (it binds to conversation + skill + bundle_sha) and forget who.
+      reference :approved_by, on_delete: :nilify
     end
   end
 

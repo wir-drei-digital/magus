@@ -117,7 +117,14 @@
 
 	let slashCommandRows = $state<SlashRow[]>([]);
 	let skillRows = $state<SlashRow[]>([]);
-	const slashCommands = $derived<SlashRow[]>([...slashCommandRows, ...skillRows]);
+	// Commands win on name collision: backend SlashCommands.resolve/3 gives a
+	// command precedence over a same-named skill, so a colliding skill row is
+	// unreachable by slash anyway. Dropping it also avoids a duplicate keyed-each
+	// key ({#each ... (command.name)}), which crashes the composer in Svelte 5.
+	const slashCommands = $derived<SlashRow[]>([
+		...slashCommandRows,
+		...skillRows.filter((s) => !slashCommandRows.some((c) => c.name === s.name))
+	]);
 
 	const SLASH_ICONS: Record<string, typeof Globe> = {
 		'lucide-globe': Globe,

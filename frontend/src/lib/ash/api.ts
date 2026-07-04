@@ -395,15 +395,6 @@ export function createSandboxSecret(input: {
 	return run((opts) => rpc.createSandboxSecret({ input, fields: SANDBOX_SECRET_FIELDS, ...opts }));
 }
 
-export function updateSandboxSecret(
-	id: string,
-	input: { value: string; description?: string }
-): Promise<RpcResult<SandboxSecretEntry>> {
-	return run((opts) =>
-		rpc.updateSandboxSecret({ identity: id, input, fields: SANDBOX_SECRET_FIELDS, ...opts })
-	);
-}
-
 export function destroySandboxSecret(id: string): Promise<RpcResult<Record<string, never>>> {
 	return run((opts) => rpc.destroySandboxSecret({ identity: id, ...opts }));
 }
