@@ -35,7 +35,6 @@
 				{ id: 'models', label: 'Models', icon: Boxes },
 				{ id: 'providers', label: 'Providers', icon: Key },
 				{ id: 'memory', label: 'Memory', icon: Brain },
-				{ id: 'knowledge', label: 'Knowledge', icon: FolderSync },
 				{ id: 'mcp-servers', label: 'MCP Servers', icon: Server }
 			]
 		},
@@ -49,6 +48,7 @@
 		{
 			label: 'Storage & Data',
 			items: [
+				{ id: 'knowledge', label: 'File sync', icon: FolderSync },
 				{ id: 'storage', label: 'Storage', icon: Database },
 				{ id: 'data', label: 'Data', icon: Shield }
 			]
