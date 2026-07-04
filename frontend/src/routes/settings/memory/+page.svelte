@@ -7,7 +7,10 @@
 		updateProfileSetting,
 		listUserMemories,
 		deactivateUserMemory,
-		type UserMemory
+		getUserProfile,
+		clearUserProfile,
+		type UserMemory,
+		type UserProfileDoc
 	} from '$lib/ash/api';
 	import { bucketOptions } from '$lib/settings/memory-buckets';
 
@@ -65,6 +68,40 @@
 		if (!ok) return;
 		const result = await deactivateUserMemory(m.id);
 		if (result.success) memories = memories.filter((x) => x.id !== m.id);
+	}
+
+	let profile = $state<UserProfileDoc | null>(null);
+	let profileLoading = $state(true);
+
+	async function loadProfile() {
+		profileLoading = true;
+		const userId = session.user?.id;
+		if (!userId) {
+			profileLoading = false;
+			return;
+		}
+		const result = await getUserProfile(userId, selectedBucketId);
+		if (result.success) profile = result.data;
+		profileLoading = false;
+	}
+
+	$effect(() => {
+		// Refetch whenever the selected bucket changes.
+		selectedBucketId;
+		void loadProfile();
+	});
+
+	async function resetProfile() {
+		if (!profile) return;
+		const ok = await confirmAction({
+			title: 'Reset your profile?',
+			description:
+				'The distilled profile for this workspace will be cleared. It rebuilds from your memories over time.',
+			confirmLabel: 'Reset'
+		});
+		if (!ok) return;
+		const result = await clearUserProfile(profile.id);
+		if (result.success) profile = { ...profile, document: '', tokenEstimate: 0 };
 	}
 </script>
 
@@ -136,6 +173,28 @@
 						</button>
 					</div>
 				{/each}
+			</div>
+		{/if}
+	</SettingsSection>
+
+	<SettingsSection title="Profile" description="The distilled summary for the selected workspace.">
+		{#if profileLoading}
+			<div class="h-16 animate-pulse rounded-lg bg-muted/60"></div>
+		{:else if !profile || profile.document === ''}
+			<p class="text-xs text-muted-foreground" data-testid="profile-empty">
+				No profile yet. It is distilled from your memories over time.
+			</p>
+		{:else}
+			<div class="space-y-2" data-testid="profile-card">
+				<pre class="whitespace-pre-wrap rounded-lg bg-secondary/60 p-3 text-xs">{profile.document}</pre>
+				<button
+					type="button"
+					class="rounded px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
+					data-testid="profile-reset"
+					onclick={() => void resetProfile()}
+				>
+					Reset profile
+				</button>
 			</div>
 		{/if}
 	</SettingsSection>
