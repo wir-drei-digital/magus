@@ -72,6 +72,72 @@ defmodule Magus.SuperBrain.Retrieval do
     end
   end
 
+  @doc """
+  Semantic search over the actor's claims (pgvector). Independent of super-graph
+  state: works during cold start and drift. Returns claims ordered by cosine
+  distance, loaded with `:episode` for provenance.
+
+  ## Options
+
+    * `:query_embedding` (required) — the dense embedding for the query.
+    * `:workspace_context` — workspace id when searching from a workspace
+      surface, `nil` for personal. Only consulted when `:accessible_graphs`
+      is absent.
+    * `:trust_tiers` — list of trust tiers to include. Defaults to
+      `[:instruction, :evidence]` (noise is excluded).
+    * `:limit` — max claims to return. Defaults to 10.
+    * `:accessible_graphs` — precomputed allow-list of graph names. Callers
+      (e.g. the per-turn context builder) may compute this once and pass it
+      to both `search/2` and `search_claims/2` to avoid recomputing it
+      twice. Defaults to `AccessibleGraphs.for_actor/2` with the super
+      graphs rejected.
+  """
+  def search_claims(actor, opts) do
+    if Magus.SuperBrain.enabled?() do
+      embedding = Keyword.fetch!(opts, :query_embedding)
+      limit = Keyword.get(opts, :limit, 10)
+
+      tiers =
+        opts |> Keyword.get(:trust_tiers, @default_trust_tiers) |> Enum.map(&Atom.to_string/1)
+
+      graphs = accessible_graphs(actor, opts)
+
+      ids = Magus.SuperBrain.Claim.top_ids_by_embedding(embedding, graphs, tiers, limit)
+      {:ok, load_claims_in_order(ids)}
+    else
+      {:ok, []}
+    end
+  end
+
+  defp load_claims_in_order([]), do: []
+
+  defp load_claims_in_order(ids) do
+    {:ok, claims} =
+      Magus.SuperBrain.Claim
+      |> Ash.Query.filter(id in ^ids)
+      |> Ash.Query.load(:episode)
+      |> Ash.read(authorize?: false)
+
+    by_id = Map.new(claims, &{&1.id, &1})
+    Enum.flat_map(ids, fn id -> List.wrap(Map.get(by_id, id)) end)
+  end
+
+  # Shared accessible-graph list: callers (per-turn context) may precompute it
+  # once and pass it to both search/2 and search_claims/2. search/2's own
+  # cold-start/drift dispatch computes its own list internally and is left
+  # unchanged; this helper is consulted only by search_claims/2 for now.
+  defp accessible_graphs(actor, opts) do
+    case Keyword.get(opts, :accessible_graphs) do
+      nil ->
+        actor
+        |> AccessibleGraphs.for_actor(workspace_context: Keyword.get(opts, :workspace_context))
+        |> Enum.reject(&String.starts_with?(&1, "super:"))
+
+      list ->
+        list
+    end
+  end
+
   defp do_search(actor, opts) do
     _query_text = Keyword.fetch!(opts, :query)
     _query_embedding = Keyword.fetch!(opts, :query_embedding)
