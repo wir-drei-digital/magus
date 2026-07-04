@@ -24,11 +24,12 @@ defmodule Magus.Knowledge.Connectors.GoogleDrive do
 
   require Logger
 
-  @base_url "https://www.googleapis.com/drive/v3"
-  @token_url "https://oauth2.googleapis.com/token"
+  @default_base_url "https://www.googleapis.com/drive/v3"
   @max_download_size 100 * 1024 * 1024
   @content_download_timeout 300_000
   @folder_mime_type "application/vnd.google-apps.folder"
+
+  defp base_url, do: Application.get_env(:magus, :google_drive_base_url, @default_base_url)
 
   defstruct [:access_token, :refresh_token]
 
@@ -417,16 +418,19 @@ defmodule Magus.Knowledge.Connectors.GoogleDrive do
 
   defp get(%__MODULE__{refresh_token: refresh_token} = conn, path, params, opts \\ []) do
     token = get_current_token(conn)
-    url = @base_url <> path
+    url = base_url() <> path
     max_size = Keyword.get(opts, :max_size)
     timeout = Keyword.get(opts, :timeout, 30_000)
 
     case do_get(url, token, params, max_size, timeout) do
       {:error, {:drive_api_error, 401, _}} when is_binary(refresh_token) ->
-        case refresh_access_token(refresh_token) do
-          {:ok, new_token, new_refresh} ->
+        case Magus.Knowledge.OAuth.refresh_google_token(refresh_token) do
+          {:ok, %{"access_token" => new_token, "refresh_token" => new_refresh}} ->
             cache_refreshed_token(refresh_token, new_token, new_refresh)
             do_get(url, new_token, params, max_size, timeout)
+
+          {:error, :reauth_required} ->
+            {:error, :reauth_required}
 
           {:error, reason} ->
             Logger.error("Google Drive token refresh failed: #{inspect(reason)}")
@@ -458,41 +462,6 @@ defmodule Magus.Knowledge.Connectors.GoogleDrive do
 
       {:error, reason} ->
         {:error, {:request_failed, reason}}
-    end
-  end
-
-  defp refresh_access_token(refresh_token) do
-    client_id = System.get_env("GOOGLE_CLIENT_ID")
-    client_secret = System.get_env("GOOGLE_CLIENT_SECRET")
-
-    if is_nil(client_id) or is_nil(client_secret) do
-      Logger.error(
-        "Cannot refresh Google Drive token: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET not set"
-      )
-
-      {:error, :missing_oauth_config}
-    else
-      case Req.post(@token_url,
-             form: [
-               grant_type: "refresh_token",
-               refresh_token: refresh_token,
-               client_id: client_id,
-               client_secret: client_secret
-             ],
-             receive_timeout: 10_000
-           ) do
-        {:ok, %Req.Response{status: 200, body: %{"access_token" => new_token} = body}} ->
-          Logger.info("Google Drive access token refreshed successfully")
-          # Google may return a new refresh_token — cache it alongside the access token
-          new_refresh = Map.get(body, "refresh_token")
-          {:ok, new_token, new_refresh}
-
-        {:ok, %Req.Response{status: status, body: body}} ->
-          {:error, {:refresh_failed, status, body}}
-
-        {:error, reason} ->
-          {:error, {:refresh_request_failed, reason}}
-      end
     end
   end
 
