@@ -14,6 +14,7 @@
 	} from '$lib/ash/api';
 	import { bucketOptions } from '$lib/settings/memory-buckets';
 	import { relativeTime } from '$lib/time';
+	import { ChevronRight } from '@lucide/svelte';
 
 	let memoryEnabled = $state(session.user?.globalMemoryEnabled ?? true);
 	let profileEnabled = $state(session.user?.profileEnabled ?? false);
@@ -43,6 +44,10 @@
 	let selectedBucketId = $state<string | null>(session.user?.currentWorkspaceId ?? null);
 	let memories = $state<UserMemory[]>([]);
 	let memLoading = $state(true);
+	// Which memory rows are expanded to show full text + metadata.
+	let expanded = $state<Record<string, boolean>>({});
+
+	const hasContent = (m: UserMemory) => !!m.content && Object.keys(m.content).length > 0;
 	const bucketOptionsList = $derived(
 		bucketOptions(workbench.workspaces, session.user?.currentWorkspaceId ?? null)
 	);
@@ -159,29 +164,70 @@
 		{:else}
 			<div class="flex flex-col gap-1.5" data-testid="user-memories">
 				{#each memories as m (m.id)}
-					<div class="flex items-start justify-between gap-2 rounded-lg bg-secondary/60 px-3 py-2">
-						<span class="min-w-0">
-							<span class="text-sm font-medium">{m.name}</span>
-							{#if m.kind}
-								<span class="ml-1.5 text-xs text-muted-foreground">{m.kind}</span>
-							{/if}
-							{#if m.summary}
-								<span class="mt-0.5 block truncate text-xs text-muted-foreground">{m.summary}</span>
-							{/if}
-							{#if m.updatedAt}
-								<span class="mt-0.5 block text-xs text-muted-foreground"
-									>Updated {relativeTime(m.updatedAt)}</span
-								>
-							{/if}
-						</span>
-						<button
-							type="button"
-							class="shrink-0 rounded px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
-							data-testid={`memory-delete-${m.id}`}
-							onclick={() => void removeMemory(m)}
-						>
-							Delete
-						</button>
+					{@const isOpen = !!expanded[m.id]}
+					<div class="rounded-lg bg-secondary/60" data-testid={`memory-item-${m.id}`}>
+						<div class="flex items-start justify-between gap-2 px-3 py-2">
+							<button
+								type="button"
+								class="flex min-w-0 flex-1 items-start gap-1.5 text-left"
+								aria-expanded={isOpen}
+								data-testid={`memory-toggle-${m.id}`}
+								onclick={() => (expanded[m.id] = !isOpen)}
+							>
+								<ChevronRight
+									class="mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-transform {isOpen
+										? 'rotate-90'
+										: ''}"
+								/>
+								<span class="min-w-0">
+									<span class="text-sm font-medium">{m.name}</span>
+									{#if m.kind}
+										<span class="ml-1.5 text-xs text-muted-foreground">{m.kind}</span>
+									{/if}
+									{#if m.summary}
+										<span
+											class="mt-0.5 block text-xs text-muted-foreground {isOpen ? '' : 'truncate'}"
+											>{m.summary}</span
+										>
+									{/if}
+									{#if m.updatedAt}
+										<span class="mt-0.5 block text-xs text-muted-foreground"
+											>Updated {relativeTime(m.updatedAt)}</span
+										>
+									{/if}
+								</span>
+							</button>
+							<button
+								type="button"
+								class="shrink-0 rounded px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
+								data-testid={`memory-delete-${m.id}`}
+								onclick={() => void removeMemory(m)}
+							>
+								Delete
+							</button>
+						</div>
+						{#if isOpen}
+							<div
+								class="border-t border-border/60 px-3 py-2"
+								data-testid={`memory-detail-${m.id}`}
+							>
+								<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+									<dt class="text-muted-foreground">Scope</dt>
+									<dd>{m.scope}</dd>
+									<dt class="text-muted-foreground">Confidence</dt>
+									<dd>{Math.round(m.confidence * 100)}%</dd>
+								</dl>
+								{#if hasContent(m)}
+									<p class="mt-2 text-xs text-muted-foreground">Content</p>
+									<pre
+										class="mt-0.5 overflow-x-auto rounded bg-background/60 p-2 text-xs">{JSON.stringify(
+											m.content,
+											null,
+											2
+										)}</pre>
+								{/if}
+							</div>
+						{/if}
 					</div>
 				{/each}
 			</div>

@@ -339,6 +339,9 @@ export type UserMemory = {
 	name: string;
 	summary: string | null;
 	kind: string | null;
+	scope: 'agent' | 'local' | 'user';
+	confidence: number;
+	content: Record<string, unknown> | null;
 	updatedAt: string | null;
 };
 
@@ -347,6 +350,9 @@ const USER_MEMORY_FIELDS: rpc.ListUserMemoriesFields = [
 	'name',
 	'summary',
 	'kind',
+	'scope',
+	'confidence',
+	'content',
 	'updatedAt'
 ];
 
@@ -3984,6 +3990,7 @@ export function createBrainPage(input: {
 	brainId: string;
 	title?: string;
 	parentPageId?: string | null;
+	kind?: 'page' | 'plan' | 'spec';
 }): Promise<RpcResult<PageTreeNode>> {
 	return run((opts) => rpc.createBrainPage({ input, fields: PAGE_NODE_FIELDS, ...opts }));
 }

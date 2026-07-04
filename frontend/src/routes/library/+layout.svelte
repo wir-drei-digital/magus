@@ -47,18 +47,18 @@
 </svelte:head>
 
 <div class="flex h-full min-h-0" data-testid="library-view">
-	<!-- Full width at rest; a master rail when a reader is open. On narrow
-	     screens the reader takes the whole pane, so the gallery hides. -->
-	<div
-		class="flex min-h-0 min-w-0 flex-col {readerOpen
-			? 'hidden md:flex md:w-[44%] md:shrink-0 lg:w-[40%]'
-			: 'flex-1'}"
-	>
+	<!-- Full width at rest; the dominant pane when a reader is open — the
+	     reader opens as a narrower companion beside it, so the item grid keeps
+	     most of the width. On narrow screens the reader takes the whole pane,
+	     so the gallery hides. -->
+	<div class="flex min-h-0 min-w-0 flex-col {readerOpen ? 'hidden md:flex md:flex-1' : 'flex-1'}">
 		<LibraryGallery {selectedId} compact={readerOpen} />
 	</div>
 
 	{#if readerOpen}
-		<div class="min-h-0 min-w-0 flex-1 md:border-l">
+		<div
+			class="min-h-0 min-w-0 flex-1 md:flex-none md:w-[44%] md:shrink-0 lg:w-[40%] xl:max-w-[640px] md:border-l"
+		>
 			{@render children()}
 		</div>
 	{/if}
