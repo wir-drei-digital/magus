@@ -50,7 +50,9 @@ defmodule Magus.Integrations.Workers.PollDataSource do
   end
 
   @impl Oban.Worker
-  def perform(%Oban.Job{args: %{"integration_id" => integration_id}}) do
+  def perform(%Oban.Job{args: %{"integration_id" => integration_id}} = job) do
+    final_attempt? = job.attempt >= job.max_attempts
+
     with {:ok, integration} <- load_integration(integration_id),
          :ok <- check_active(integration),
          {:ok, provider_module} <- get_provider(integration),
@@ -60,7 +62,7 @@ defmodule Magus.Integrations.Workers.PollDataSource do
           handle_poll_success(integration_id, integration, provider_module, raw_entries)
 
         {:error, reason} ->
-          handle_poll_failure(integration_id, integration, reason)
+          handle_poll_failure(integration_id, integration, reason, final_attempt?)
       end
     else
       {:cancel, reason} ->
@@ -84,7 +86,16 @@ defmodule Magus.Integrations.Workers.PollDataSource do
     :ok
   end
 
-  defp handle_poll_failure(integration_id, integration, reason) do
+  defp handle_poll_failure(integration_id, _integration, reason, false = _final_attempt?) do
+    Logger.warning(
+      "PollDataSource failed for #{integration_id} (attempt will be retried by Oban): " <>
+        inspect(reason)
+    )
+
+    {:error, reason}
+  end
+
+  defp handle_poll_failure(integration_id, integration, reason, true = _final_attempt?) do
     Logger.warning("PollDataSource failed for #{integration_id}: #{inspect(reason)}")
 
     {:ok, updated} =

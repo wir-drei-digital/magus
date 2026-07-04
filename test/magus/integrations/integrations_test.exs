@@ -3,10 +3,12 @@ defmodule Magus.IntegrationsTest do
   Comprehensive tests for the Integrations domain.
   """
   use Magus.DataCase, async: true
+  use Oban.Testing, repo: Magus.Repo
 
   import Magus.Generators
 
   alias Magus.Integrations
+  alias Magus.Integrations.Workers.PollDataSource
 
   defp create_agent(user) do
     {:ok, agent} =
@@ -565,6 +567,62 @@ defmodule Magus.IntegrationsTest do
       assert {:ok, unchanged} = Integrations.reactivate_if_errored(disabled, actor: user)
 
       assert unchanged.status == :disabled
+    end
+
+    test "does not enqueue a poll for a non-pollable provider (:simple_webhook)", %{
+      user: user,
+      integration: integration
+    } do
+      {:ok, errored} =
+        Integrations.record_integration_poll_failure(integration, %{last_error: "boom"},
+          authorize?: false
+        )
+
+      {:ok, errored} = Integrations.mark_integration_errored(errored, authorize?: false)
+
+      assert {:ok, _reactivated} = Integrations.reactivate_if_errored(errored, actor: user)
+
+      refute_enqueued(worker: PollDataSource, args: %{integration_id: integration.id})
+    end
+  end
+
+  describe "reactivate_if_errored/2 restarts polling for pollable providers" do
+    setup do
+      user = generate(user())
+      agent = create_agent(user)
+
+      {:ok, integration} =
+        Integrations.create_user_integration(
+          :rss_source,
+          %{
+            user_id: user.id,
+            custom_agent_id: agent.id,
+            config: %{"feed_urls" => ["http://127.0.0.1:1/feed.xml"]}
+          },
+          actor: user
+        )
+
+      %{user: user, integration: integration}
+    end
+
+    test "reactivating an errored RSS integration re-enqueues a PollDataSource job", %{
+      user: user,
+      integration: integration
+    } do
+      {:ok, integration} = Integrations.activate_user_integration(integration, actor: user)
+
+      {:ok, errored} =
+        Integrations.record_integration_poll_failure(integration, %{last_error: "boom"},
+          authorize?: false
+        )
+
+      {:ok, errored} = Integrations.mark_integration_errored(errored, authorize?: false)
+      assert errored.status == :error
+
+      assert {:ok, reactivated} = Integrations.reactivate_if_errored(errored, actor: user)
+      assert reactivated.status == :active
+
+      assert_enqueued(worker: PollDataSource, args: %{integration_id: integration.id})
     end
   end
 
