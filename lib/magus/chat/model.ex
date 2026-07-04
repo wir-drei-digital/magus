@@ -72,7 +72,7 @@ defmodule Magus.Chat.Model do
         :key,
         :provider,
         :api_provider,
-        :allowed_providers,
+        :denied_providers,
         :context_window,
         :input_cost,
         :output_cost,
@@ -143,7 +143,7 @@ defmodule Magus.Chat.Model do
         :key,
         :provider,
         :api_provider,
-        :allowed_providers,
+        :denied_providers,
         :context_window,
         :input_cost,
         :output_cost,
@@ -317,6 +317,18 @@ defmodule Magus.Chat.Model do
       default []
       public? true
       description "OpenRouter provider slugs that can serve this model. Empty = no restriction."
+    end
+
+    attribute :denied_providers, {:array, :string} do
+      allow_nil? false
+      default []
+      public? true
+
+      description """
+      OpenRouter provider slugs to exclude for this specific model. Subtracted
+      from the global admin allow-list at request time. Empty = no per-model
+      exclusions.
+      """
     end
 
     attribute :context_window, :integer do

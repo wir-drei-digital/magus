@@ -873,13 +873,14 @@ export type MessageAttributesOnlySchema = {
 // Model Schema
 export type ModelResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "options" | "active" | "provider" | "allowedProviders" | "contextWindow" | "inputCost" | "outputCost" | "inputCostValue" | "outputCostValue" | "inputCostUnit" | "outputCostUnit" | "inputModalities" | "outputModalities" | "supportsSearch" | "supportsReasoning" | "supportsTools" | "shortDescription" | "detailedDescription" | "info" | "releasedAt" | "shortDescriptionTranslations" | "detailedDescriptionTranslations" | "llmMetadata" | "internal" | "modelProviderId" | "requestCostCents";
+  __primitiveFields: "id" | "name" | "options" | "active" | "provider" | "allowedProviders" | "deniedProviders" | "contextWindow" | "inputCost" | "outputCost" | "inputCostValue" | "outputCostValue" | "inputCostUnit" | "outputCostUnit" | "inputModalities" | "outputModalities" | "supportsSearch" | "supportsReasoning" | "supportsTools" | "shortDescription" | "detailedDescription" | "info" | "releasedAt" | "shortDescriptionTranslations" | "detailedDescriptionTranslations" | "llmMetadata" | "internal" | "modelProviderId" | "requestCostCents";
   id: UUID;
   name: string;
   options: Record<string, any> | null;
   active: boolean;
   provider: string | null;
   allowedProviders: Array<string>;
+  deniedProviders: Array<string>;
   contextWindow: number | null;
   inputCost: string | null;
   outputCost: string | null;
@@ -909,13 +910,14 @@ export type ModelResourceSchema = {
 
 export type ModelAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "options" | "active" | "provider" | "allowedProviders" | "contextWindow" | "inputCost" | "outputCost" | "inputCostValue" | "outputCostValue" | "inputCostUnit" | "outputCostUnit" | "inputModalities" | "outputModalities" | "supportsSearch" | "supportsReasoning" | "supportsTools" | "shortDescription" | "detailedDescription" | "info" | "releasedAt" | "shortDescriptionTranslations" | "detailedDescriptionTranslations" | "llmMetadata" | "internal" | "modelProviderId";
+  __primitiveFields: "id" | "name" | "options" | "active" | "provider" | "allowedProviders" | "deniedProviders" | "contextWindow" | "inputCost" | "outputCost" | "inputCostValue" | "outputCostValue" | "inputCostUnit" | "outputCostUnit" | "inputModalities" | "outputModalities" | "supportsSearch" | "supportsReasoning" | "supportsTools" | "shortDescription" | "detailedDescription" | "info" | "releasedAt" | "shortDescriptionTranslations" | "detailedDescriptionTranslations" | "llmMetadata" | "internal" | "modelProviderId";
   id: UUID;
   name: string;
   options: Record<string, any> | null;
   active: boolean;
   provider: string | null;
   allowedProviders: Array<string>;
+  deniedProviders: Array<string>;
   contextWindow: number | null;
   inputCost: string | null;
   outputCost: string | null;
@@ -4121,6 +4123,12 @@ export type ModelFilterInput = {
     in?: Array<Array<string>>;
   };
 
+  deniedProviders?: {
+    eq?: Array<string>;
+    notEq?: Array<string>;
+    in?: Array<Array<string>>;
+  };
+
   contextWindow?: {
     eq?: number;
     notEq?: number;
@@ -6773,7 +6781,7 @@ export type FolderFilterField = (typeof folderFilterFields)[number];
 export const messageFilterFields = ["id", "role", "model", "attachments", "metadata", "status", "insertedAt", "updatedAt", "text", "source", "mode", "messageType", "modelName", "citations", "reasoningSummary", "reasoningDetails", "disabled", "toolCallData", "conversationId", "responseToId", "respondingAgentId", "selectedModelId", "threadCount", "threadMessageCount", "conversation", "responseTo", "response", "respondingAgent", "selectedModel", "threads"] as const;
 export type MessageFilterField = (typeof messageFilterFields)[number];
 
-export const modelFilterFields = ["id", "name", "options", "active", "provider", "allowedProviders", "contextWindow", "inputCost", "outputCost", "inputCostValue", "outputCostValue", "inputCostUnit", "outputCostUnit", "inputModalities", "outputModalities", "supportsSearch", "supportsReasoning", "supportsTools", "shortDescription", "detailedDescription", "info", "releasedAt", "shortDescriptionTranslations", "detailedDescriptionTranslations", "llmMetadata", "internal", "modelProviderId", "requestCostCents", "modelProvider"] as const;
+export const modelFilterFields = ["id", "name", "options", "active", "provider", "allowedProviders", "deniedProviders", "contextWindow", "inputCost", "outputCost", "inputCostValue", "outputCostValue", "inputCostUnit", "outputCostUnit", "inputModalities", "outputModalities", "supportsSearch", "supportsReasoning", "supportsTools", "shortDescription", "detailedDescription", "info", "releasedAt", "shortDescriptionTranslations", "detailedDescriptionTranslations", "llmMetadata", "internal", "modelProviderId", "requestCostCents", "modelProvider"] as const;
 export type ModelFilterField = (typeof modelFilterFields)[number];
 
 export const userFolderStateFilterFields = ["id", "isExpanded", "userId", "folderId", "user", "folder"] as const;
@@ -6927,7 +6935,7 @@ export type FolderSortField = (typeof folderSortFields)[number];
 export const messageSortFields = ["id", "role", "model", "attachments", "metadata", "status", "insertedAt", "updatedAt", "text", "source", "mode", "messageType", "modelName", "citations", "reasoningSummary", "reasoningDetails", "disabled", "toolCallData", "conversationId", "responseToId", "respondingAgentId", "selectedModelId", "threadCount", "threadMessageCount"] as const;
 export type MessageSortField = (typeof messageSortFields)[number];
 
-export const modelSortFields = ["id", "name", "options", "active", "provider", "allowedProviders", "contextWindow", "inputCost", "outputCost", "inputCostValue", "outputCostValue", "inputCostUnit", "outputCostUnit", "inputModalities", "outputModalities", "supportsSearch", "supportsReasoning", "supportsTools", "shortDescription", "detailedDescription", "info", "releasedAt", "shortDescriptionTranslations", "detailedDescriptionTranslations", "llmMetadata", "internal", "modelProviderId", "requestCostCents"] as const;
+export const modelSortFields = ["id", "name", "options", "active", "provider", "allowedProviders", "deniedProviders", "contextWindow", "inputCost", "outputCost", "inputCostValue", "outputCostValue", "inputCostUnit", "outputCostUnit", "inputModalities", "outputModalities", "supportsSearch", "supportsReasoning", "supportsTools", "shortDescription", "detailedDescription", "info", "releasedAt", "shortDescriptionTranslations", "detailedDescriptionTranslations", "llmMetadata", "internal", "modelProviderId", "requestCostCents"] as const;
 export type ModelSortField = (typeof modelSortFields)[number];
 
 export const userFolderStateSortFields = ["id", "isExpanded", "userId", "folderId"] as const;
