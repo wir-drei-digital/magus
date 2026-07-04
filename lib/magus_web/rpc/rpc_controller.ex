@@ -53,7 +53,7 @@ defmodule MagusWeb.Rpc.RpcController do
       tokens ->
         conn = Plug.Conn.delete_session(conn, :knowledge_oauth_tokens)
 
-        case Magus.Knowledge.Connect.connect_and_create(provider, tokens, actor: user) do
+        case Magus.Knowledge.Connect.reconnect_or_create(provider, tokens, actor: user) do
           {:ok, source} ->
             json(conn, %{
               source: %{

@@ -48,6 +48,56 @@ defmodule Magus.Knowledge.Connect do
   end
 
   @doc """
+  Reconnect flow: if the actor already has a source for this provider, validate
+  the new credentials and update it in place (clearing any reauth flag and
+  reactivating it). Otherwise behaves like `connect_and_create/3`. This is what
+  the OAuth finalize endpoint uses so re-authorizing an expired connection heals
+  the existing source and its collections instead of stranding them behind a
+  duplicate.
+  """
+  def reconnect_or_create(provider, auth_config, opts)
+      when is_binary(provider) and is_map(auth_config) do
+    actor = Keyword.fetch!(opts, :actor)
+
+    with {:ok, provider_atom} <- parse_provider(provider),
+         module <- Connector.connector_for(provider_atom),
+         {:ok, _conn} <- module.connect(auth_config) do
+      case existing_source(provider_atom, actor) do
+        nil ->
+          connect_and_create(provider, auth_config, opts)
+
+        source ->
+          update_existing(source, auth_config, actor)
+      end
+    else
+      :error -> {:error, "Unknown provider"}
+      {:error, reason} -> {:error, friendly_error(reason)}
+    end
+  end
+
+  defp existing_source(provider_atom, actor) do
+    case Knowledge.list_sources_for_user(actor: actor) do
+      {:ok, sources} -> Enum.find(sources, &(&1.provider == provider_atom))
+      _ -> nil
+    end
+  end
+
+  defp update_existing(source, auth_config, actor) do
+    with {:ok, source} <-
+           Knowledge.update_source_auth_config(source, %{auth_config: auth_config}, actor: actor),
+         {:ok, source} <- Knowledge.update_source_status(source, %{status: :active}, actor: actor) do
+      # Clear any reauth flag so scheduled syncs resume. Best-effort: a source
+      # that was never flagged still ends up active from the status update above.
+      case Knowledge.clear_source_reauth(source, authorize?: false) do
+        {:ok, cleared} -> {:ok, cleared}
+        {:error, _} -> {:ok, source}
+      end
+    else
+      {:error, reason} -> {:error, friendly_error(reason)}
+    end
+  end
+
+  @doc """
   List folders under `parent_id` (nil = root) for an already-created source.
   Connects with the source's stored credentials each call (lazy browsing).
   """
