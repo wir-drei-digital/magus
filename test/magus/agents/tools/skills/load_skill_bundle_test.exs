@@ -54,7 +54,17 @@ defmodule Magus.Agents.Tools.Skills.LoadSkillBundleTest do
         actor: owner
       )
 
-    {:ok, conv} = Chat.record_skill_approval(conv, %{skill_id: skill.id}, actor: owner)
+    {:ok, _} =
+      Magus.Skills.record_conversation_approval(
+        %{
+          conversation_id: conv.id,
+          skill_id: skill.id,
+          bundle_sha: skill.bundle_sha,
+          approved_by_id: owner.id,
+          source: :approval_card
+        },
+        authorize?: false
+      )
 
     ctx = %{user_id: owner.id, user: owner, conversation_id: conv.id}
     {:ok, result} = LoadSkill.run(%{skill_name: "user:" <> skill.id}, ctx)

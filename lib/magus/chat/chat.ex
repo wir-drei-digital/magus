@@ -272,7 +272,6 @@ defmodule Magus.Chat do
       define :deactivate_system_prompt, action: :deactivate_system_prompt
       define :set_conversation_skill, action: :set_skill
       define :set_conversation_loaded_tools, action: :set_loaded_tools
-      define :record_skill_approval, action: :record_skill_approval
       define :schedule_extraction, action: :schedule_extraction
       define :mark_memory_consolidated, action: :mark_memory_consolidated
 
