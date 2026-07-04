@@ -128,6 +128,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
 
   alias Magus.SuperBrain.Tools.Search, as: SuperBrainSearch
   alias Magus.Agents.Tools.SuperBrain.PinFact
+  alias Magus.SuperBrain.Tools.GetDossier
 
   alias Magus.Agents.Tools.Catalog
   alias Magus.Agents.Tools.Search.{ToolSearch, LoadTool}
@@ -311,6 +312,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
       RequestApproval,
       SearchMemories,
       SuperBrainSearch,
+      GetDossier,
       SearchConversationHistory,
       FetchConversationHistory,
       PinFact,
@@ -344,6 +346,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
       Rag,
       SearchMemories,
       SuperBrainSearch,
+      GetDossier,
       PinFact,
       SetMemory,
       ForgetMemory
@@ -463,7 +466,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
     tools =
       if Magus.SuperBrain.enabled?(),
         do: tools,
-        else: tools -- [SuperBrainSearch, PinFact]
+        else: tools -- [SuperBrainSearch, PinFact, GetDossier]
 
     # Capability gating: drop web tools whose provider isn't configured, so a
     # self-host instance without a search/crawl key doesn't offer a dead tool.
