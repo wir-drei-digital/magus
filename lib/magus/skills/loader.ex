@@ -100,7 +100,11 @@ defmodule Magus.Skills.Loader do
             _ -> conversation
           end
 
-        if Magus.Skills.Approval.approved?(conversation, skill) do
+        approved? =
+          Magus.Skills.Approval.approved?(conversation, skill) or
+            trusted_and_record(conversation, skill, user_id)
+
+        if approved? do
           materialize(context, skill, base, tools, conversation_id, user_id)
         else
           Magus.Skills.Approval.request(conversation_id, skill, user_id)
@@ -136,6 +140,29 @@ defmodule Magus.Skills.Loader do
   end
 
   defp maybe_autorecord(_source, _conversation, _skill, _user_id), do: :ok
+
+  # An agent-initiated load of a skill the user has explicitly trusted is honored
+  # without a fresh approval card: record a :trusted approval so materialization
+  # proceeds. Returns true only when the user trusts the skill (and the trusted
+  # sha still matches, per Approval.trusted?/2).
+  defp trusted_and_record(conversation, skill, user_id) do
+    if user_id && Magus.Skills.Approval.trusted?(user_id, skill) do
+      Magus.Skills.record_conversation_approval(
+        %{
+          conversation_id: conversation.id,
+          skill_id: skill.id,
+          bundle_sha: Map.get(skill, :bundle_sha),
+          approved_by_id: user_id,
+          source: :trusted
+        },
+        authorize?: false
+      )
+
+      true
+    else
+      false
+    end
+  end
 
   defp materialize(_context, skill, base, tools, conversation_id, user_id) do
     case Magus.Skills.Materializer.materialize(conversation_id, skill, user_id) do

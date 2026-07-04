@@ -40,6 +40,12 @@ defmodule Magus.Skills do
       rpc_action :favorite_skill, :create
       rpc_action :unfavorite_skill, :destroy
     end
+
+    resource Magus.Skills.SkillTrust do
+      rpc_action :my_skill_trusts, :my_trusts
+      rpc_action :trust_skill, :create
+      rpc_action :untrust_skill, :destroy
+    end
   end
 
   resources do
@@ -67,6 +73,12 @@ defmodule Magus.Skills do
     resource Magus.Skills.ConversationSkillApproval do
       define :record_conversation_approval, action: :record
       define :list_conversation_approvals, action: :for_conversation, args: [:conversation_id]
+    end
+
+    resource Magus.Skills.SkillTrust do
+      define :trust_skill, action: :create
+      define :untrust_skill, action: :destroy
+      define :my_skill_trusts, action: :my_trusts
     end
   end
 end
