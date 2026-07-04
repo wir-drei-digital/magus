@@ -218,52 +218,6 @@ export async function currentUser<Fields extends CurrentUserFields>(
 }
 
 
-export type GrantDataRegionConsentInput = {
-  region: string;
-};
-
-export type GrantDataRegionConsentFields = UnifiedFieldSelection<UserResourceSchema>[];
-
-export type InferGrantDataRegionConsentResult<
-  Fields extends GrantDataRegionConsentFields | undefined,
-> = InferResult<UserResourceSchema, Fields>;
-
-export type GrantDataRegionConsentResult<Fields extends GrantDataRegionConsentFields | undefined = undefined> = | { success: true; data: InferGrantDataRegionConsentResult<Fields>; }
-| { success: false; errors: AshRpcError[]; }
-
-;
-
-/**
- * Update an existing User
- *
- * @ashActionType :update
- */
-export async function grantDataRegionConsent<Fields extends GrantDataRegionConsentFields | undefined = undefined>(
-  config: {
-  tenant?: string;
-  identity: UUID;
-  input: GrantDataRegionConsentInput;
-  fields?: Fields;
-  headers?: Record<string, string>;
-  fetchOptions?: RequestInit;
-  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-}
-): Promise<GrantDataRegionConsentResult<Fields extends undefined ? [] : Fields>> {
-  const payload = {
-    action: "grant_data_region_consent",
-    ...(config.tenant !== undefined && { tenant: config.tenant }),
-    identity: config.identity,
-    input: config.input,
-    ...(config.fields !== undefined && { fields: config.fields })
-  };
-
-  return executeActionRpcRequest<GrantDataRegionConsentResult<Fields extends undefined ? [] : Fields>>(
-    payload,
-    config
-  );
-}
-
-
 export type RequestEmailChangeInput = {
   newEmail: string;
 };
@@ -535,52 +489,6 @@ export async function setUserPassword<Fields extends SetUserPasswordFields | und
   };
 
   return executeActionRpcRequest<SetUserPasswordResult<Fields extends undefined ? [] : Fields>>(
-    payload,
-    config
-  );
-}
-
-
-export type UpdateDataRegionPreferenceInput = {
-  regions: Array<string>;
-};
-
-export type UpdateDataRegionPreferenceFields = UnifiedFieldSelection<UserResourceSchema>[];
-
-export type InferUpdateDataRegionPreferenceResult<
-  Fields extends UpdateDataRegionPreferenceFields | undefined,
-> = InferResult<UserResourceSchema, Fields>;
-
-export type UpdateDataRegionPreferenceResult<Fields extends UpdateDataRegionPreferenceFields | undefined = undefined> = | { success: true; data: InferUpdateDataRegionPreferenceResult<Fields>; }
-| { success: false; errors: AshRpcError[]; }
-
-;
-
-/**
- * Update an existing User
- *
- * @ashActionType :update
- */
-export async function updateDataRegionPreference<Fields extends UpdateDataRegionPreferenceFields | undefined = undefined>(
-  config: {
-  tenant?: string;
-  identity: UUID;
-  input: UpdateDataRegionPreferenceInput;
-  fields?: Fields;
-  headers?: Record<string, string>;
-  fetchOptions?: RequestInit;
-  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-}
-): Promise<UpdateDataRegionPreferenceResult<Fields extends undefined ? [] : Fields>> {
-  const payload = {
-    action: "update_data_region_preference",
-    ...(config.tenant !== undefined && { tenant: config.tenant }),
-    identity: config.identity,
-    input: config.input,
-    ...(config.fields !== undefined && { fields: config.fields })
-  };
-
-  return executeActionRpcRequest<UpdateDataRegionPreferenceResult<Fields extends undefined ? [] : Fields>>(
     payload,
     config
   );

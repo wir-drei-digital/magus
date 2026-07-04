@@ -105,6 +105,7 @@ defmodule MagusWeb.Admin.ModelsLive do
     |> assign(:model, model)
     |> assign(:form, form)
     |> assign(:desc_tab, "en")
+    |> assign(:openrouter_provider_slugs, load_openrouter_provider_slugs(socket))
     |> assign(:registry_prefill, nil)
   end
 
@@ -130,6 +131,7 @@ defmodule MagusWeb.Admin.ModelsLive do
         |> assign(:model, model)
         |> assign(:form, form)
         |> assign(:desc_tab, "en")
+        |> assign(:openrouter_provider_slugs, load_openrouter_provider_slugs(socket))
 
       {:error, _} ->
         socket
@@ -140,6 +142,14 @@ defmodule MagusWeb.Admin.ModelsLive do
 
   defp provider_options(providers) do
     [{"-- none --", ""}] ++ Enum.map(providers, fn p -> {p.name, p.id} end)
+  end
+
+  # Synced OpenRouter provider slugs, offered as the denied_providers checkbox
+  # options in the model form. Admin-gated read; the current user is the actor.
+  defp load_openrouter_provider_slugs(socket) do
+    Magus.Models.list_open_router_providers!(actor: socket.assigns.current_user)
+    |> Enum.map(& &1.slug)
+    |> Enum.sort()
   end
 
   defp create_form(prefill) do
@@ -1199,7 +1209,13 @@ defmodule MagusWeb.Admin.ModelsLive do
         <%!-- Form Card --%>
         <div class="card bg-base-200 border border-base-300">
           <div class="card-body">
-            <.form for={@form} phx-change="validate" phx-submit="save" class="space-y-6">
+            <.form
+              for={@form}
+              id="model-form"
+              phx-change="validate"
+              phx-submit="save"
+              class="space-y-6"
+            >
               <%!-- Basic Info Section --%>
               <div>
                 <h3 class="text-lg font-semibold text-base-content mb-4">Basic Information</h3>
@@ -1271,6 +1287,28 @@ defmodule MagusWeb.Admin.ModelsLive do
                     options={["text", "image", "video"]}
                   />
                 </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <%!-- Provider Routing Section --%>
+              <div>
+                <h3 class="text-lg font-semibold text-base-content mb-4">Provider routing</h3>
+                <%= if @openrouter_provider_slugs == [] do %>
+                  <p class="text-sm text-base-content/60">
+                    Sync OpenRouter providers first to configure denied providers.
+                  </p>
+                <% else %>
+                  <.modality_checkboxes
+                    label="Denied providers (OpenRouter)"
+                    field={@form[:denied_providers]}
+                    options={@openrouter_provider_slugs}
+                    allow_empty={true}
+                  />
+                  <p class="text-xs text-base-content/50 mt-2">
+                    Checked providers are excluded when this model is served through OpenRouter.
+                  </p>
+                <% end %>
               </div>
 
               <div class="divider"></div>
@@ -1385,12 +1423,18 @@ defmodule MagusWeb.Admin.ModelsLive do
   attr :label, :string, required: true
   attr :field, Phoenix.HTML.FormField, required: true
   attr :options, :list, required: true
+  # Opt-in only. When true, a hidden sentinel sends the field key even when every
+  # checkbox is unchecked, so an all-unchecked submit clears the list to [] instead
+  # of omitting the key (which Ash would treat as "unchanged"). Modality fields do
+  # not set this, so their behavior is unaffected.
+  attr :allow_empty, :boolean, default: false
 
   defp modality_checkboxes(assigns) do
     ~H"""
     <fieldset>
       <legend class="label font-medium">{@label}</legend>
       <div class="flex flex-wrap gap-4 mt-2">
+        <input :if={@allow_empty} type="hidden" name={@field.name <> "[]"} value="" />
         <label :for={opt <- @options} class="label cursor-pointer gap-2">
           <input
             type="checkbox"

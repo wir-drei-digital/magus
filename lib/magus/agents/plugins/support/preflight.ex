@@ -97,46 +97,45 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
 
     case check_usage_limit(user, mode, model, workspace) do
       {:ok, :allowed} ->
-        # Check region availability: block if model not in user's allowed regions
-        unless Magus.Providers.Routing.model_available_for_user?(model, user) do
-          handle_region_unavailable(conversation_id, message_id)
-          {:ok, {:override, Jido.Actions.Control.Noop}}
-        else
-          provider_routing = Magus.Providers.Routing.build_provider_routing(model, user)
+        case Magus.Providers.Routing.build_provider_routing(model) do
+          {:error, :no_allowed_providers} ->
+            handle_no_allowed_providers(conversation_id, message_id)
+            {:ok, {:override, Jido.Actions.Control.Noop}}
 
-          request_context =
-            build_request_context(conversation_id, state, data, mode, model, conversation)
+          provider_routing ->
+            request_context =
+              build_request_context(conversation_id, state, data, mode, model, conversation)
 
-          # Merge provider routing into llm_opts
-          llm_opts_with_routing =
-            merge_provider_routing(request_context.llm_opts, provider_routing)
+            # Merge provider routing into llm_opts
+            llm_opts_with_routing =
+              merge_provider_routing(request_context.llm_opts, provider_routing)
 
-          resolved_model_key = model.key || model_key_for_mode(model_keys, mode)
+            resolved_model_key = model.key || model_key_for_mode(model_keys, mode)
 
-          react_signal =
-            %{
-              query: text,
-              request_id: message_id
-            }
-            |> maybe_put_field(:model, resolved_model_key)
-            |> maybe_put_field(:model_name, model.name)
-            |> maybe_put_field(:system_prompt, request_context.system_prompt)
-            |> maybe_put_field(:tool_context, request_context.tool_context)
-            |> maybe_put_field(:tools, request_context.tools)
-            |> maybe_put_field(:max_iterations, request_context.max_iterations)
-            |> maybe_put_field(:llm_opts, llm_opts_with_routing)
-            |> maybe_put_field(:initial_messages, request_context.initial_messages)
-            |> maybe_put_runtime_field(:model, data)
-            |> maybe_put_runtime_field(:tool_context, data)
-            |> maybe_put_runtime_field(:tools, data)
-            |> maybe_put_runtime_field(:max_iterations, data)
-            |> maybe_put_runtime_field(:llm_opts, data)
-            |> maybe_put_runtime_field(:req_http_options, data)
-            |> maybe_put_runtime_field(:system_prompt, data)
-            |> maybe_put_runtime_field(:model_name, data)
-            |> then(&Jido.Signal.new!("ai.react.query", &1))
+            react_signal =
+              %{
+                query: text,
+                request_id: message_id
+              }
+              |> maybe_put_field(:model, resolved_model_key)
+              |> maybe_put_field(:model_name, model.name)
+              |> maybe_put_field(:system_prompt, request_context.system_prompt)
+              |> maybe_put_field(:tool_context, request_context.tool_context)
+              |> maybe_put_field(:tools, request_context.tools)
+              |> maybe_put_field(:max_iterations, request_context.max_iterations)
+              |> maybe_put_field(:llm_opts, llm_opts_with_routing)
+              |> maybe_put_field(:initial_messages, request_context.initial_messages)
+              |> maybe_put_runtime_field(:model, data)
+              |> maybe_put_runtime_field(:tool_context, data)
+              |> maybe_put_runtime_field(:tools, data)
+              |> maybe_put_runtime_field(:max_iterations, data)
+              |> maybe_put_runtime_field(:llm_opts, data)
+              |> maybe_put_runtime_field(:req_http_options, data)
+              |> maybe_put_runtime_field(:system_prompt, data)
+              |> maybe_put_runtime_field(:model_name, data)
+              |> then(&Jido.Signal.new!("ai.react.query", &1))
 
-          {:ok, {:continue, react_signal}}
+            {:ok, {:continue, react_signal}}
         end
 
       {:error, error} ->
@@ -335,9 +334,7 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
       _ ->
         %{
           id: user_id,
-          timezone: "Etc/UTC",
-          data_region_preference: ["US", "EU", "CH"],
-          data_region_consents: %{}
+          timezone: "Etc/UTC"
         }
     end
   end
@@ -852,19 +849,22 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
     Map.put(base, :openrouter_provider, routing)
   end
 
-  defp handle_region_unavailable(conversation_id, message_id) do
+  @doc false
+  def apply_provider_routing(llm_opts, routing), do: merge_provider_routing(llm_opts, routing)
+
+  defp handle_no_allowed_providers(conversation_id, message_id) do
     error_message =
-      "This model is not available in your enabled data regions. Update your data region preferences in settings."
+      "No provider is currently allowed to serve this model. An administrator must allow at least one OpenRouter provider for it."
 
-    Logger.info("Region unavailable for conversation #{conversation_id}")
+    Logger.info("No allowed providers for conversation #{conversation_id}")
 
-    Signals.error(conversation_id, message_id, :region_unavailable, error_message)
+    Signals.error(conversation_id, message_id, :no_allowed_providers, error_message)
     Signals.state_change(conversation_id, :idle)
     Signals.response_complete(conversation_id, %{})
 
     ErrorMessages.create_error_event(
       conversation_id,
-      :region_unavailable,
+      :no_allowed_providers,
       %RuntimeError{message: error_message}
     )
   end

@@ -211,17 +211,18 @@ defmodule Magus.LiveE2ECase do
   end
 
   # Apply the desired shape via the Model `:update` action (model.ex accepts
-  # :allowed_providers, :api_provider, :supports_tools?, :model_provider_id,
-  # :active?, :llm_metadata on both :create and :update). Used by BOTH the
-  # create path (to thread allowed_providers the generator drops) and the reuse
+  # :api_provider, :supports_tools?, :model_provider_id, :active?, :llm_metadata
+  # on both :create and :update). Used by BOTH the create path and the reuse
   # path (to normalize a pre-existing row).
   #
-  # Pin to the mistral provider so OpenRouter routing is deterministic. Without
-  # an allowlist, build_provider_routing sends only data_collection: deny, and
-  # OpenRouter intermittently finds no ministral-3b provider honoring it (HTTP
-  # 404 "No allowed providers are specified"). "mistral" routes to EU, which the
-  # default user data_region_preference (US/EU/CH) permits. Test-only: prod
-  # routing for the catalog entry is untouched.
+  # Deterministic upstream-provider selection no longer comes from a per-model
+  # pin (:allowed_providers was removed from the Model actions, so this path no
+  # longer threads it). Preflight is now wired to build_provider_routing/1, which
+  # derives the upstream `only` list from the global OpenRouter allow-list
+  # (Magus.Models.OpenRouterProvider rows with allowed: true, seeded by the
+  # provider migration to include "mistral" for the ministral-3b model),
+  # intersected with the model's serving-provider set. This determinism is
+  # exercised only by bin/test-e2e-live, not by CI.
   defp update_live_model_row(model, provider, llm_metadata) do
     Ash.update!(
       model,
@@ -229,7 +230,6 @@ defmodule Magus.LiveE2ECase do
         active?: true,
         supports_tools?: true,
         api_provider: :openrouter,
-        allowed_providers: ["mistral"],
         model_provider_id: provider.id,
         llm_metadata: llm_metadata
       },

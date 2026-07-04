@@ -559,6 +559,7 @@ defmodule MagusWeb.CoreRouter do
           live "/providers", Admin.ProvidersLive, :index
           live "/providers/new", Admin.ProvidersLive, :new
           live "/providers/:id/edit", Admin.ProvidersLive, :edit
+          live "/openrouter-routing", Admin.OpenRouterRoutingLive, :index
           live "/config", Admin.ConfigHealthLive, :index
           live "/usage", Admin.UsageLive, :index
         end

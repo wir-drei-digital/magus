@@ -13,7 +13,7 @@ export type UtcDateTimeUsec = string;
 // User Schema
 export type UserResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "email" | "displayName" | "currentWorkspaceId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "imageGenerationSettings" | "videoGenerationSettings" | "isAdmin" | "language" | "avatarPath" | "pendingEmail" | "uiPreferences" | "timezone" | "lastTimezoneChangeAt" | "dataRegionPreference" | "dataRegionConsents" | "selectedPlanKey" | "globalMemoryEnabled" | "contextStrategy" | "name" | "acceptedTerms" | "acceptedAgeRequirement" | "hasPassword" | "avatarUrl";
+  __primitiveFields: "id" | "email" | "displayName" | "currentWorkspaceId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "imageGenerationSettings" | "videoGenerationSettings" | "isAdmin" | "language" | "avatarPath" | "pendingEmail" | "uiPreferences" | "timezone" | "lastTimezoneChangeAt" | "selectedPlanKey" | "globalMemoryEnabled" | "contextStrategy" | "name" | "acceptedTerms" | "acceptedAgeRequirement" | "hasPassword" | "avatarUrl";
   id: UUID;
   email: string;
   displayName: string | null;
@@ -30,8 +30,6 @@ export type UserResourceSchema = {
   uiPreferences: Record<string, any>;
   timezone: string | null;
   lastTimezoneChangeAt: UtcDateTimeUsec | null;
-  dataRegionPreference: Array<string>;
-  dataRegionConsents: Record<string, any>;
   selectedPlanKey: string | null;
   globalMemoryEnabled: boolean;
   contextStrategy: "compact" | "rolling" | null;
@@ -46,7 +44,7 @@ export type UserResourceSchema = {
 
 export type UserAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "email" | "displayName" | "currentWorkspaceId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "imageGenerationSettings" | "videoGenerationSettings" | "isAdmin" | "language" | "avatarPath" | "pendingEmail" | "uiPreferences" | "timezone" | "lastTimezoneChangeAt" | "dataRegionPreference" | "dataRegionConsents" | "selectedPlanKey" | "globalMemoryEnabled" | "contextStrategy" | "name" | "acceptedTerms" | "acceptedAgeRequirement";
+  __primitiveFields: "id" | "email" | "displayName" | "currentWorkspaceId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "imageGenerationSettings" | "videoGenerationSettings" | "isAdmin" | "language" | "avatarPath" | "pendingEmail" | "uiPreferences" | "timezone" | "lastTimezoneChangeAt" | "selectedPlanKey" | "globalMemoryEnabled" | "contextStrategy" | "name" | "acceptedTerms" | "acceptedAgeRequirement";
   id: UUID;
   email: string;
   displayName: string | null;
@@ -63,8 +61,6 @@ export type UserAttributesOnlySchema = {
   uiPreferences: Record<string, any>;
   timezone: string | null;
   lastTimezoneChangeAt: UtcDateTimeUsec | null;
-  dataRegionPreference: Array<string>;
-  dataRegionConsents: Record<string, any>;
   selectedPlanKey: string | null;
   globalMemoryEnabled: boolean;
   contextStrategy: "compact" | "rolling" | null;
@@ -873,13 +869,14 @@ export type MessageAttributesOnlySchema = {
 // Model Schema
 export type ModelResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "options" | "active" | "provider" | "allowedProviders" | "contextWindow" | "inputCost" | "outputCost" | "inputCostValue" | "outputCostValue" | "inputCostUnit" | "outputCostUnit" | "inputModalities" | "outputModalities" | "supportsSearch" | "supportsReasoning" | "supportsTools" | "shortDescription" | "detailedDescription" | "info" | "releasedAt" | "shortDescriptionTranslations" | "detailedDescriptionTranslations" | "llmMetadata" | "internal" | "modelProviderId" | "requestCostCents";
+  __primitiveFields: "id" | "name" | "options" | "active" | "provider" | "allowedProviders" | "deniedProviders" | "contextWindow" | "inputCost" | "outputCost" | "inputCostValue" | "outputCostValue" | "inputCostUnit" | "outputCostUnit" | "inputModalities" | "outputModalities" | "supportsSearch" | "supportsReasoning" | "supportsTools" | "shortDescription" | "detailedDescription" | "info" | "releasedAt" | "shortDescriptionTranslations" | "detailedDescriptionTranslations" | "llmMetadata" | "internal" | "modelProviderId" | "requestCostCents";
   id: UUID;
   name: string;
   options: Record<string, any> | null;
   active: boolean;
   provider: string | null;
   allowedProviders: Array<string>;
+  deniedProviders: Array<string>;
   contextWindow: number | null;
   inputCost: string | null;
   outputCost: string | null;
@@ -909,13 +906,14 @@ export type ModelResourceSchema = {
 
 export type ModelAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "options" | "active" | "provider" | "allowedProviders" | "contextWindow" | "inputCost" | "outputCost" | "inputCostValue" | "outputCostValue" | "inputCostUnit" | "outputCostUnit" | "inputModalities" | "outputModalities" | "supportsSearch" | "supportsReasoning" | "supportsTools" | "shortDescription" | "detailedDescription" | "info" | "releasedAt" | "shortDescriptionTranslations" | "detailedDescriptionTranslations" | "llmMetadata" | "internal" | "modelProviderId";
+  __primitiveFields: "id" | "name" | "options" | "active" | "provider" | "allowedProviders" | "deniedProviders" | "contextWindow" | "inputCost" | "outputCost" | "inputCostValue" | "outputCostValue" | "inputCostUnit" | "outputCostUnit" | "inputModalities" | "outputModalities" | "supportsSearch" | "supportsReasoning" | "supportsTools" | "shortDescription" | "detailedDescription" | "info" | "releasedAt" | "shortDescriptionTranslations" | "detailedDescriptionTranslations" | "llmMetadata" | "internal" | "modelProviderId";
   id: UUID;
   name: string;
   options: Record<string, any> | null;
   active: boolean;
   provider: string | null;
   allowedProviders: Array<string>;
+  deniedProviders: Array<string>;
   contextWindow: number | null;
   inputCost: string | null;
   outputCost: string | null;
@@ -2079,18 +2077,6 @@ export type UserFilterInput = {
     lessThanOrEqual?: UtcDateTimeUsec;
     in?: Array<UtcDateTimeUsec>;
     isNil?: boolean;
-  };
-
-  dataRegionPreference?: {
-    eq?: Array<string>;
-    notEq?: Array<string>;
-    in?: Array<Array<string>>;
-  };
-
-  dataRegionConsents?: {
-    eq?: Record<string, any>;
-    notEq?: Record<string, any>;
-    in?: Array<Record<string, any>>;
   };
 
   selectedPlanKey?: {
@@ -4116,6 +4102,12 @@ export type ModelFilterInput = {
   };
 
   allowedProviders?: {
+    eq?: Array<string>;
+    notEq?: Array<string>;
+    in?: Array<Array<string>>;
+  };
+
+  deniedProviders?: {
     eq?: Array<string>;
     notEq?: Array<string>;
     in?: Array<Array<string>>;
@@ -6710,7 +6702,7 @@ export type WorkspaceMemberFilterInput = {
 };
 
 
-export const userFilterFields = ["id", "email", "displayName", "currentWorkspaceId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "imageGenerationSettings", "videoGenerationSettings", "isAdmin", "language", "avatarPath", "pendingEmail", "uiPreferences", "timezone", "lastTimezoneChangeAt", "dataRegionPreference", "dataRegionConsents", "selectedPlanKey", "globalMemoryEnabled", "contextStrategy", "name", "acceptedTerms", "acceptedAgeRequirement", "hasPassword", "avatarUrl"] as const;
+export const userFilterFields = ["id", "email", "displayName", "currentWorkspaceId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "imageGenerationSettings", "videoGenerationSettings", "isAdmin", "language", "avatarPath", "pendingEmail", "uiPreferences", "timezone", "lastTimezoneChangeAt", "selectedPlanKey", "globalMemoryEnabled", "contextStrategy", "name", "acceptedTerms", "acceptedAgeRequirement", "hasPassword", "avatarUrl"] as const;
 export type UserFilterField = (typeof userFilterFields)[number];
 
 export const agentActivityLogFilterFields = ["id", "agentId", "userId", "activityType", "summary", "eventId", "runId", "taskId", "conversationId", "details", "modelUsed", "tokensUsed", "estimatedCostUsd", "durationMs", "insertedAt"] as const;
@@ -6773,7 +6765,7 @@ export type FolderFilterField = (typeof folderFilterFields)[number];
 export const messageFilterFields = ["id", "role", "model", "attachments", "metadata", "status", "insertedAt", "updatedAt", "text", "source", "mode", "messageType", "modelName", "citations", "reasoningSummary", "reasoningDetails", "disabled", "toolCallData", "conversationId", "responseToId", "respondingAgentId", "selectedModelId", "threadCount", "threadMessageCount", "conversation", "responseTo", "response", "respondingAgent", "selectedModel", "threads"] as const;
 export type MessageFilterField = (typeof messageFilterFields)[number];
 
-export const modelFilterFields = ["id", "name", "options", "active", "provider", "allowedProviders", "contextWindow", "inputCost", "outputCost", "inputCostValue", "outputCostValue", "inputCostUnit", "outputCostUnit", "inputModalities", "outputModalities", "supportsSearch", "supportsReasoning", "supportsTools", "shortDescription", "detailedDescription", "info", "releasedAt", "shortDescriptionTranslations", "detailedDescriptionTranslations", "llmMetadata", "internal", "modelProviderId", "requestCostCents", "modelProvider"] as const;
+export const modelFilterFields = ["id", "name", "options", "active", "provider", "allowedProviders", "deniedProviders", "contextWindow", "inputCost", "outputCost", "inputCostValue", "outputCostValue", "inputCostUnit", "outputCostUnit", "inputModalities", "outputModalities", "supportsSearch", "supportsReasoning", "supportsTools", "shortDescription", "detailedDescription", "info", "releasedAt", "shortDescriptionTranslations", "detailedDescriptionTranslations", "llmMetadata", "internal", "modelProviderId", "requestCostCents", "modelProvider"] as const;
 export type ModelFilterField = (typeof modelFilterFields)[number];
 
 export const userFolderStateFilterFields = ["id", "isExpanded", "userId", "folderId", "user", "folder"] as const;
@@ -6864,7 +6856,7 @@ export const workspaceMemberFilterFields = ["id", "role", "status", "isActive", 
 export type WorkspaceMemberFilterField = (typeof workspaceMemberFilterFields)[number];
 
 
-export const userSortFields = ["id", "email", "displayName", "currentWorkspaceId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "imageGenerationSettings", "videoGenerationSettings", "isAdmin", "language", "avatarPath", "pendingEmail", "uiPreferences", "timezone", "lastTimezoneChangeAt", "dataRegionPreference", "dataRegionConsents", "selectedPlanKey", "globalMemoryEnabled", "contextStrategy", "name", "acceptedTerms", "acceptedAgeRequirement", "hasPassword", "avatarUrl"] as const;
+export const userSortFields = ["id", "email", "displayName", "currentWorkspaceId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "imageGenerationSettings", "videoGenerationSettings", "isAdmin", "language", "avatarPath", "pendingEmail", "uiPreferences", "timezone", "lastTimezoneChangeAt", "selectedPlanKey", "globalMemoryEnabled", "contextStrategy", "name", "acceptedTerms", "acceptedAgeRequirement", "hasPassword", "avatarUrl"] as const;
 export type UserSortField = (typeof userSortFields)[number];
 
 export const agentActivityLogSortFields = ["id", "agentId", "userId", "activityType", "summary", "eventId", "runId", "taskId", "conversationId", "details", "modelUsed", "tokensUsed", "estimatedCostUsd", "durationMs", "insertedAt"] as const;
@@ -6927,7 +6919,7 @@ export type FolderSortField = (typeof folderSortFields)[number];
 export const messageSortFields = ["id", "role", "model", "attachments", "metadata", "status", "insertedAt", "updatedAt", "text", "source", "mode", "messageType", "modelName", "citations", "reasoningSummary", "reasoningDetails", "disabled", "toolCallData", "conversationId", "responseToId", "respondingAgentId", "selectedModelId", "threadCount", "threadMessageCount"] as const;
 export type MessageSortField = (typeof messageSortFields)[number];
 
-export const modelSortFields = ["id", "name", "options", "active", "provider", "allowedProviders", "contextWindow", "inputCost", "outputCost", "inputCostValue", "outputCostValue", "inputCostUnit", "outputCostUnit", "inputModalities", "outputModalities", "supportsSearch", "supportsReasoning", "supportsTools", "shortDescription", "detailedDescription", "info", "releasedAt", "shortDescriptionTranslations", "detailedDescriptionTranslations", "llmMetadata", "internal", "modelProviderId", "requestCostCents"] as const;
+export const modelSortFields = ["id", "name", "options", "active", "provider", "allowedProviders", "deniedProviders", "contextWindow", "inputCost", "outputCost", "inputCostValue", "outputCostValue", "inputCostUnit", "outputCostUnit", "inputModalities", "outputModalities", "supportsSearch", "supportsReasoning", "supportsTools", "shortDescription", "detailedDescription", "info", "releasedAt", "shortDescriptionTranslations", "detailedDescriptionTranslations", "llmMetadata", "internal", "modelProviderId", "requestCostCents"] as const;
 export type ModelSortField = (typeof modelSortFields)[number];
 
 export const userFolderStateSortFields = ["id", "isExpanded", "userId", "folderId"] as const;
