@@ -37,11 +37,21 @@ defmodule Magus.Agents.Config do
   def extraction_model, do: Magus.Models.Roles.resolve(:memory_extraction)
 
   @doc """
-  Feature flag for the distilled user profile layer (Hermes-style working
-  memory). Env var wins so eval A/B runs can toggle it per process.
+  Whether the distilled user profile layer is enabled for the given user.
+  Per-user opt-in (default false); there is no global env flag.
   """
-  def profile_enabled? do
-    System.get_env("MAGUS_MEMORY_PROFILE") == "1" or
-      Application.get_env(:magus, :memory_profile_enabled, false)
+  def profile_enabled?(user_id) when is_binary(user_id) do
+    require Ash.Query
+
+    Magus.Accounts.User
+    |> Ash.Query.filter(id == ^user_id)
+    |> Ash.Query.select([:profile_enabled])
+    |> Ash.read_one(authorize?: false)
+    |> case do
+      {:ok, %{profile_enabled: true}} -> true
+      _ -> false
+    end
   end
+
+  def profile_enabled?(_), do: false
 end

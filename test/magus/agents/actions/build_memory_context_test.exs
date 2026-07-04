@@ -1,7 +1,5 @@
 defmodule Magus.Agents.Actions.BuildMemoryContextTest do
-  # async: false because the "profile injection" tests toggle global app config
-  # for the :memory_profile_enabled flag.
-  use Magus.ResourceCase, async: false
+  use Magus.ResourceCase, async: true
 
   alias Magus.Agents.Actions.BuildMemoryContext
 
@@ -37,14 +35,14 @@ defmodule Magus.Agents.Actions.BuildMemoryContextTest do
   end
 
   describe "profile injection" do
-    setup do
-      Application.put_env(:magus, :memory_profile_enabled, true)
-      on_exit(fn -> Application.delete_env(:magus, :memory_profile_enabled) end)
-      :ok
-    end
-
     test "injects the profile document and drops the global key-memory layer" do
-      user = generate(user())
+      user =
+        generate(user())
+        |> Ash.Changeset.for_update(:update_profile_setting, %{profile_enabled: true},
+          authorize?: false
+        )
+        |> Ash.update!()
+
       conv = generate(conversation(actor: user))
       ai = %Magus.Agents.Support.AiAgent{}
 
@@ -80,7 +78,13 @@ defmodule Magus.Agents.Actions.BuildMemoryContextTest do
     end
 
     test "falls back to global key memories when no profile exists" do
-      user = generate(user())
+      user =
+        generate(user())
+        |> Ash.Changeset.for_update(:update_profile_setting, %{profile_enabled: true},
+          authorize?: false
+        )
+        |> Ash.update!()
+
       conv = generate(conversation(actor: user))
       ai = %Magus.Agents.Support.AiAgent{}
 
