@@ -14,7 +14,19 @@ defmodule Magus.Memory do
   Each memory maintains a version history for debugging and rollback purposes.
   """
 
-  use Ash.Domain, otp_app: :magus
+  use Ash.Domain, otp_app: :magus, extensions: [AshTypescript.Rpc]
+
+  typescript_rpc do
+    resource Magus.Memory.Memory do
+      rpc_action :list_user_memories, :user_for_user
+      rpc_action :deactivate_user_memory, :deactivate
+    end
+
+    resource Magus.Memory.UserProfile do
+      rpc_action :get_user_profile, :for_bucket
+      rpc_action :clear_user_profile, :clear
+    end
+  end
 
   @doc """
   Bulk-update last_accessed_at for the given memory IDs.

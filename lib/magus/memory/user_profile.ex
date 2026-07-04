@@ -13,11 +13,16 @@ defmodule Magus.Memory.UserProfile do
     otp_app: :magus,
     domain: Magus.Memory,
     data_layer: AshPostgres.DataLayer,
+    extensions: [AshTypescript.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   postgres do
     table "user_profiles"
     repo Magus.Repo
+  end
+
+  typescript do
+    type_name "UserProfile"
   end
 
   actions do
@@ -82,6 +87,22 @@ defmodule Magus.Memory.UserProfile do
         Ash.Changeset.force_change_attribute(changeset, :pending_notes, notes)
       end
     end
+
+    update :clear do
+      description "Reset the profile document to empty (keeps the row + version history)"
+      accept []
+      require_atomic? false
+
+      change fn changeset, _context ->
+        changeset
+        |> Ash.Changeset.force_change_attribute(:document, "")
+        |> Ash.Changeset.force_change_attribute(:token_estimate, 0)
+        |> Ash.Changeset.force_change_attribute(:pending_notes, [])
+        |> Ash.Changeset.force_change_attribute(:last_distilled_at, DateTime.utc_now())
+      end
+
+      change Magus.Memory.UserProfile.Changes.CreateVersion
+    end
   end
 
   policies do
@@ -108,11 +129,12 @@ defmodule Magus.Memory.UserProfile do
     attribute :document, :string,
       allow_nil?: false,
       default: "",
+      public?: true,
       constraints: [allow_empty?: true, trim?: false]
 
     attribute :pending_notes, {:array, :string}, allow_nil?: false, default: []
-    attribute :token_estimate, :integer, allow_nil?: false, default: 0
-    attribute :last_distilled_at, :utc_datetime_usec
+    attribute :token_estimate, :integer, allow_nil?: false, default: 0, public?: true
+    attribute :last_distilled_at, :utc_datetime_usec, public?: true
 
     create_timestamp :inserted_at
     update_timestamp :updated_at

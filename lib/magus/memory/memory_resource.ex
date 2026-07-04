@@ -21,7 +21,7 @@ defmodule Magus.Memory.Memory do
     otp_app: :magus,
     domain: Magus.Memory,
     data_layer: AshPostgres.DataLayer,
-    extensions: [AshOban],
+    extensions: [AshOban, AshTypescript.Resource],
     authorizers: [Ash.Policy.Authorizer]
 
   import AshOban.Changes.BuiltinChanges, only: [run_oban_trigger: 1]
@@ -87,6 +87,10 @@ defmodule Magus.Memory.Memory do
         scheduler_module_name Magus.Memory.Memory.Schedulers.GenerateEmbedding
       end
     end
+  end
+
+  typescript do
+    type_name "Memory"
   end
 
   actions do
@@ -501,7 +505,10 @@ defmodule Magus.Memory.Memory do
     end
 
     create_timestamp :inserted_at
-    update_timestamp :updated_at
+
+    update_timestamp :updated_at do
+      public? true
+    end
   end
 
   relationships do
