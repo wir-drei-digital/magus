@@ -118,7 +118,8 @@ defmodule Magus.Skills.Skill do
                  :bundle_backend,
                  :bundle_byte_size,
                  :file_manifest,
-                 :has_executable_bundle
+                 :has_executable_bundle,
+                 :bundle_sha
                ]
 
       change relate_actor(:user)
@@ -275,6 +276,12 @@ defmodule Magus.Skills.Skill do
 
     attribute :bundle_path, :string do
       allow_nil? true
+    end
+
+    attribute :bundle_sha, :string do
+      allow_nil? true
+      public? true
+      description "sha256 hex of the bundle zip; nil for prompt-only skills. Approvals bind to this."
     end
 
     attribute :bundle_backend, :string do
