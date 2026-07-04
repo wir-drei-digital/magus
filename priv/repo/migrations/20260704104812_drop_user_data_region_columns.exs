@@ -16,7 +16,7 @@ defmodule Magus.Repo.Migrations.DropUserDataRegionColumns do
 
   def down do
     alter table(:users) do
-      add :data_region_preference, {:array, :text}, null: false
+      add :data_region_preference, {:array, :text}, null: false, default: []
       add :data_region_consents, :map, null: false, default: %{}
     end
   end
