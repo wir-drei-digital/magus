@@ -24,7 +24,7 @@ defmodule Magus.Skills.Materializer do
     with {:ok, bytes} <- Magus.Files.Storage.get(skill.bundle_path),
          {:ok, %{skill_md: md, files: files}} <- Unpack.unpack(bytes),
          :ok <- write_all(conversation_id, dir, [{"SKILL.md", md} | files], user_id),
-         :ok <- ensure_env(conversation_id, user_id),
+         :ok <- ensure_env(conversation_id, skill, user_id),
          {:ok, _} <- Orchestrator.write_file(conversation_id, marker, "ok", user_id: user_id) do
       {:ok, dir}
     end
@@ -43,19 +43,22 @@ defmodule Magus.Skills.Materializer do
     end)
   end
 
-  # Ensure the agent's :sandbox_env secrets are available as /workspace/.env so
-  # the skill's scripts can `source` them. Mirrors ExecCommand's injection; a
-  # conversation without a custom agent simply gets no env file.
-  # authorize?: false on both calls: internal materialization step, runs deep in
-  # the agent pipeline with no acting user.
-  defp ensure_env(conversation_id, user_id) do
-    with {:ok, conversation} <-
-           Magus.Chat.get_conversation(conversation_id, authorize?: false),
-         agent_id when not is_nil(agent_id) <- conversation.custom_agent_id,
-         {:ok, env_map} when map_size(env_map) > 0 <-
-           Magus.Agents.sandbox_env_map_for_agent(agent_id, authorize?: false) do
+  # Build /workspace/.env from the agent's :sandbox_env secrets (if any) merged
+  # with the user's declared skill secrets (only the keys the skill lists in
+  # required_secrets). Skill-declared user secrets do NOT override agent secrets
+  # on key conflict (the agent owner curated those for this context).
+  # authorize?: false on the internal lookups: internal materialization step,
+  # runs deep in the agent pipeline with no acting user.
+  defp ensure_env(conversation_id, skill, user_id) do
+    agent_env = agent_env_map(conversation_id)
+    skill_env = declared_skill_env(skill, user_id)
+    env = Map.merge(skill_env, agent_env)
+
+    if map_size(env) == 0 do
+      :ok
+    else
       content =
-        Enum.map_join(env_map, "\n", fn {k, v} ->
+        Enum.map_join(env, "\n", fn {k, v} ->
           "export #{k}='#{String.replace(v, "'", "'\\''")}'"
         end)
 
@@ -63,9 +66,31 @@ defmodule Magus.Skills.Materializer do
         {:ok, _} -> :ok
         other -> normalize(other)
       end
-    else
-      _ -> :ok
     end
+  end
+
+  defp agent_env_map(conversation_id) do
+    with {:ok, conversation} <- Magus.Chat.get_conversation(conversation_id, authorize?: false),
+         agent_id when not is_nil(agent_id) <- conversation.custom_agent_id,
+         {:ok, env_map} when map_size(env_map) > 0 <-
+           Magus.Agents.sandbox_env_map_for_agent(agent_id, authorize?: false) do
+      env_map
+    else
+      _ -> %{}
+    end
+  end
+
+  defp declared_skill_env(skill, user_id) do
+    keys =
+      (skill.required_secrets || [])
+      |> Enum.map(fn
+        %{"key" => k} -> k
+        %{key: k} -> k
+        _ -> nil
+      end)
+      |> Enum.reject(&is_nil/1)
+
+    if user_id && keys != [], do: Magus.Skills.sandbox_env_for_user(user_id, keys), else: %{}
   end
 
   defp normalize({:error, reason, _details}), do: {:error, reason}

@@ -19,6 +19,22 @@ defmodule Magus.Skills do
     |> Keyword.get(:enabled, true)
   end
 
+  require Ash.Query
+
+  @doc """
+  Returns `%{key => value}` for the intersection of `keys` and the user's stored
+  sandbox secrets. Only declared keys are ever returned; unknown keys are absent.
+  """
+  def sandbox_env_for_user(user_id, keys) when is_list(keys) do
+    wanted = MapSet.new(keys)
+
+    Magus.Skills.SandboxSecret
+    |> Ash.Query.filter(user_id == ^user_id)
+    |> Ash.read!(authorize?: false)
+    |> Enum.filter(&MapSet.member?(wanted, &1.key))
+    |> Map.new(fn s -> {s.key, s.value} end)
+  end
+
   typescript_rpc do
     resource Magus.Skills.Skill do
       rpc_action :my_skills, :my_skills
@@ -45,6 +61,14 @@ defmodule Magus.Skills do
       rpc_action :my_skill_trusts, :my_trusts
       rpc_action :trust_skill, :create
       rpc_action :untrust_skill, :destroy
+    end
+
+    # `value` is not public, so the my_sandbox_secrets list action never exposes it.
+    resource Magus.Skills.SandboxSecret do
+      rpc_action :my_sandbox_secrets, :my_secrets
+      rpc_action :create_sandbox_secret, :create
+      rpc_action :update_sandbox_secret, :update
+      rpc_action :destroy_sandbox_secret, :destroy
     end
   end
 
@@ -79,6 +103,13 @@ defmodule Magus.Skills do
       define :trust_skill, action: :create
       define :untrust_skill, action: :destroy
       define :my_skill_trusts, action: :my_trusts
+    end
+
+    resource Magus.Skills.SandboxSecret do
+      define :create_sandbox_secret, action: :create
+      define :update_sandbox_secret, action: :update
+      define :destroy_sandbox_secret, action: :destroy
+      define :my_sandbox_secrets, action: :my_secrets
     end
   end
 end
