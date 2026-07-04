@@ -40,7 +40,15 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
       end
 
     agent_slash_commands = get_agent_slash_commands(conversation)
-    actor = load_actor(conversation)
+
+    # The member who sent the triggering message (owner fallback for autonomous
+    # turns) is the actor for BOTH slash-skill visibility below AND, further down,
+    # the credential actor for model resolution + the spend-gate subject (magus-k3at).
+    # Compute once and reuse. In a shared conversation a non-owner member must
+    # resolve their OWN personal skills, so slash resolution uses this member, not
+    # the conversation owner.
+    acting_user_id = Helpers.acting_user_id(agent, message_id)
+    actor = load_actor(acting_user_id, conversation)
 
     text =
       case SlashCommands.resolve(raw_text, agent_slash_commands,
@@ -83,11 +91,10 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
       video: raw_model_keys[:video] == :auto
     }
 
-    # The member who sent the triggering message (owner fallback for autonomous
-    # turns) is both the credential actor for model resolution (scopes owned-model
-    # visibility) and the spend-gate subject below (magus-k3at). Compute once.
-    acting_user_id = Helpers.acting_user_id(agent, message_id)
-
+    # `acting_user_id` (the triggering member, owner fallback) is computed above
+    # for slash-skill visibility and reused here as the credential actor for model
+    # resolution (scopes owned-model visibility) and the spend-gate subject
+    # (magus-k3at).
     {:ok, resolution} =
       Resolver.resolve(acting_user_id, %{
         model_keys: model_keys,
@@ -870,14 +877,31 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
     )
   end
 
-  defp load_actor(nil), do: nil
+  defp load_actor(acting_user_id, conversation),
+    do: resolve_slash_actor(acting_user_id, conversation)
 
-  defp load_actor(conversation) do
-    case Magus.Accounts.get_user(conversation.user_id, authorize?: false) do
+  @doc false
+  # Resolve the actor for explicit slash-skill visibility. Prefers the triggering
+  # member (`acting_user_id`) so a non-owner in a shared conversation resolves
+  # their OWN personal skills; falls back to the conversation owner when the
+  # member is absent (autonomous turns) or fails to load, else nil. Extracted as a
+  # public function so the member-vs-owner precedence is unit-testable.
+  def resolve_slash_actor(acting_user_id, conversation) do
+    load_user(acting_user_id) || load_conversation_owner(conversation)
+  end
+
+  defp load_user(nil), do: nil
+
+  defp load_user(user_id) do
+    case Magus.Accounts.get_user(user_id, authorize?: false) do
       {:ok, user} -> user
       _ -> nil
     end
   end
+
+  defp load_conversation_owner(nil), do: nil
+  defp load_conversation_owner(%{user_id: owner_id}), do: load_user(owner_id)
+  defp load_conversation_owner(_), do: nil
 
   # ---------------------------------------------------------------------------
   # Provider routing helpers
