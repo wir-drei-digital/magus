@@ -236,5 +236,81 @@ defmodule Magus.Knowledge.KnowledgeCollectionTest do
       {:ok, reloaded} = Magus.Knowledge.get_source(source.id, actor: user)
       assert reloaded.needs_reauth == true
     end
+
+    test "a reactive 401 refresh during full sync merges the refreshed token, preserving expires_at",
+         %{bypass: token_bypass} do
+      drive_bypass = Bypass.open()
+      prev_drive_base = Application.get_env(:magus, :google_drive_base_url)
+      Application.put_env(:magus, :google_drive_base_url, "http://localhost:#{drive_bypass.port}")
+      on_exit(fn -> Application.put_env(:magus, :google_drive_base_url, prev_drive_base) end)
+
+      user = generate(user())
+      # Not-yet-expiring, so TokenManager.ensure_fresh/1 skips its proactive
+      # refresh and the reactive 401-refresh path in the connector is what
+      # gets exercised (and what must persist expires_at correctly).
+      not_expiring = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.to_iso8601()
+
+      {:ok, source} =
+        Magus.Knowledge.create_source(
+          %{
+            name: "GD",
+            provider: :google_drive,
+            auth_config: %{
+              "access_token" => "stale-access-token",
+              "refresh_token" => "still-good-refresh-token",
+              "expires_at" => not_expiring,
+              "some_other_key" => "keep-me"
+            }
+          },
+          actor: user
+        )
+
+      {:ok, source} =
+        Magus.Knowledge.update_source_status(source, %{status: :active}, actor: user)
+
+      {:ok, collection} =
+        Magus.Knowledge.create_collection(
+          source.id,
+          %{name: "Folder", external_id: "root", external_path: "/root"},
+          actor: user
+        )
+
+      counter = start_supervised!({Agent, fn -> 0 end})
+
+      Bypass.expect(drive_bypass, "GET", "/files", fn conn ->
+        case Agent.get_and_update(counter, &{&1, &1 + 1}) do
+          0 ->
+            Plug.Conn.resp(conn, 401, "{}")
+
+          _ ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/json")
+            |> Plug.Conn.resp(200, Jason.encode!(%{"files" => []}))
+        end
+      end)
+
+      Bypass.expect_once(token_bypass, "POST", "/token", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(
+          200,
+          Jason.encode!(%{
+            "access_token" => "fresh-access-token",
+            "refresh_token" => "still-good-refresh-token",
+            "expires_in" => 3600
+          })
+        )
+      end)
+
+      Magus.Knowledge.KnowledgeCollection.Changes.FullSync.do_full_sync(collection)
+
+      {:ok, reloaded} = Magus.Knowledge.get_source(source.id, actor: user)
+
+      assert reloaded.auth_config["access_token"] == "fresh-access-token"
+      assert is_binary(reloaded.auth_config["expires_at"])
+      assert reloaded.auth_config["expires_at"] != not_expiring
+      # Merge (not replace) must keep keys the reactive refresh never touched.
+      assert reloaded.auth_config["some_other_key"] == "keep-me"
+    end
   end
 end

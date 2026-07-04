@@ -81,5 +81,56 @@ defmodule Magus.Knowledge.Connectors.GoogleDriveTest do
                  "folders" => ["root"]
                })
     end
+
+    test "successful reactive refresh caches expires_at alongside the new token", %{
+      drive: drive,
+      token: token
+    } do
+      counter = start_supervised!({Agent, fn -> 0 end})
+
+      Bypass.expect(drive, "GET", "/files", fn conn ->
+        case Agent.get_and_update(counter, &{&1, &1 + 1}) do
+          0 ->
+            Plug.Conn.resp(conn, 401, "{}")
+
+          _ ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/json")
+            |> Plug.Conn.resp(200, Jason.encode!(%{"files" => []}))
+        end
+      end)
+
+      Bypass.expect_once(token, "POST", "/token", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(
+          200,
+          Jason.encode!(%{
+            "access_token" => "new-access-token",
+            "refresh_token" => "new-refresh-token",
+            "expires_in" => 3600
+          })
+        )
+      end)
+
+      {:ok, conn} =
+        GoogleDrive.connect(%{
+          "access_token" => "expired",
+          "refresh_token" => "old-refresh-token"
+        })
+
+      assert {:ok, _folders} = GoogleDrive.list_folders(conn, nil)
+
+      # RED before fix: refreshed_auth_config/1 only returned access_token and
+      # refresh_token, dropping expires_at (asymmetric with TokenManager's
+      # proactive persist path, which does carry expires_at). That silently
+      # disables the proactive-refresh schedule for the source (see
+      # TokenManager.expiring_soon?, which treats nil expires_at as "not
+      # expiring").
+      refreshed = GoogleDrive.refreshed_auth_config(conn)
+      assert %{"access_token" => "new-access-token"} = refreshed
+      assert is_binary(refreshed["expires_at"])
+      assert refreshed["expires_at"] != ""
+    end
   end
 end
