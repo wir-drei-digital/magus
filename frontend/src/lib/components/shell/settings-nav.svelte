@@ -3,6 +3,7 @@
 	import { base } from '$app/paths';
 	import {
 		Boxes,
+		Brain,
 		Building2,
 		CreditCard,
 		Database,
@@ -22,6 +23,7 @@
 		{ id: 'profile', label: 'Profile', icon: User },
 		{ id: 'preferences', label: 'Preferences', icon: SlidersHorizontal },
 		{ id: 'models', label: 'Models', icon: Boxes },
+		{ id: 'memory', label: 'Memory', icon: Brain },
 		{ id: 'organization', label: 'Organization', icon: Building2 },
 		{ id: 'providers', label: 'Providers', icon: Key },
 		{ id: 'subscription', label: 'Subscription', icon: CreditCard },
