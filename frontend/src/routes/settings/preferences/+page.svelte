@@ -3,72 +3,19 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Section as SettingsSection, CONTROL_CLASS } from '$lib/components/crud';
 	import ToggleSwitch from '$lib/components/crud/toggle-switch.svelte';
-	import { confirmAction } from '$lib/stores/confirm.svelte';
 	import {
-		grantDataRegionConsent,
 		listActiveModels,
 		listImageGenerationModels,
 		listVideoGenerationModels,
 		selectDefaultImageModel,
 		selectDefaultModel,
 		selectDefaultVideoModel,
-		updateDataRegionPreference,
 		updateTimezone,
 		userSettings,
 		type ModelSummary,
 		type UserSettings
 	} from '$lib/ash/api';
 	import { session } from '$lib/stores/session.svelte';
-
-	// Mirrors config/config.exs :magus :regions. Consent-gated regions record a
-	// timestamp before they can be enabled.
-	const DATA_REGIONS = [
-		{ code: 'US', label: 'United States', consent: false },
-		{ code: 'EU', label: 'Europe', consent: false },
-		{ code: 'CH', label: 'Switzerland', consent: false },
-		{ code: 'CN', label: 'China', consent: true },
-		{ code: 'SG', label: 'Singapore', consent: true }
-	];
-
-	const enabledRegions = $derived(session.user?.dataRegionPreference ?? []);
-	const regionConsents = $derived(session.user?.dataRegionConsents ?? {});
-	let regionBusy = $state(false);
-	let regionError = $state<string | null>(null);
-
-	async function toggleRegion(code: string, enable: boolean) {
-		const userId = session.user?.id;
-		if (!userId || regionBusy) return;
-		regionBusy = true;
-		regionError = null;
-
-		const region = DATA_REGIONS.find((entry) => entry.code === code);
-		let result;
-		if (enable && region?.consent && !regionConsents[code]) {
-			const ok = await confirmAction({
-				title: `Enable ${region.label}?`,
-				description: 'This consents to processing your data in that region.',
-				confirmLabel: 'Enable',
-				destructive: false
-			});
-			if (!ok) {
-				regionBusy = false;
-				return;
-			}
-			result = await grantDataRegionConsent(userId, code);
-		} else {
-			const next = enable
-				? [...enabledRegions, code]
-				: enabledRegions.filter((entry) => entry !== code);
-			result = await updateDataRegionPreference(userId, next);
-		}
-
-		regionBusy = false;
-		if (result.success) {
-			await session.load();
-		} else {
-			regionError = result.errors[0]?.message ?? 'Could not update data regions';
-		}
-	}
 
 	const FIELD = CONTROL_CLASS;
 	const TZ_LOCK_DAYS = 30;
@@ -284,34 +231,6 @@
 						onchange={(next) => void session.setUiPreference('tabs_enabled', next)}
 					/>
 				</div>
-			</div>
-		</SettingsSection>
-
-		<SettingsSection
-			title="Data region"
-			description="Regions your data may be processed in for model routing. At least one is required."
-		>
-			{#if regionError}
-				<p class="mb-2 text-xs text-destructive" data-testid="data-region-error">{regionError}</p>
-			{/if}
-			<div class="divide-y">
-				{#each DATA_REGIONS as region (region.code)}
-					<div class="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-						<div class="pr-4">
-							<p class="text-sm font-medium">{region.label}</p>
-							<p class="text-xs text-muted-foreground">
-								{region.code}{#if region.consent}
-									· requires consent{/if}
-							</p>
-						</div>
-						<ToggleSwitch
-							checked={enabledRegions.includes(region.code)}
-							label={region.label}
-							testid="data-region-{region.code}"
-							onchange={(next) => void toggleRegion(region.code, next)}
-						/>
-					</div>
-				{/each}
 			</div>
 		</SettingsSection>
 	</div>
