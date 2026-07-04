@@ -1888,6 +1888,7 @@ defmodule Mix.Tasks.SuperBrain.BackfillClaims do
 
   @workers %{
     brain_page: Magus.SuperBrain.Workers.ExtractBrainPage,
+    brain_source: Magus.SuperBrain.Workers.ExtractBrainSource,
     memory: Magus.SuperBrain.Workers.ExtractMemory,
     file_chunk: Magus.SuperBrain.Workers.ExtractFileChunk,
     draft: Magus.SuperBrain.Workers.ExtractDraft
