@@ -23,7 +23,7 @@ defmodule Magus.Memory do
   """
   # Intentionally raw SQL: this must NOT run through the :set/:deactivate
   # actions, which would create a MemoryVersion, broadcast PubSub, and bump
-  # lock_version on every ambient retrieval.
+  # lock_version on every semantic-retrieval and search-tool touch.
   def touch_accessed(memory_ids) when is_list(memory_ids) and memory_ids != [] do
     Magus.Repo.query!(
       "UPDATE memories SET last_accessed_at = $1 WHERE id = ANY($2::uuid[])",
