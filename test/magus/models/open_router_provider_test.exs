@@ -3,6 +3,14 @@ defmodule Magus.Models.OpenRouterProviderTest do
 
   alias Magus.Models
 
+  # The seed migration commits US/EU/CH provider rows into the shared test DB.
+  # Clear them (transaction-local, rolled back) so these tests see only the
+  # rows they create themselves.
+  setup do
+    Magus.DataCase.clear_open_router_providers!()
+    :ok
+  end
+
   # These interfaces are gated by `Magus.Checks.IsAdmin` and the Models domain
   # authorizes by default, so actor-less calls would be forbidden. The real
   # callers are the sync path (`authorize?: false`) and the admin UI (passes an
