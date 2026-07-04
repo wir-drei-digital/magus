@@ -1,0 +1,306 @@
+# Super Brain Phase 3: Temporal ranking (supersedence, validity, recency)
+
+Date: 2026-07-04
+Status: Approved (design)
+Scope: Third slice of the "super graph" upgrade roadmap. Makes claim
+retrieval time-aware: the latest claim on a functional attribute wins
+(supersedence), expired claims drop out (validity windows), and recency
+gently breaks ties. Answers "what is the latest on X" and preserves the
+history.
+
+## Context
+
+Phase 2 (Claims v1, merged) made claims the first-class knowledge unit and
+deliberately stored `asserted_at`, `valid_from`, and `valid_to` "for the
+temporal phase," but the retrieval ranker never uses them: `retrieval.ex`
+still stubs `latest_evidence_at: DateTime.utc_now()` with the comment
+"temporal recency is deferred," and `search_claims/2` ranks purely on
+`vector_similarity x trust_tier`. So two claims that state different values
+for the same fact ("Aurora ships Q3", later "Aurora ships Q4") both surface,
+ranked only by text similarity to the query, with no notion that the second
+supersedes the first.
+
+The Claims v1 eval encodes this exactly: the `temporal` case is a known-gap
+xfail where the query embedding sits nearest the STALE claim (Q3) while the
+gold answer is the current claim (Q4). It fails today by construction and is
+the ready-made success signal for this phase.
+
+The roadmap originally named identity resolution as Phase 3, but that was
+reconsidered: its sizing metric (`ambiguous_bucket_count`) needs real graph
+data to be meaningful, and `super_brain_enabled` is `false` (no production
+corpus), so identity resolution would be a large speculative build against
+unmeasured need. Temporal ranking instead builds directly on fields Claims
+v1 already stores, flips a measurable eval xfail, and is lower risk.
+
+### Key insight: supersedence is accessor-relative
+
+"Aurora ships Q4" in a user's personal draft supersedes "Aurora ships Q3" in
+a shared brain FOR THAT USER, but a teammate who cannot read the draft should
+still see Q3 as current. So "is this claim superseded" is not a global
+property of the claim: it depends on which claims the reader can access. A
+single global `superseded_by_id` column would be wrong in shared-workspace
+cases, and per-accessor materialized supersedence would be as heavy as the L2
+super graph. This drove the storage decision below.
+
+## Decisions
+
+1. **Approach A: query-time resolution.** Supersedence, validity, and
+   recency are computed at query time from only the claims the accessor can
+   see. No schema change, no `superseded_by_id`, no background pass. Correct
+   per-accessor by construction. Materialized supersedence (approach B) stays
+   available later as a pure performance optimization if telemetry shows query
+   cost.
+2. **Full temporal scope:** supersedence + validity windows + recency, not a
+   subset. Supersedence is the piece that flips the xfail and delivers
+   current-state retrieval.
+3. **A pure `Magus.SuperBrain.Temporal` module** holds the logic (functions
+   over a claim list, `now` injected), mirroring the `EdgeAggregation` /
+   `Dossier` purity pattern. Retrieval, context, and dossier consume it.
+
+## Goals
+
+- `search_claims` returns current claims, ranked with recency; superseded and
+  expired claims are excluded from the default result but fetchable for
+  history.
+- The `<super_brain>` context block shows current facts and collapses a
+  superseded fact to a compact trailer (`Aurora ships Q4 (was: Q3)`).
+- `get_dossier` shows the current value per group plus a short history trail.
+- The `temporal` eval xfail flips to a supported, passing case.
+- New eval cases cover expired-validity, multi-valued non-supersedence, and
+  accessor-relativity.
+
+## Non-goals (this phase)
+
+Materialized supersedence / a `superseded_by_id` column (deferred; approach B
+stays a pure perf option). Identity resolution / alias fusion. The
+contradiction inbox / proactive surfacing. `updates`-predicate-driven or
+source-derived `asserted_at` refinement (the episode `extracted_at` proxy is
+kept). Any UI beyond the context-block and dossier text. Temporal logic on
+the entity super-graph path (`score_canonicals`); temporal lives on the claim
+layer.
+
+## Success criteria
+
+- `mix test` deterministic eval: the `temporal` case is `supported: true` and
+  passes at recall 1.0 (current-state retrieval returns Q4 for a query nearest
+  the stale Q3).
+- New deterministic cases pass: expired claim excluded from current; a
+  multi-valued predicate is not superseded (both objects current); a
+  superseding claim in an inaccessible graph does not supersede for the other
+  accessor.
+- The live `:e2e_live` eval adds one real-embedding temporal case that passes.
+- `Temporal` has pure unit tests for each rule.
+- Full `test/magus/super_brain/` suite stays green; no schema migration.
+
+## Architecture
+
+### The pure module: `Magus.SuperBrain.Temporal`
+
+```
+Temporal.resolve(claims :: [Claim.t()], now: DateTime.t()) ::
+  %{current: [%{claim: Claim.t(), score_factors: %{recency: float}}],
+    historic: [%{claim: Claim.t(), reason: :superseded | :expired | :future}]}
+```
+
+Pure: `now` is injected (never `DateTime.utc_now()` inside the module) so the
+eval can pin time and the functions stay deterministic. Input is a set of
+accessible claims (the caller has already applied the graph allow-list). The
+module never does I/O.
+
+Resolution order:
+
+1. **Validity partition.** A claim is `:expired` when `valid_to != nil and
+   valid_to < now`; `:future` when `valid_from != nil and valid_from > now`;
+   otherwise in-window. Expired and future claims go straight to `historic`
+   with their reason. `valid_from` / `valid_to` are nullable; a claim with
+   neither is always in-window.
+2. **Supersedence** over the in-window claims (see rules below): the winner of
+   each group is `current`, the losers go to `historic` with reason
+   `:superseded`.
+3. **Recency scoring** on the `current` claims (see below).
+
+### Supersedence rules
+
+Claim B supersedes claim A (both in-window, both accessible) when either:
+
+- **Value-change (functional predicates):** `A.subject_key == B.subject_key`
+  AND `A.predicate == B.predicate` AND `B.predicate in
+  Ontology.single_valued_predicates()` AND B is newer. "Newer" is
+  `asserted_at` descending, tie-broken by `valid_from` (nil sorts oldest)
+  then `id`. This covers both a changed object (Q3 -> Q4) and a re-assertion
+  of the same object. It is the rule the `temporal` xfail exercises.
+- **Polarity flip (any predicate):** `A.subject_key == B.subject_key` AND
+  `A.predicate == B.predicate` AND `A.object_key == B.object_key` AND
+  `A.polarity != B.polarity` AND B is newer. A direct affirm-then-negate on
+  the exact same triple is an unambiguous supersedence regardless of
+  predicate.
+
+Grouping keys:
+- Value-change groups by `(subject_key, predicate)`.
+- Polarity-flip groups by `(subject_key, predicate, object_key)`.
+
+A claim not matching either rule against any newer sibling stays `current`.
+Multi-valued facts (e.g. `relates_to`, `mentions`) never supersede by value;
+their objects all stay current and are ordered by recency only.
+
+`Ontology.single_valued_predicates/0` is a new curated set, seeded with
+`occurs_at` (an event or deadline has one time). It is intentionally small and
+conservative: expanding it is an eval-tuned knob, and a wrong inclusion would
+suppress legitimately-coexisting facts, so predicates are added only with a
+supporting eval case. Everything not in the set is multi-valued.
+
+### Recency
+
+Among `current` claims, a gentle exponential decay on `asserted_at` revives
+the decay the legacy fan-out ranker intended (`Retrieval.Ranker`, 90-day
+half-life) but the claim path never had:
+
+```
+recency_factor = 0.5 + 0.5 * :math.exp(-age_days * ln(2) / 90)
+```
+
+Age is `max(0, now - asserted_at)` in days. The factor lives in `[0.5, 1.0]`:
+a nudge, not a cliff, so a slightly older but strongly-matching claim still
+beats a fresh weak one. `asserted_at` is the episode `extracted_at` proxy
+Claims v1 stores; this phase keeps that proxy and documents it as the ordering
+signal.
+
+### The claim score
+
+`search_claims` keeps its existing score shape with one factor added:
+
+```
+score = vector_similarity x trust_tier_multiplier x recency_factor
+```
+
+Superseded and expired claims are excluded from the ranked `current` result
+(not merely down-weighted), so they can never crowd out a current fact, and
+are returned separately only when history is requested.
+
+## Retrieval integration: the recall fix
+
+The pgvector KNN can return a stale claim without its superseder (the fresh
+claim is orthogonal to a query that matches the stale one, exactly the
+`temporal` xfail geometry). So `search_claims/2` resolves current-state in two
+steps:
+
+1. **Candidates:** the existing pgvector KNN over accessible claims
+   (`Claim.top_ids_by_embedding` + `load_claims_in_order`), unchanged.
+2. **Group completion:** collect the `(subject_key, predicate)` pairs (and the
+   `(subject_key, predicate, object_key)` triples for polarity) among the
+   candidates, then one batched read of ALL accessible claims in those groups
+   (`graph_name in ^accessible AND subject_key in ^keys AND predicate in
+   ^preds`, loaded with `:episode`). This surfaces the superseders the KNN
+   missed. It is one extra query per retrieval, batched, and scoped to the
+   same accessor allow-list, so it cannot leak.
+
+Then `Temporal.resolve(candidates ++ completions, now: now)` yields
+`current` / `historic`; `search_claims` returns `current` ranked by score.
+
+`search_claims/2` gains an option `include_historic: false` (default). When
+`true` (the dossier passes this), the result also carries the `historic`
+claims with their reason so callers can render a history trail. The kill
+switch, tier filter, and accessible-graph allow-list are unchanged.
+
+## Surfacing
+
+- **`<super_brain>` context block** (`super_brain_rag_context.ex`): renders
+  `current` claims as today. For a fact whose group has a superseded prior,
+  append a compact trailer built from the historic claim's object:
+  `- "Aurora ships in Q4." (page ..., 2026-06-12) (was: Q3)`. Expired claims
+  are omitted from the block. This stays within the existing per-entity and
+  per-message caps.
+- **`get_dossier`** (`dossier.ex` + `get_dossier.ex`): each group shows the
+  current value plus a short history trail, e.g. `occurs_at Q4 (current);
+  history: Q3 [superseded]`. Expired facts are labeled `[expired]`. The pure
+  `Dossier` module gains the current-vs-historic split; `get_dossier` passes
+  `include_historic: true` when fetching claims and threads `now` in.
+
+## Eval
+
+Builds on the Claims v1 eval framework.
+
+- **Flip the `temporal` xfail** in `priv/eval/super_brain_retrieval/cases.json`
+  from `supported: false` to `supported: true`. The fixture is unchanged
+  (Aurora `occurs_at` Q3 asserted earlier, Q4 asserted later, query nearest
+  Q3, `k: 1`); it now passes because `occurs_at` is single-valued and Q4
+  supersedes Q3, so current-state retrieval returns Q4. This is the conscious
+  promotion the Phase 1 eval was built to force.
+- **New supported deterministic cases** (both subjects unless noted):
+  - `temporal_expired`: a claim with `valid_to` in the past is excluded from
+    current; the in-window claim is returned.
+  - `temporal_multivalued`: two `relates_to` claims (multi-valued) with
+    different objects are BOTH current (no false supersedence).
+  - `temporal_accessor` (deterministic only): a superseding claim seeded in a
+    graph NOT in the accessor's allow-list does not supersede the older
+    accessible claim, so the older one stays current. This pins the
+    accessor-relativity property that justified approach A.
+- The deterministic subject seeds these with authored `asserted_at` /
+  `valid_from` / `valid_to` and passes a fixed `now` through to
+  `Temporal.resolve`. The eval `Fixture` gains `asserted_at` / `valid_from` /
+  `valid_to` / `now` fields; the benchmark forwards `now`.
+- The live subject adds one real-embedding temporal case behind `:e2e_live`.
+- `Temporal` gets direct pure unit tests (each supersedence rule, validity
+  partition, recency monotonicity, tie-breaking, empty input).
+
+### Deterministic `now` threading
+
+The deterministic eval must pin `now` so recency and validity are
+reproducible. `now` rides in the case (a fixed ISO timestamp), the benchmark
+forwards it into the subject `ctx`, and the subject passes it to
+`search_claims` (which passes it to `Temporal.resolve`). `search_claims` gains
+an optional `:now` (default `DateTime.utc_now()` in production, pinned in the
+eval). This keeps production behavior unchanged while making the eval
+deterministic, and keeps `Temporal` pure.
+
+## Testing strategy
+
+- `Magus.SuperBrain.Temporal`: pure unit tests for validity partition,
+  value-change supersedence (single-valued only), polarity-flip supersedence,
+  recency decay bounds and monotonicity, tie-breaking, and the
+  current/historic split.
+- `search_claims/2`: the two-step group-completion fetch returns the
+  superseder even when the KNN did not; accessor allow-list still isolates;
+  `include_historic` toggles the historic payload. FK-safe seeding (real user
+  + episode, per the Claims v1 conventions).
+- Context block: superseded trailer renders, expired omitted, caps hold.
+- Dossier: current-vs-historic split and the history trail render.
+- Eval: the flipped `temporal` case plus the three new cases pass
+  deterministically; the regression test asserts the supported aggregate
+  stays 1.0 with `temporal` now in the supported set. Live case behind
+  `:e2e_live`.
+- Full `test/magus/super_brain/` suite green; no migration.
+
+## Risks and mitigations
+
+- **Single-valued set is a correctness knob.** A wrong inclusion suppresses
+  coexisting facts. Mitigation: seed with only `occurs_at`, require an eval
+  case for each addition, and default everything else to multi-valued.
+- **Group-completion query cost.** One extra batched read per retrieval on the
+  per-turn hot path. Mitigation: it is a single read narrowed by the indexed
+  `graph_name` and `subject_key` columns (predicate is filtered in-row, not
+  indexed) and scoped to the retrieved groups; if telemetry shows cost,
+  approach B (materialization) is the escalation, out of scope now.
+- **`asserted_at` is a proxy** (episode `extracted_at`), so re-extraction of
+  old content stamps it "now" and can reorder history. Mitigation: documented;
+  source-derived timestamps are a later refinement; supersedence still
+  prefers the most-recently-extracted statement, which is the correct default
+  for "what does the system currently believe."
+- **Accessor-relativity is the load-bearing property.** Mitigation: the
+  `temporal_accessor` eval case pins it, and query-time resolution over the
+  allow-list-filtered set makes it correct by construction.
+
+## Build sequence (for the implementation plan)
+
+1. `Ontology.single_valued_predicates/0` (seed `occurs_at`) + `Magus.SuperBrain.Temporal`
+   pure module + unit tests.
+2. `search_claims/2`: two-step group-completion fetch, `Temporal.resolve`
+   integration, `:now` and `:include_historic` options + tests.
+3. Context block superseded-trailer + expired omission + tests.
+4. `Dossier` current-vs-historic split + `get_dossier` history trail + tests.
+5. Eval: `Fixture` temporal fields + `now` threading; flip the `temporal`
+   xfail; add `temporal_expired` / `temporal_multivalued` / `temporal_accessor`;
+   deterministic subject seeds them; regression test update.
+6. Live subject temporal case (`:e2e_live`).
+7. Docs: update `docs/system/15-super-brain.md` (temporal ranking, the
+   Temporal module, current-vs-historic surfacing).
