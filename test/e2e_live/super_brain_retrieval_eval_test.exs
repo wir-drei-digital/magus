@@ -22,5 +22,15 @@ defmodule Magus.SuperBrainRetrievalEvalE2ETest do
 
     assert is_number(run.aggregate)
     assert run.scoreboard_path && File.exists?(run.scoreboard_path)
+
+    claim_case = Enum.find(run.per_case, &(&1.category == "claim_recall"))
+
+    assert claim_case,
+           "expected a claim_recall case in the live run (cases.json subjects must include \"live\")"
+
+    assert claim_case.recall_at_k == 1.0,
+           "claim_recall graded at #{claim_case.recall_at_k}, expected 1.0 with real embeddings"
+
+    assert run.aggregate == 1.0
   end
 end
