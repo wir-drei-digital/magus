@@ -30,6 +30,7 @@
 		{ id: 'mcp-servers', label: 'MCP Servers', icon: Server },
 		{ id: 'storage', label: 'Storage', icon: Database },
 		{ id: 'api-tokens', label: 'API tokens', icon: KeyRound },
+		{ id: 'sandbox-secrets', label: 'Sandbox secrets', icon: KeyRound },
 		{ id: 'data', label: 'Data', icon: Shield }
 	];
 

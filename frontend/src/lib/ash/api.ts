@@ -360,6 +360,54 @@ export function revokeApiToken(id: string): Promise<RpcResult<{ id: string }>> {
 	return controllerFetch(`/rpc/api-tokens/${id}`, { method: 'DELETE' });
 }
 
+// ─── Sandbox secrets (settings) ──────────────────────────────────────────────
+
+/**
+ * One entry in the per-user sandbox secret vault. The `value` is write-only:
+ * the server never returns the plaintext, so it is absent from this type and
+ * from `SANDBOX_SECRET_FIELDS`. Only the key (and optional description) is
+ * listable; the value is injected into a skill's sandbox server-side only.
+ */
+export type SandboxSecretEntry = {
+	id: string;
+	key: string;
+	description: string | null;
+	insertedAt: string;
+};
+
+// Never include `value` here: it is write-only and not a readable field.
+const SANDBOX_SECRET_FIELDS: rpc.MySandboxSecretsFields = [
+	'id',
+	'key',
+	'description',
+	'insertedAt'
+];
+
+export function mySandboxSecrets(): Promise<RpcResult<SandboxSecretEntry[]>> {
+	return run((opts) => rpc.mySandboxSecrets({ fields: SANDBOX_SECRET_FIELDS, ...opts }));
+}
+
+export function createSandboxSecret(input: {
+	key: string;
+	value: string;
+	description?: string;
+}): Promise<RpcResult<SandboxSecretEntry>> {
+	return run((opts) => rpc.createSandboxSecret({ input, fields: SANDBOX_SECRET_FIELDS, ...opts }));
+}
+
+export function updateSandboxSecret(
+	id: string,
+	input: { value: string; description?: string }
+): Promise<RpcResult<SandboxSecretEntry>> {
+	return run((opts) =>
+		rpc.updateSandboxSecret({ identity: id, input, fields: SANDBOX_SECRET_FIELDS, ...opts })
+	);
+}
+
+export function destroySandboxSecret(id: string): Promise<RpcResult<Record<string, never>>> {
+	return run((opts) => rpc.destroySandboxSecret({ identity: id, ...opts }));
+}
+
 // ─── MCP registry discovery (settings) ───────────────────────────────────────
 
 /** A required header declared by a registry entry's remote (for the connect form). */

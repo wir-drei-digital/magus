@@ -17,6 +17,7 @@
 		knowledge: 'Knowledge',
 		storage: 'Storage',
 		'api-tokens': 'API tokens',
+		'sandbox-secrets': 'Sandbox secrets',
 		data: 'Data'
 	};
 	const sectionLabel = $derived(
