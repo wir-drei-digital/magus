@@ -1,5 +1,7 @@
 defmodule Magus.Agents.Actions.BuildMemoryContextTest do
-  use Magus.ResourceCase, async: true
+  # async: false because the "profile injection" tests toggle global app config
+  # for the :memory_profile_enabled flag.
+  use Magus.ResourceCase, async: false
 
   alias Magus.Agents.Actions.BuildMemoryContext
 
@@ -32,5 +34,75 @@ defmodule Magus.Agents.Actions.BuildMemoryContextTest do
 
     {:ok, reloaded} = Magus.Memory.get_memory(memory.id, actor: user)
     assert is_nil(reloaded.last_accessed_at)
+  end
+
+  describe "profile injection" do
+    setup do
+      Application.put_env(:magus, :memory_profile_enabled, true)
+      on_exit(fn -> Application.delete_env(:magus, :memory_profile_enabled) end)
+      :ok
+    end
+
+    test "injects the profile document and drops the global key-memory layer" do
+      user = generate(user())
+      conv = generate(conversation(actor: user))
+      ai = %Magus.Agents.Support.AiAgent{}
+
+      {:ok, _} =
+        Magus.Memory.create_user_memory(
+          user.id,
+          nil,
+          "Global Key Memory",
+          %{content: %{}, summary: "Would be injected by recency"},
+          actor: ai
+        )
+
+      {:ok, _} =
+        Magus.Memory.create_user_profile(
+          user.id,
+          nil,
+          %{document: "## Preferences\nConcise answers, Elixir stack."},
+          actor: ai
+        )
+
+      {:ok, context} =
+        Magus.Agents.Actions.BuildMemoryContext.build(%{
+          user_id: to_string(user.id),
+          conversation_id: to_string(conv.id),
+          query_text: "",
+          global_enabled: true
+        })
+
+      assert context.profile_document =~ "Concise answers"
+      assert context.formatted =~ "### User Profile"
+      assert context.formatted =~ "Concise answers"
+      refute Enum.any?(context.important, &(&1.display_scope == :user))
+    end
+
+    test "falls back to global key memories when no profile exists" do
+      user = generate(user())
+      conv = generate(conversation(actor: user))
+      ai = %Magus.Agents.Support.AiAgent{}
+
+      {:ok, _} =
+        Magus.Memory.create_user_memory(
+          user.id,
+          nil,
+          "Global Key Memory",
+          %{content: %{}, summary: "Injected by recency"},
+          actor: ai
+        )
+
+      {:ok, context} =
+        Magus.Agents.Actions.BuildMemoryContext.build(%{
+          user_id: to_string(user.id),
+          conversation_id: to_string(conv.id),
+          query_text: "",
+          global_enabled: true
+        })
+
+      assert is_nil(context.profile_document)
+      assert Enum.any?(context.important, &(&1.display_scope == :user))
+    end
   end
 end
