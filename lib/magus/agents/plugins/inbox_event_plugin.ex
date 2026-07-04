@@ -228,11 +228,21 @@ defmodule Magus.Agents.Plugins.InboxEventPlugin do
   # the only way approval is recorded, so the agent cannot self-approve.
   defp maybe_record_skill_approval("Approve skill: " <> skill_id, conversation_id, user_id)
        when is_binary(conversation_id) do
+    skill_id = String.trim(skill_id)
+
     with {:ok, user} when not is_nil(user) <- Magus.Accounts.get_user(user_id, authorize?: false),
-         {:ok, conversation} <- Magus.Chat.get_conversation(conversation_id, actor: user),
+         {:ok, _conversation} <- Magus.Chat.get_conversation(conversation_id, actor: user),
+         {:ok, skill} <- Magus.Skills.get_skill(skill_id, actor: user),
          {:ok, _} <-
-           Magus.Chat.record_skill_approval(conversation, %{skill_id: String.trim(skill_id)},
-             actor: user
+           Magus.Skills.record_conversation_approval(
+             %{
+               conversation_id: conversation_id,
+               skill_id: skill_id,
+               bundle_sha: skill.bundle_sha,
+               approved_by_id: user.id,
+               source: :approval_card
+             },
+             authorize?: false
            ) do
       :ok
     else

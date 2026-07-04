@@ -128,7 +128,7 @@ defmodule Magus.Agents.Tools.Skills.LoadSkill do
     # authorize?: false: internal read of the current conversation to check approval state
     case Magus.Chat.get_conversation(conversation_id, authorize?: false) do
       {:ok, conversation} ->
-        if Magus.Skills.Approval.approved?(conversation, skill.id) do
+        if Magus.Skills.Approval.approved?(conversation, skill) do
           case Magus.Skills.Materializer.materialize(conversation_id, skill, user_id) do
             {:ok, dir} ->
               enriched =

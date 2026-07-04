@@ -63,5 +63,10 @@ defmodule Magus.Skills do
       define :unfavorite_skill, action: :destroy
       define :my_skill_favorites, action: :my_favorites
     end
+
+    resource Magus.Skills.ConversationSkillApproval do
+      define :record_conversation_approval, action: :record
+      define :list_conversation_approvals, action: :for_conversation, args: [:conversation_id]
+    end
   end
 end
