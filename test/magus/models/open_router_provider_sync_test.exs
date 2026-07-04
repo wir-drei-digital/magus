@@ -4,6 +4,14 @@ defmodule Magus.Models.OpenRouterProviderSyncTest do
   alias Magus.Models
   alias Magus.Models.OpenRouterProviderSync
 
+  # The seed migration commits allowed US/EU/CH provider rows into the shared
+  # test DB. Clear them (transaction-local) so this file's exact-list and
+  # allowed-flag assertions observe only what each test stubs.
+  setup do
+    Magus.DataCase.clear_open_router_providers!()
+    :ok
+  end
+
   defp stub(payload) do
     Req.Test.stub(OpenRouterProviderSync, fn conn ->
       Req.Test.json(conn, payload)
