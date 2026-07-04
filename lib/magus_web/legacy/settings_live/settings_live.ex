@@ -52,11 +52,6 @@ defmodule MagusWeb.SettingsLive do
     |> assign_profile_form(user)
     |> assign_email_form()
     |> assign_password_form()
-    |> assign(:data_regions, Magus.Providers.Registry.all_regions())
-    |> assign(:data_region_preference, user.data_region_preference || ["US", "EU", "CH"])
-    |> assign(:data_region_consents, user.data_region_consents || %{})
-    |> assign(:show_region_consent_modal, false)
-    |> assign(:pending_consent_region, nil)
     |> assign(:show_avatar_gen, false)
     |> assign(:profile_gen_ref, nil)
     |> allow_upload(:avatar,
@@ -451,86 +446,6 @@ defmodule MagusWeb.SettingsLive do
      )}
   end
 
-  # -- Events: Data Regions --
-
-  @impl true
-  def handle_event("toggle_data_region", %{"region" => region}, socket) do
-    user = socket.assigns.user
-    current = socket.assigns.data_region_preference
-
-    if region in current do
-      new_regions = List.delete(current, region)
-
-      if new_regions == [] do
-        {:noreply,
-         put_flash(socket, :error, gettext("You must keep at least one data region enabled."))}
-      else
-        case Magus.Accounts.update_data_region_preference(user, new_regions, actor: user) do
-          {:ok, updated_user} ->
-            {:noreply,
-             socket
-             |> assign(:user, updated_user)
-             |> assign(:data_region_preference, updated_user.data_region_preference)}
-
-          {:error, _} ->
-            {:noreply, put_flash(socket, :error, gettext("Could not update data regions."))}
-        end
-      end
-    else
-      if Magus.Providers.Registry.requires_consent?(region) and
-           not Map.has_key?(socket.assigns.data_region_consents, region) do
-        {:noreply,
-         socket
-         |> assign(:show_region_consent_modal, true)
-         |> assign(:pending_consent_region, region)}
-      else
-        new_regions = current ++ [region]
-
-        case Magus.Accounts.update_data_region_preference(user, new_regions, actor: user) do
-          {:ok, updated_user} ->
-            {:noreply,
-             socket
-             |> assign(:user, updated_user)
-             |> assign(:data_region_preference, updated_user.data_region_preference)}
-
-          {:error, _} ->
-            {:noreply, put_flash(socket, :error, gettext("Could not update data regions."))}
-        end
-      end
-    end
-  end
-
-  @impl true
-  def handle_event("accept_settings_region_consent", _params, socket) do
-    user = socket.assigns.user
-    region = socket.assigns.pending_consent_region
-
-    case Magus.Accounts.grant_data_region_consent(user, region, actor: user) do
-      {:ok, updated_user} ->
-        {:noreply,
-         socket
-         |> assign(:user, updated_user)
-         |> assign(:data_region_preference, updated_user.data_region_preference)
-         |> assign(:data_region_consents, updated_user.data_region_consents)
-         |> assign(:show_region_consent_modal, false)
-         |> assign(:pending_consent_region, nil)}
-
-      {:error, _} ->
-        {:noreply,
-         socket
-         |> assign(:show_region_consent_modal, false)
-         |> put_flash(:error, gettext("Could not grant consent."))}
-    end
-  end
-
-  @impl true
-  def handle_event("dismiss_settings_region_consent", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_region_consent_modal, false)
-     |> assign(:pending_consent_region, nil)}
-  end
-
   # -- Events: My Data --
 
   @impl true
@@ -643,12 +558,8 @@ defmodule MagusWeb.SettingsLive do
                   timezone_form={@timezone_form}
                   timezone_locked={@timezone_locked}
                   timezone_days_remaining={@timezone_days_remaining}
-                  data_regions={@data_regions}
-                  data_region_preference={@data_region_preference}
                   autoscroll_enabled={@autoscroll_enabled}
                   tabs_enabled={@tabs_enabled}
-                  show_region_consent_modal={@show_region_consent_modal}
-                  pending_consent_region={@pending_consent_region}
                 />
               <% :storage -> %>
                 <.render_storage_section storage_usage={@storage_usage} />
@@ -800,12 +711,8 @@ defmodule MagusWeb.SettingsLive do
   attr :timezone_form, :any, required: true
   attr :timezone_locked, :boolean, required: true
   attr :timezone_days_remaining, :integer, required: true
-  attr :data_regions, :map, required: true
-  attr :data_region_preference, :list, required: true
   attr :autoscroll_enabled, :boolean, required: true
   attr :tabs_enabled, :boolean, required: true
-  attr :show_region_consent_modal, :boolean, required: true
-  attr :pending_consent_region, :any, required: true
 
   def render_preferences_section(assigns) do
     ~H"""
@@ -869,35 +776,6 @@ defmodule MagusWeb.SettingsLive do
       </.form>
     </.content_card>
 
-    <.content_card title={gettext("Data Regions")} icon="lucide-shield">
-      <div class="space-y-3 max-w-md">
-        <p class="text-sm text-base-content/70">
-          {gettext("Control which server regions can process your AI requests.")}
-        </p>
-        <div class="flex flex-wrap gap-4">
-          <div
-            :for={{code, config} <- Enum.sort_by(@data_regions, fn {code, _} -> code end)}
-            class="flex items-center gap-2 cursor-pointer"
-            phx-click="toggle_data_region"
-            phx-value-region={code}
-          >
-            <input
-              type="checkbox"
-              class="checkbox checkbox-sm checkbox-primary pointer-events-none"
-              checked={code in @data_region_preference}
-            />
-            <span class="text-sm">{config.label}</span>
-            <span
-              :if={config.requires_consent}
-              class="badge badge-warning badge-xs"
-            >
-              {gettext("Consent")}
-            </span>
-          </div>
-        </div>
-      </div>
-    </.content_card>
-
     <.content_card title={gettext("Chat")} icon="lucide-message-square">
       <div class="space-y-6">
         <div class="flex items-center justify-between max-w-md">
@@ -959,40 +837,6 @@ defmodule MagusWeb.SettingsLive do
         />
       </div>
     </.content_card>
-
-    <%!-- Region Consent Modal --%>
-    <div
-      :if={@show_region_consent_modal}
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-    >
-      <div class="bg-base-100 rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
-        <h3 class="text-lg font-semibold mb-3">
-          {gettext("Data Region Consent")}
-        </h3>
-        <p class="text-sm text-base-content/70 mb-4">
-          {gettext(
-            "Models hosted in %{region} may process your data on servers located in that region. By enabling this region, you acknowledge that your conversations may be processed under that region's data protection laws.",
-            region: (@data_regions[@pending_consent_region] || %{})[:label] || @pending_consent_region
-          )}
-        </p>
-        <div class="flex justify-end gap-2">
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            phx-click="dismiss_settings_region_consent"
-          >
-            {gettext("Cancel")}
-          </button>
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            phx-click="accept_settings_region_consent"
-          >
-            {gettext("Accept")}
-          </button>
-        </div>
-      </div>
-    </div>
     """
   end
 
