@@ -58,7 +58,16 @@ defmodule Magus.LiveE2E.SkillsBundledTest do
 
         # Record approval (simulates user clicking "Approve skill: <id>")
         {:ok, _} =
-          Magus.Chat.record_skill_approval(conversation, %{skill_id: skill.id}, actor: user)
+          Magus.Skills.record_conversation_approval(
+            %{
+              conversation_id: conversation.id,
+              skill_id: skill.id,
+              bundle_sha: skill.bundle_sha,
+              approved_by_id: user.id,
+              source: :approval_card
+            },
+            authorize?: false
+          )
 
         # Second load: approved — should materialize into sandbox
         {:ok, r2} = LoadSkill.run(%{skill_name: ref}, ctx)
