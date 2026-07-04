@@ -128,9 +128,7 @@ defmodule Magus.Eval.Benchmarks.ProfileDistill do
     both in the order listed above.
     """
 
-    case LLMClient.llm_client().generate_object(model, prompt, @judge_schema,
-           system_prompt: "You are a strict grader. Judge only from the document text."
-         ) do
+    case judge_generate_with_retry(model, prompt, 1) do
       {:ok, %{object: obj}} ->
         %{
           covered: pad_bools(obj["covered"], length(gold), false),
@@ -160,4 +158,30 @@ defmodule Magus.Eval.Benchmarks.ProfileDistill do
   end
 
   defp pad_bools(_other, expected, fill), do: List.duplicate(fill, expected)
+
+  # Mirror Magus.Eval.Judge's retry: scoring fires a burst of judge calls, and a
+  # transient provider error (rate limit) must not be silently graded worst-case,
+  # which would understate the aggregate. Retry with linear backoff before the
+  # caller falls back to the worst-case grade.
+  @judge_max_attempts 4
+  @judge_retry_base_ms 400
+
+  defp judge_generate_with_retry(model, prompt, attempt) do
+    result =
+      LLMClient.llm_client().generate_object(model, prompt, @judge_schema,
+        system_prompt: "You are a strict grader. Judge only from the document text."
+      )
+
+    case result do
+      {:ok, _} = ok ->
+        ok
+
+      {:error, _reason} when attempt < @judge_max_attempts ->
+        Process.sleep(@judge_retry_base_ms * attempt)
+        judge_generate_with_retry(model, prompt, attempt + 1)
+
+      {:error, _} = err ->
+        err
+    end
+  end
 end
