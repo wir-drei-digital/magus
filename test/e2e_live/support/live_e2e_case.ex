@@ -216,12 +216,13 @@ defmodule Magus.LiveE2ECase do
   # path (to normalize a pre-existing row).
   #
   # Deterministic upstream-provider selection no longer comes from a per-model
-  # pin (:allowed_providers was removed from the Model actions). It now derives
-  # from the global OpenRouter allow-list (Magus.Models.OpenRouterProvider rows
-  # with allowed: true, seeded to include "mistral" for the ministral-3b model)
-  # intersected with OpenRouter's own serving-provider set. That path activates
-  # when Preflight routing switches to build_provider_routing/1 in a later task
-  # of this feature; it is not wired at this commit.
+  # pin (:allowed_providers was removed from the Model actions, so this path no
+  # longer threads it). Preflight is now wired to build_provider_routing/1, which
+  # derives the upstream `only` list from the global OpenRouter allow-list
+  # (Magus.Models.OpenRouterProvider rows with allowed: true, seeded by the
+  # provider migration to include "mistral" for the ministral-3b model),
+  # intersected with the model's serving-provider set. This determinism is
+  # exercised only by bin/test-e2e-live, not by CI.
   defp update_live_model_row(model, provider, llm_metadata) do
     Ash.update!(
       model,
