@@ -24,7 +24,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
   # Tool imports
   alias Magus.Agents.Tools.{DiceRoll, Rag}
   alias Magus.Agents.Tools.Web.{WebFetch, WebSearch}
-  alias Magus.Agents.Tools.Memory.{SearchMemories, SetMemory, ForgetMemory}
+  alias Magus.Agents.Tools.Memory.{SearchMemories, SetMemory, ForgetMemory, UpdateProfile}
 
   alias Magus.Agents.Tools.Integrations.{
     SearchEntries,
@@ -151,6 +151,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
     "search_memories" => SearchMemories,
     "set_memory" => SetMemory,
     "forget_memory" => ForgetMemory,
+    "update_profile" => UpdateProfile,
     "create_job" => CreateJob,
     "update_job" => UpdateJob,
     "list_jobs" => ListJobs,
@@ -214,6 +215,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
     SearchMemories => :memory,
     SetMemory => :memory,
     ForgetMemory => :memory,
+    UpdateProfile => :memory,
     Rag => :files,
     WriteDraft => :files,
     ReadDraft => :files,
@@ -318,6 +320,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
       PinFact,
       SetMemory,
       ForgetMemory,
+      UpdateProfile,
       WriteDraft,
       ReadDraft,
       CreateTask,
@@ -349,7 +352,8 @@ defmodule Magus.Agents.Tools.ToolBuilder do
       GetDossier,
       PinFact,
       SetMemory,
-      ForgetMemory
+      ForgetMemory,
+      UpdateProfile
     ]
 
     tools =
