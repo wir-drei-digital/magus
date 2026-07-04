@@ -30,6 +30,27 @@ Several test files below use `user_fixture()`, a `:user`-scoped `Memory`, brains
 - **`seed_claim/3`** is shown in full in Task 5. Copy that helper locally into each test file that needs to seed claims (Tasks 5, 8). Do not rely on it being shared across files: subagent-driven execution gives each task a fresh context.
 - **DB case:** claim tests are pure Postgres, so `use Magus.DataCase, async: false` (match the sibling files; some are `async: false` because of the shared FalkorDB/DB state).
 - **Scope every assertion to seeded rows** (unique names / ids), never global counts (see Global Constraints).
+- **Every `Claim` needs a real `Episode`.** `Claim.episode_id` is a hard DB foreign key (`belongs_to :episode`, `allow_nil? false`), so a fabricated `Ash.UUID.generate()` episode id violates the constraint on insert. Before seeding any claim (in tests and in the eval subjects), create an Episode and use its id. Shared helper to copy locally where needed:
+
+```elixir
+defp seed_episode(graph_name, user_id) do
+  {:ok, ep} =
+    Magus.SuperBrain.Episode
+    |> Ash.Changeset.for_create(:create, %{
+      resource_type: :memory,
+      resource_id: Ash.UUID.generate(),
+      graph_name: graph_name,
+      raw_text: "seed",
+      source_user_id: user_id,
+      extractor_version: "test"
+    })
+    |> Ash.create(authorize?: false)
+
+  ep
+end
+```
+
+The claim's `graph_name` / `source_user_id` should match the episode's for coherence. In the eval subjects (Tasks 12, 13), create ONE episode per case (in `ingest`) and reuse its id for every claim seeded that case.
 
 ---
 
@@ -1050,10 +1071,12 @@ defmodule Magus.SuperBrain.RetrievalClaimsTest do
   defp one_hot(i), do: List.duplicate(0.0, 1536) |> List.replace_at(i, 1.0)
 
   defp seed_claim(graph, uid, text, embedding) do
+    ep = seed_episode(graph, uid)   # see "Test setup conventions"; Claim.episode_id is a hard FK
+
     Claim
     |> Ash.Changeset.for_create(:create, %{
       graph_name: graph,
-      episode_id: Ash.UUID.generate(),
+      episode_id: ep.id,
       source_user_id: uid,
       subject_name: "Aurora",
       subject_key: "aurora",
@@ -2140,12 +2163,13 @@ where `decoded` is the full `Jason.decode!(text)` map. Add:
 
   defp seed_claims(user, fixture) do
     graph = "memories:user:#{user.id}"
+    ep = seed_episode(graph, user.id)   # one episode per case; Claim.episode_id is a hard FK
 
     Enum.each(fixture.claims, fn c ->
       Claim
       |> Ash.Changeset.for_create(:create, %{
         graph_name: graph,
-        episode_id: Ash.UUID.generate(),
+        episode_id: ep.id,
         source_user_id: user.id,
         subject_name: c.subject, subject_key: key(c.subject),
         object_name: c.object, object_key: key(c.object),
@@ -2221,13 +2245,14 @@ In `test/support/eval/subject/super_brain_live.ex`, `ingest/2`: for `fixture.cla
 ```elixir
   defp seed_claims(ctx, fixture) do
     graph = ctx.brain_graph   # the "brain:<id>" the live subject already builds
+    ep = seed_episode(graph, ctx.user.id)   # one episode per case; Claim.episode_id is a hard FK
 
     Enum.each(fixture.claims, fn c ->
       {:ok, embedding} = Magus.Files.EmbeddingModel.embed(c.claim_text)
 
       Magus.SuperBrain.Claim
       |> Ash.Changeset.for_create(:create, %{
-        graph_name: graph, episode_id: Ash.UUID.generate(), source_user_id: ctx.user.id,
+        graph_name: graph, episode_id: ep.id, source_user_id: ctx.user.id,
         subject_name: c.subject, subject_key: key(c.subject),
         object_name: c.object, object_key: key(c.object),
         predicate: c.predicate, polarity: :affirms, claim_text: c.claim_text,
