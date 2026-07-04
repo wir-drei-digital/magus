@@ -1303,6 +1303,7 @@ defmodule MagusWeb.Admin.ModelsLive do
                     label="Denied providers (OpenRouter)"
                     field={@form[:denied_providers]}
                     options={@openrouter_provider_slugs}
+                    allow_empty={true}
                   />
                   <p class="text-xs text-base-content/50 mt-2">
                     Checked providers are excluded when this model is served through OpenRouter.
@@ -1422,12 +1423,18 @@ defmodule MagusWeb.Admin.ModelsLive do
   attr :label, :string, required: true
   attr :field, Phoenix.HTML.FormField, required: true
   attr :options, :list, required: true
+  # Opt-in only. When true, a hidden sentinel sends the field key even when every
+  # checkbox is unchecked, so an all-unchecked submit clears the list to [] instead
+  # of omitting the key (which Ash would treat as "unchanged"). Modality fields do
+  # not set this, so their behavior is unaffected.
+  attr :allow_empty, :boolean, default: false
 
   defp modality_checkboxes(assigns) do
     ~H"""
     <fieldset>
       <legend class="label font-medium">{@label}</legend>
       <div class="flex flex-wrap gap-4 mt-2">
+        <input :if={@allow_empty} type="hidden" name={@field.name <> "[]"} value="" />
         <label :for={opt <- @options} class="label cursor-pointer gap-2">
           <input
             type="checkbox"

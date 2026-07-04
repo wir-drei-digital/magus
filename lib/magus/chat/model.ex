@@ -98,6 +98,8 @@ defmodule Magus.Chat.Model do
         :llm_metadata,
         :internal?
       ]
+
+      change Magus.Chat.Model.Changes.NormalizeDeniedProviders
     end
 
     create :create_owned do
@@ -137,6 +139,10 @@ defmodule Magus.Chat.Model do
 
     update :update do
       primary? true
+      # NormalizeDeniedProviders rewrites a list attribute (strip blanks, dedup),
+      # which cannot be expressed atomically. Admin model edits are low-frequency,
+      # so a read-then-write update is fine.
+      require_atomic? false
 
       accept [
         :name,
@@ -169,6 +175,8 @@ defmodule Magus.Chat.Model do
         :llm_metadata,
         :internal?
       ]
+
+      change Magus.Chat.Model.Changes.NormalizeDeniedProviders
     end
 
     read :read do
@@ -323,6 +331,11 @@ defmodule Magus.Chat.Model do
       allow_nil? false
       default []
       public? true
+
+      # Accept empty-string items so the admin form's hidden clear-sentinel
+      # (denied_providers[]="") survives casting; NormalizeDeniedProviders then
+      # strips blanks/dupes on :create and :update, so "" never persists.
+      constraints items: [allow_empty?: true]
 
       description """
       OpenRouter provider slugs to exclude for this specific model. Subtracted
