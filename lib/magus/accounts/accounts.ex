@@ -23,8 +23,6 @@ defmodule Magus.Accounts do
       rpc_action :select_default_image_model, :select_image_model
       rpc_action :select_default_video_model, :select_video_model
       rpc_action :update_timezone, :update_timezone
-      rpc_action :update_data_region_preference, :update_data_region_preference
-      rpc_action :grant_data_region_consent, :grant_data_region_consent
 
       # Settings: memory
       rpc_action :update_global_memory_setting, :update_global_memory_setting
@@ -64,12 +62,6 @@ defmodule Magus.Accounts do
       define :change_user_password, action: :change_password
       define :set_user_password, action: :set_password
       define :complete_profile, action: :complete_profile
-
-      define :update_data_region_preference,
-        action: :update_data_region_preference,
-        args: [:regions]
-
-      define :grant_data_region_consent, action: :grant_data_region_consent, args: [:region]
     end
   end
 
