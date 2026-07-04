@@ -267,15 +267,21 @@ defmodule Magus.SuperBrain.Workers.ExtractBase do
   # Phase 1 (budget + fingerprint gate, reads only) and phase 2 (the LLM
   # call), both OUTSIDE any transaction so no pooled DB connection is held
   # across the slow HTTP call. On success, hands off to phase 3
-  # (`persist_extraction/5`).
+  # (`persist_extraction/6`).
+  #
+  # `"force" => true` (Task 10: backfill_claims) bypasses this gate so
+  # already-extracted, byte-identical content re-extracts once through the
+  # normal supersede path - used to backfill claims onto resources that were
+  # extracted by a pre-claims worker version.
   defp gate_extract_persist(worker_module, input, started_at, args) do
     new_fingerprint = :crypto.hash(:sha256, input.raw_text || "")
+    force? = Map.get(args, "force", false)
 
     with :ok <- check_budget(input.user_id),
          :continue <-
-           gate_on_fingerprint(input.resource_type, input.resource_id, new_fingerprint),
+           gate_or_force(force?, input.resource_type, input.resource_id, new_fingerprint),
          {:ok, extraction} <- run_extraction(input, started_at) do
-      persist_extraction(worker_module, input, extraction, new_fingerprint, args)
+      persist_extraction(worker_module, input, extraction, new_fingerprint, args, force?)
     else
       :skip_unchanged -> :ok
       {:error, :budget_exceeded} -> {:cancel, :budget_exceeded}
@@ -283,16 +289,23 @@ defmodule Magus.SuperBrain.Workers.ExtractBase do
     end
   end
 
+  # `force?` short-circuits straight to `:continue`, skipping the Episode
+  # read entirely. `false` delegates to the normal fingerprint gate.
+  defp gate_or_force(true, _resource_type, _resource_id, _new_fingerprint), do: :continue
+
+  defp gate_or_force(false, resource_type, resource_id, new_fingerprint),
+    do: gate_on_fingerprint(resource_type, resource_id, new_fingerprint)
+
   # Phase 3: persist the extraction in a short transaction (no advisory lock).
-  # The fingerprint gate is re-checked first: if another worker extracted the
-  # same content while this worker was calling the LLM, we discard our result
-  # via `:skip_unchanged` instead of churning the graph. `claim_episode`'s
-  # supersede now runs only after a successful LLM call, so a failed LLM call
-  # leaves the prior extraction intact.
-  defp persist_extraction(worker_module, input, extraction, new_fingerprint, args) do
+  # The fingerprint gate is re-checked first (unless `force?`): if another
+  # worker extracted the same content while this worker was calling the LLM,
+  # we discard our result via `:skip_unchanged` instead of churning the
+  # graph. `claim_episode`'s supersede now runs only after a successful LLM
+  # call, so a failed LLM call leaves the prior extraction intact.
+  defp persist_extraction(worker_module, input, extraction, new_fingerprint, args, force?) do
     Repo.transaction(fn ->
       with :continue <-
-             gate_on_fingerprint(input.resource_type, input.resource_id, new_fingerprint),
+             gate_or_force(force?, input.resource_type, input.resource_id, new_fingerprint),
            :ok <- ensure_graph_indexes(input.graph_name),
            {:ok, episode} <- claim_episode(input, worker_module),
            {:ok, episode} <- mark_processing(episode),
