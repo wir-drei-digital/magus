@@ -4,14 +4,33 @@ defmodule Magus.Skills.ApprovalTest do
   alias Magus.Skills.Approval
   alias Magus.Chat
 
-  test "approved? reflects the conversation's approved_skill_ids" do
+  test "approved? reflects a recorded ConversationSkillApproval row" do
     owner = generate(user())
     {:ok, conv} = Chat.create_conversation(%{title: "t"}, actor: owner)
-    id = Ecto.UUID.generate()
 
-    refute Approval.approved?(conv, id)
-    {:ok, conv} = Chat.record_skill_approval(conv, %{skill_id: id}, actor: owner)
-    assert Approval.approved?(conv, id)
+    bytes =
+      build_zip([
+        {"SKILL.md", "---\nname: approved-check\ndescription: D\n---\nb"},
+        {"scripts/go.py", "x=1"}
+      ])
+
+    {:ok, skill} = Magus.Skills.Import.import_bundle(bytes, actor: owner)
+
+    refute Approval.approved?(conv, skill)
+
+    {:ok, _} =
+      Magus.Skills.record_conversation_approval(
+        %{
+          conversation_id: conv.id,
+          skill_id: skill.id,
+          bundle_sha: skill.bundle_sha,
+          approved_by_id: owner.id,
+          source: :approval_card
+        },
+        actor: owner
+      )
+
+    assert Approval.approved?(conv, skill)
   end
 
   test "request/3 stores approve_phrase in notification metadata" do

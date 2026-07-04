@@ -7,11 +7,26 @@ defmodule Magus.Skills.Approval do
   """
 
   require Logger
+  require Ash.Query
 
-  @spec approved?(map(), Ecto.UUID.t()) :: boolean()
-  @doc "True when the skill is recorded as approved on the conversation."
-  def approved?(conversation, skill_id) do
-    skill_id in (Map.get(conversation, :approved_skill_ids) || [])
+  @spec approved?(map(), map()) :: boolean()
+  @doc """
+  True when a `ConversationSkillApproval` row exists for this conversation and
+  skill AND the skill is prompt-only (no sha) or its current bundle_sha matches
+  the approved sha. A bundle change re-gates.
+  """
+  def approved?(conversation, skill) do
+    conversation_id = Map.get(conversation, :id)
+    skill_id = Map.get(skill, :id)
+    current_sha = Map.get(skill, :bundle_sha)
+
+    Magus.Skills.ConversationSkillApproval
+    |> Ash.Query.filter(conversation_id == ^conversation_id and skill_id == ^skill_id)
+    |> Ash.read!(authorize?: false)
+    |> case do
+      [] -> false
+      [row | _] -> is_nil(current_sha) or row.bundle_sha == current_sha
+    end
   end
 
   @spec approve_phrase(Ecto.UUID.t()) :: String.t()
