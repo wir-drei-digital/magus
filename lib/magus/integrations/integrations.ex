@@ -20,6 +20,8 @@ defmodule Magus.Integrations do
 
   use Ash.Domain, otp_app: :magus, extensions: [AshTypescript.Rpc]
 
+  require Logger
+
   typescript_rpc do
     resource Magus.Integrations.UserIntegration do
       rpc_action :list_user_integrations, :for_user
@@ -321,10 +323,37 @@ defmodule Magus.Integrations do
         %Magus.Integrations.UserIntegration{status: :error} = integration,
         opts
       ) do
-    activate_user_integration(integration, opts)
+    with {:ok, reactivated} <- activate_user_integration(integration, opts) do
+      maybe_restart_polling(reactivated)
+      {:ok, reactivated}
+    end
   end
 
   def reactivate_if_errored(%Magus.Integrations.UserIntegration{} = integration, _opts) do
     {:ok, integration}
+  end
+
+  # Best-effort: re-enqueue polling for pull-type providers after
+  # reactivation. Non-pollable providers (webhook/push-based) are a no-op.
+  # Enqueue failures must never fail the reactivation itself.
+  defp maybe_restart_polling(integration) do
+    provider_module = get_provider_module(integration.provider_key)
+
+    if provider_module && function_exported?(provider_module, :poll, 2) do
+      case Magus.Integrations.Workers.PollDataSource.enqueue(integration.id) do
+        {:ok, _job} ->
+          :ok
+
+        {:error, reason} ->
+          Logger.warning(
+            "reactivate_if_errored: failed to enqueue poll for integration " <>
+              "#{integration.id}: #{inspect(reason)}"
+          )
+
+          :ok
+      end
+    else
+      :ok
+    end
   end
 end

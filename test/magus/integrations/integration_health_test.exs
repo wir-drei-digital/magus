@@ -132,10 +132,14 @@ defmodule Magus.Integrations.IntegrationHealthTest do
   end
 
   describe "PollDataSource worker threshold behavior" do
-    test "a single poll failure increments the counter, does not error the integration, and re-enqueues",
+    test "a single poll failure on the final attempt increments the counter, does not error the integration, and re-enqueues",
          %{integration: integration} do
       assert {:error, :all_feeds_failed} =
-               PollDataSource.perform(%Oban.Job{args: %{"integration_id" => integration.id}})
+               PollDataSource.perform(%Oban.Job{
+                 attempt: 3,
+                 max_attempts: 3,
+                 args: %{"integration_id" => integration.id}
+               })
 
       {:ok, reloaded} = Integrations.get_user_integration(integration.id, authorize?: false)
       assert reloaded.consecutive_failures == 1
@@ -162,7 +166,11 @@ defmodule Magus.Integrations.IntegrationHealthTest do
       assert integration.consecutive_failures == 9
 
       assert {:error, :all_feeds_failed} =
-               PollDataSource.perform(%Oban.Job{args: %{"integration_id" => integration.id}})
+               PollDataSource.perform(%Oban.Job{
+                 attempt: 3,
+                 max_attempts: 3,
+                 args: %{"integration_id" => integration.id}
+               })
 
       {:ok, reloaded} = Integrations.get_user_integration(integration.id, authorize?: false)
       assert reloaded.consecutive_failures == 10
@@ -195,7 +203,11 @@ defmodule Magus.Integrations.IntegrationHealthTest do
       assert integration.consecutive_failures == 9
 
       assert {:error, :all_feeds_failed} =
-               PollDataSource.perform(%Oban.Job{args: %{"integration_id" => integration.id}})
+               PollDataSource.perform(%Oban.Job{
+                 attempt: 3,
+                 max_attempts: 3,
+                 args: %{"integration_id" => integration.id}
+               })
 
       {:ok, errored} = Integrations.get_user_integration(integration.id, authorize?: false)
       assert errored.status == :error
@@ -208,7 +220,11 @@ defmodule Magus.Integrations.IntegrationHealthTest do
       # short-circuits via check_active/1 (status no longer :active) or
       # re-runs the threshold branch, no additional notification must be
       # created.
-      PollDataSource.perform(%Oban.Job{args: %{"integration_id" => integration.id}})
+      PollDataSource.perform(%Oban.Job{
+        attempt: 3,
+        max_attempts: 3,
+        args: %{"integration_id" => integration.id}
+      })
 
       {:ok, notifications_after_second_run} =
         Magus.Notifications.list_unread_notifications(actor: user)
@@ -227,6 +243,73 @@ defmodule Magus.Integrations.IntegrationHealthTest do
 
       {:ok, reloaded} = Integrations.get_user_integration(integration.id, authorize?: false)
       assert reloaded.consecutive_failures == 0
+    end
+  end
+
+  describe "PollDataSource only counts + chains on the final Oban attempt" do
+    test "a non-final attempt failure does not increment consecutive_failures and does not re-enqueue",
+         %{integration: integration} do
+      assert {:error, :all_feeds_failed} =
+               PollDataSource.perform(%Oban.Job{
+                 attempt: 1,
+                 max_attempts: 3,
+                 args: %{"integration_id" => integration.id}
+               })
+
+      {:ok, reloaded} = Integrations.get_user_integration(integration.id, authorize?: false)
+      assert reloaded.consecutive_failures == 0
+      assert reloaded.status == :active
+
+      refute_enqueued(worker: PollDataSource, args: %{integration_id: integration.id})
+    end
+
+    test "a middle (non-final) attempt failure still does not count toward the threshold", %{
+      integration: integration
+    } do
+      assert {:error, :all_feeds_failed} =
+               PollDataSource.perform(%Oban.Job{
+                 attempt: 2,
+                 max_attempts: 3,
+                 args: %{"integration_id" => integration.id}
+               })
+
+      {:ok, reloaded} = Integrations.get_user_integration(integration.id, authorize?: false)
+      assert reloaded.consecutive_failures == 0
+
+      refute_enqueued(worker: PollDataSource, args: %{integration_id: integration.id})
+    end
+
+    test "the final attempt failure increments consecutive_failures and re-enqueues the next cycle",
+         %{integration: integration} do
+      assert {:error, :all_feeds_failed} =
+               PollDataSource.perform(%Oban.Job{
+                 attempt: 3,
+                 max_attempts: 3,
+                 args: %{"integration_id" => integration.id}
+               })
+
+      {:ok, reloaded} = Integrations.get_user_integration(integration.id, authorize?: false)
+      assert reloaded.consecutive_failures == 1
+      assert reloaded.status == :active
+
+      assert_enqueued(worker: PollDataSource, args: %{integration_id: integration.id})
+    end
+
+    test "one bad poll cycle (3 attempts, default max_attempts) records exactly one failure", %{
+      integration: integration
+    } do
+      # Simulate Oban retrying the same job three times for one poll cycle:
+      # only the final attempt should count toward consecutive_failures.
+      for attempt <- 1..3 do
+        PollDataSource.perform(%Oban.Job{
+          attempt: attempt,
+          max_attempts: 3,
+          args: %{"integration_id" => integration.id}
+        })
+      end
+
+      {:ok, reloaded} = Integrations.get_user_integration(integration.id, authorize?: false)
+      assert reloaded.consecutive_failures == 1
     end
   end
 
