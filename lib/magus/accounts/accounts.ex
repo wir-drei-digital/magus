@@ -26,7 +26,7 @@ defmodule Magus.Accounts do
       rpc_action :update_data_region_preference, :update_data_region_preference
       rpc_action :grant_data_region_consent, :grant_data_region_consent
 
-      # Settings — memory
+      # Settings: memory
       rpc_action :update_global_memory_setting, :update_global_memory_setting
       rpc_action :update_profile_setting, :update_profile_setting
     end
