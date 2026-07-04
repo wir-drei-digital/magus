@@ -41,7 +41,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPageTest do
        {"entities": [
           {"name": "X", "type": "person", "subtype": null, "confidence": 0.8}
         ],
-        "edges": []}
+        "claims":[]}
        """,
        usage: zero_usage()
      }}
@@ -97,7 +97,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPageTest do
         {:ok,
          %{
            content:
-             ~s({"entities":[{"name":"L","type":"concept","subtype":null,"confidence":0.8}],"edges":[]}),
+             ~s({"entities":[{"name":"L","type":"concept","subtype":null,"confidence":0.8}],"claims":[]}),
            usage: zero_usage()
          }}
       end)
@@ -275,7 +275,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPageTest do
         {:ok,
          %{
            content:
-             ~s({"entities": [{"name": "EntityA", "type": "concept", "subtype": null, "confidence": 0.8}], "edges": []}),
+             ~s({"entities": [{"name": "EntityA", "type": "concept", "subtype": null, "confidence": 0.8}], "claims":[]}),
            usage: zero_usage()
          }}
       end
@@ -284,7 +284,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPageTest do
         {:ok,
          %{
            content:
-             ~s({"entities": [{"name": "EntityB", "type": "concept", "subtype": null, "confidence": 0.8}], "edges": []}),
+             ~s({"entities": [{"name": "EntityB", "type": "concept", "subtype": null, "confidence": 0.8}], "claims":[]}),
            usage: zero_usage()
          }}
       end
@@ -305,7 +305,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPageTest do
         {:ok,
          %{
            content:
-             ~s({"entities": [{"name": "EntityA2", "type": "concept", "subtype": null, "confidence": 0.8}], "edges": []}),
+             ~s({"entities": [{"name": "EntityA2", "type": "concept", "subtype": null, "confidence": 0.8}], "claims":[]}),
            usage: zero_usage()
          }}
       end)
@@ -337,7 +337,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPageTest do
         {:ok,
          %{
            content:
-             ~s({"entities":[{"name":"Daniel","type":"person","subtype":null,"confidence":0.9}],"edges":[]}),
+             ~s({"entities":[{"name":"Daniel","type":"person","subtype":null,"confidence":0.9}],"claims":[]}),
            usage: zero_usage()
          }}
       end)
@@ -495,7 +495,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPageTest do
       expect(Magus.SuperBrain.LLMMock, :complete, fn _, _ ->
         {:ok,
          %{
-           content: ~s({"entities":[],"edges":[]}),
+           content: ~s({"entities":[],"claims":[]}),
            usage: %Usage{
              model_name: "anthropic:claude-haiku-4-5",
              total_tokens: 5,
@@ -540,7 +540,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPageTest do
         {:ok,
          %{
            content:
-             ~s({"entities":[{"name":"Daniel","type":"person","subtype":"colleague","confidence":0.9}],"edges":[]}),
+             ~s({"entities":[{"name":"Daniel","type":"person","subtype":"colleague","confidence":0.9}],"claims":[]}),
            usage: zero_usage()
          }}
       end)
@@ -602,7 +602,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPageTest do
         {:ok,
          %{
            content:
-             ~s({"entities":[{"name":"X","type":"person","subtype":null,"confidence":0.8}],"edges":[]}),
+             ~s({"entities":[{"name":"X","type":"person","subtype":null,"confidence":0.8}],"claims":[]}),
            usage: %Usage{
              model_name: "test-model",
              prompt_tokens: 42,
@@ -655,7 +655,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPageTest do
         {:ok,
          %{
            content:
-             ~s({"entities":[{"name":"Daniel","type":"person","subtype":null,"confidence":0.95}],"edges":[]}),
+             ~s({"entities":[{"name":"Daniel","type":"person","subtype":null,"confidence":0.95}],"claims":[]}),
            usage: zero_usage()
          }}
       end)
@@ -683,7 +683,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPageTest do
         {:ok,
          %{
            content:
-             ~s({"entities":[{"name":"Daniel","type":"person","subtype":null,"confidence":0.95}],"edges":[]}),
+             ~s({"entities":[{"name":"Daniel","type":"person","subtype":null,"confidence":0.95}],"claims":[]}),
            usage: zero_usage()
          }}
       end)
@@ -718,7 +718,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPageTest do
       expect(Magus.SuperBrain.LLMMock, :complete, fn _, _ ->
         {:ok,
          %{
-           content: ~s({"entities":[],"edges":[]}),
+           content: ~s({"entities":[],"claims":[]}),
            usage: %Magus.SuperBrain.Usage{
              model_name: "t",
              total_tokens: 1,

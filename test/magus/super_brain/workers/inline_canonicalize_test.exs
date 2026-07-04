@@ -96,7 +96,7 @@ defmodule Magus.SuperBrain.Workers.InlineCanonicalizeTest do
       {:ok,
        %{
          content:
-           ~s({"entities":[{"name":"Daniel","type":"person","subtype":#{subtype_field},"confidence":#{confidence}}],"edges":[]}),
+           ~s({"entities":[{"name":"Daniel","type":"person","subtype":#{subtype_field},"confidence":#{confidence}}],"claims":[]}),
          usage: %Magus.SuperBrain.Usage{
            model_name: "t",
            total_tokens: 1,

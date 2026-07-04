@@ -108,12 +108,16 @@ defmodule Magus.SuperBrain.Extraction.Prompt do
           "confidence": 0.0-1.0
         }
       ],
-      "edges": [
+      "claims": [
         {
           "subject_name": "must match an entity name in entities",
           "predicate": "one of: #{preds}, or a free-form snake_case verb",
           "object_name": "must match an entity name in entities",
-          "confidence": 0.0-1.0
+          "polarity": "affirms | negates",
+          "claim_text": "the sentence from the content that states this fact (max 500 chars)",
+          "confidence": 0.0-1.0,
+          "valid_from": "ISO 8601 date, or null unless the text states it",
+          "valid_to": "ISO 8601 date, or null unless the text states it"
         }
       ]
     }
@@ -142,15 +146,13 @@ defmodule Magus.SuperBrain.Extraction.Prompt do
     - Causal: use `causes` when X produces Y; `prevents` when X blocks Y;
       `enables` when X makes Y possible without strictly producing it.
 
-    Edge density:
-    - For a batch with N entities, aim for roughly N/2 edges, with a
-      minimum of 2 edges when N >= 3. Connect related entities explicitly:
-      isolated entities are not useful in a knowledge graph.
-    - Prefer factual statements over speculative links. When you are
-      unsure about a relationship, emit it with lower confidence
-      (e.g. 0.4 to 0.6) rather than omitting it entirely.
-    - subject_name and object_name must still match an entity in the
-      entities list above. Never invent endpoints to satisfy the ratio.
+    Claim rules:
+    - Every claim MUST be supported by a sentence in the content. Put that
+      sentence (quoted or minimally normalised) in claim_text.
+    - Prefer fewer, well-grounded claims. Never invent a relation to connect
+      entities. When unsure, lower confidence rather than omit.
+    - Use polarity "negates" for explicit denials ("Aurora does NOT ship in Q3").
+    - subject_name and object_name MUST match an entity in the entities list.
     """
   end
 end

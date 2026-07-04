@@ -54,7 +54,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBaseTest do
     {:ok,
      %{
        content:
-         ~s({"entities":[{"name":"T","type":"concept","subtype":null,"confidence":0.8}],"edges":[]}),
+         ~s({"entities":[{"name":"T","type":"concept","subtype":null,"confidence":0.8}],"claims":[]}),
        usage: %Usage{
          model_name: "test-model",
          total_tokens: 10,
@@ -176,7 +176,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBaseTest do
     {:ok,
      %{
        content:
-         ~s({"entities":[{"name":"Daniel","type":"person","subtype":"user","confidence":0.9}],"edges":[]}),
+         ~s({"entities":[{"name":"Daniel","type":"person","subtype":"user","confidence":0.9}],"claims":[]}),
        usage: %Usage{
          model_name: "test-model",
          total_tokens: 1,
@@ -494,7 +494,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBaseTest do
     {:ok,
      %{
        content:
-         ~s({"entities":[{"name":"Apple","type":"organization","subtype":"company","confidence":0.9},{"name":"Apple","type":"concept","subtype":"food","confidence":0.8}],"edges":[]}),
+         ~s({"entities":[{"name":"Apple","type":"organization","subtype":"company","confidence":0.9},{"name":"Apple","type":"concept","subtype":"food","confidence":0.8}],"claims":[]}),
        usage: %Usage{
          model_name: "test-model",
          total_tokens: 10,
@@ -592,7 +592,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBaseTest do
         {:ok,
          %{
            content:
-             ~s({"entities":[{"name":"Daniel","type":"person","subtype":"user","confidence":0.9},{"name":"Daniel","type":"concept","subtype":"character","confidence":0.7},{"name":"Project X","type":"project","subtype":null,"confidence":0.9}],"edges":[{"subject_name":"Daniel","object_name":"Project X","predicate":"supports","confidence":0.8}]}),
+             ~s({"entities":[{"name":"Daniel","type":"person","subtype":"user","confidence":0.9},{"name":"Daniel","type":"concept","subtype":"character","confidence":0.7},{"name":"Project X","type":"project","subtype":null,"confidence":0.9}],"claims":[{"subject_name":"Daniel","object_name":"Project X","predicate":"supports","polarity":"affirms","claim_text":"Daniel supports Project X.","confidence":0.8}]}),
            usage: %Usage{
              model_name: "test-model",
              total_tokens: 10,
@@ -735,108 +735,6 @@ defmodule Magus.SuperBrain.Workers.ExtractBaseTest do
         )
 
       assert [[2]] = has_entity_count_after.rows
-    end
-  end
-
-  # ---------------------------------------------------------------------------
-  # Wave 3 Task 3.6: sparse-edges telemetry.
-  #
-  # The iter4 extraction prompt asks the LLM for N/2 edges with a floor of 2
-  # when N >= 3, but it is honor-system. Hub-and-spoke islands and lonely
-  # entity lists slip through. Iter5 adds observability: when a batch lands
-  # below the floor, emit a telemetry counter + Logger.info so we can
-  # measure how often it happens in real traffic.
-  # ---------------------------------------------------------------------------
-
-  describe "Task 3.6: sparse-edges telemetry" do
-    defp ok_three_entities_no_edges(_messages, _opts) do
-      {:ok,
-       %{
-         content:
-           ~s({"entities":[{"name":"A","type":"concept","subtype":null,"confidence":0.8},{"name":"B","type":"concept","subtype":"topic","confidence":0.8},{"name":"C","type":"concept","subtype":"area","confidence":0.8}],"edges":[]}),
-         usage: %Usage{
-           model_name: "test-model",
-           total_tokens: 10,
-           prompt_tokens: 5,
-           completion_tokens: 5,
-           input_cost: Decimal.new("0"),
-           output_cost: Decimal.new("0"),
-           total_cost: Decimal.new("0")
-         }
-       }}
-    end
-
-    test "emits [:super_brain, :extraction, :sparse_edges] when N >= 3 and edges < 2" do
-      :ok = stub_unit_embeddings()
-
-      user = generate(user())
-      graph = "test:base:sparse:#{user.id}:#{System.unique_integer([:positive])}"
-      on_exit_drop_graph(graph)
-
-      handler_ref = make_ref()
-      handler_id = "test-sparse-#{System.unique_integer([:positive])}"
-      test_pid = self()
-
-      :telemetry.attach(
-        handler_id,
-        [:super_brain, :extraction, :sparse_edges],
-        fn _name, measurements, metadata, _ ->
-          send(test_pid, {handler_ref, measurements, metadata})
-        end,
-        nil
-      )
-
-      on_exit(fn -> :telemetry.detach(handler_id) end)
-
-      expect(Magus.SuperBrain.LLMMock, :complete, &ok_three_entities_no_edges/2)
-
-      assert :ok =
-               perform_job(TestWorker, %{
-                 "user_id" => user.id,
-                 "text" => "A, B, C with no connections",
-                 "graph" => graph
-               })
-
-      assert_received {^handler_ref, %{count: 1}, metadata}
-      assert metadata.entity_count == 3
-      assert metadata.edge_count == 0
-      assert metadata.user_id == user.id
-    end
-
-    test "does NOT emit sparse_edges counter when N < 3" do
-      :ok = stub_unit_embeddings()
-
-      user = generate(user())
-      graph = "test:base:not_sparse_n:#{user.id}:#{System.unique_integer([:positive])}"
-      on_exit_drop_graph(graph)
-
-      handler_ref = make_ref()
-      handler_id = "test-not-sparse-n-#{System.unique_integer([:positive])}"
-      test_pid = self()
-
-      :telemetry.attach(
-        handler_id,
-        [:super_brain, :extraction, :sparse_edges],
-        fn _name, measurements, metadata, _ ->
-          send(test_pid, {handler_ref, measurements, metadata})
-        end,
-        nil
-      )
-
-      on_exit(fn -> :telemetry.detach(handler_id) end)
-
-      # Single-entity extraction (N = 1): below the N>=3 threshold, so no
-      # sparse-edge signal even though edges = 0.
-      expect(Magus.SuperBrain.LLMMock, :complete, &ok_one_entity/2)
-
-      assert :ok =
-               perform_job(TestWorker, %{
-                 "user_id" => user.id,
-                 "text" => "single",
-                 "graph" => graph
-               })
-
-      refute_received {^handler_ref, _measurements, _metadata}
     end
   end
 

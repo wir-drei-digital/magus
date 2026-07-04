@@ -1,16 +1,18 @@
 defmodule Magus.SuperBrain.Extraction do
   @moduledoc """
-  LLM-driven entity and edge extraction orchestrator.
+  LLM-driven entity and claim extraction orchestrator.
 
   Pipeline:
 
     1. Build a system + user prompt via `Magus.SuperBrain.Extraction.Prompt`.
     2. Call the configured `Magus.SuperBrain.LLMClient` implementation.
     3. Parse the LLM's strict-JSON output.
-    4. Sanitise entities and edges via `Magus.SuperBrain.Extraction.Sanitizer`
+    4. Sanitise entities and claims via `Magus.SuperBrain.Extraction.Sanitizer`
        (clipping, control-char stripping, confidence clamping, ontology
-       coercion). Drops edges whose subject or object names are not in the
+       coercion). Drops claims whose subject or object names are not in the
        sanitised entity set.
+    5. Derive L1 `edges` from the sanitised claims (`claims_to_edges/1`) so
+       the FalkorDB builders keep consuming the same edge shape unchanged.
 
   The LLM client is resolved at runtime from the application env so tests
   can bind a Mox mock without touching production code.
@@ -21,7 +23,7 @@ defmodule Magus.SuperBrain.Extraction do
   require Logger
 
   @doc """
-  Extracts entities and edges from `text`.
+  Extracts entities and claims from `text`.
 
   Options:
 
@@ -32,7 +34,9 @@ defmodule Magus.SuperBrain.Extraction do
 
   Returns:
 
-    * `{:ok, %{entities: [...], edges: [...], usage: %Magus.SuperBrain.Usage{}, user_id: id_or_nil}}`
+    * `{:ok, %{entities: [...], claims: [...], edges: [...], usage: %Magus.SuperBrain.Usage{}, user_id: id_or_nil}}`
+      where `claims` are sanitized claim maps and `edges` are derived from
+      those claims (one per claim).
     * `{:error, :invalid_json}` - LLM output did not parse as JSON.
     * `{:error, :unexpected_schema}` - LLM JSON was missing expected keys.
     * `{:error, term()}` - propagated from the LLM client.
@@ -49,7 +53,6 @@ defmodule Magus.SuperBrain.Extraction do
     case llm_client().complete(messages, model: opts[:model]) do
       {:ok, %{content: raw, usage: %Magus.SuperBrain.Usage{} = usage}} ->
         with {:ok, payload} <- parse_and_sanitize(raw) do
-          maybe_emit_sparse_edges(payload, user_id)
           {:ok, payload |> Map.put(:usage, usage) |> Map.put(:user_id, user_id)}
         end
 
@@ -58,40 +61,9 @@ defmodule Magus.SuperBrain.Extraction do
     end
   end
 
-  # iter5 Task 3.6: observability for hub-and-spoke extractions. The prompt
-  # asks the LLM to aim for N/2 edges with a floor of 2 when N >= 3, but it
-  # is honor-system: nothing in the pipeline currently rejects or re-prompts
-  # on under-density. Emit a telemetry counter and Logger.info when a batch
-  # falls below the floor so we can measure how often the LLM ignores the
-  # guidance in real traffic. Logger level is :info, not :warning, because
-  # sparse extractions are not errors (a one-line input is correctly
-  # sparse); we only want a signal to drive prompt iteration.
-  defp maybe_emit_sparse_edges(%{entities: entities, edges: edges}, user_id)
-       when is_list(entities) and is_list(edges) do
-    n = length(entities)
-    e = length(edges)
-
-    if n >= 3 and e < 2 do
-      :telemetry.execute(
-        [:super_brain, :extraction, :sparse_edges],
-        %{count: 1},
-        %{entity_count: n, edge_count: e, user_id: user_id}
-      )
-
-      Logger.info(
-        "super_brain: sparse-edge extraction (entities=#{n} edges=#{e}); " <>
-          "below N/2 target and the floor of 2 for N>=3"
-      )
-    end
-
-    :ok
-  end
-
-  defp maybe_emit_sparse_edges(_payload, _user_id), do: :ok
-
   defp parse_and_sanitize(raw) do
     with {:ok, payload} <- decode_json(raw),
-         %{"entities" => raw_entities, "edges" => raw_edges} <- payload do
+         %{"entities" => raw_entities, "claims" => raw_claims} <- payload do
       entities =
         raw_entities
         |> Enum.map(&sanitize_entity_input/1)
@@ -99,19 +71,51 @@ defmodule Magus.SuperBrain.Extraction do
 
       entity_names = MapSet.new(entities, & &1.name)
 
-      edges =
-        raw_edges
-        |> Enum.map(&sanitize_edge_input/1)
+      sanitized =
+        raw_claims
+        |> Enum.map(&Sanitizer.sanitize_claim/1)
         |> Enum.reject(&(&1 == :skip))
-        |> Enum.filter(fn e ->
-          MapSet.member?(entity_names, e.subject_name) and
-            MapSet.member?(entity_names, e.object_name)
+
+      claims =
+        Enum.filter(sanitized, fn c ->
+          MapSet.member?(entity_names, c.subject_name) and
+            MapSet.member?(entity_names, c.object_name)
         end)
 
-      {:ok, %{entities: entities, edges: edges}}
+      # Observability: claims dropped because an endpoint was not an
+      # extracted entity. Emitted from day one so sanitizer strictness is
+      # measurable.
+      Magus.SuperBrain.Telemetry.claims_dropped(length(sanitized) - length(claims))
+
+      {:ok, %{entities: entities, claims: claims, edges: claims_to_edges(claims)}}
     else
       {:error, :invalid_json} = err -> err
       _ -> {:error, :unexpected_schema}
+    end
+  end
+
+  @doc """
+  Derives L1 `RELATES_TO` edge observations from claims: one per claim, using
+  the claim's predicate as an atom (via the atom-safe classifier). The
+  FalkorDB builders consume these unchanged; polarity stays on the claim,
+  not the edge.
+  """
+  def claims_to_edges(claims) do
+    Enum.map(claims, fn c ->
+      %{
+        subject_name: c.subject_name,
+        object_name: c.object_name,
+        predicate: predicate_atom(c.predicate),
+        confidence: c.confidence
+      }
+    end)
+  end
+
+  defp predicate_atom(p) when is_binary(p) do
+    case Magus.SuperBrain.Ontology.classify_predicate(p) do
+      {:canonical, atom} -> atom
+      {:freeform, atom} when is_atom(atom) -> atom
+      _ -> :relates_to
     end
   end
 
@@ -160,22 +164,6 @@ defmodule Magus.SuperBrain.Extraction do
   end
 
   defp sanitize_entity_input(_malformed), do: :skip
-
-  defp sanitize_edge_input(%{
-         "subject_name" => s,
-         "object_name" => o,
-         "predicate" => p,
-         "confidence" => c
-       }) do
-    Sanitizer.sanitize_edge(%{
-      subject_name: s,
-      object_name: o,
-      predicate: p,
-      confidence: c
-    })
-  end
-
-  defp sanitize_edge_input(_malformed), do: :skip
 
   # The LLM emits type strings; only convert to atoms when the atom is
   # already known. Unknown strings degrade to :concept and the sanitizer's

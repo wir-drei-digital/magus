@@ -29,8 +29,15 @@ defmodule Magus.SuperBrain.ExtractionTest do
           {"name": "Daniel", "type": "person", "subtype": null, "confidence": 0.9},
           {"name": "Project X", "type": "project", "subtype": "internal", "confidence": 0.8}
         ],
-        "edges": [
-          {"subject_name": "Daniel", "object_name": "Project X", "predicate": "works_on", "confidence": 0.85}
+        "claims": [
+          {
+            "subject_name": "Daniel",
+            "object_name": "Project X",
+            "predicate": "works_on",
+            "polarity": "affirms",
+            "claim_text": "Daniel works on Project X.",
+            "confidence": 0.85
+          }
         ]
       }
       """
@@ -66,7 +73,7 @@ defmodule Magus.SuperBrain.ExtractionTest do
     test "parses JSON wrapped in markdown code fences" do
       fenced = """
       ```json
-      {"entities": [{"name": "Daniel", "type": "person", "subtype": null, "confidence": 0.9}], "edges": []}
+      {"entities": [{"name": "Daniel", "type": "person", "subtype": null, "confidence": 0.9}], "claims": []}
       ```
       """
 
@@ -81,7 +88,7 @@ defmodule Magus.SuperBrain.ExtractionTest do
 
     test "parses a JSON object surrounded by prose" do
       chatty =
-        ~s(Here is the extraction:\n{"entities": [{"name": "Lisa", "type": "person", "subtype": null, "confidence": 0.8}], "edges": []}\nHope this helps!)
+        ~s(Here is the extraction:\n{"entities": [{"name": "Lisa", "type": "person", "subtype": null, "confidence": 0.8}], "claims": []}\nHope this helps!)
 
       expect(Magus.SuperBrain.LLMMock, :complete, fn _, _ ->
         {:ok, %{content: chatty, usage: build_usage()}}
@@ -96,8 +103,15 @@ defmodule Magus.SuperBrain.ExtractionTest do
       raw_json = """
       {
         "entities": [{"name": "A", "type": "concept", "subtype": null, "confidence": 0.5}],
-        "edges": [
-          {"subject_name": "A", "object_name": "GHOST", "predicate": "relates_to", "confidence": 0.7}
+        "claims": [
+          {
+            "subject_name": "A",
+            "object_name": "GHOST",
+            "predicate": "relates_to",
+            "polarity": "affirms",
+            "claim_text": "A relates_to GHOST.",
+            "confidence": 0.7
+          }
         ]
       }
       """
@@ -116,7 +130,7 @@ defmodule Magus.SuperBrain.ExtractionTest do
           {"name": "Daniel", "type": "person", "confidence": 0.9},
           {"name": "incomplete"}
         ],
-        "edges": []
+        "claims": []
       })
 
       expect(Magus.SuperBrain.LLMMock, :complete, fn _, _ ->
@@ -143,8 +157,15 @@ defmodule Magus.SuperBrain.ExtractionTest do
     test "skips edges with missing required fields" do
       raw_json = ~s({
         "entities": [{"name": "A", "type": "concept", "confidence": 0.5}],
-        "edges": [
-          {"subject_name": "A", "object_name": "A", "predicate": "relates_to", "confidence": 0.7},
+        "claims": [
+          {
+            "subject_name": "A",
+            "object_name": "A",
+            "predicate": "relates_to",
+            "polarity": "affirms",
+            "claim_text": "A relates_to A.",
+            "confidence": 0.7
+          },
           {"subject_name": "X"}
         ]
       })
@@ -167,6 +188,60 @@ defmodule Magus.SuperBrain.ExtractionTest do
 
       assert {:ok, %{edges: edges}} = Extraction.extract("anything")
       assert length(edges) == 1
+    end
+
+    test "extract returns sanitized claims and derives edges from them" do
+      payload =
+        Jason.encode!(%{
+          "entities" => [
+            %{"name" => "Aurora", "type" => "project", "confidence" => 0.9},
+            %{"name" => "Q3", "type" => "date", "confidence" => 0.9}
+          ],
+          "claims" => [
+            %{
+              "subject_name" => "Aurora",
+              "object_name" => "Q3",
+              "predicate" => "occurs_at",
+              "polarity" => "affirms",
+              "claim_text" => "Aurora targets Q3.",
+              "confidence" => 0.8
+            }
+          ]
+        })
+
+      expect(Magus.SuperBrain.LLMMock, :complete, fn _messages, _opts ->
+        {:ok, %{content: payload, usage: build_usage()}}
+      end)
+
+      assert {:ok, %{entities: entities, claims: claims, edges: edges}} =
+               Extraction.extract("some text")
+
+      assert length(entities) == 2
+      assert [%{claim_text: "Aurora targets Q3.", polarity: :affirms}] = claims
+      assert [%{subject_name: "Aurora", object_name: "Q3", predicate: :occurs_at}] = edges
+    end
+
+    test "claims whose endpoints are not extracted entities are dropped" do
+      payload =
+        Jason.encode!(%{
+          "entities" => [%{"name" => "Aurora", "type" => "project", "confidence" => 0.9}],
+          "claims" => [
+            %{
+              "subject_name" => "Aurora",
+              "object_name" => "Ghost",
+              "predicate" => "relates_to",
+              "polarity" => "affirms",
+              "claim_text" => "Aurora relates to Ghost.",
+              "confidence" => 0.7
+            }
+          ]
+        })
+
+      expect(Magus.SuperBrain.LLMMock, :complete, fn _m, _o ->
+        {:ok, %{content: payload, usage: build_usage()}}
+      end)
+
+      assert {:ok, %{claims: [], edges: []}} = Extraction.extract("t")
     end
   end
 end

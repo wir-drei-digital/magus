@@ -33,7 +33,7 @@ defmodule Magus.SuperBrain.Workers.ExtractMemoryTest do
     {:ok,
      %{
        content:
-         ~s({"entities":[{"name":"Berlin","type":"location","subtype":null,"confidence":0.8}],"edges":[]}),
+         ~s({"entities":[{"name":"Berlin","type":"location","subtype":null,"confidence":0.8}],"claims":[]}),
        usage: zero_usage()
      }}
   end
@@ -147,7 +147,7 @@ defmodule Magus.SuperBrain.Workers.ExtractMemoryTest do
         {:ok,
          %{
            content:
-             ~s({"entities":[{"name":"Berlin","type":"location","subtype":null,"confidence":0.95}],"edges":[]}),
+             ~s({"entities":[{"name":"Berlin","type":"location","subtype":null,"confidence":0.95}],"claims":[]}),
            usage: zero_usage()
          }}
       end)
@@ -214,7 +214,7 @@ defmodule Magus.SuperBrain.Workers.ExtractMemoryTest do
         {:ok,
          %{
            content:
-             ~s({"entities":[{"name":"Berlin","type":"location","subtype":null,"confidence":0.95}],"edges":[]}),
+             ~s({"entities":[{"name":"Berlin","type":"location","subtype":null,"confidence":0.95}],"claims":[]}),
            usage: zero_usage()
          }}
       end)

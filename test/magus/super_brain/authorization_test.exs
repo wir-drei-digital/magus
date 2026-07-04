@@ -618,7 +618,7 @@ defmodule Magus.SuperBrain.AuthorizationTest do
             {:ok,
              %{
                content:
-                 ~s({"entities":[{"name":"E","type":"concept","subtype":null,"confidence":0.9}],"edges":[]}),
+                 ~s({"entities":[{"name":"E","type":"concept","subtype":null,"confidence":0.9}],"claims":[]}),
                usage: %Magus.SuperBrain.Usage{
                  model_name: "t",
                  total_tokens: 1,

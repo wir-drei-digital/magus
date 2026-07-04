@@ -36,7 +36,7 @@ defmodule Magus.SuperBrain.Workers.BuildSuperIncrementalTest do
     {:ok,
      %{
        content:
-         ~s({"entities":[{"name":"Alpha","type":"concept","subtype":null,"confidence":0.9}],"edges":[]}),
+         ~s({"entities":[{"name":"Alpha","type":"concept","subtype":null,"confidence":0.9}],"claims":[]}),
        usage: %Magus.SuperBrain.Usage{
          model_name: "t",
          total_tokens: 1,
@@ -57,7 +57,7 @@ defmodule Magus.SuperBrain.Workers.BuildSuperIncrementalTest do
     {:ok,
      %{
        content:
-         ~s({"entities":[{"name":"Beta","type":"concept","subtype":"topic","confidence":0.85}],"edges":[]}),
+         ~s({"entities":[{"name":"Beta","type":"concept","subtype":"topic","confidence":0.85}],"claims":[]}),
        usage: %Magus.SuperBrain.Usage{
          model_name: "t",
          total_tokens: 1,
@@ -152,7 +152,7 @@ defmodule Magus.SuperBrain.Workers.BuildSuperIncrementalTest do
       {:ok,
        %{
          content:
-           ~s({"entities":[{"name":"Alpha","type":"concept","subtype":null,"confidence":0.9}],"edges":[]}),
+           ~s({"entities":[{"name":"Alpha","type":"concept","subtype":null,"confidence":0.9}],"claims":[]}),
          usage: %Magus.SuperBrain.Usage{
            model_name: "t",
            total_tokens: 1,
@@ -171,7 +171,7 @@ defmodule Magus.SuperBrain.Workers.BuildSuperIncrementalTest do
       {:ok,
        %{
          content:
-           ~s({"entities":[{"name":"Beta","type":"concept","subtype":"topic","confidence":0.85}],"edges":[]}),
+           ~s({"entities":[{"name":"Beta","type":"concept","subtype":"topic","confidence":0.85}],"claims":[]}),
          usage: %Magus.SuperBrain.Usage{
            model_name: "t",
            total_tokens: 1,
@@ -188,7 +188,7 @@ defmodule Magus.SuperBrain.Workers.BuildSuperIncrementalTest do
       {:ok,
        %{
          content:
-           ~s({"entities":[{"name":"Alpha","type":"concept","subtype":null,"confidence":0.9},{"name":"Beta","type":"concept","subtype":"topic","confidence":0.85}],"edges":[{"subject_name":"Alpha","object_name":"Beta","predicate":"relates_to","confidence":0.8}]}),
+           ~s({"entities":[{"name":"Alpha","type":"concept","subtype":null,"confidence":0.9},{"name":"Beta","type":"concept","subtype":"topic","confidence":0.85}],"claims":[{"subject_name":"Alpha","object_name":"Beta","predicate":"relates_to","polarity":"affirms","claim_text":"Alpha relates_to Beta.","confidence":0.8}]}),
          usage: %Magus.SuperBrain.Usage{
            model_name: "t",
            total_tokens: 1,
@@ -330,7 +330,7 @@ defmodule Magus.SuperBrain.Workers.BuildSuperIncrementalTest do
       {:ok,
        %{
          content:
-           ~s({"entities":[{"name":"Alice","type":"person","subtype":null,"confidence":0.9},{"name":"Aurora","type":"project","subtype":null,"confidence":0.9}],"edges":[{"subject_name":"Alice","object_name":"Aurora","predicate":"supports","confidence":0.85}]}),
+           ~s({"entities":[{"name":"Alice","type":"person","subtype":null,"confidence":0.9},{"name":"Aurora","type":"project","subtype":null,"confidence":0.9}],"claims":[{"subject_name":"Alice","object_name":"Aurora","predicate":"supports","polarity":"affirms","claim_text":"Alice supports Aurora.","confidence":0.85}]}),
          usage: %Magus.SuperBrain.Usage{
            model_name: "t",
            total_tokens: 1,
@@ -346,7 +346,7 @@ defmodule Magus.SuperBrain.Workers.BuildSuperIncrementalTest do
       {:ok,
        %{
          content:
-           ~s({"entities":[{"name":"Alice","type":"person","subtype":null,"confidence":0.9},{"name":"Aurora","type":"project","subtype":null,"confidence":0.9}],"edges":[{"subject_name":"Alice","object_name":"Aurora","predicate":"contradicts","confidence":0.8}]}),
+           ~s({"entities":[{"name":"Alice","type":"person","subtype":null,"confidence":0.9},{"name":"Aurora","type":"project","subtype":null,"confidence":0.9}],"claims":[{"subject_name":"Alice","object_name":"Aurora","predicate":"contradicts","polarity":"affirms","claim_text":"Alice contradicts Aurora.","confidence":0.8}]}),
          usage: %Magus.SuperBrain.Usage{
            model_name: "t",
            total_tokens: 1,
@@ -622,7 +622,7 @@ defmodule Magus.SuperBrain.Workers.BuildSuperIncrementalTest do
       {:ok,
        %{
          content:
-           ~s({"entities":[{"name":"Daniel","type":"person","subtype":"user","confidence":0.9}],"edges":[]}),
+           ~s({"entities":[{"name":"Daniel","type":"person","subtype":"user","confidence":0.9}],"claims":[]}),
          usage: %Magus.SuperBrain.Usage{
            model_name: "t",
            total_tokens: 1,
@@ -637,7 +637,7 @@ defmodule Magus.SuperBrain.Workers.BuildSuperIncrementalTest do
       {:ok,
        %{
          content:
-           ~s({"entities":[{"name":"Daniel","type":"person","subtype":null,"confidence":0.85}],"edges":[]}),
+           ~s({"entities":[{"name":"Daniel","type":"person","subtype":null,"confidence":0.85}],"claims":[]}),
          usage: %Magus.SuperBrain.Usage{
            model_name: "t",
            total_tokens: 1,
@@ -799,7 +799,7 @@ defmodule Magus.SuperBrain.Workers.BuildSuperIncrementalTest do
       {:ok,
        %{
          content:
-           ~s({"entities":[{"name":"Daniel","type":"person","subtype":"user","confidence":0.9},{"name":"Dan","type":"person","subtype":"user","confidence":0.85}],"edges":[{"subject_name":"Daniel","object_name":"Dan","predicate":"relates_to","confidence":0.8}]}),
+           ~s({"entities":[{"name":"Daniel","type":"person","subtype":"user","confidence":0.9},{"name":"Dan","type":"person","subtype":"user","confidence":0.85}],"claims":[{"subject_name":"Daniel","object_name":"Dan","predicate":"relates_to","polarity":"affirms","claim_text":"Daniel relates_to Dan.","confidence":0.8}]}),
          usage: %Magus.SuperBrain.Usage{
            model_name: "t",
            total_tokens: 1,

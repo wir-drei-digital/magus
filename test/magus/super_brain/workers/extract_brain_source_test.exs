@@ -33,7 +33,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainSourceTest do
     {:ok,
      %{
        content:
-         ~s({"entities":[{"name":"Topic","type":"concept","subtype":null,"confidence":0.8}],"edges":[]}),
+         ~s({"entities":[{"name":"Topic","type":"concept","subtype":null,"confidence":0.8}],"claims":[]}),
        usage: zero_usage()
      }}
   end

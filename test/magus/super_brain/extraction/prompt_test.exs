@@ -32,7 +32,7 @@ defmodule Magus.SuperBrain.Extraction.PromptTest do
     test "system prompt includes JSON schema for output" do
       result = Prompt.build("anything")
       assert result.system =~ ~s("entities":)
-      assert result.system =~ ~s("edges":)
+      assert result.system =~ ~s("claims":)
     end
 
     test "system prompt nudges the LLM toward subtype emission" do
@@ -43,16 +43,13 @@ defmodule Magus.SuperBrain.Extraction.PromptTest do
       assert result.system =~ "character"
     end
 
-    test "system prompt pressures the LLM toward dense, connected edge graphs" do
+    test "system prompt requires claims to be grounded in claim_text and describes polarity" do
       result = Prompt.build("anything")
 
-      # Numeric target ratio + minimum floor for moderate batches.
-      assert result.system =~ "N/2"
-      assert result.system =~ ~r/minimum/i
-      assert result.system =~ ~r/\bN\s*>=\s*3\b/
-
-      # Explicit "isolated entities are not useful" hint.
-      assert result.system =~ ~r/isolated/i
+      assert result.system =~ ~s("claim_text":)
+      assert result.system =~ ~s("polarity":)
+      assert result.system =~ "affirms | negates"
+      assert result.system =~ ~r/MUST be supported by a sentence/
     end
   end
 end

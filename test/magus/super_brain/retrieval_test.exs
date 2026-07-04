@@ -198,7 +198,7 @@ defmodule Magus.SuperBrain.RetrievalTest do
         {:ok,
          %{
            content:
-             ~s({"entities":[{"name":"X","type":"concept","subtype":null,"confidence":0.8}],"edges":[]}),
+             ~s({"entities":[{"name":"X","type":"concept","subtype":null,"confidence":0.8}],"claims":[]}),
            usage: %Magus.SuperBrain.Usage{
              model_name: "t",
              total_tokens: 1,

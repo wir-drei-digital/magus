@@ -33,7 +33,7 @@ defmodule Magus.SuperBrain.Workers.ExtractDraftTest do
     {:ok,
      %{
        content:
-         ~s({"entities":[{"name":"DraftIdea","type":"concept","subtype":null,"confidence":0.8}],"edges":[]}),
+         ~s({"entities":[{"name":"DraftIdea","type":"concept","subtype":null,"confidence":0.8}],"claims":[]}),
        usage: zero_usage()
      }}
   end

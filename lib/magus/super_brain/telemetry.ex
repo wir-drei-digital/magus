@@ -59,11 +59,15 @@ defmodule Magus.SuperBrain.Telemetry do
       `BuildSuperIncremental` when the read-set snapshot does not
       match the current read-set.
 
-    * `[:super_brain, :extraction, :sparse_edges]`
-      Metadata: `%{entity_count, edge_count, user_id}`. Emitted by
-      `Magus.SuperBrain.Extraction.extract/2` when the LLM returns a
-      batch with `entity_count >= 3 and edge_count < 2`. Iter5 Task 3.6
-      observability only: nothing rejects or re-prompts on this signal.
+    * `[:super_brain, :extract, :claims_dropped]`
+      Measurements: `%{count}`. Emitted by
+      `Magus.SuperBrain.Extraction.extract/2` for the number of sanitized
+      claims whose subject or object name was not in the extracted entity
+      set. No-op for `count <= 0`.
+
+    * `[:super_brain, :extract, :claims_emitted]`
+      Measurements: `%{count}`. Emitted when claims are written to the
+      graph. No-op for `count <= 0`.
 
     * `[:super_brain, :migration, :progress]`
       Measurements: `%{total_rows, stale_rows, enqueued,
@@ -136,6 +140,22 @@ defmodule Magus.SuperBrain.Telemetry do
       metadata
     )
   end
+
+  @doc "Emit a one-shot counter for claims written to the graph. No-op for count <= 0."
+  @spec claims_emitted(integer()) :: :ok
+  def claims_emitted(count) when is_integer(count) and count > 0 do
+    :telemetry.execute([:super_brain, :extract, :claims_emitted], %{count: count}, %{})
+  end
+
+  def claims_emitted(_), do: :ok
+
+  @doc "Emit a one-shot counter for claims dropped by the extraction parser. No-op for count <= 0."
+  @spec claims_dropped(integer()) :: :ok
+  def claims_dropped(count) when is_integer(count) and count > 0 do
+    :telemetry.execute([:super_brain, :extract, :claims_dropped], %{count: count}, %{})
+  end
+
+  def claims_dropped(_), do: :ok
 
   @doc """
   Emit a `MigrationSweeper` tick progress event.

@@ -54,7 +54,7 @@ defmodule Magus.SuperBrain.ConvergenceTest do
   end
 
   # Minimal LLM stub: takes the entity name + subtype and emits one
-  # Alice-supports-Bob edge using whatever names the page wants.
+  # Alice-supports-Bob claim using whatever names the page wants.
   defp emit_pair(name_a, sub_a, name_b, sub_b, predicate) do
     fn _, _ ->
       {:ok,
@@ -65,11 +65,13 @@ defmodule Magus.SuperBrain.ConvergenceTest do
                %{name: name_a, type: "person", subtype: sub_a, confidence: 0.9},
                %{name: name_b, type: "project", subtype: sub_b, confidence: 0.9}
              ],
-             edges: [
+             claims: [
                %{
                  subject_name: name_a,
                  object_name: name_b,
                  predicate: predicate,
+                 polarity: "affirms",
+                 claim_text: "#{name_a} #{predicate} #{name_b}.",
                  confidence: 0.85
                }
              ]

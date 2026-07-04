@@ -33,7 +33,7 @@ defmodule Magus.SuperBrain.Workers.ExtractFileChunkTest do
     {:ok,
      %{
        content:
-         ~s({"entities":[{"name":"GraphRAG","type":"concept","subtype":null,"confidence":0.8}],"edges":[]}),
+         ~s({"entities":[{"name":"GraphRAG","type":"concept","subtype":null,"confidence":0.8}],"claims":[]}),
        usage: zero_usage()
      }}
   end
