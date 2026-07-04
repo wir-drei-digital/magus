@@ -17,6 +17,7 @@ defmodule Magus.Agents.Tools.Rag do
     Use this tool when the user asks questions that might be answered by their uploaded documents,
     or when you need to find specific information from PDFs, text files, or other uploaded content.
     Always cite the source document when using information from this tool.
+    Searches raw document excerpts (verbatim file text), not distilled facts.
     """,
     schema: [
       query: [

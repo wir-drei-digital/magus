@@ -29,6 +29,7 @@ defmodule Magus.Agents.Tools.Memory.SearchMemories do
     - "all": Both local and global memories.
 
     Use this when you need to find specific information across multiple memories.
+    Searches your curated conversation and user memories, not cross-source claims.
     """,
     schema: [
       query: [

@@ -19,10 +19,9 @@ defmodule Magus.SuperBrain.Tools.Search do
   use Jido.Action,
     name: "super_brain_search",
     description: """
-    Search the user's super brain across brains, memories, files, and
-    drafts. Returns the most relevant entities with provenance citations
-    (graph name, trust tier, composite score). Use this when you need to
-    surface knowledge from the user's accumulated context.
+    Search your accumulated knowledge for distilled cross-source facts
+    (claims) and entities, with citations. Prefer get_dossier for one
+    specific entity.
     """,
     schema: [
       query: [
@@ -40,6 +39,7 @@ defmodule Magus.SuperBrain.Tools.Search do
 
   require Logger
 
+  alias Magus.SuperBrain.Naming
   alias Magus.SuperBrain.Retrieval
   alias Magus.SuperBrain.Retrieval.Ranker
 
@@ -101,7 +101,9 @@ defmodule Magus.SuperBrain.Tools.Search do
            ) do
         # Super-graph happy path: Layer 2 canonicals wrapped in a map.
         {:ok, %{entities: entities}} when is_list(entities) ->
-          {:ok, %{entities: project_super_graph_entities(entities)}}
+          projected = project_super_graph_entities(entities)
+          {:ok, claims} = Retrieval.search_claims(actor, query_embedding: embedding, limit: 10)
+          {:ok, %{entities: attach_claims(projected, claims)}}
 
         # Super-graph backend errors (e.g. :all_graphs_unavailable or any
         # FalkorDB error surfaced as %{error: reason}). Surface a fixed
@@ -159,6 +161,28 @@ defmodule Magus.SuperBrain.Tools.Search do
         graph_name: candidate.graph_name,
         score: Ranker.score(candidate)
       }
+    end)
+  end
+
+  # Pure grouping step: attaches the top 2 claims (by list order, i.e. recall
+  # rank from `Retrieval.search_claims/2`) to each entity whose `:name` matches
+  # a claim's `subject_name` under `Naming.key/1`. No I/O, so it is
+  # unit-testable with hand-built entities and claims (no DB, no seeding).
+  # Entities with no matching claim get `claims: []`.
+  @doc false
+  def attach_claims(entities, claims) do
+    by_subject = Enum.group_by(claims, &Naming.key(&1.subject_name))
+
+    Enum.map(entities, fn e ->
+      key = Naming.key(Map.get(e, :name))
+
+      tops =
+        by_subject
+        |> Map.get(key, [])
+        |> Enum.take(2)
+        |> Enum.map(&%{text: &1.claim_text, predicate: &1.predicate})
+
+      Map.put(e, :claims, tops)
     end)
   end
 

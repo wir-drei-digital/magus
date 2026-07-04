@@ -258,4 +258,52 @@ defmodule Magus.SuperBrain.Tools.SearchTest do
                Search.run(%{"query" => "Daniel"}, %{user_id: user.id, conversation_id: nil})
     end
   end
+
+  describe "attach_claims/2" do
+    test "attaches the top 2 matching claims to an entity, capped and ordered" do
+      entities = [%{name: "Daniel", type: "person"}]
+
+      claims = [
+        claim("Daniel", "works_at", "Daniel works at Acme."),
+        claim("Daniel", "lives_in", "Daniel lives in Berlin."),
+        claim("Daniel", "likes", "Daniel likes coffee.")
+      ]
+
+      [result] = Search.attach_claims(entities, claims)
+
+      assert result.name == "Daniel"
+      assert length(result.claims) == 2
+
+      assert result.claims == [
+               %{text: "Daniel works at Acme.", predicate: "works_at"},
+               %{text: "Daniel lives in Berlin.", predicate: "lives_in"}
+             ]
+    end
+
+    test "entity with no matching claim gets an empty claims list" do
+      entities = [%{name: "Nobody", type: "person"}]
+      claims = [claim("Daniel", "works_at", "Daniel works at Acme.")]
+
+      [result] = Search.attach_claims(entities, claims)
+
+      assert result.claims == []
+    end
+
+    test "matches subject names case-insensitively and across whitespace, via Naming.key/1" do
+      entities = [%{name: "  Daniel   Milenkovic ", type: "person"}]
+      claims = [claim("daniel milenkovic", "role", "Daniel Milenkovic is an engineer.")]
+
+      [result] = Search.attach_claims(entities, claims)
+
+      assert result.claims == [%{text: "Daniel Milenkovic is an engineer.", predicate: "role"}]
+    end
+
+    test "returns [] unmodified when the entity list is empty" do
+      assert Search.attach_claims([], [claim("Daniel", "role", "text")]) == []
+    end
+
+    defp claim(subject_name, predicate, claim_text) do
+      %{subject_name: subject_name, predicate: predicate, claim_text: claim_text}
+    end
+  end
 end
