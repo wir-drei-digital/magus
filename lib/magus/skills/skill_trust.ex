@@ -16,6 +16,7 @@ defmodule Magus.Skills.SkillTrust do
     repo Magus.Repo
 
     references do
+      reference :user, on_delete: :delete
       reference :skill, on_delete: :delete
     end
   end

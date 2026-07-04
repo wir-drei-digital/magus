@@ -25,7 +25,8 @@ defmodule Magus.Repo.Migrations.AddSkillTrusts do
             column: :id,
             name: "skill_trusts_user_id_fkey",
             type: :uuid,
-            prefix: "public"
+            prefix: "public",
+            on_delete: :delete_all
           ), null: false
 
       add :skill_id,
