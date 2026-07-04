@@ -37,13 +37,41 @@ defmodule Magus.Eval.Subject.Live do
   @impl true
   def ingest(ctx, items) do
     items
-    |> pair_turns()
-    |> Enum.each(fn {user_text, agent_text} ->
-      force_extract(ctx, user_text, agent_text)
-    end)
+    |> to_windows()
+    |> Enum.each(fn pairs -> extract_window(ctx, pairs) end)
 
     settle_extraction()
     {:ok, ctx}
+  end
+
+  # Group ingest items into extraction windows, then pair user->agent turns
+  # within each window. Items carrying a :session tag (LongMemEval) become one
+  # window per session; untagged items (small benchmarks) form a single window.
+  # This mirrors production, where a debounce window is extracted once rather
+  # than once per turn-pair, and it cuts LongMemEval extraction calls ~10x.
+  defp to_windows(items) do
+    if Enum.any?(items, &Map.has_key?(&1, :session)) do
+      items
+      |> Enum.chunk_by(&Map.get(&1, :session))
+      |> Enum.map(&pair_turns/1)
+      |> Enum.reject(&(&1 == []))
+    else
+      case pair_turns(items) do
+        [] -> []
+        pairs -> [pairs]
+      end
+    end
+  end
+
+  # Baseline production (load_last_turn) extracts only the last (user, agent)
+  # pair of a debounce window. A replayed session is one window, so extract its
+  # last pair. The windowed-extraction hardening (memory hardening plan, Task 3)
+  # changes this to pass every pair in the window.
+  defp extract_window(ctx, pairs) do
+    case List.last(pairs) do
+      {user_text, agent_text} -> force_extract(ctx, user_text, agent_text)
+      _ -> :ok
+    end
   end
 
   @impl true
