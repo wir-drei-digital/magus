@@ -2,7 +2,10 @@ defmodule Magus.Skills.SkillTrustTest do
   use Magus.DataCase, async: true
   import Magus.Generators
 
+  require Ash.Query
+
   alias Magus.Skills.Approval
+  alias Magus.Skills.SkillTrust
 
   setup do
     user = generate(user())
@@ -27,6 +30,28 @@ defmodule Magus.Skills.SkillTrustTest do
 
     stale = %{s | bundle_sha: "deadbeef"}
     refute Approval.trusted?(u.id, stale)
+  end
+
+  test "hard-deleting a trusting user cascades their skill trusts (account deletion path)", %{
+    skill: s
+  } do
+    # A truster who does NOT own the skill, so the only FK exercised by the raw
+    # user delete is skill_trusts.user_id (the skill-owner's own resources are
+    # cleaned up separately in the real AccountDeletion flow).
+    truster = generate(user())
+    {:ok, trust} = Magus.Skills.trust_skill(%{skill_id: s.id}, actor: truster)
+    assert Approval.trusted?(truster.id, s)
+
+    # Mirrors Magus.Accounts.AccountDeletion.delete_user_row/1, which ends in a
+    # raw Ecto delete of the User row. Without the user FK cascade this raises a
+    # foreign-key violation and the whole account-deletion transaction aborts.
+    assert %Magus.Accounts.User{} = Magus.Repo.delete!(truster)
+
+    assert {:error, _} = Ash.get(SkillTrust, trust.id, authorize?: false)
+
+    assert SkillTrust
+           |> Ash.Query.filter(user_id == ^truster.id)
+           |> Ash.read!(authorize?: false) == []
   end
 
   defp build_zip(entries) do

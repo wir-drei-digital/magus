@@ -68,7 +68,7 @@
           "strategy": null
         },
         "name": "skill_trusts_user_id_fkey",
-        "on_delete": null,
+        "on_delete": "delete",
         "on_update": null,
         "primary_key?": true,
         "schema": "public",
@@ -117,7 +117,7 @@
   "custom_indexes": [],
   "custom_statements": [],
   "has_create_action": true,
-  "hash": "C9E6692882CBC87ADC6E7137E0C3594AD9CF14A12A6F2FAF7928929666A69F34",
+  "hash": "ABBFB4BA3923D79122E2F832222380CB2012CDDB5D27F8706689557B91FB31D7",
   "identities": [
     {
       "all_tenants?": false,
