@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { Columns3, LayoutList, SquareKanban, Zap, Lock } from '@lucide/svelte';
+	import { Columns3, LayoutList, SquareKanban, Zap, Lock, Plus } from '@lucide/svelte';
 	import type { PlanTask } from '$lib/ash/api';
 	import TaskCard from './task-card.svelte';
 	import TaskList from './task-list.svelte';
+	import AddTaskDialog from './add-task-dialog.svelte';
 	import { untrack } from 'svelte';
 	import {
 		PlanBoardStore,
@@ -20,6 +21,7 @@
 	// the $effect below owns re-creation + reload when the id actually changes.
 	let store = $state(untrack(() => new PlanBoardStore(brainPageId)));
 	let view = $state<BoardView>(untrack(() => loadBoardView(brainPageId)));
+	let addOpen = $state(false);
 
 	let mounted = false;
 	$effect(() => {
@@ -147,6 +149,17 @@
 		</div>
 
 		<div class="flex items-center gap-2">
+			<!-- Add task -->
+			<button
+				type="button"
+				data-testid="plan-board-add-task"
+				onclick={() => (addOpen = true)}
+				class="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+			>
+				<Plus class="size-3.5" />
+				Add task
+			</button>
+
 			<!-- Ready work pill -->
 			<button
 				type="button"
@@ -212,6 +225,15 @@
 				Break this plan into tasks. Ready work can be claimed by you or an agent, then tracked
 				across To&nbsp;Do, In&nbsp;Progress, and Done.
 			</p>
+			<button
+				type="button"
+				data-testid="plan-board-empty-add"
+				onclick={() => (addOpen = true)}
+				class="mt-1 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+			>
+				<Plus class="size-3.5" />
+				Add task
+			</button>
 		</div>
 	{:else if view === 'list'}
 		<div class="min-h-0 overflow-y-auto">
@@ -290,3 +312,5 @@
 		</div>
 	{/if}
 </section>
+
+<AddTaskDialog bind:open={addOpen} {store} />

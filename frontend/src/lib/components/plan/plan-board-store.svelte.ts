@@ -271,4 +271,36 @@ export class PlanBoardStore {
 		if (result.success) this.upsert(result.data);
 		else await this.refetch();
 	}
+
+	/**
+	 * Create a task from the full add-task form: title (required) plus optional
+	 * description, priority, and due date. Mirrors `addTask`'s upsert/refetch
+	 * handling; returns true on success so the dialog can close.
+	 */
+	async createTask(input: {
+		title: string;
+		description?: string;
+		priority?: TaskPriority;
+		dueAt?: string | null;
+	}): Promise<boolean> {
+		const title = input.title.trim();
+		if (!title) return false;
+		const payload: {
+			title: string;
+			description?: string;
+			priority?: TaskPriority;
+			dueAt?: string | null;
+		} = { title };
+		const description = input.description?.trim();
+		if (description) payload.description = description;
+		if (input.priority) payload.priority = input.priority;
+		if (input.dueAt) payload.dueAt = input.dueAt;
+		const result = await createPlanTask(this.brainPageId, payload);
+		if (result.success) {
+			this.upsert(result.data);
+			return true;
+		}
+		await this.refetch();
+		return false;
+	}
 }
