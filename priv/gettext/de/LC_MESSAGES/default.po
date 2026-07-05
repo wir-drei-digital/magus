@@ -5903,8 +5903,8 @@ msgstr[1] "%{count} Unterhaltungen und alle Nachrichten"
 #, elixir-autogen, elixir-format
 msgid "%{count} extra seat"
 msgid_plural "%{count} extra seats"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%{count} zusätzlicher Platz"
+msgstr[1] "%{count} zusätzliche Plätze"
 
 #: lib/magus_web/workbench/layout/mode_strip.ex:271
 #, elixir-autogen, elixir-format
@@ -6156,7 +6156,7 @@ msgstr ""
 #: lib/magus/agents/plugins/support/error_messages.ex:64
 #, elixir-autogen, elixir-format
 msgid "Rate limit reached. Please wait a moment and try again."
-msgstr ""
+msgstr "Ratenlimit erreicht. Warte einen Moment und versuche es erneut."
 
 #: lib/magus_web/legacy/workspace_live/members.ex:196
 #, elixir-autogen, elixir-format
@@ -6193,7 +6193,7 @@ msgstr ""
 #: lib/magus_web/workspaces/seats_live.ex:311
 #, elixir-autogen, elixir-format
 msgid "Seat count updated."
-msgstr ""
+msgstr "Anzahl der Plätze aktualisiert."
 
 #: lib/magus_web/workbench/agents/components/knowledge_section_component.ex:140
 #, elixir-autogen, elixir-format
@@ -6213,17 +6213,17 @@ msgstr "Neues Passwort"
 #: lib/magus/agents/plugins/support/error_messages.ex:54
 #, elixir-autogen, elixir-format
 msgid "The content exceeds the selected model's context window. Try a model with a larger context or shorten the input."
-msgstr ""
+msgstr "Der Inhalt überschreitet das Kontextfenster des gewählten Modells. Probiere ein Modell mit größerem Kontext oder kürze die Eingabe."
 
 #: lib/magus/agents/plugins/support/error_messages.ex:58
 #, elixir-autogen, elixir-format
 msgid "The model rejected the request. Please try again or switch models."
-msgstr ""
+msgstr "Das Modell hat die Anfrage abgelehnt. Versuche es erneut oder wechsle das Modell."
 
 #: lib/magus_web/workspaces/accept_invite.ex:56
 #, elixir-autogen, elixir-format
 msgid "This invitation has expired. Ask the workspace owner to resend it."
-msgstr ""
+msgstr "Diese Einladung ist abgelaufen. Bitte den Workspace-Eigentümer, sie erneut zu senden."
 
 #: lib/magus_web/legacy/settings_live/delete_account_modal_component.ex:86
 #: lib/magus_web/legacy/workspace_live/settings.ex:217
@@ -6454,17 +6454,17 @@ msgstr ""
 #: lib/magus_web/workspaces/accept_seat_invite.ex:118
 #, elixir-autogen, elixir-format
 msgid "%{sponsor} is offering you a %{plan} seat on Magus."
-msgstr ""
+msgstr "%{sponsor} bietet dir einen %{plan}-Platz bei Magus an."
 
 #: lib/magus_web/workspaces/accept_seat_invite.ex:87
 #, elixir-autogen, elixir-format
 msgid "A teammate"
-msgstr ""
+msgstr "Ein Teammitglied"
 
 #: lib/magus_web/workspaces/seats_live.ex:116
 #, elixir-autogen, elixir-format
 msgid "Active and pending grants"
-msgstr ""
+msgstr "Aktive und ausstehende Zuweisungen"
 
 #: lib/magus_web/workbench/resources/agent_view.ex:215
 #, elixir-autogen, elixir-format, fuzzy
@@ -6627,7 +6627,7 @@ msgstr "Dateien hier ablegen oder klicke auf +, um hochzuladen."
 #: lib/magus_web/workspaces/seats_live.ex:214
 #, elixir-autogen, elixir-format
 msgid "Extra seats are not available on your plan."
-msgstr ""
+msgstr "Zusätzliche Plätze sind in deinem Tarif nicht verfügbar."
 
 #: lib/magus_web/workbench/chat/components/brain/blocks/file_block_component.ex:42
 #, elixir-autogen, elixir-format
@@ -6685,7 +6685,7 @@ msgstr ""
 #: lib/magus_web/workspaces/seats_live.ex:99
 #, elixir-autogen, elixir-format
 msgid "Invite a teammate"
-msgstr ""
+msgstr "Teammitglied einladen"
 
 #: lib/magus_web/workspaces/seats_live.ex:166
 #, elixir-autogen, elixir-format, fuzzy
@@ -6843,7 +6843,7 @@ msgstr "Link widerrufen"
 #: lib/magus_web/workspaces/seats_live.ex:218
 #, elixir-autogen, elixir-format
 msgid "Revoke a seat before reducing your seat count."
-msgstr ""
+msgstr "Entziehe einen Platz, bevor du die Anzahl der Plätze reduzierst."
 
 #: lib/magus_web/workbench/resources/file_browser_view/folder_picker_modal.ex:42
 #, elixir-autogen, elixir-format
@@ -6858,18 +6858,18 @@ msgstr "Workspace-Einladung"
 #: lib/magus_web/workspaces/seats_live.ex:327
 #, elixir-autogen, elixir-format
 msgid "Seat charge applied, but our records didn't sync. Refresh in a moment."
-msgstr ""
+msgstr "Platz berechnet, aber unsere Daten wurden nicht synchronisiert. Lade in einem Moment neu."
 
 #: lib/magus_web/workspaces/seats_live.ex:187
 #: lib/magus_web/workspaces/seats_live.ex:190
 #, elixir-autogen, elixir-format
 msgid "Seat grant not found."
-msgstr ""
+msgstr "Platz-Zuweisung nicht gefunden."
 
 #: lib/magus_web/workspaces/seats_live.ex:184
 #, elixir-autogen, elixir-format
 msgid "Seat revoked."
-msgstr ""
+msgstr "Platz entzogen."
 
 #: lib/magus_web/workspaces/seats_live.ex:66
 #, elixir-autogen, elixir-format, fuzzy
@@ -6886,7 +6886,7 @@ msgstr "Platz-Nutzung"
 #: lib/magus_web/workspaces/seats_live.ex:108
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Send invite"
-msgstr ""
+msgstr "Einladung senden"
 
 #: lib/magus_web/workbench/resources/file_browser_view/context_menu.ex:63
 #: lib/magus_web/workbench/resources/file_browser_view/context_menu.ex:104
@@ -6980,7 +6980,7 @@ msgstr "Dieser Ordner ist nicht verfügbar."
 #: lib/magus_web/workspaces/accept_seat_invite.ex:61
 #, elixir-autogen, elixir-format, fuzzy
 msgid "This invitation has expired. Ask the sponsor to resend it."
-msgstr ""
+msgstr "Diese Einladung ist abgelaufen. Bitte den Sponsor, sie erneut zu senden."
 
 #: lib/magus_web/workbench/detail/usage_section.ex:148
 #: lib/magus_web/workbench/detail/usage_section.ex:317
@@ -7056,7 +7056,7 @@ msgstr "Benutzer"
 #: lib/magus_web/workspaces/seats_live.ex:58
 #, elixir-autogen, elixir-format
 msgid "View Plans"
-msgstr ""
+msgstr "Tarife ansehen"
 
 #: lib/magus_web/workbench/resources/agent_view.ex:465
 #, elixir-autogen, elixir-format, fuzzy
@@ -7077,17 +7077,17 @@ msgstr "Workspaces"
 #: lib/magus_web/workspaces/accept_seat_invite.ex:52
 #, elixir-autogen, elixir-format
 msgid "You're now on %{sponsor}'s seat."
-msgstr ""
+msgstr "Du nutzt jetzt den Platz von %{sponsor}."
 
 #: lib/magus_web/workspaces/accept_seat_invite.ex:115
 #, elixir-autogen, elixir-format
 msgid "You've been offered a seat!"
-msgstr ""
+msgstr "Dir wurde ein Platz angeboten!"
 
 #: lib/magus_web/workspaces/seats_live.ex:55
 #, elixir-autogen, elixir-format
 msgid "Your current plan does not include sponsored seats."
-msgstr ""
+msgstr "Dein aktueller Tarif enthält keine gesponserten Plätze."
 
 #: lib/magus_web/workspaces/seats_live.ex:104
 #, elixir-autogen, elixir-format, fuzzy
@@ -7813,8 +7813,8 @@ msgstr ""
 #, elixir-autogen, elixir-format
 msgid "model"
 msgid_plural "models"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Modell"
+msgstr[1] "Modelle"
 
 #: lib/magus_web/legacy/settings_live/subscription_live.ex:235
 #, elixir-autogen, elixir-format
