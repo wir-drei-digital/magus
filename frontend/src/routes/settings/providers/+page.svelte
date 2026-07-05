@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { ChevronDown, ChevronRight, Pencil, Plus, RefreshCw, Trash2 } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
@@ -26,7 +27,9 @@
 	} from '$lib/ash/api';
 	import {
 		PROVIDER_TYPES,
+		SUBSCRIPTION_SETTINGS_PATH,
 		badgeKind,
+		isPaidPlanRequired,
 		requiresBaseUrl,
 		type ProviderType
 	} from '$lib/components/settings/providers/provider-form';
@@ -36,6 +39,10 @@
 		pickerMode,
 		type RemoteListStatus
 	} from '$lib/components/settings/providers/model-picker';
+	import {
+		parseTemplateParam,
+		type ModelTemplate
+	} from '$lib/components/settings/providers/model-template';
 
 	// Tailwind classes per badge kind. Kept out of the pure module (which decides
 	// the kind) so tests stay structural and never assert on CSS.
@@ -113,6 +120,9 @@
 	let saveError = $state<string | null>(null);
 	let baseUrlError = $state<string | null>(null);
 	let typeError = $state<string | null>(null);
+	// Set when the cloud ProviderGate rejects the save for lack of a paid plan;
+	// swaps the generic form error for an upgrade CTA linking to subscriptions.
+	let gateUpgrade = $state(false);
 
 	let name = $state('');
 	let providerType = $state<ProviderType>('anthropic');
@@ -123,7 +133,49 @@
 	const showBaseUrl = $derived(requiresBaseUrl(providerType));
 	const dialogTitle = $derived(editing ? 'Edit provider' : 'Add provider');
 
-	onMount(() => void load());
+	// Clone/prefill: a `?template=<json>` param seeds the add-model form from a
+	// catalog model. If the user owns no provider we open the create-provider form
+	// FIRST and keep the param in the URL so the prefill survives that detour; the
+	// param is stripped only once the add-model dialog actually consumes it.
+	let pendingTemplate = $state<ModelTemplate | null>(null);
+	let templateConsumed = false;
+	// Ensures the create-provider detour is auto-opened at most once, so canceling
+	// it does not immediately reopen the dialog on the next reactive tick.
+	let templatePromptedCreate = false;
+
+	onMount(() => {
+		pendingTemplate = parseTemplateParam(
+			new URLSearchParams(window.location.search).get('template')
+		);
+		void load();
+	});
+
+	// Runs after every provider list change (initial load and after a create): the
+	// moment an owned provider exists, consume the pending template into a prefilled
+	// add-model dialog and strip the param so a refresh does not re-trigger it.
+	$effect(() => {
+		if (templateConsumed || !pendingTemplate || loading) return;
+		if (providers.length === 0) {
+			// No compatible provider yet: prompt provider creation once, keeping the
+			// param so the prefill survives; consumed once a provider exists.
+			if (!templatePromptedCreate) {
+				templatePromptedCreate = true;
+				openCreate();
+			}
+			return;
+		}
+		const template = pendingTemplate;
+		templateConsumed = true;
+		pendingTemplate = null;
+		stripTemplateParam();
+		void openAddModel(providers[0], template);
+	});
+
+	function stripTemplateParam() {
+		const url = new URL(window.location.href);
+		url.searchParams.delete('template');
+		void goto(`${url.pathname}${url.search}`, { replaceState: true, noScroll: true });
+	}
 
 	async function load() {
 		loading = true;
@@ -192,11 +244,18 @@
 		saveError = null;
 		baseUrlError = null;
 		typeError = null;
+		gateUpgrade = false;
 	}
 
 	/** Route Ash field errors onto their control; keep the rest as a form error. */
 	function applyErrors(errors: RpcError[]) {
 		clearErrors();
+		// A paid-plan gate rejection short-circuits field routing: it is not a
+		// fixable input error, so show the upgrade CTA instead of a form message.
+		if (isPaidPlanRequired(errors)) {
+			gateUpgrade = true;
+			return;
+		}
 		const leftover: RpcError[] = [];
 		for (const err of errors) {
 			const fields = err.fields ?? [];
@@ -323,15 +382,19 @@
 		}
 	}
 
-	async function openAddModel(provider: ProviderEntry) {
+	async function openAddModel(provider: ProviderEntry, template?: ModelTemplate) {
 		modelProvider = provider;
-		modelId = '';
-		modelName = '';
-		modelIdQuery = '';
-		contextWindow = '';
-		inputCost = '';
-		outputCost = '';
-		manualEntry = false;
+		// Prefill from a clone/template when present; otherwise start blank. Costs and
+		// context are omitted from the template when unknown, so they stay empty.
+		modelId = template?.modelId ?? '';
+		modelName = template?.name ?? '';
+		modelIdQuery = template?.modelId ?? '';
+		contextWindow = template?.contextWindow != null ? String(template.contextWindow) : '';
+		inputCost = template?.inputCost != null ? String(template.inputCost) : '';
+		outputCost = template?.outputCost != null ? String(template.outputCost) : '';
+		// A prefilled id is user-editable free text; force free-text so the probed
+		// picker does not clobber the cloned value on open.
+		manualEntry = template != null;
 		remoteIds = [];
 		remoteStatus = 'unavailable';
 		clearModelErrors();
@@ -646,7 +709,21 @@
 				/>
 			</Field>
 
-			{#if saveError}
+			{#if gateUpgrade}
+				<div class="rounded-lg border border-dashed p-3 text-xs" data-testid="provider-gate-cta">
+					<p class="font-medium">Bring-your-own keys need a paid plan.</p>
+					<p class="mt-1 text-muted-foreground">
+						Upgrade your subscription to add your own provider keys.
+					</p>
+					<a
+						href={SUBSCRIPTION_SETTINGS_PATH}
+						class="mt-2 inline-block underline underline-offset-2 hover:text-foreground"
+						data-testid="provider-gate-cta-link"
+					>
+						View plans
+					</a>
+				</div>
+			{:else if saveError}
 				<p class="text-xs text-destructive" data-testid="provider-save-error">{saveError}</p>
 			{/if}
 

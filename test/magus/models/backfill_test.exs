@@ -13,7 +13,7 @@ defmodule Magus.Models.BackfillTest do
         api_provider: :openrouter,
         context_window: 1_000_000
       })
-      |> Ash.create()
+      |> Ash.create(authorize?: false)
 
     {:ok, _} =
       Magus.Chat.Model
@@ -24,7 +24,7 @@ defmodule Magus.Models.BackfillTest do
         api_provider: :xai,
         context_window: 100_000
       })
-      |> Ash.create()
+      |> Ash.create(authorize?: false)
 
     assert :ok = Backfill.run()
 
@@ -51,7 +51,7 @@ defmodule Magus.Models.BackfillTest do
         api_provider: :openrouter,
         context_window: 100_000
       })
-      |> Ash.create()
+      |> Ash.create(authorize?: false)
 
     assert :ok = Backfill.run()
     assert :ok = Backfill.run()
@@ -69,7 +69,7 @@ defmodule Magus.Models.BackfillTest do
         context_window: 1_000_000,
         llm_metadata: %{"output_limit" => 9_999}
       })
-      |> Ash.create()
+      |> Ash.create(authorize?: false)
 
     assert :ok = Backfill.run()
 

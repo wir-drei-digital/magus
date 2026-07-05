@@ -125,7 +125,7 @@ defmodule Magus.Models.ProviderTest do
           provider: "Test",
           model_provider_id: provider.id
         })
-        |> Ash.create!()
+        |> Ash.create!(authorize?: false)
 
       # The FK on models.model_provider_id has no ON DELETE action, so deleting
       # a provider that still has models is blocked at the DB level and surfaces

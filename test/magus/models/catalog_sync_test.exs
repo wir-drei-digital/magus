@@ -37,7 +37,7 @@ defmodule Magus.Models.CatalogSyncTest do
         attrs
       )
     )
-    |> Ash.create!()
+    |> Ash.create!(authorize?: false)
   end
 
   test "groups models by provider slug with name and base_url", ctx do
@@ -295,7 +295,7 @@ defmodule Magus.Models.CatalogSyncTest do
                  key: "openrouter:dup/key",
                  provider: "Test"
                })
-               |> Ash.create()
+               |> Ash.create(authorize?: false)
     end
   end
 
@@ -310,7 +310,7 @@ defmodule Magus.Models.CatalogSyncTest do
                  model_provider_id: ctx.openrouter.id,
                  input_modalities: ["text", "definitely_not_valid"]
                })
-               |> Ash.create()
+               |> Ash.create(authorize?: false)
     end
 
     test "known modalities are accepted on create", ctx do
@@ -324,7 +324,7 @@ defmodule Magus.Models.CatalogSyncTest do
                  input_modalities: ["text", "image", "file"],
                  output_modalities: ["text", "video"]
                })
-               |> Ash.create()
+               |> Ash.create(authorize?: false)
     end
   end
 end

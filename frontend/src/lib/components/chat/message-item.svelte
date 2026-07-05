@@ -28,6 +28,7 @@
 		ZapOff
 	} from '@lucide/svelte';
 	import type { ChatMessage, CompanionSpec, DisplayAttachment } from '$lib/ash/api';
+	import { isBrokenSelection } from '$lib/chat/broken-selection';
 	import { toolViewFromPersisted } from '$lib/chat/events';
 	import { eventVisual } from '$lib/chat/event-style';
 	import {
@@ -52,6 +53,7 @@
 		onOpenPdf,
 		onToggleDisabled,
 		onRetry,
+		onResetBrokenSelection,
 		onCreatePrompt,
 		onOpenCompanion,
 		conversationId
@@ -68,6 +70,9 @@
 		onToggleDisabled?: (id: string) => void;
 		/** Re-sends this message's text (user messages only). */
 		onRetry?: (text: string) => void;
+		/** Resets the scoped model selection and retries the blocked message
+		 *  behind a broken-selection event (event messages only). */
+		onResetBrokenSelection?: (messageId: string) => void;
 		/** Opens the prompt creation dialog prefilled with this text. */
 		onCreatePrompt?: (text: string) => void;
 		/** Opens a companion from a tool card's action button (View Draft, etc.). */
@@ -92,6 +97,9 @@
 	const isUser = $derived(message.source === 'user');
 	const isEvent = $derived(message.messageType !== 'message');
 	const toolData = $derived(message.toolCallData);
+	// A degraded-model hard-stop event (Task 1): its tool_call_data is the
+	// broken_model_selection payload, not a tool result; render remediation.
+	const brokenSelection = $derived(isEvent && isBrokenSelection(toolData));
 	const canBranch = $derived(
 		message.status === 'complete' && (onStartThread !== undefined || thread !== null)
 	);
@@ -352,7 +360,27 @@
 {/snippet}
 
 {#if isEvent}
-	{#if toolData}
+	{#if brokenSelection}
+		<!-- Degraded-model hard-stop (Task 1): the message text explains the
+		     failure; the action clears the scoped selection and retries. -->
+		<div class="flex flex-col gap-1.5 py-0.5" data-role="event" data-event="broken_selection">
+			<div class="flex items-center gap-2 text-sm">
+				<AlertTriangle class="size-4 shrink-0 text-warning" />
+				<span class="text-muted-foreground">{message.text}</span>
+			</div>
+			{#if onResetBrokenSelection}
+				<button
+					type="button"
+					class="ml-6 self-start rounded-md border border-input px-2 py-1 text-xs text-foreground transition-colors hover:bg-accent"
+					data-testid="broken-selection-reset"
+					onclick={() => onResetBrokenSelection(message.id)}
+				>
+					<RefreshCw class="mr-1 inline size-3.5" />
+					Reset to default and retry
+				</button>
+			{/if}
+		</div>
+	{:else if toolData}
 		<!-- Persisted tool event: same collapsible card as the live tool, so it
 		     settles into its persisted twin without a visual jump. -->
 		<div data-role="event">

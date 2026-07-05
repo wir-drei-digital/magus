@@ -171,7 +171,7 @@ defmodule Magus.Models.ResolverTest do
           context_window: 1_000,
           model_provider_id: provider.id
         })
-        |> Ash.create!()
+        |> Ash.create!(authorize?: false)
 
       {:ok, res} =
         Resolver.resolve(nil, %{
