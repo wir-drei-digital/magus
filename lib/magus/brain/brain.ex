@@ -27,6 +27,7 @@ defmodule Magus.Brain do
       rpc_action :brain_page_children, :children_of
       rpc_action :trashed_brain_pages, :trashed
       rpc_action :brain_pages, :for_brain
+      rpc_action :brain_templates, :templates_for_brain
       rpc_action :save_brain_page_prosemirror, :save_prosemirror
       rpc_action :create_brain_page, :create
       rpc_action :brain_page_version_diff, :version_diff

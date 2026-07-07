@@ -3903,6 +3903,8 @@ export type BrainSummary = {
 	id: string;
 	title: string;
 	description: string | null;
+	/** The brain constitution: always-on markdown guidance the agent reads every turn. */
+	instructions: string | null;
 	icon: string | null;
 	color: string | null;
 	workspaceId: string | null;
@@ -3913,6 +3915,7 @@ const BRAIN_FIELDS: rpc.MyBrainsFields = [
 	'id',
 	'title',
 	'description',
+	'instructions',
 	'icon',
 	'color',
 	'workspaceId',
@@ -3929,12 +3932,13 @@ export function workspaceBrains(workspaceId: string): Promise<RpcResult<BrainSum
 	);
 }
 
-/** Update a brain's metadata (settings modal: title/description/icon/color). */
+/** Update a brain's metadata (settings modal: title/description/icon/color/instructions). */
 export function updateBrain(
 	id: string,
 	input: {
 		title?: string;
 		description?: string | null;
+		instructions?: string | null;
 		icon?: string | null;
 		color?: string | null;
 	}
@@ -4047,6 +4051,41 @@ export function getBrainPageForEdit(id: string): Promise<RpcResult<BrainPageEdit
 /** All pages of a brain — wikilink suggestion source. */
 export function brainPages(brainId: string): Promise<RpcResult<PageTreeNode[]>> {
 	return run((opts) => rpc.brainPages({ input: { brainId }, fields: PAGE_NODE_FIELDS, ...opts }));
+}
+
+export type TypeEntry = {
+	id: string;
+	title: string;
+	/** First non-heading line of the template body (a template has no dedicated description field yet). */
+	description: string;
+};
+
+const TEMPLATE_FIELDS: rpc.BrainTemplatesFields = ['id', 'title', 'body'];
+
+/** First non-empty, non-heading line of a markdown body (mirrors `Magus.Brain.Guide.first_body_line/1`). */
+function firstBodyLine(body: string | null): string {
+	if (!body) return '';
+	for (const raw of body.split('\n')) {
+		const line = raw.trim();
+		if (line !== '' && !/^#{1,6}(\s|$)/.test(line)) return line;
+	}
+	return '';
+}
+
+/** The brain's `:template` pages (the Guide's types index, rendered by `types-view.svelte`). */
+export async function templatesForBrain(brainId: string): Promise<RpcResult<TypeEntry[]>> {
+	const result = await run<{ id: string; title: string | null; body: string | null }[]>((opts) =>
+		rpc.brainTemplates({ input: { brainId }, fields: TEMPLATE_FIELDS, ...opts })
+	);
+	if (!result.success) return result;
+	return {
+		success: true,
+		data: result.data.map((template) => ({
+			id: template.id,
+			title: template.title || 'Untitled',
+			description: firstBodyLine(template.body)
+		}))
+	};
 }
 
 export type SaveProsemirrorResult =
