@@ -202,6 +202,117 @@ defmodule Magus.Brain.FrontmatterTest do
         Frontmatter.dump(%{icon: "🧠"})
       end
     end
+
+    test "round-trips a multi-line scalar via a double-quoted YAML escape" do
+      matter = %{"instructions" => "a\nb"}
+      dumped = Frontmatter.dump(matter)
+
+      assert String.starts_with?(dumped, "---\n")
+      assert String.ends_with?(dumped, "---\n")
+      # Serialized on a single logical line (double-quoted scalar), not a
+      # raw newline splitting the YAML mapping entry.
+      assert dumped =~ ~s(instructions: "a\\nb")
+
+      reparsed_body = dumped <> "body"
+      assert {parsed, "body"} = Frontmatter.parse(reparsed_body)
+      assert parsed["instructions"] == "a\nb"
+    end
+
+    test "round-trips a scalar containing backslash, quote, tab, and carriage return" do
+      matter = %{"instructions" => "a\\b\"c\td\re"}
+      dumped = Frontmatter.dump(matter)
+
+      reparsed_body = dumped <> "body"
+      assert {parsed, "body"} = Frontmatter.parse(reparsed_body)
+      assert parsed["instructions"] == "a\\b\"c\td\re"
+    end
+
+    test "round-trips a multi-paragraph multi-line scalar (minus one trailing newline)" do
+      text = "Section guide:\n\n- Cite sources.\n- Keep entries dated.\n"
+      matter = %{"instructions" => text}
+      dumped = Frontmatter.dump(matter)
+
+      reparsed_body = dumped <> "body"
+      assert {parsed, "body"} = Frontmatter.parse(reparsed_body)
+      # The underlying YAML parser (yamerl, via YamlElixir) normalizes a
+      # double-quoted scalar's trailing "\n" escape by dropping exactly one
+      # trailing newline on parse (confirmed: "a\nb\n" -> "a\nb", and
+      # "a\nb\n\n" -> "a\nb", i.e. always exactly one, not "all trailing
+      # newlines"). This is a parser-level normalization, not data loss in
+      # dump/1: a value with no trailing newline round-trips byte-for-byte
+      # (see the "double-quoted YAML escape" test above), and section-guide
+      # prose text has no caller that treats a trailing newline as
+      # semantically meaningful.
+      expected = binary_part(text, 0, byte_size(text) - 1)
+      assert parsed["instructions"] == expected
+    end
+  end
+
+  describe "dump_value fallback (defensive, via dump/1)" do
+    test "serializes a preserved non-scalar/non-list value via to_string/1 instead of crashing" do
+      # `created:`/`modified:` keys can carry a Date/DateTime when a page's
+      # frontmatter map was built programmatically rather than parsed from
+      # YAML text. dump/1 must not crash on these; it should fall back to
+      # to_string/1 rather than only handling binary/number/atom/list.
+      matter = %{"created" => ~D[2026-01-15]}
+      dumped = Frontmatter.dump(matter)
+
+      assert dumped =~ "created: 2026-01-15"
+    end
+
+    test "serializes a DateTime value via to_string/1" do
+      matter = %{"modified" => ~U[2026-01-15 10:30:00Z]}
+      dumped = Frontmatter.dump(matter)
+
+      # to_string/1 on a DateTime yields "2026-01-15 10:30:00Z", which
+      # contains a `:` (a YAML special char per dump_scalar's existing
+      # quoting rule), so it's quoted like any other scalar containing `:`.
+      assert dumped =~ ~s(modified: "2026-01-15 10:30:00Z")
+
+      reparsed_body = dumped <> "body"
+      assert {parsed, "body"} = Frontmatter.parse(reparsed_body)
+      assert parsed["modified"] == "2026-01-15 10:30:00Z"
+    end
+  end
+
+  describe "put/3" do
+    test "adds a key to a body with no existing frontmatter" do
+      body = "# Hello\n\nworld"
+      result = Frontmatter.put(body, "instructions", "Be concise.")
+
+      assert {matter, rest} = Frontmatter.parse(result)
+      assert matter["instructions"] == "Be concise."
+      assert rest == body
+    end
+
+    test "overwrites an existing key while preserving other keys" do
+      body = "---\ninstructions: Old guide.\ntype: Paper\n---\n# X\n"
+      result = Frontmatter.put(body, "instructions", "New guide.")
+
+      assert {matter, rest} = Frontmatter.parse(result)
+      assert matter["instructions"] == "New guide."
+      assert matter["type"] == "Paper"
+      assert rest == "# X\n"
+    end
+
+    test "puts a multi-line value into a body that already has type and tags, preserving both" do
+      body = "---\ntype: Paper\ntags: [a, b]\n---\n# X\n"
+      multi_line = "Line one.\nLine two.\nLine three."
+
+      result = Frontmatter.put(body, "instructions", multi_line)
+
+      assert {matter, rest} = Frontmatter.parse(result)
+      assert matter["instructions"] == multi_line
+      assert matter["type"] == "Paper"
+      assert matter["tags"] == ["a", "b"]
+      assert rest == "# X\n"
+    end
+
+    test "returns an error tuple rather than corrupting the body when frontmatter is malformed" do
+      body = "---\nicon: [unterminated\n---\nx\n"
+
+      assert {:error, :invalid_frontmatter} = Frontmatter.put(body, "instructions", "text")
+    end
   end
 
   describe "normalize_tag/1" do

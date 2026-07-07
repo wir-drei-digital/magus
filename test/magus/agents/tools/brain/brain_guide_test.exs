@@ -257,4 +257,211 @@ defmodule Magus.Agents.Tools.Brain.BrainGuideTest do
       assert error =~ "instructions"
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # set_page_guide
+  # ---------------------------------------------------------------------------
+
+  describe "set_page_guide action" do
+    test "sets a page's instructions frontmatter and a child page inherits it via get_guide" do
+      %{user: user, brain: brain} = setup_brain()
+      parent = create_page!(brain.id, "Research", user)
+      child = create_page!(brain.id, "Attention Is All You Need", user, parent_page_id: parent.id)
+
+      context = default_context(user, brain.id)
+
+      assert {:ok, result} =
+               BrainGuide.run(
+                 %{
+                   action: "set_page_guide",
+                   page_id: parent.id,
+                   instructions: "Keep entries dated and cite primary sources."
+                 },
+                 context
+               )
+
+      assert result.action == "set_page_guide"
+      assert result.page_id == parent.id
+
+      # The frontmatter cache is rebuilt by update_page_body's derived-state
+      # pipeline; confirm it landed there (not just in the raw body string).
+      {:ok, reloaded_parent} = Brain.get_page(parent.id, actor: user)
+      assert reloaded_parent.frontmatter["instructions"] =~ "cite primary sources"
+
+      assert {:ok, guide_result} =
+               BrainGuide.run(%{action: "get_guide", page_id: child.id}, context)
+
+      assert [%{title: "Research", instructions: instructions}] = guide_result.section_guides
+      assert instructions =~ "Keep entries dated and cite primary sources."
+    end
+
+    test "accepts multi-line instructions and round-trips them through get_guide" do
+      %{user: user, brain: brain} = setup_brain()
+      parent = create_page!(brain.id, "Papers", user)
+      child = create_page!(brain.id, "Some Paper", user, parent_page_id: parent.id)
+
+      context = default_context(user, brain.id)
+      multi_line = "Section guide:\n\n- One paper per page.\n- Cite the arXiv link."
+
+      assert {:ok, result} =
+               BrainGuide.run(
+                 %{action: "set_page_guide", page_id: parent.id, instructions: multi_line},
+                 context
+               )
+
+      assert result.action == "set_page_guide"
+
+      assert {:ok, guide_result} =
+               BrainGuide.run(%{action: "get_guide", page_id: child.id}, context)
+
+      assert [%{title: "Papers", instructions: instructions}] = guide_result.section_guides
+      assert instructions =~ "One paper per page."
+      assert instructions =~ "Cite the arXiv link."
+    end
+
+    test "resolves the page by page_title" do
+      %{user: user, brain: brain} = setup_brain()
+      page = create_page!(brain.id, "Titled Page", user)
+
+      context = default_context(user, brain.id)
+
+      assert {:ok, result} =
+               BrainGuide.run(
+                 %{
+                   action: "set_page_guide",
+                   page_title: "Titled Page",
+                   instructions: "Guide text."
+                 },
+                 context
+               )
+
+      assert result.action == "set_page_guide"
+      assert result.page_id == page.id
+    end
+
+    test "merges into existing frontmatter without clobbering type or tags" do
+      %{user: user, brain: brain} = setup_brain()
+      page = create_page!(brain.id, "Typed Page", user)
+
+      page =
+        write_body!(
+          page,
+          "---\ntype: Paper\ntags: [ml, research]\n---\n\n# Typed Page\n",
+          user
+        )
+
+      context = default_context(user, brain.id)
+
+      assert {:ok, _result} =
+               BrainGuide.run(
+                 %{
+                   action: "set_page_guide",
+                   page_id: page.id,
+                   instructions: "One paper per page."
+                 },
+                 context
+               )
+
+      {:ok, reloaded} = Brain.get_page(page.id, actor: user)
+      assert reloaded.frontmatter["instructions"] == "One paper per page."
+      assert reloaded.frontmatter["type"] == "Paper"
+      assert reloaded.frontmatter["tags"] == ["ml", "research"]
+      assert reloaded.body =~ "# Typed Page"
+    end
+
+    test "errors when instructions is missing" do
+      %{user: user, brain: brain} = setup_brain()
+      page = create_page!(brain.id, "Notes", user)
+      context = default_context(user, brain.id)
+
+      assert {:ok, %{error: error}} =
+               BrainGuide.run(%{action: "set_page_guide", page_id: page.id}, context)
+
+      assert error =~ "instructions"
+    end
+
+    test "errors when instructions is blank" do
+      %{user: user, brain: brain} = setup_brain()
+      page = create_page!(brain.id, "Notes", user)
+      context = default_context(user, brain.id)
+
+      assert {:ok, %{error: error}} =
+               BrainGuide.run(
+                 %{action: "set_page_guide", page_id: page.id, instructions: "   "},
+                 context
+               )
+
+      assert error =~ "instructions"
+    end
+
+    test "errors when no page is specified and none is active in context" do
+      %{user: user, brain: brain} = setup_brain()
+      context = default_context(user, brain.id)
+
+      assert {:ok, %{error: error}} =
+               BrainGuide.run(
+                 %{action: "set_page_guide", instructions: "Guide text."},
+                 context
+               )
+
+      # Same "no page specified" message get_guide's equivalent test asserts
+      # on (both actions resolve the page via BrainResolver.resolve_page),
+      # not just a substring match that "set_page_guide" itself would satisfy.
+      assert error =~ "No page specified"
+    end
+
+    test "reports an error instead of corrupting the body when existing frontmatter is malformed" do
+      %{user: user, brain: brain} = setup_brain()
+      page = create_page!(brain.id, "Malformed Frontmatter Page", user)
+      malformed_body = "---\nicon: [unterminated\n---\nx\n"
+      page = write_body!(page, malformed_body, user)
+
+      context = default_context(user, brain.id)
+
+      assert {:ok, %{error: error}} =
+               BrainGuide.run(
+                 %{action: "set_page_guide", page_id: page.id, instructions: "Guide text."},
+                 context
+               )
+
+      assert error =~ "frontmatter"
+
+      {:ok, reloaded} = Brain.get_page(page.id, actor: user)
+      assert reloaded.body == malformed_body
+    end
+
+    test "succeeds even when the page was written by someone else since it was last read" do
+      # set_page_guide resolves the page fresh (via BrainResolver) on every
+      # call rather than trusting a caller-supplied lock_version, so an
+      # intervening write from elsewhere does not produce a false-positive
+      # conflict: the tool's own read is never stale by the time it writes.
+      # (The underlying update_body optimistic-lock mechanism that a genuine
+      # concurrent conflict would hit is exercised directly, independent of
+      # any one caller, in test/magus/brain/page/update_body_test.exs
+      # "optimistic locking".)
+      %{user: user, brain: brain} = setup_brain()
+      page = create_page!(brain.id, "Contested Page", user)
+      {:ok, _bumped} = Brain.update_page_body(page, %{body: "# X", base_version: 0}, actor: user)
+
+      context = default_context(user, brain.id)
+
+      assert {:ok, result} =
+               BrainGuide.run(
+                 %{
+                   action: "set_page_guide",
+                   page_id: page.id,
+                   instructions: "Guide after an intervening write."
+                 },
+                 context
+               )
+
+      assert result.action == "set_page_guide"
+
+      {:ok, reloaded} = Brain.get_page(page.id, actor: user)
+      assert reloaded.frontmatter["instructions"] =~ "Guide after an intervening write."
+      # The intervening write's body content is preserved (set_page_guide
+      # only merges the instructions key, it doesn't clobber body content).
+      assert reloaded.body =~ "# X"
+    end
+  end
 end
