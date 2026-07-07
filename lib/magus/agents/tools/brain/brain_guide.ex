@@ -12,19 +12,17 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
   matching `:template` page, so the agent can fetch the template body
   itself with `read_brain.read_page`.
 
-  Future actions on this tool (set_brain_guide, set_page_guide,
-  define_type, set_page_type) will let the agent maintain the
-  constitution, section guides, and types index without hand-editing
-  frontmatter.
+  Future actions on this tool (set_page_guide, define_type,
+  set_page_type) will let the agent maintain the section guides and
+  types index without hand-editing frontmatter.
   """
 
   use Jido.Action,
     name: "brain_guide",
     description: """
-    Read (and, in future actions, maintain) a brain's "Guide": the
-    constitution (brain-wide instructions), inherited section guides
-    for a page's location in the tree, and the types index (from
-    :template pages).
+    Read and maintain a brain's "Guide": the constitution (brain-wide
+    instructions), inherited section guides for a page's location in
+    the tree, and the types index (from :template pages).
 
     Actions:
     - get_guide: Returns the Guide for a page's location in the brain.
@@ -34,12 +32,15 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
       root-to-current, nearest last), and type_template (the :template
       page matching the current page's frontmatter `type`, or null when
       the page has no type or no template matches).
+    - set_brain_guide: Sets the brain's constitution (brain-wide
+      instructions). Optional: brain_id (auto-resolved from context
+      when omitted). Required: instructions.
     """,
     schema: [
       action: [
-        type: {:in, ["get_guide"]},
+        type: {:in, ["get_guide", "set_brain_guide"]},
         required: true,
-        doc: "Action to perform: get_guide"
+        doc: "Action to perform: get_guide | set_brain_guide"
       ],
       brain_id: [
         type: {:or, [:string, nil]},
@@ -51,6 +52,11 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
         type: {:or, [:string, nil]},
         default: nil,
         doc: "Page title (lookup within brain)"
+      ],
+      instructions: [
+        type: {:or, [:string, nil]},
+        default: nil,
+        doc: "set_brain_guide: the brain's constitution (brain-wide instructions)"
       ]
     ]
 
@@ -61,7 +67,7 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
   import Magus.Agents.Tools.Helpers,
     only: [validate_context: 2, get_param: 2, tool_error: 3]
 
-  @valid_actions ~w(get_guide)
+  @valid_actions ~w(get_guide set_brain_guide)
 
   def display_name, do: "Reading brain guide..."
 
@@ -72,6 +78,12 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
 
   def summarize_output(%{action: "get_guide", type_template: %{title: title}}),
     do: "Loaded brain guide (type: #{title})"
+
+  def summarize_output(%{action: "set_brain_guide", brain_title: title})
+      when is_binary(title),
+      do: "Updated brain guide: #{title}"
+
+  def summarize_output(%{action: "set_brain_guide"}), do: "Updated brain guide"
 
   def summarize_output(_), do: "Completed"
 
@@ -125,6 +137,38 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
       {:error, err} -> {:ok, %{error: tool_error("get brain guide", err, nil)}}
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # set_brain_guide
+  # ---------------------------------------------------------------------------
+
+  defp dispatch("set_brain_guide", params, ctx, context) do
+    instructions = get_param(params, :instructions)
+
+    if blank?(instructions) do
+      {:ok, %{error: "Missing required parameter: instructions"}}
+    else
+      with {:ok, brain_id} <- BrainResolver.resolve_brain_id(context, params),
+           {:ok, brain} <- Brain.get_brain(brain_id, actor: ctx.user),
+           {:ok, updated} <-
+             Brain.set_brain_instructions(brain, %{instructions: instructions}, actor: ctx.user) do
+        {:ok,
+         %{
+           action: "set_brain_guide",
+           brain_id: updated.id,
+           brain_title: updated.title
+         }}
+      else
+        {:error, msg} when is_binary(msg) -> {:ok, %{error: msg}}
+        {:error, err} -> {:ok, %{error: tool_error("set brain guide", err, nil)}}
+      end
+    end
+  end
+
+  defp blank?(nil), do: true
+  defp blank?(""), do: true
+  defp blank?(s) when is_binary(s), do: String.trim(s) == ""
+  defp blank?(_), do: false
 
   # Resolves the page's frontmatter `type` (if present) to the `:template`
   # page in the same brain whose title matches case-insensitively. Returns
