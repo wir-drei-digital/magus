@@ -69,7 +69,8 @@ defmodule Magus.Agents.Tools.ToolBuilder do
 
   alias Magus.Agents.Tools.Brain.{
     ReadBrain,
-    EditBrain
+    EditBrain,
+    BrainGuide
   }
 
   alias Magus.Agents.Tools.Media.{
@@ -190,6 +191,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
     "create_thread" => CreateThread,
     "read_brain" => ReadBrain,
     "edit_brain" => EditBrain,
+    "brain_guide" => BrainGuide,
     "generate_image" => GenerateImage,
     "generate_video" => GenerateVideo,
     "read_sheet" => ReadSheet,
@@ -239,6 +241,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
     ConfigureApiIntegration => :integrations,
     ReadBrain => :brain,
     EditBrain => :brain,
+    BrainGuide => :brain,
     GenerateImage => :media,
     GenerateVideo => :media,
     ReadSheet => :files,
@@ -458,7 +461,7 @@ defmodule Magus.Agents.Tools.ToolBuilder do
 
     brain_tools =
       if brain_id || has_agent_brain_access?(agent_id) || user_has_brain?(user_id) do
-        [ReadBrain, EditBrain]
+        [ReadBrain, EditBrain, BrainGuide]
       else
         []
       end
