@@ -30,6 +30,7 @@
 	} from '$lib/brain/file-map';
 	import { relativeTime } from '$lib/time';
 	import BrainBottomBar from '$lib/components/brain/brain-bottom-bar.svelte';
+	import TaskBottomBar from '$lib/components/brain/task-bottom-bar.svelte';
 	import VersionDiffOverlay from '$lib/components/brain/version-diff-overlay.svelte';
 	import PresenceAvatars from '$lib/components/chat/presence-avatars.svelte';
 	import { ResourcePresence } from '$lib/chat/resource-presence.svelte';
@@ -39,7 +40,6 @@
 	import * as Resizable from '$lib/components/ui/resizable';
 	import BrainEditor from '$lib/components/brain/brain-editor.svelte';
 	import BrainFilePickerDialog from '$lib/components/brain/brain-file-picker-dialog.svelte';
-	import TaskBoard from '$lib/components/plan/task-board.svelte';
 	import { brainNav } from '$lib/stores/brain-nav.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import { workbench } from '$lib/stores/workbench.svelte';
@@ -516,13 +516,12 @@
 					onViewVersion={(versionId) => void viewVersion(versionId)}
 				/>
 
-				<!-- Content pages pin a task board below the editor: the document
-				     stays on top, the kanban/list board claims up to ~55% of the
-				     pane with its own scroll. -->
+				<!-- Content pages dock a collapsible task bar below the editor: the
+				     document stays on top, the bar's header is always visible, and
+				     its body (the kanban/list board) claims up to ~55% of the pane
+				     with its own scroll when expanded. -->
 				{#if pageData.kind === 'page'}
-					<div class="flex max-h-[55%] min-h-0 shrink-0 flex-col">
-						<TaskBoard brainPageId={pageData.id} />
-					</div>
+					<TaskBottomBar brainId={pageData.brain.id} brainPageId={pageData.id} />
 				{/if}
 
 				<BrainFilePickerDialog
