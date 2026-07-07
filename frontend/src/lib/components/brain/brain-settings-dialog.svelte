@@ -4,6 +4,8 @@
 	import { brainNav } from '$lib/stores/brain-nav.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import ConstitutionPanel from './constitution-panel.svelte';
+	import TypesView from './types-view.svelte';
 
 	// Classic BrainSettingsModal: edit title/description/icon/color, plus a
 	// workspace-share toggle for workspace brains.
@@ -71,83 +73,93 @@
 				void save();
 			}}
 		>
-			<label class="flex flex-col gap-1.5 text-sm">
-				<span class="text-xs font-medium text-muted-foreground">Name</span>
-				<input
-					type="text"
-					bind:value={title}
-					data-testid="brain-settings-title"
-					class="w-full rounded-md border border-input bg-secondary px-2.5 py-1.5 text-sm outline-none focus:border-primary/60"
-				/>
-			</label>
-
-			<label class="flex flex-col gap-1.5 text-sm">
-				<span class="text-xs font-medium text-muted-foreground">Description</span>
-				<textarea
-					bind:value={description}
-					rows="2"
-					data-testid="brain-settings-description"
-					class="w-full resize-none rounded-md border border-input bg-secondary px-2.5 py-1.5 text-sm outline-none focus:border-primary/60"
-				></textarea>
-			</label>
-
-			<div class="flex gap-3">
-				<label class="flex w-20 flex-col gap-1.5 text-sm">
-					<span class="text-xs font-medium text-muted-foreground">Icon</span>
+			<div class="flex max-h-[70vh] flex-col gap-3 overflow-y-auto">
+				<label class="flex flex-col gap-1.5 text-sm">
+					<span class="text-xs font-medium text-muted-foreground">Name</span>
 					<input
 						type="text"
-						bind:value={icon}
-						placeholder="🧠"
-						maxlength="4"
-						data-testid="brain-settings-icon"
-						class="w-full rounded-md border border-input bg-secondary px-2.5 py-1.5 text-center text-sm outline-none focus:border-primary/60"
-					/>
-				</label>
-				<label class="flex flex-1 flex-col gap-1.5 text-sm">
-					<span class="text-xs font-medium text-muted-foreground">Color</span>
-					<input
-						type="text"
-						bind:value={color}
-						placeholder="#8b5cf6"
-						data-testid="brain-settings-color"
+						bind:value={title}
+						data-testid="brain-settings-title"
 						class="w-full rounded-md border border-input bg-secondary px-2.5 py-1.5 text-sm outline-none focus:border-primary/60"
 					/>
 				</label>
-			</div>
 
-			{#if brain?.workspaceId}
-				<div
-					class="flex items-center justify-between gap-3 rounded-lg border p-3"
-					data-testid="brain-settings-share"
-				>
-					<div class="min-w-0">
-						<p class="text-sm font-medium">Workspace sharing</p>
-						<p class="text-xs text-muted-foreground">
-							{brain.isSharedToWorkspace
-								? 'Everyone in this workspace can read and edit.'
-								: 'Only people you grant access can see this brain.'}
-						</p>
-					</div>
-					<Button
-						type="button"
-						variant={brain.isSharedToWorkspace ? 'outline' : 'default'}
-						disabled={sharing}
-						onclick={() => void toggleShare()}
-					>
-						{#if brain.isSharedToWorkspace}
-							<Lock class="size-4" />
-							Make private
-						{:else}
-							<Users class="size-4" />
-							Share
-						{/if}
-					</Button>
+				<label class="flex flex-col gap-1.5 text-sm">
+					<span class="text-xs font-medium text-muted-foreground">Description</span>
+					<textarea
+						bind:value={description}
+						rows="2"
+						data-testid="brain-settings-description"
+						class="w-full resize-none rounded-md border border-input bg-secondary px-2.5 py-1.5 text-sm outline-none focus:border-primary/60"
+					></textarea>
+				</label>
+
+				<div class="flex gap-3">
+					<label class="flex w-20 flex-col gap-1.5 text-sm">
+						<span class="text-xs font-medium text-muted-foreground">Icon</span>
+						<input
+							type="text"
+							bind:value={icon}
+							placeholder="🧠"
+							maxlength="4"
+							data-testid="brain-settings-icon"
+							class="w-full rounded-md border border-input bg-secondary px-2.5 py-1.5 text-center text-sm outline-none focus:border-primary/60"
+						/>
+					</label>
+					<label class="flex flex-1 flex-col gap-1.5 text-sm">
+						<span class="text-xs font-medium text-muted-foreground">Color</span>
+						<input
+							type="text"
+							bind:value={color}
+							placeholder="#8b5cf6"
+							data-testid="brain-settings-color"
+							class="w-full rounded-md border border-input bg-secondary px-2.5 py-1.5 text-sm outline-none focus:border-primary/60"
+						/>
+					</label>
 				</div>
-			{/if}
 
-			{#if error}
-				<p class="text-xs text-destructive" data-testid="brain-settings-error">{error}</p>
-			{/if}
+				{#if brain?.workspaceId}
+					<div
+						class="flex items-center justify-between gap-3 rounded-lg border p-3"
+						data-testid="brain-settings-share"
+					>
+						<div class="min-w-0">
+							<p class="text-sm font-medium">Workspace sharing</p>
+							<p class="text-xs text-muted-foreground">
+								{brain.isSharedToWorkspace
+									? 'Everyone in this workspace can read and edit.'
+									: 'Only people you grant access can see this brain.'}
+							</p>
+						</div>
+						<Button
+							type="button"
+							variant={brain.isSharedToWorkspace ? 'outline' : 'default'}
+							disabled={sharing}
+							onclick={() => void toggleShare()}
+						>
+							{#if brain.isSharedToWorkspace}
+								<Lock class="size-4" />
+								Make private
+							{:else}
+								<Users class="size-4" />
+								Share
+							{/if}
+						</Button>
+					</div>
+				{/if}
+
+				{#if error}
+					<p class="text-xs text-destructive" data-testid="brain-settings-error">{error}</p>
+				{/if}
+
+				<!-- Power-user Guide surfaces (spec 10): collapsed constitution editor +
+				     read-only types index. Both key off the open brain, so they only
+				     mount once one is selected. -->
+				{#if brain}
+					<ConstitutionPanel brainId={brain.id} instructions={brain.instructions} />
+					<TypesView brainId={brain.id} />
+				{/if}
+			</div>
 
 			<Dialog.Footer>
 				<Button type="button" variant="ghost" onclick={() => (open = false)}>Cancel</Button>

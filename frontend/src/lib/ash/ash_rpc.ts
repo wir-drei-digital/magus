@@ -2175,6 +2175,7 @@ export type CreateBrainInput = {
   icon?: string | null;
   color?: string | null;
   workspaceId?: UUID | null;
+  instructions?: string | null;
 };
 
 export type CreateBrainFields = UnifiedFieldSelection<BrainResourceSchema>[];
@@ -2343,6 +2344,7 @@ export type UpdateBrainInput = {
   description?: string | null;
   icon?: string | null;
   color?: string | null;
+  instructions?: string | null;
 };
 
 export type UpdateBrainFields = UnifiedFieldSelection<BrainResourceSchema>[];
@@ -2600,6 +2602,53 @@ export async function brainPages<Fields extends BrainPagesFields>(
   };
 
   return executeActionRpcRequest<BrainPagesResult<Fields>>(
+    payload,
+    config
+  );
+}
+
+
+export type BrainTemplatesInput = {
+  brainId: UUID;
+};
+
+export type BrainTemplatesFields = UnifiedFieldSelection<BrainPageResourceSchema>[];
+export type InferBrainTemplatesResult<
+  Fields extends BrainTemplatesFields,
+> = Array<InferResult<BrainPageResourceSchema, Fields>>;
+
+export type BrainTemplatesResult<Fields extends BrainTemplatesFields> = | { success: true; data: InferBrainTemplatesResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Read Page records
+ *
+ * @ashActionType :read
+ */
+export async function brainTemplates<Fields extends BrainTemplatesFields>(
+  config: {
+  tenant?: string;
+  input: BrainTemplatesInput;
+  fields: Fields;
+  filter?: BrainPageFilterInput;
+  sort?: SortString<BrainPageSortField> | SortString<BrainPageSortField>[];
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<BrainTemplatesResult<Fields>> {
+  const payload = {
+    action: "brain_templates",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input,
+    ...(config.fields !== undefined && { fields: config.fields }),
+    ...(config.filter && { filter: config.filter }),
+    ...(config.sort && { sort: Array.isArray(config.sort) ? config.sort.join(",") : config.sort })
+  };
+
+  return executeActionRpcRequest<BrainTemplatesResult<Fields>>(
     payload,
     config
   );

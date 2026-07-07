@@ -329,10 +329,11 @@ export type MagusAgentsSlashCommandInputSchema = {
 // Brain Schema
 export type BrainResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "description" | "icon" | "color" | "workspaceId" | "isSharedToWorkspace";
+  __primitiveFields: "id" | "title" | "description" | "instructions" | "icon" | "color" | "workspaceId" | "isSharedToWorkspace";
   id: UUIDv7;
   title: string;
   description: string | null;
+  instructions: string | null;
   icon: string | null;
   color: string | null;
   workspaceId: UUID | null;
@@ -344,10 +345,11 @@ export type BrainResourceSchema = {
 
 export type BrainAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "description" | "icon" | "color" | "workspaceId";
+  __primitiveFields: "id" | "title" | "description" | "instructions" | "icon" | "color" | "workspaceId";
   id: UUIDv7;
   title: string;
   description: string | null;
+  instructions: string | null;
   icon: string | null;
   color: string | null;
   workspaceId: UUID | null;
@@ -2929,6 +2931,13 @@ export type BrainFilterInput = {
   };
 
   description?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  instructions?: {
     eq?: string;
     notEq?: string;
     in?: Array<string>;
@@ -6996,7 +7005,7 @@ export type CustomAgentFilterField = (typeof customAgentFilterFields)[number];
 export const magusAgentsSlashCommandFilterFields = ["name", "title", "instruction", "icon"] as const;
 export type MagusAgentsSlashCommandFilterField = (typeof magusAgentsSlashCommandFilterFields)[number];
 
-export const brainFilterFields = ["id", "title", "description", "icon", "color", "workspaceId", "isSharedToWorkspace", "workspace"] as const;
+export const brainFilterFields = ["id", "title", "description", "instructions", "icon", "color", "workspaceId", "isSharedToWorkspace", "workspace"] as const;
 export type BrainFilterField = (typeof brainFilterFields)[number];
 
 export const brainPageFilterFields = ["id", "title", "icon", "kind", "body", "lockVersion", "updatedAt", "brainId", "parentPageId", "prosemirror", "brain", "parentPage"] as const;
@@ -7162,7 +7171,7 @@ export type CustomAgentSortField = (typeof customAgentSortFields)[number];
 export const magusAgentsSlashCommandSortFields = ["name", "title", "instruction", "icon"] as const;
 export type MagusAgentsSlashCommandSortField = (typeof magusAgentsSlashCommandSortFields)[number];
 
-export const brainSortFields = ["id", "title", "description", "icon", "color", "workspaceId", "isSharedToWorkspace"] as const;
+export const brainSortFields = ["id", "title", "description", "instructions", "icon", "color", "workspaceId", "isSharedToWorkspace"] as const;
 export type BrainSortField = (typeof brainSortFields)[number];
 
 export const brainPageSortFields = ["id", "title", "icon", "kind", "body", "lockVersion", "updatedAt", "brainId", "parentPageId", "prosemirror"] as const;
