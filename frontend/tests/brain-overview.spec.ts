@@ -6,9 +6,9 @@ import { expect, test, type Page } from '@playwright/test';
 // label text / CSS / copy (project rule: no brittle UI tests).
 //
 // The overview route does NOT mount the brain rich-text editor, so it should not
-// hit the pre-existing wikilink crash that blocks the plan-board page spec under
-// vite preview. We still guard for it (detect + skip) so the suite stays green
-// if the shell pulls the editor in transitively; the store's derivations are
+// hit the pre-existing wikilink crash that blocks brain page specs under vite
+// preview. We still guard for it (detect + skip) so the suite stays green if
+// the shell pulls the editor in transitively; the store's derivations are
 // covered exhaustively by brain-overview-store.svelte.test.ts (vitest).
 
 const user = {
@@ -157,31 +157,11 @@ async function mockOverviewRpc(page: Page) {
 						{ id: planB, title: 'Research plan', icon: null, parentPageId: null }
 					]);
 				case 'brain_pages':
-					// The overview loads pages WITH their lifecycle fields (project-state):
-					// planA is active, planB is done-but-not-delivered (stranded).
+					// The overview loads the brain's pages to resolve a task's
+					// brainPageId -> plan title for the rollup + activity labels.
 					return respond([
-						{
-							id: planA,
-							title: 'Launch plan',
-							icon: null,
-							kind: 'plan',
-							parentPageId: null,
-							specPageId: null,
-							lifecycle: 'active',
-							deliveredAt: null,
-							deliveryRef: null
-						},
-						{
-							id: planB,
-							title: 'Research plan',
-							icon: null,
-							kind: 'plan',
-							parentPageId: null,
-							specPageId: null,
-							lifecycle: 'done',
-							deliveredAt: null,
-							deliveryRef: null
-						}
+						{ id: planA, title: 'Launch plan', icon: null, parentPageId: null },
+						{ id: planB, title: 'Research plan', icon: null, parentPageId: null }
 					]);
 				case 'brain_tasks':
 					return respond(brainTasksFixture());
@@ -260,22 +240,4 @@ test('switching the rollup grouping re-renders the rows', async ({ page }) => {
 	// By assignee → claude-code, the user, and the unassigned pool.
 	await rollup.locator('[data-testid="rollup-mode"][data-mode="assignee"]').click();
 	await expect(page.getByTestId('rollup-row')).toHaveCount(3);
-});
-
-test('the overview surfaces stranded plans and the unified plan tree', async ({ page }) => {
-	await mockOverviewRpc(page);
-	await openOverview(page);
-
-	// plan-b is done-but-not-delivered → exactly one stranded row, with a deliver
-	// control. plan-a (active) is not stranded.
-	await expect(page.getByTestId('overview-stranded')).toBeVisible();
-	await expect(page.getByTestId('stranded-plan')).toHaveCount(1);
-	await expect(page.getByTestId('stranded-deliver')).toHaveCount(1);
-
-	// The plan tree lists both plan pages as nodes (kind: plan), with their
-	// lifecycle badges. The done plan also carries a deliver affordance.
-	await expect(page.getByTestId('overview-plan-tree')).toBeVisible();
-	await expect(page.getByTestId('plan-node')).toHaveCount(2);
-	await expect(page.locator('[data-testid="plan-node"][data-stranded="true"]')).toHaveCount(1);
-	await expect(page.getByTestId('lifecycle-badge')).toHaveCount(3); // 2 tree + 1 stranded row
 });

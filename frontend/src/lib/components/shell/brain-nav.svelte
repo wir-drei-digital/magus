@@ -7,7 +7,6 @@
 	import { brainNav } from '$lib/stores/brain-nav.svelte';
 	import { session } from '$lib/stores/session.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import BrainSettingsDialog from '$lib/components/brain/brain-settings-dialog.svelte';
 
 	let { query = '' }: { query?: string } = $props();
@@ -36,12 +35,8 @@
 	const personal = $derived(brainNav.personal.filter(matches));
 	const all = $derived(brainNav.brains.filter(matches));
 
-	async function newPage(
-		brainId: string,
-		parentPageId: string | null = null,
-		kind: 'page' | 'plan' = 'page'
-	) {
-		const result = await createBrainPage({ brainId, title: 'Untitled', parentPageId, kind });
+	async function newPage(brainId: string, parentPageId: string | null = null) {
+		const result = await createBrainPage({ brainId, title: 'Untitled', parentPageId });
 		if (result.success) {
 			await brainNav.expandBrain(brainId, true);
 			if (parentPageId) await brainNav.expandPage(parentPageId, true);
@@ -156,35 +151,15 @@
 			<Settings />
 			<span class="sr-only">Settings</span>
 		</Sidebar.MenuAction>
-		<DropdownMenu.Root>
-			<DropdownMenu.Trigger>
-				{#snippet child({ props })}
-					<Sidebar.MenuAction
-						{...props}
-						showOnHover
-						title="New page in {brain.title}"
-						data-testid="brain-new-page"
-					>
-						<Plus />
-						<span class="sr-only">New page or plan</span>
-					</Sidebar.MenuAction>
-				{/snippet}
-			</DropdownMenu.Trigger>
-			<DropdownMenu.Content align="start" class="w-40">
-				<DropdownMenu.Item
-					data-testid="brain-new-page-page"
-					onSelect={() => void newPage(brain.id, null, 'page')}
-				>
-					New page
-				</DropdownMenu.Item>
-				<DropdownMenu.Item
-					data-testid="brain-new-plan"
-					onSelect={() => void newPage(brain.id, null, 'plan')}
-				>
-					New plan
-				</DropdownMenu.Item>
-			</DropdownMenu.Content>
-		</DropdownMenu.Root>
+		<Sidebar.MenuAction
+			showOnHover
+			title="New page in {brain.title}"
+			data-testid="brain-new-page"
+			onclick={() => void newPage(brain.id, null)}
+		>
+			<Plus />
+			<span class="sr-only">New page</span>
+		</Sidebar.MenuAction>
 		{#if expanded}
 			<Sidebar.MenuSub class="mr-0 pr-0">
 				{#each brainNav.roots[brain.id] ?? [] as node (node.id)}

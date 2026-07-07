@@ -23,12 +23,9 @@
 import {
 	brainTasks,
 	brainTaskEvents,
-	brainPlanPages,
-	markBrainPageDelivered,
-	undeliverBrainPage,
+	brainPages,
 	myAgents,
 	type PlanTask,
-	type PlanPage,
 	type TaskStatus,
 	type TaskPriority,
 	type TaskEventEntry,
@@ -38,9 +35,6 @@ import { session } from '$lib/stores/session.svelte';
 import type { Assignee } from './assignee-chip.svelte';
 import { resolveAssignee, assigneeKey, assigneeName, assigneeTypeLabel } from './assignee';
 import { isReady, isStale, LEASE_EXPIRING_MS } from './task-board-store.svelte';
-import { buildPlanTree, isStranded, type PlanTreeNode } from './plan-tree-store.svelte';
-
-export type { PlanTreeNode };
 
 export { LEASE_EXPIRING_MS };
 
@@ -146,11 +140,6 @@ export class BrainOverviewStore {
 	brainId = $state('');
 	tasks = $state<PlanTask[]>([]);
 	events = $state<TaskEventEntry[]>([]);
-	/** Every :plan / :spec / :page in the brain with its lifecycle rollup loaded.
-	 *  Drives the plan tree, the stranded set, and the plan-title lookup. */
-	planPages = $state<PlanPage[]>([]);
-	/** Plan ids with a deliver/undeliver mutation in flight (disables the control). */
-	deliverPending = $state<Set<string>>(new Set());
 	loading = $state(true);
 	loadError = $state<string | null>(null);
 	/** Which dimension the rollup groups by (segmented toggle). */
@@ -175,7 +164,7 @@ export class BrainOverviewStore {
 			brainTasks(id),
 			brainTaskEvents(id),
 			myAgents(),
-			brainPlanPages(id)
+			brainPages(id)
 		]);
 		if (id !== this.brainId) return;
 
@@ -183,7 +172,6 @@ export class BrainOverviewStore {
 			this.agentNames = new Map(agentsResult.data.map((agent) => [agent.id, agent.name]));
 		}
 		if (pagesResult.success) {
-			this.planPages = pagesResult.data;
 			this.pageTitles = new Map(
 				pagesResult.data.map((page) => [page.id, page.title ?? 'Untitled plan'])
 			);
@@ -202,63 +190,6 @@ export class BrainOverviewStore {
 	 * on each `task.*` event, and available for a manual / focus refresh. */
 	async reload(): Promise<void> {
 		await this.load();
-	}
-
-	private setDeliverPending(id: string, on: boolean): void {
-		const next = new Set(this.deliverPending);
-		if (on) next.add(id);
-		else next.delete(id);
-		this.deliverPending = next;
-	}
-
-	/**
-	 * Refetch every plan page after a delivery change. A delivery flips one page's
-	 * gate, but the recursive lifecycle rollup means an ancestor's lifecycle can
-	 * change too (a phase delivered → its parent plan becomes done/delivered), so
-	 * the whole set is reloaded rather than patching a single row.
-	 */
-	private async refetchPlanPages(): Promise<void> {
-		const id = this.brainId;
-		const result = await brainPlanPages(id);
-		if (id === this.brainId && result.success) this.planPages = result.data;
-	}
-
-	/**
-	 * Close out a plan: stamp its delivery gate (optionally with a reference). The
-	 * tree + stranded set derive from `planPages`, so reconciling the whole set
-	 * keeps the recursive rollup correct. A failed delivery leaves the set as-is.
-	 */
-	async markDelivered(pageId: string, deliveryRef: string | null): Promise<void> {
-		if (this.deliverPending.has(pageId)) return;
-		this.setDeliverPending(pageId, true);
-		await markBrainPageDelivered(pageId, deliveryRef);
-		await this.refetchPlanPages();
-		this.setDeliverPending(pageId, false);
-	}
-
-	/** Reverse a mistaken delivery; the plan returns to its derived lifecycle. */
-	async undeliver(pageId: string): Promise<void> {
-		if (this.deliverPending.has(pageId)) return;
-		this.setDeliverPending(pageId, true);
-		await undeliverBrainPage(pageId);
-		await this.refetchPlanPages();
-		this.setDeliverPending(pageId, false);
-	}
-
-	// ── Plan tree + stranded set (derived from planPages) ────────────────────
-	/** The unified spec -> plan -> phases -> tasks tree. */
-	get tree(): PlanTreeNode[] {
-		return buildPlanTree(this.planPages, this.tasks);
-	}
-
-	/** Done-but-not-delivered plans: the anti-stranding alarm list. */
-	get strandedPlans(): PlanPage[] {
-		return this.planPages.filter(isStranded);
-	}
-
-	/** Count of plans complete but not yet delivered (the alarm badge). */
-	get strandedCount(): number {
-		return this.strandedPlans.length;
 	}
 
 	// ── Shared helpers ───────────────────────────────────────────────────────
