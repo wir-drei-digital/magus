@@ -123,7 +123,7 @@ automatically; you don't create them by hand.
 
 Any page can carry tasks (`create_task` / `update_task` / `list_tasks` / `clear_tasks`
 from the Plan domain, keyed by the page). A page with tasks is what used to be called a
-"plan" — there's no separate plan or spec kind anymore. Add tasks to whatever page
+"plan": there's no separate plan or spec kind anymore. Add tasks to whatever page
 they belong on: a project page, a spec page, a meeting note, anything.
 
 ## Read the Guide before you write
@@ -140,18 +140,18 @@ follow that brain's own conventions on top of the defaults above.
 The Guide isn't written by the user; you write and evolve it as you learn the shape of
 a brain, using the `brain_guide` tool:
 
-- `set_brain_guide` — set the brain's constitution (brain-wide instructions). Use
+- `set_brain_guide`: set the brain's constitution (brain-wide instructions). Use
   this after eliciting purpose/preferences, or when you notice a pattern worth
   making explicit for the whole brain.
-- `set_page_guide` — set a section guide (`instructions:` frontmatter) on a page;
+- `set_page_guide`: set a section guide (`instructions:` frontmatter) on a page;
   it's inherited by every page nested under it. Use for area-specific conventions
   (e.g. "pages under Projects/ always link their spec and their owner").
-- `define_type` — create or update a per-type template page (title = type name, body
+- `define_type`: create or update a per-type template page (title = type name, body
   = the skeleton + guidance for that type). Propose a new type when a page shape
   recurs (roughly 3 or more similar pages), not for a one-off. Reuse an existing type
   unless the new page is clearly distinct; type explosion makes the brain harder to
   read, not easier.
-- `set_page_type` — classify a page by setting its `type:` frontmatter. Do this for
+- `set_page_type`: classify a page by setting its `type:` frontmatter. Do this for
   every content page: pick a matching existing type, or classify it and consider
   `define_type` once the shape repeats.
 
