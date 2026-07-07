@@ -100,11 +100,6 @@ defmodule Magus.Brain do
       define :update_page_title, action: :update_title
       define :update_page_body, action: :update_body
       define :set_page_kind, action: :set_kind, args: [:kind]
-      define :set_page_spec, action: :set_spec, args: [:spec_page_id]
-      define :plans_for_spec, action: :plans_for_spec, args: [:spec_page_id]
-      define :mark_page_delivered, action: :mark_delivered
-      define :undeliver_page, action: :undeliver
-      define :stranded_plans, action: :stranded_plans, args: [:brain_id]
       define :find_page_by_title, action: :by_title_in_brain, args: [:brain_id, :title]
 
       define :find_page_by_title_ci,
