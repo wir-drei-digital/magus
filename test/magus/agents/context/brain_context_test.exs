@@ -383,6 +383,83 @@ defmodule Magus.Agents.Context.BrainContextTest do
     end
   end
 
+  describe "Brain Guide section" do
+    test "includes the constitution when brain.instructions is set", %{user: user, brain: brain} do
+      {:ok, _brain} =
+        Brain.set_brain_instructions(brain, %{instructions: "Always cite sources."}, actor: user)
+
+      {:ok, page} = Brain.create_page(brain.id, %{title: "Overview"}, actor: user)
+      set_page_fields(page.id, body: "# Overview")
+
+      context = BrainContext.build(brain.id, page.id, actor: user)
+      assert context =~ "### Brain Guide"
+      assert context =~ "Always cite sources."
+    end
+
+    test "includes inherited section guides ordered root-to-current", %{
+      user: user,
+      brain: brain
+    } do
+      {:ok, root} = Brain.create_page(brain.id, %{title: "Root"}, actor: user)
+
+      set_page_fields(root.id,
+        body: "# Root",
+        frontmatter: %{"instructions" => "Root-level guidance."}
+      )
+
+      {:ok, child} =
+        Brain.create_page(brain.id, %{title: "Child", parent_page_id: root.id}, actor: user)
+
+      set_page_fields(child.id,
+        body: "# Child",
+        frontmatter: %{"instructions" => "Child-level guidance."}
+      )
+
+      context = BrainContext.build(brain.id, child.id, actor: user)
+      assert context =~ "### Brain Guide"
+      assert context =~ "Root-level guidance."
+      assert context =~ "Child-level guidance."
+
+      # Root's guide must appear before Child's guide (root-to-current order).
+      root_index = :binary.match(context, "Root-level guidance.") |> elem(0)
+      child_index = :binary.match(context, "Child-level guidance.") |> elem(0)
+      assert root_index < child_index
+    end
+
+    test "includes a Types line listing template titles", %{user: user, brain: brain} do
+      {:ok, template} =
+        Brain.create_page(brain.id, %{title: "Meeting Note", kind: :template}, actor: user)
+
+      set_page_fields(template.id, body: "# Meeting Note\n\nA template for meeting notes.")
+
+      {:ok, page} = Brain.create_page(brain.id, %{title: "Overview"}, actor: user)
+      set_page_fields(page.id, body: "# Overview")
+
+      context = BrainContext.build(brain.id, page.id, actor: user)
+      assert context =~ "### Brain Guide"
+      assert context =~ "Types:"
+      assert context =~ "Meeting Note"
+    end
+
+    test "omits the ### Brain Guide header when constitution, guides, and types are all empty",
+         %{user: user, brain: brain, page: page} do
+      context = BrainContext.build(brain.id, page.id, actor: user)
+      refute context =~ "### Brain Guide"
+    end
+
+    test "surfaces the active page's type in the frontmatter line", %{
+      user: user,
+      brain: brain,
+      page: page
+    } do
+      set_page_fields(page.id, frontmatter: %{"type" => "research-note"})
+
+      context = BrainContext.build(brain.id, page.id, actor: user)
+      assert context =~ "Frontmatter:"
+      assert context =~ "research-note"
+    end
+  end
+
   describe "page neighborhood" do
     test "omits the deprecated 'Brain Tools' blurb", %{user: user, brain: brain, page: page} do
       context = BrainContext.build(brain.id, page.id, actor: user)
