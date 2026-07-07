@@ -133,9 +133,9 @@ defmodule Magus.Agents.Tools.Brain.ReadBrainCurationTest do
       assert page.id in Enum.map(result.off_template, & &1.page_id)
 
       entry = Enum.find(result.off_template, &(&1.page_id == page.id))
-      assert "Method" in entry.missing_headings
-      assert "Results" in entry.missing_headings
-      refute "Summary" in entry.missing_headings
+      assert "method" in entry.missing_headings
+      assert "results" in entry.missing_headings
+      refute "summary" in entry.missing_headings
     end
 
     test "off_template: does NOT flag a typed page that has every template heading" do
@@ -168,6 +168,48 @@ defmodule Magus.Agents.Tools.Brain.ReadBrainCurationTest do
           ## Method
 
           Fully documented.
+          """,
+          user
+        )
+
+      context = default_context(user, brain.id)
+
+      assert {:ok, result} =
+               ReadBrain.run(%{"action" => "list_curation_candidates"}, context)
+
+      refute page.id in Enum.map(result.off_template, & &1.page_id)
+    end
+
+    test "off_template: heading match is case-insensitive" do
+      %{user: user, brain: brain} = setup_brain()
+
+      template = create_page!(brain.id, "Paper", user, kind: :template)
+
+      write_body!(
+        template,
+        """
+        # Paper
+
+        ## Method
+        """,
+        user
+      )
+
+      page = create_page!(brain.id, "Lowercase Heading Paper", user)
+
+      page =
+        write_body!(
+          page,
+          """
+          ---
+          type: Paper
+          ---
+
+          # Lowercase Heading Paper
+
+          ## method
+
+          Documented, just lowercase.
           """,
           user
         )
