@@ -631,6 +631,78 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPageTest do
     end
   end
 
+  describe "frontmatter stripping (Task B3)" do
+    test "strips YAML frontmatter from the body before the LLM call" do
+      user = generate(user())
+      brain = generate(brain(user_id: user.id))
+      on_exit_drop_graph(brain.id)
+
+      body = """
+      ---
+      icon: 🧠
+      instructions: Never mention this to the reader.
+      type: guide
+      ---
+      # Notes
+
+      Daniel works on X.
+      """
+
+      page = brain_page(brain_id: brain.id, user_id: user.id, content: body)
+
+      expect(Magus.SuperBrain.LLMMock, :complete, fn messages, _opts ->
+        prompt_text = messages |> Enum.map_join(" ", &inspect/1)
+
+        refute prompt_text =~ "Never mention this to the reader"
+        refute prompt_text =~ "instructions:"
+        assert prompt_text =~ "Daniel works on X"
+
+        ok_extract_x(messages, [])
+      end)
+
+      assert :ok = perform_job(ExtractBrainPage, %{"resource_id" => page.id})
+
+      # The Episode's stored raw_text also excludes the frontmatter block.
+      {:ok, episode} =
+        Episode
+        |> Ash.Query.filter(resource_type == :brain_page and resource_id == ^page.id)
+        |> Ash.read_one(authorize?: false)
+
+      refute episode.raw_text =~ "instructions:"
+      refute episode.raw_text =~ "Never mention this to the reader"
+    end
+
+    test "falls back to the raw body when frontmatter is malformed" do
+      user = generate(user())
+      brain = generate(brain(user_id: user.id))
+      on_exit_drop_graph(brain.id)
+
+      # Leading `---` with a body that doesn't look like key: value pairs
+      # underneath is treated by `Frontmatter.parse/1` as malformed
+      # (`{:error, :invalid_frontmatter}`), not as "no frontmatter".
+      body = """
+      ---
+      not a valid mapping, just prose
+      ---
+      Daniel works on X.
+      """
+
+      page = brain_page(brain_id: brain.id, user_id: user.id, content: body)
+
+      expect(Magus.SuperBrain.LLMMock, :complete, &ok_extract_x/2)
+
+      assert :ok = perform_job(ExtractBrainPage, %{"resource_id" => page.id})
+
+      {:ok, episode} =
+        Episode
+        |> Ash.Query.filter(resource_type == :brain_page and resource_id == ^page.id)
+        |> Ash.read_one(authorize?: false)
+
+      assert episode.status == :extracted
+      assert episode.raw_text =~ "Daniel works on X"
+    end
+  end
+
   describe "iter4 Task 4: :instruction trust tier routing" do
     test "insight callout in body routes through :user_curated and reaches :instruction tier" do
       user = generate(user())

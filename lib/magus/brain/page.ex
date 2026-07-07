@@ -243,9 +243,37 @@ defmodule Magus.Brain.Page do
     end
 
     read :for_brain do
+      description """
+      The page tree / list source. Excludes `:template` pages: templates
+      are reusable starting points, not content, so they never appear in
+      the page listing. See `:templates_for_brain` for the template-only
+      counterpart.
+      """
+
       argument :brain_id, :uuid, allow_nil?: false
 
-      filter expr(brain_id == ^arg(:brain_id) and is_nil(deleted_at) and ^no_trashed_ancestor())
+      filter expr(
+               brain_id == ^arg(:brain_id) and kind != :template and is_nil(deleted_at) and
+                 ^no_trashed_ancestor()
+             )
+
+      prepare build(sort: [position: :asc])
+    end
+
+    read :templates_for_brain do
+      description """
+      Returns only `:template` pages for a brain (the counterpart to
+      `:for_brain`, which excludes them). Templates are meta content:
+      reusable starting points rather than knowledge, so they're listed
+      separately from the regular page tree.
+      """
+
+      argument :brain_id, :uuid, allow_nil?: false
+
+      filter expr(
+               brain_id == ^arg(:brain_id) and kind == :template and is_nil(deleted_at) and
+                 ^no_trashed_ancestor()
+             )
 
       prepare build(sort: [position: :asc])
     end
@@ -455,6 +483,7 @@ defmodule Magus.Brain.Page do
     policy action([
              :read,
              :for_brain,
+             :templates_for_brain,
              :by_title_in_brain,
              :by_title_in_brain_ci,
              :root_pages,

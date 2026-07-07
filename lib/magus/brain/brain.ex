@@ -90,6 +90,7 @@ defmodule Magus.Brain do
       define :create_page_as_external_agent, action: :create_as_external_agent, args: [:brain_id]
       define :get_page, action: :read, get_by: [:id]
       define :list_pages, action: :for_brain, args: [:brain_id]
+      define :templates_for_brain, action: :templates_for_brain, args: [:brain_id]
       define :update_page_title, action: :update_title
       define :update_page_body, action: :update_body
       define :find_page_by_title, action: :by_title_in_brain, args: [:brain_id, :title]
