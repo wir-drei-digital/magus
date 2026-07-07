@@ -1015,15 +1015,16 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain do
     end
   end
 
-  # ATX section headings (`##` through `######`), text trimmed, `#` markers
-  # stripped. Excludes level-1 (`# Title`): every template and every page
-  # opens with its own `# <own title>` line, which never matches across a
-  # template/instance pair by design (a page's title isn't the template's
-  # title) — diffing it would flag every typed page as off_template
-  # regardless of its actual sections. Level is otherwise ignored for the
-  # diff (a template's `## Method` matches a page's `### Method` just as
-  # well) since the goal is "does the section exist", not exact structural
-  # parity.
+  # ATX section headings (`##` through `######`), text trimmed and downcased,
+  # `#` markers stripped. Excludes level-1 (`# Title`): every template and
+  # every page opens with its own `# <own title>` line, which never matches
+  # across a template/instance pair by design (a page's title isn't the
+  # template's title), so diffing it would flag every typed page as
+  # off_template regardless of its actual sections. Level is otherwise
+  # ignored for the diff (a template's `## Method` matches a page's
+  # `### Method` just as well), and case is ignored too (a template's
+  # `## Method` matches a page's `## method`), since the goal is "does the
+  # section exist", not exact structural parity.
   defp heading_set(body) when is_binary(body) do
     body
     |> String.split("\n")
@@ -1036,7 +1037,7 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain do
 
   defp heading_text(line) do
     case Regex.run(~r/^\#{2,6}\s+(.+?)\s*$/, line) do
-      [_, text] -> text
+      [_, text] -> String.downcase(text)
       nil -> nil
     end
   end
