@@ -46,7 +46,7 @@ and anything the user calls temporary.
 
 ## Pick the brain
 
-1. `read_brain find_page <topic>` — each result shows which brain it's in.
+1. `read_brain find_page <topic>`: each result shows which brain it's in.
 2. Route by domain (work / personal / research). One brain → skip. Ambiguous → ask.
 
 `brain_id` accepts a brain's id, slug, or title; your context lists the available
@@ -89,9 +89,9 @@ changes use `edit_brain edit_page` (find-and-replace).
 Write the page body as natural markdown: headings (`#`), lists (`-`), code fences,
 quotes (`>`). Plus:
 
-- `[[Page Name]]` — link another page inline (backlinks are tracked automatically).
-- `#tag` (or a frontmatter `tags:` list) — tag the page.
-- `![caption](magus://image/<file_id>)` — embed an image. `[📎 caption](magus://file/<file_id>)` — attach a file.
+- `[[Page Name]]`: link another page inline (backlinks are tracked automatically).
+- `#tag` (or a frontmatter `tags:` list): tag the page.
+- `![caption](magus://image/<file_id>)`: embed an image. `[📎 caption](magus://file/<file_id>)`: attach a file.
 
 Two fenced blocks render as cards:
 
@@ -115,7 +115,7 @@ text: The key takeaway.
 ```
 ````
 
-There is no separate "add block" or "link" step — author everything in the page
+There is no separate "add block" or "link" step; author everything in the page
 markdown. Typed relationships (supports / contradicts / derived_from) are derived
 automatically; you don't create them by hand.
 
