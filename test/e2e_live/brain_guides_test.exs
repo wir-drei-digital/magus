@@ -18,14 +18,33 @@ defmodule Magus.LiveE2E.BrainGuidesTest do
   @moduletag :brain_guides
   @moduletag timeout: 240_000
 
+  # The shared LiveE2ECase `model` fixture (mistralai/ministral-3b-2512) is
+  # too weak to reliably follow the multi-step Guide behavior this test
+  # proves (classify content with `brain_guide set_page_type` after writing
+  # a page): it intermittently stops after `edit_brain write_page` and skips
+  # the classification step, making assertion #2 flaky for reasons that are
+  # about model capability, not test correctness. This test instead points
+  # its conversation at a capable model (x-ai/grok-4.3, the model the
+  # LiveE2ECase moduledoc and CLAUDE.md document as the intended live E2E
+  # model) registered the same way `LiveE2ECase.create_live_model/0` does,
+  # scoped to this file so the shared ministral-3b fixture (and every other
+  # e2e_live test using it) is untouched.
+  @capable_model_key "openrouter:x-ai/grok-4.3"
+  @capable_model_metadata %{
+    "context" => 1_000_000,
+    "output_limit" => 8_192,
+    "input_cost" => 1.25,
+    "output_cost" => 2.50
+  }
+
   describe "agent captures a note per the brain's Guide" do
     test "classifies the new/updated page with a type from the brain's Guide", %{
-      user: user,
-      model: model
+      user: user
     } do
       %{brain: brain, topic_page: topic_page, existing_page: existing_page} =
         seed_brain_with_guide(user)
 
+      model = create_capable_model()
       conversation = create_conversation(user, model)
       subscribe_to_agent(conversation.id)
 
@@ -43,9 +62,17 @@ defmodule Magus.LiveE2E.BrainGuidesTest do
       )
 
       # The agent must reach for the brain tools (read_brain to look around
-      # and/or edit_brain to write) rather than just replying in prose.
-      assert_tool_started("edit_brain")
-      assert_tool_completed("edit_brain")
+      # and/or edit_brain to write) rather than just replying in prose. A
+      # capable model reasonably calls `brain_guide` (reading the Guide)
+      # before `edit_brain` (writing per it), which is exactly the desired
+      # Guide-following behavior, so this budgets a full extra turn: a
+      # `brain_guide` read, then reasoning, then the `edit_brain` write, all
+      # before the tool-specific assertions here time out. The generic
+      # @default_timeout (60s) in assertions.ex is tuned for a small,
+      # low-latency model calling its first tool immediately and is too
+      # tight for a deliberate/reasoning model's first couple of turns.
+      assert_tool_started("edit_brain", 120_000)
+      assert_tool_completed("edit_brain", 120_000)
 
       assert_response_complete(180_000)
       drain_signals()
@@ -105,6 +132,81 @@ defmodule Magus.LiveE2E.BrainGuidesTest do
                inspect(Enum.map(typed_pages, &{&1.title, &1.frontmatter["type"]})) <>
                " and task_count: #{task_count}"
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Capable model fixture
+  # ---------------------------------------------------------------------------
+
+  # Registers x-ai/grok-4.3 as a DB-backed model row, mirroring the shape
+  # `LiveE2ECase.create_live_model/0` builds for ministral-3b (Provider row +
+  # Model row with llm_metadata + a synchronous CatalogSync reload so ReqLLM
+  # resolves it with the same metadata as a deployed instance). Kept local to
+  # this test file rather than changing the shared fixture, so every other
+  # e2e_live test keeps using the cheap ministral-3b model unaffected.
+  #
+  # Unlike ministral-3b, `allowed_providers` is left at its default `[]`
+  # ("no restriction", per lib/magus/chat/model.ex). The mistral pin in
+  # LiveE2ECase works around a specific ministral-3b routing flake; grok-4.3
+  # is xAI's own model on OpenRouter and does not need that workaround.
+  defp create_capable_model do
+    require Ash.Query
+
+    provider =
+      case Magus.Models.get_provider_by_slug("openrouter") do
+        {:ok, provider} ->
+          provider
+
+        _ ->
+          Magus.Models.create_provider!(
+            %{name: "OpenRouter", slug: "openrouter", req_llm_id: "openrouter"},
+            authorize?: false
+          )
+      end
+
+    model =
+      Magus.Chat.Model
+      |> Ash.Query.filter(key == ^@capable_model_key)
+      |> Ash.read!(authorize?: false)
+      |> List.first()
+      |> case do
+        nil -> generate_capable_model_row(provider)
+        existing -> existing
+      end
+
+    model =
+      Ash.update!(
+        model,
+        %{
+          active?: true,
+          supports_tools?: true,
+          api_provider: :openrouter,
+          model_provider_id: provider.id,
+          llm_metadata: @capable_model_metadata
+        },
+        authorize?: false
+      )
+
+    :ok = Magus.Models.CatalogSync.reload()
+
+    model
+  end
+
+  defp generate_capable_model_row(provider) do
+    import Magus.Generators
+
+    generate(
+      model(
+        name: "Grok 4.3 (brain guides E2E)",
+        key: @capable_model_key,
+        provider: "openrouter",
+        api_provider: :openrouter,
+        active?: true,
+        supports_tools?: true,
+        model_provider_id: provider.id,
+        llm_metadata: @capable_model_metadata
+      )
+    )
   end
 
   # ---------------------------------------------------------------------------
