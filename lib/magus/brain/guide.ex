@@ -141,9 +141,28 @@ defmodule Magus.Brain.Guide do
   defp type_entry(template) do
     %{
       title: template.title || "Untitled",
-      description: first_body_line(template.body)
+      description: frontmatter_description(template) || first_body_line(template.body)
     }
   end
+
+  # The `define_type` tool action (and hand-edited frontmatter) can set an
+  # explicit `description:` key on a template page; prefer it over the
+  # derived first-body-line when present, since it's an intentional
+  # description rather than an incidental opening line.
+  defp frontmatter_description(%{frontmatter: fm}) when is_map(fm) do
+    case Map.get(fm, "description") do
+      description when is_binary(description) ->
+        case String.trim(description) do
+          "" -> nil
+          trimmed -> trimmed
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp frontmatter_description(_), do: nil
 
   # First non-empty, non-heading line of the body, trimmed. Headings are
   # skipped (not just stripped of `#`) because a template's leading
