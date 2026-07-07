@@ -14,6 +14,7 @@ defmodule Magus.Agents.Context.BrainContext do
   alias Magus.Brain
   alias Magus.Brain.BodyParser
   alias Magus.Brain.Frontmatter
+  alias Magus.Brain.Guide
   alias Magus.Brain.Hierarchy
 
   @body_preview_limit 500
@@ -129,6 +130,7 @@ defmodule Magus.Agents.Context.BrainContext do
 
     stats_line = build_stats_line(pages, body, effective_frontmatter)
     frontmatter_line = build_frontmatter_line(effective_frontmatter)
+    guide_section = build_guide_section(brain, page, pages, actor)
     body_preview = build_body_preview(body_without_frontmatter)
     sources_section = build_sources_section(body)
     brains_section = wrap_brains_section(available_brains_section(actor, workspace_id))
@@ -144,6 +146,7 @@ defmodule Magus.Agents.Context.BrainContext do
         "Pages near current:",
         page_list,
         "",
+        guide_section,
         "### Current Page Body",
         "",
         body_preview,
@@ -187,6 +190,7 @@ defmodule Magus.Agents.Context.BrainContext do
     parts =
       []
       |> append_part(format_icon(frontmatter))
+      |> append_part(format_type(frontmatter))
       |> append_part(format_tags(frontmatter))
 
     case parts do
@@ -201,11 +205,64 @@ defmodule Magus.Agents.Context.BrainContext do
   defp format_icon(%{"icon" => icon}) when is_binary(icon) and icon != "", do: "icon #{icon}"
   defp format_icon(_), do: nil
 
+  defp format_type(%{"type" => type}) when is_binary(type) and type != "", do: "type: #{type}"
+  defp format_type(_), do: nil
+
   defp format_tags(%{"tags" => tags}) when is_list(tags) and tags != [] do
     "tags: " <> Enum.map_join(tags, ", ", &"##{&1}")
   end
 
   defp format_tags(_), do: nil
+
+  # Renders the `### Brain Guide` block: constitution, inherited section
+  # guides for the active page's location, and the brain's types index.
+  # Omitted entirely when `Guide` has nothing to show (see `Guide.empty?/1`).
+  defp build_guide_section(brain, page, pages, actor) do
+    guide = Guide.for_page(brain, page, pages, actor)
+
+    if Guide.empty?(guide) do
+      nil
+    else
+      parts =
+        [
+          render_constitution(guide.constitution),
+          render_section_guides(guide.section_guides),
+          render_types(guide.types)
+        ]
+        |> Enum.reject(&is_nil/1)
+
+      "### Brain Guide\n\n" <> Enum.join(parts, "\n\n") <> "\n"
+    end
+  end
+
+  defp render_constitution(nil), do: nil
+  defp render_constitution(text), do: "**Constitution:**\n\n#{text}"
+
+  defp render_section_guides([]), do: nil
+
+  defp render_section_guides(section_guides) do
+    lines =
+      Enum.map_join(section_guides, "\n\n", fn %{title: title, instructions: instructions} ->
+        "**#{title}:** #{instructions}"
+      end)
+
+    "**Section guides** (root to current; nearest applies most):\n\n#{lines}"
+  end
+
+  defp render_types([]), do: nil
+
+  defp render_types(types) do
+    lines =
+      Enum.map_join(types, "\n", fn %{title: title, description: description} ->
+        if description == "" do
+          "- #{title}"
+        else
+          "- #{title}: #{description}"
+        end
+      end)
+
+    "**Types:**\n\n#{lines}"
+  end
 
   defp build_body_preview(""), do: "_(empty page)_"
   defp build_body_preview(nil), do: "_(empty page)_"
