@@ -12,9 +12,8 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
   matching `:template` page, so the agent can fetch the template body
   itself with `read_brain.read_page`.
 
-  Future actions on this tool (set_page_guide, define_type,
-  set_page_type) will let the agent maintain the section guides and
-  types index without hand-editing frontmatter.
+  Future actions on this tool (define_type, set_page_type) will let the
+  agent maintain the types index without hand-editing frontmatter.
   """
 
   use Jido.Action,
@@ -35,12 +34,17 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
     - set_brain_guide: Sets the brain's constitution (brain-wide
       instructions). Optional: brain_id (auto-resolved from context
       when omitted). Required: instructions.
+    - set_page_guide: Sets a section guide on a page (its `instructions:`
+      frontmatter), inherited by every descendant page's get_guide
+      result. Required one of: page_id, page_title. Required:
+      instructions. Merges into the page's existing frontmatter (does
+      not clobber `type`, `tags`, or any other key).
     """,
     schema: [
       action: [
-        type: {:in, ["get_guide", "set_brain_guide"]},
+        type: {:in, ["get_guide", "set_brain_guide", "set_page_guide"]},
         required: true,
-        doc: "Action to perform: get_guide | set_brain_guide"
+        doc: "Action to perform: get_guide | set_brain_guide | set_page_guide"
       ],
       brain_id: [
         type: {:or, [:string, nil]},
@@ -56,18 +60,21 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
       instructions: [
         type: {:or, [:string, nil]},
         default: nil,
-        doc: "set_brain_guide: the brain's constitution (brain-wide instructions)"
+        doc:
+          "set_brain_guide: the brain's constitution. set_page_guide: the page's section guide."
       ]
     ]
 
   alias Magus.Brain
+  alias Magus.Brain.Frontmatter
   alias Magus.Brain.Guide
+  alias Magus.Brain.Page.Errors.VersionConflict
   alias Magus.Agents.Tools.Brain.BrainResolver
 
   import Magus.Agents.Tools.Helpers,
     only: [validate_context: 2, get_param: 2, tool_error: 3]
 
-  @valid_actions ~w(get_guide set_brain_guide)
+  @valid_actions ~w(get_guide set_brain_guide set_page_guide)
 
   def display_name, do: "Reading brain guide..."
 
@@ -84,6 +91,8 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
       do: "Updated brain guide: #{title}"
 
   def summarize_output(%{action: "set_brain_guide"}), do: "Updated brain guide"
+
+  def summarize_output(%{action: "set_page_guide"}), do: "Updated page guide"
 
   def summarize_output(_), do: "Completed"
 
@@ -162,6 +171,74 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
         {:error, msg} when is_binary(msg) -> {:ok, %{error: msg}}
         {:error, err} -> {:ok, %{error: tool_error("set brain guide", err, nil)}}
       end
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # set_page_guide
+  # ---------------------------------------------------------------------------
+
+  defp dispatch("set_page_guide", params, ctx, context) do
+    instructions = get_param(params, :instructions)
+
+    if blank?(instructions) do
+      {:ok, %{error: "Missing required parameter: instructions"}}
+    else
+      with {:ok, brain_id} <- BrainResolver.resolve_brain_id(context, params),
+           {:ok, page} <- BrainResolver.resolve_page(context, params, brain_id) do
+        new_body = Frontmatter.put(page.body || "", "instructions", instructions)
+        save_page_guide(page, new_body, ctx)
+      else
+        {:error, msg} when is_binary(msg) -> {:ok, %{error: msg}}
+        {:error, err} -> {:ok, %{error: tool_error("set page guide", err, nil)}}
+      end
+    end
+  end
+
+  defp save_page_guide(page, {:error, :invalid_frontmatter}, _ctx) do
+    {:ok,
+     %{
+       error:
+         "Page '#{page.title}' has malformed YAML frontmatter that can't be safely merged. " <>
+           "Fix the frontmatter block manually with edit_page, then retry."
+     }}
+  end
+
+  defp save_page_guide(page, new_body, ctx) when is_binary(new_body) do
+    case Brain.update_page_body(
+           page,
+           %{body: new_body, base_version: page.lock_version},
+           actor: ctx.user
+         ) do
+      {:ok, updated} ->
+        {:ok, %{action: "set_page_guide", page_id: updated.id}}
+
+      {:error, %Ash.Error.Invalid{errors: errors}} = err ->
+        case Enum.find(errors, &match?(%VersionConflict{}, &1)) do
+          %VersionConflict{} ->
+            {:ok,
+             %{
+               error:
+                 "Concurrent edit detected while setting page guide on '#{page.title}'. " <>
+                   "The page changed under you; re-read and retry.",
+               conflict: true,
+               page_id: page.id
+             }}
+
+          nil ->
+            {:ok, %{error: tool_error("set page guide", err, nil)}}
+        end
+
+      {:error, err} ->
+        {:ok,
+         %{
+           error:
+             tool_error(
+               "set page guide",
+               err,
+               "Verify page_id with read_brain list_pages."
+             )
+         }}
     end
   end
 

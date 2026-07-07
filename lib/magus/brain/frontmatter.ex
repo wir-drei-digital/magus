@@ -108,6 +108,37 @@ defmodule Magus.Brain.Frontmatter do
   end
 
   @doc """
+  Puts (adds or overwrites) a single `key => value` into `body`'s frontmatter,
+  preserving every other key, and returns the full body (re-serialized
+  frontmatter block + unchanged rest-of-body content).
+
+  When `body` has no frontmatter block yet, one is created. When `body`'s
+  leading `---` block is malformed, returns `{:error, :invalid_frontmatter}`
+  instead of guessing (never corrupts the body by, say, prepending a second
+  frontmatter block above an unparseable one).
+
+  This is the shared helper for any caller that needs to set exactly one
+  frontmatter key without disturbing the rest (e.g. the `brain_guide` tool's
+  `set_page_guide` action writing a page's `instructions:`).
+
+  ## Examples
+
+      iex> Magus.Brain.Frontmatter.put("# Hello\\n", "icon", "🧠")
+      "---\\nicon: 🧠\\n---\\n# Hello\\n"
+  """
+  @spec put(binary(), binary(), term()) :: binary() | {:error, :invalid_frontmatter}
+  def put(body, key, value) when is_binary(body) and is_binary(key) do
+    case parse(body) do
+      {:error, :invalid_frontmatter} = error ->
+        error
+
+      {matter, rest} ->
+        updated = Map.put(matter, key, value)
+        dump(updated) <> rest
+    end
+  end
+
+  @doc """
   Normalizes the known frontmatter keys:
 
     * `icon` is coerced to a string (or dropped if not a scalar)
@@ -216,13 +247,33 @@ defmodule Magus.Brain.Frontmatter do
     "[" <> items <> "]"
   end
 
+  # Defensive fallback: a preserved key (e.g. `created:`/`modified:`) can
+  # carry a Date/DateTime/NaiveDateTime when the frontmatter map was built
+  # programmatically rather than parsed from YAML text, which is neither a
+  # binary, number, atom, nor list. Rather than let dump/1 crash the whole
+  # save, serialize it via to_string/1 (Date/DateTime/NaiveDateTime all
+  # implement String.Chars) and quote it like any other scalar.
+  defp dump_value(v), do: dump_scalar(to_string(v))
+
   defp dump_scalar(s) when is_binary(s) do
     cond do
       String.contains?(s, ["\n", "\r"]) ->
-        # Multi-line scalars need block-style quoting; we don't produce them
-        # in any current code path, so refuse rather than emit invalid YAML.
-        raise ArgumentError,
-              "Magus.Brain.Frontmatter.dump/1 does not support multi-line scalars"
+        # Multi-line scalars (e.g. a page's `instructions:` section guide)
+        # must stay on a single YAML mapping line, or the parser reads the
+        # continuation as a new (malformed) entry. A double-quoted scalar
+        # supports C-style escapes, so emit one: backslash and double-quote
+        # escaped first (order matters, else we'd double-escape the
+        # backslashes just introduced by the \n/\r/\t substitutions), then
+        # newline/carriage-return/tab replaced with their escape sequences.
+        escaped =
+          s
+          |> String.replace("\\", "\\\\")
+          |> String.replace("\"", "\\\"")
+          |> String.replace("\r", "\\r")
+          |> String.replace("\n", "\\n")
+          |> String.replace("\t", "\\t")
+
+        ~s("#{escaped}")
 
       String.contains?(s, [":", "#", "[", "]", "{", "}", ",", "\"", "\\"]) or
         String.starts_with?(s, " ") or String.ends_with?(s, " ") ->
