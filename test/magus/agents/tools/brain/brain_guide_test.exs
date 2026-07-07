@@ -631,4 +631,143 @@ defmodule Magus.Agents.Tools.Brain.BrainGuideTest do
       assert error =~ "template_body"
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # set_page_type
+  # ---------------------------------------------------------------------------
+
+  describe "set_page_type action" do
+    test "sets a page's type frontmatter and get_guide then reports the matching type_template" do
+      %{user: user, brain: brain} = setup_brain()
+      context = default_context(user, brain.id)
+
+      page = create_page!(brain.id, "Attention Is All You Need", user)
+
+      assert {:ok, define_result} =
+               BrainGuide.run(
+                 %{
+                   action: "define_type",
+                   type_name: "Paper",
+                   template_body: "# Paper\n\nA template for summarizing a research paper."
+                 },
+                 context
+               )
+
+      assert {:ok, result} =
+               BrainGuide.run(
+                 %{action: "set_page_type", page_id: page.id, type: "Paper"},
+                 context
+               )
+
+      assert result.action == "set_page_type"
+      assert result.page_id == page.id
+      assert result.type == "Paper"
+
+      {:ok, reloaded} = Brain.get_page(page.id, actor: user)
+      assert reloaded.frontmatter["type"] == "Paper"
+
+      assert {:ok, guide_result} =
+               BrainGuide.run(%{action: "get_guide", page_id: page.id}, context)
+
+      assert guide_result.type_template.title == "Paper"
+      assert guide_result.type_template.page_id == define_result.page_id
+    end
+
+    test "resolves the page by page_title" do
+      %{user: user, brain: brain} = setup_brain()
+      page = create_page!(brain.id, "Titled Page", user)
+
+      context = default_context(user, brain.id)
+
+      assert {:ok, result} =
+               BrainGuide.run(
+                 %{action: "set_page_type", page_title: "Titled Page", type: "Note"},
+                 context
+               )
+
+      assert result.action == "set_page_type"
+      assert result.page_id == page.id
+    end
+
+    test "merges into existing frontmatter without clobbering instructions or tags" do
+      %{user: user, brain: brain} = setup_brain()
+      page = create_page!(brain.id, "Guided Page", user)
+
+      page =
+        write_body!(
+          page,
+          "---\ninstructions: Keep it short.\ntags: [ml, research]\n---\n\n# Guided Page\n",
+          user
+        )
+
+      context = default_context(user, brain.id)
+
+      assert {:ok, _result} =
+               BrainGuide.run(
+                 %{action: "set_page_type", page_id: page.id, type: "Paper"},
+                 context
+               )
+
+      {:ok, reloaded} = Brain.get_page(page.id, actor: user)
+      assert reloaded.frontmatter["type"] == "Paper"
+      assert reloaded.frontmatter["instructions"] == "Keep it short."
+      assert reloaded.frontmatter["tags"] == ["ml", "research"]
+      assert reloaded.body =~ "# Guided Page"
+    end
+
+    test "errors when type is missing" do
+      %{user: user, brain: brain} = setup_brain()
+      page = create_page!(brain.id, "Notes", user)
+      context = default_context(user, brain.id)
+
+      assert {:ok, %{error: error}} =
+               BrainGuide.run(%{action: "set_page_type", page_id: page.id}, context)
+
+      assert error =~ "type"
+    end
+
+    test "errors when type is blank" do
+      %{user: user, brain: brain} = setup_brain()
+      page = create_page!(brain.id, "Notes", user)
+      context = default_context(user, brain.id)
+
+      assert {:ok, %{error: error}} =
+               BrainGuide.run(
+                 %{action: "set_page_type", page_id: page.id, type: "   "},
+                 context
+               )
+
+      assert error =~ "type"
+    end
+
+    test "errors when no page is specified and none is active in context" do
+      %{user: user, brain: brain} = setup_brain()
+      context = default_context(user, brain.id)
+
+      assert {:ok, %{error: error}} =
+               BrainGuide.run(%{action: "set_page_type", type: "Paper"}, context)
+
+      assert error =~ "No page specified"
+    end
+
+    test "reports an error instead of corrupting the body when existing frontmatter is malformed" do
+      %{user: user, brain: brain} = setup_brain()
+      page = create_page!(brain.id, "Malformed Frontmatter Page", user)
+      malformed_body = "---\nicon: [unterminated\n---\nx\n"
+      page = write_body!(page, malformed_body, user)
+
+      context = default_context(user, brain.id)
+
+      assert {:ok, %{error: error}} =
+               BrainGuide.run(
+                 %{action: "set_page_type", page_id: page.id, type: "Paper"},
+                 context
+               )
+
+      assert error =~ "frontmatter"
+
+      {:ok, reloaded} = Brain.get_page(page.id, actor: user)
+      assert reloaded.body == malformed_body
+    end
+  end
 end

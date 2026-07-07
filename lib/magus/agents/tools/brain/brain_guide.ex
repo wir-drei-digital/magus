@@ -4,16 +4,17 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
   inherited section guides, and the types index) plus, later, the
   actions that let an agent maintain that Guide.
 
-  `get_guide` (this task) returns the assembled Guide for a page's
-  location in the tree, computed by the shared `Magus.Brain.Guide`
-  module (also used to render the Guide into the agent's system-prompt
-  context via `Magus.Agents.Context.BrainContext`). It additionally
-  resolves the page's own `type` frontmatter (when present) to its
-  matching `:template` page, so the agent can fetch the template body
-  itself with `read_brain.read_page`.
+  `get_guide` returns the assembled Guide for a page's location in the
+  tree, computed by the shared `Magus.Brain.Guide` module (also used to
+  render the Guide into the agent's system-prompt context via
+  `Magus.Agents.Context.BrainContext`). It additionally resolves the
+  page's own `type` frontmatter (when present) to its matching
+  `:template` page, so the agent can fetch the template body itself
+  with `read_brain.read_page`.
 
-  Future actions on this tool (define_type, set_page_type) will let the
-  agent maintain the types index without hand-editing frontmatter.
+  `define_type` and `set_page_type` let the agent maintain the types
+  index (per-type template pages and each page's classification)
+  without hand-editing frontmatter.
   """
 
   use Jido.Action,
@@ -48,12 +49,21 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
       brain's existing template pages, so calling it again with the
       same type_name updates that template instead of creating a
       duplicate.
+    - set_page_type: Classifies a page by setting its `type:`
+      frontmatter. Required one of: page_id, page_title. Required:
+      type. Merges into the page's existing frontmatter (does not
+      clobber `instructions`, `tags`, or any other key). A subsequent
+      get_guide on the page reports the matching type_template when a
+      :template page with that type_name exists.
     """,
     schema: [
       action: [
-        type: {:in, ["get_guide", "set_brain_guide", "set_page_guide", "define_type"]},
+        type:
+          {:in,
+           ["get_guide", "set_brain_guide", "set_page_guide", "define_type", "set_page_type"]},
         required: true,
-        doc: "Action to perform: get_guide | set_brain_guide | set_page_guide | define_type"
+        doc:
+          "Action to perform: get_guide | set_brain_guide | set_page_guide | define_type | set_page_type"
       ],
       brain_id: [
         type: {:or, [:string, nil]},
@@ -86,6 +96,11 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
         type: {:or, [:string, nil]},
         default: nil,
         doc: "define_type: optional description, merged into the template page's frontmatter"
+      ],
+      type: [
+        type: {:or, [:string, nil]},
+        default: nil,
+        doc: "set_page_type: the page's `type:` frontmatter value"
       ]
     ]
 
@@ -98,7 +113,7 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
   import Magus.Agents.Tools.Helpers,
     only: [validate_context: 2, get_param: 2, tool_error: 3]
 
-  @valid_actions ~w(get_guide set_brain_guide set_page_guide define_type)
+  @valid_actions ~w(get_guide set_brain_guide set_page_guide define_type set_page_type)
 
   def display_name, do: "Reading brain guide..."
 
@@ -122,6 +137,11 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
     do: "Defined type: #{type}"
 
   def summarize_output(%{action: "define_type"}), do: "Defined type"
+
+  def summarize_output(%{action: "set_page_type", type: type}) when is_binary(type),
+    do: "Set page type: #{type}"
+
+  def summarize_output(%{action: "set_page_type"}), do: "Set page type"
 
   def summarize_output(_), do: "Completed"
 
@@ -225,6 +245,27 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
   end
 
   # ---------------------------------------------------------------------------
+  # set_page_type
+  # ---------------------------------------------------------------------------
+
+  defp dispatch("set_page_type", params, ctx, context) do
+    type = get_param(params, :type)
+
+    if blank?(type) do
+      {:ok, %{error: "Missing required parameter: type"}}
+    else
+      with {:ok, brain_id} <- BrainResolver.resolve_brain_id(context, params),
+           {:ok, page} <- BrainResolver.resolve_page(context, params, brain_id) do
+        new_body = Frontmatter.put(page.body || "", "type", type)
+        save_page_type(page, new_body, type, ctx)
+      else
+        {:error, msg} when is_binary(msg) -> {:ok, %{error: msg}}
+        {:error, err} -> {:ok, %{error: tool_error("set page type", err, nil)}}
+      end
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # define_type
   # ---------------------------------------------------------------------------
 
@@ -303,6 +344,53 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
            error:
              tool_error(
                "set page guide",
+               err,
+               "Verify page_id with read_brain list_pages."
+             )
+         }}
+    end
+  end
+
+  defp save_page_type(page, {:error, :invalid_frontmatter}, _type, _ctx) do
+    {:ok,
+     %{
+       error:
+         "Page '#{page.title}' has malformed YAML frontmatter that can't be safely merged. " <>
+           "Fix the frontmatter block manually with edit_page, then retry."
+     }}
+  end
+
+  defp save_page_type(page, new_body, type, ctx) when is_binary(new_body) do
+    case Brain.update_page_body(
+           page,
+           %{body: new_body, base_version: page.lock_version},
+           actor: ctx.user
+         ) do
+      {:ok, updated} ->
+        {:ok, %{action: "set_page_type", page_id: updated.id, type: type}}
+
+      {:error, %Ash.Error.Invalid{errors: errors}} = err ->
+        case Enum.find(errors, &match?(%VersionConflict{}, &1)) do
+          %VersionConflict{} ->
+            {:ok,
+             %{
+               error:
+                 "Concurrent edit detected while setting page type on '#{page.title}'. " <>
+                   "The page changed under you; re-read and retry.",
+               conflict: true,
+               page_id: page.id
+             }}
+
+          nil ->
+            {:ok, %{error: tool_error("set page type", err, nil)}}
+        end
+
+      {:error, err} ->
+        {:ok,
+         %{
+           error:
+             tool_error(
+               "set page type",
                err,
                "Verify page_id with read_brain list_pages."
              )
