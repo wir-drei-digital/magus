@@ -25,7 +25,7 @@ defmodule Magus.Brain.BrainResource do
 
     create :create do
       primary? true
-      accept [:title, :description, :icon, :color, :workspace_id]
+      accept [:title, :description, :icon, :color, :workspace_id, :instructions]
 
       change set_attribute(:user_id, actor(:id))
       change {Magus.Brain.Changes.Slugify, attribute: :title, target: :slug}
@@ -33,7 +33,11 @@ defmodule Magus.Brain.BrainResource do
 
     update :update do
       primary? true
-      accept [:title, :description, :icon, :color]
+      accept [:title, :description, :icon, :color, :instructions]
+    end
+
+    update :set_instructions do
+      accept [:instructions]
     end
 
     update :share_to_team do
@@ -88,6 +92,7 @@ defmodule Magus.Brain.BrainResource do
 
     attribute :title, :string, allow_nil?: false, public?: true
     attribute :description, :string, public?: true
+    attribute :instructions, :string, public?: true
     attribute :slug, :string, allow_nil?: false
     attribute :icon, :string, public?: true
     attribute :color, :string, public?: true

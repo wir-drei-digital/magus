@@ -80,6 +80,7 @@ defmodule Magus.Brain do
       define :personal_brains, action: :list_for_user
       define :list_brains_for_workspace, action: :list_for_workspace, args: [:workspace_id]
       define :update_brain, action: :update
+      define :set_brain_instructions, action: :set_instructions
       define :archive_brain, action: :archive
       define :destroy_brain, action: :destroy
     end
