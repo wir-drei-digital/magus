@@ -13,10 +13,7 @@
 	import { joinBrainTasks } from '$lib/realtime/task-updates';
 	import OverviewWorkerCard from '$lib/components/plan/overview-worker-card.svelte';
 	import OverviewRollup from '$lib/components/plan/overview-rollup.svelte';
-	import OverviewStranded from '$lib/components/plan/overview-stranded.svelte';
-	import PlanTree from '$lib/components/plan/plan-tree.svelte';
 	import ActivityFeed from '$lib/components/plan/activity-feed.svelte';
-	import { ListTree } from '@lucide/svelte';
 
 	// Which brain the overview shows:
 	//   1. an explicit ?brain=<id> (e.g. the nav's per-brain Overview link), else
@@ -145,12 +142,6 @@
 					<span
 						><span class="tabular-nums text-foreground">{store.readyCount}</span> ready to grab</span
 					>
-					{#if store.strandedCount > 0}
-						<span aria-hidden="true">·</span>
-						<span class="font-medium text-warning" data-testid="overview-stranded-summary">
-							<span class="tabular-nums">{store.strandedCount}</span> need delivery
-						</span>
-					{/if}
 					<span aria-hidden="true">·</span>
 					<span>updated {updatedLabel}</span>
 				</p>
@@ -175,13 +166,6 @@
 				class="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto p-6 lg:grid-cols-[1fr_22rem]"
 			>
 				<div class="flex min-w-0 flex-col gap-8">
-					<!-- NEEDS DELIVERY (anti-stranding alarm): renders only when non-empty -->
-					<OverviewStranded
-						plans={store.strandedPlans}
-						pending={store.deliverPending}
-						onDeliver={(id, ref) => void store!.markDelivered(id, ref)}
-					/>
-
 					<!-- IN FLIGHT -->
 					<section data-testid="overview-in-flight" class="flex flex-col gap-3">
 						<div class="flex items-center gap-2">
@@ -217,23 +201,6 @@
 						readyCount={store.readyCount}
 						onmode={setMode}
 					/>
-
-					<!-- PLAN STRUCTURE (unified spec -> plan -> phases -> tasks tree) -->
-					<section data-testid="overview-plan-tree" class="flex flex-col gap-3">
-						<div class="flex items-center gap-2">
-							<ListTree class="size-4 shrink-0 text-primary-link" />
-							<h2 class="text-sm font-semibold tracking-wide text-foreground uppercase">
-								Plan structure
-							</h2>
-							<span class="text-xs text-muted-foreground">spec to plan to phases</span>
-						</div>
-						<PlanTree
-							tree={store.tree}
-							pending={store.deliverPending}
-							onDeliver={(id, ref) => void store!.markDelivered(id, ref)}
-							onUndeliver={(id) => void store!.undeliver(id)}
-						/>
-					</section>
 				</div>
 
 				<!-- ACTIVITY rail -->

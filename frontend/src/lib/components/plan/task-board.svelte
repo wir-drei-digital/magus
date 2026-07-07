@@ -103,7 +103,7 @@
 </script>
 
 <section
-	data-testid="plan-board"
+	data-testid="task-board"
 	data-view={view}
 	class="flex min-h-0 flex-col border-t bg-background"
 >
@@ -117,7 +117,7 @@
 		<!-- Dot-separated counts -->
 		<div
 			class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"
-			data-testid="plan-board-counts"
+			data-testid="task-board-counts"
 		>
 			<span class="inline-flex items-center gap-1.5">
 				<span class="size-1.5 rounded-full bg-primary"></span>
@@ -140,7 +140,7 @@
 		<!-- Segmented progress bar -->
 		<div
 			class="flex h-1.5 min-w-[6rem] flex-1 overflow-hidden rounded-full bg-secondary"
-			data-testid="plan-board-progress"
+			data-testid="task-board-progress"
 			role="presentation"
 		>
 			<div class="h-full bg-primary/70" style="width: {progress.inProgress * 100}%"></div>
@@ -152,7 +152,7 @@
 			<!-- Add task -->
 			<button
 				type="button"
-				data-testid="plan-board-add-task"
+				data-testid="task-board-add-task"
 				onclick={() => (addOpen = true)}
 				class="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
 			>
@@ -163,7 +163,7 @@
 			<!-- Ready work pill -->
 			<button
 				type="button"
-				data-testid="plan-board-ready-jump"
+				data-testid="task-board-ready-jump"
 				onclick={jumpToReady}
 				disabled={counts.ready === 0}
 				class="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success transition-colors hover:bg-success/20 disabled:opacity-40"
@@ -183,7 +183,7 @@
 					type="button"
 					role="tab"
 					aria-selected={view === 'list'}
-					data-testid="plan-board-view-list"
+					data-testid="task-board-view-list"
 					onclick={() => setView('list')}
 					class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors {view ===
 					'list'
@@ -196,7 +196,7 @@
 					type="button"
 					role="tab"
 					aria-selected={view === 'columns'}
-					data-testid="plan-board-view-columns"
+					data-testid="task-board-view-columns"
 					onclick={() => setView('columns')}
 					class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors {view ===
 					'columns'
@@ -217,7 +217,7 @@
 	{:else if store.active.length === 0}
 		<div
 			class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center"
-			data-testid="plan-board-empty"
+			data-testid="task-board-empty"
 		>
 			<SquareKanban class="size-8 text-muted-foreground/40" />
 			<p class="text-sm font-medium text-foreground">No tasks yet</p>
@@ -227,7 +227,7 @@
 			</p>
 			<button
 				type="button"
-				data-testid="plan-board-empty-add"
+				data-testid="task-board-empty-add"
 				onclick={() => (addOpen = true)}
 				class="mt-1 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
 			>
