@@ -4,6 +4,8 @@ defmodule Magus.Agents.Tools.Brain.ReadBrainCurationTest do
   alias Magus.Agents.Tools.Brain.ReadBrain
   alias Magus.Brain
 
+  import Ecto.Query, only: [from: 2]
+
   # ---------------------------------------------------------------------------
   # Setup helpers (mirrors read_brain_test.exs / brain_guide_test.exs)
   # ---------------------------------------------------------------------------
@@ -43,6 +45,21 @@ defmodule Magus.Agents.Tools.Brain.ReadBrainCurationTest do
 
   defp default_context(user, brain_id) do
     %{user_id: user.id, user: user, brain_id: brain_id}
+  end
+
+  # Backdate a page's updated_at so "stale" can be exercised without time
+  # travel. Mirrors read_brain_test.exs's backdate_page!/2: update_body/Ash
+  # own the timestamp normally, so we reach past them with a raw update_all.
+  defp backdate_page!(page, days_ago) do
+    ts = DateTime.add(DateTime.utc_now(), -days_ago * 86_400, :second)
+
+    {1, _} =
+      Magus.Repo.update_all(
+        from(p in "brain_pages", where: p.id == type(^page.id, Ecto.UUID)),
+        set: [updated_at: ts]
+      )
+
+    ts
   end
 
   # ---------------------------------------------------------------------------
@@ -380,6 +397,107 @@ defmodule Magus.Agents.Tools.Brain.ReadBrainCurationTest do
       assert result.untyped == []
       assert result.off_template == []
       assert result.unfiled == []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # list_curation_candidates: :template pages must never leak into any signal
+  # ---------------------------------------------------------------------------
+
+  describe "list_curation_candidates: :template pages are excluded from every category" do
+    test "a :template page appears in none of the six curation categories" do
+      %{user: user, brain: brain} = setup_brain()
+
+      # A template is parentless and unlinked by construction (nothing
+      # wikilinks a template; templates don't nest under a parent), which
+      # is exactly the shape that, pre-fix, wrongly qualified it as both an
+      # orphan and unfiled. Backdate it past the stale threshold too, so the
+      # stale assertion is a real regression guard rather than vacuously true.
+      template = create_page!(brain.id, "Paper", user, kind: :template)
+      write_body!(template, "# Paper\n\n## Method\n", user)
+      backdate_page!(template, 45)
+
+      context = default_context(user, brain.id)
+
+      assert {:ok, result} =
+               ReadBrain.run(%{"action" => "list_curation_candidates"}, context)
+
+      refute template.id in Enum.map(result.orphans, & &1.page_id)
+      refute template.id in Enum.map(result.unfiled, & &1.page_id)
+      refute template.id in Enum.map(result.stale, & &1.page_id)
+      refute template.id in Enum.map(result.drifted, & &1.page_id)
+      refute template.id in Enum.map(result.untyped, & &1.page_id)
+      refute template.id in Enum.map(result.off_template, & &1.page_id)
+    end
+
+    test "a :template page does not count toward the total or any per-category count" do
+      %{user: user, brain: brain} = setup_brain()
+
+      template = create_page!(brain.id, "Paper", user, kind: :template)
+      write_body!(template, "# Paper\n\n## Method\n", user)
+      backdate_page!(template, 45)
+
+      context = default_context(user, brain.id)
+
+      assert {:ok, result} =
+               ReadBrain.run(%{"action" => "list_curation_candidates"}, context)
+
+      assert result.count == 0
+      assert result.counts.orphans == 0
+      assert result.counts.unfiled == 0
+      assert result.counts.stale == 0
+      assert result.counts.drifted == 0
+      assert result.counts.untyped == 0
+      assert result.counts.off_template == 0
+    end
+
+    test "off_template still fetches template bodies for the heading diff via templates_for_brain" do
+      %{user: user, brain: brain} = setup_brain()
+
+      template = create_page!(brain.id, "Paper", user, kind: :template)
+
+      write_body!(
+        template,
+        """
+        # Paper
+
+        ## Summary
+
+        ## Method
+        """,
+        user
+      )
+
+      page = create_page!(brain.id, "Missing Method Section", user)
+
+      page =
+        write_body!(
+          page,
+          """
+          ---
+          type: Paper
+          ---
+
+          # Missing Method Section
+
+          ## Summary
+          """,
+          user
+        )
+
+      context = default_context(user, brain.id)
+
+      assert {:ok, result} =
+               ReadBrain.run(%{"action" => "list_curation_candidates"}, context)
+
+      # The template itself never appears as a candidate...
+      refute template.id in Enum.map(result.off_template, & &1.page_id)
+      # ...but its body is still used as the diff target, so the untemplated
+      # content page is correctly flagged for the heading it's missing. This
+      # proves templates_for_brain (a separate query) still runs.
+      assert page.id in Enum.map(result.off_template, & &1.page_id)
+      entry = Enum.find(result.off_template, &(&1.page_id == page.id))
+      assert "method" in entry.missing_headings
     end
   end
 end
