@@ -27,7 +27,7 @@ defmodule Magus.Brain.Frontmatter do
   jsonb cache column.
   """
 
-  @known_keys ~w(icon tags aliases created modified)
+  @known_keys ~w(icon tags aliases created modified instructions type)
 
   @doc """
   Parses a page body string and returns `{frontmatter_map, body_without_frontmatter}`.
@@ -126,6 +126,8 @@ defmodule Magus.Brain.Frontmatter do
         key == "icon" -> put_if_present(acc, key, normalize_icon(v))
         key == "tags" -> put_if_present(acc, key, normalize_tags(v))
         key == "aliases" -> put_if_present(acc, key, normalize_aliases(v))
+        key == "instructions" -> put_if_present(acc, key, normalize_text(v))
+        key == "type" -> put_if_present(acc, key, normalize_text(v))
         true -> Map.put(acc, key, v)
       end
     end)
@@ -154,6 +156,16 @@ defmodule Magus.Brain.Frontmatter do
   defp normalize_icon(v) when is_binary(v), do: v
   defp normalize_icon(v) when is_number(v) or is_atom(v), do: to_string(v)
   defp normalize_icon(_), do: nil
+
+  defp normalize_text(v) when is_binary(v) do
+    case String.trim(v) do
+      "" -> nil
+      t -> t
+    end
+  end
+
+  defp normalize_text(v) when is_number(v) or is_atom(v), do: normalize_text(to_string(v))
+  defp normalize_text(_), do: nil
 
   defp normalize_tags(v) when is_list(v) do
     v

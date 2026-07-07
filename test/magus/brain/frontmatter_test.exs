@@ -133,6 +133,21 @@ defmodule Magus.Brain.FrontmatterTest do
 
       assert {%{}, ^body} = Frontmatter.parse(body)
     end
+
+    test "normalizes type and instructions to trimmed strings" do
+      body = "---\ntype: Paper\ninstructions: One paper per page.\n---\n# X\n"
+
+      assert {matter, _rest} = Frontmatter.parse(body)
+      assert matter == %{"type" => "Paper", "instructions" => "One paper per page."}
+    end
+
+    test "drops a blank type" do
+      body = "---\ntype: \"  \"\nicon: 🧠\n---\nx\n"
+
+      assert {matter, _rest} = Frontmatter.parse(body)
+      refute Map.has_key?(matter, "type")
+      assert matter["icon"] == "🧠"
+    end
   end
 
   describe "normalize_known_keys/1" do
