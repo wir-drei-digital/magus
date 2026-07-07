@@ -18,7 +18,7 @@
  * mutations driven by the brain overview store, which renders this tree.
  */
 import type { PlanPage, PlanTask, Lifecycle } from '$lib/ash/api';
-import { isReady } from './plan-board-store.svelte';
+import { isReady } from './task-board-store.svelte';
 
 /** A node in the unified plan tree: a :plan or :spec page plus its tasks + children. */
 export type PlanTreeNode = {

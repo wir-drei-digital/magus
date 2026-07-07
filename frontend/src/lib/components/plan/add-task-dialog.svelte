@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button, Field, CONTROL_CLASS, TEXTAREA_CLASS } from '$lib/components/crud';
-	import type { PlanBoardStore } from './plan-board-store.svelte';
+	import type { TaskBoardStore } from './task-board-store.svelte';
 	import type { TaskPriority } from '$lib/ash/api';
 
 	let {
@@ -9,7 +9,7 @@
 		store
 	}: {
 		open?: boolean;
-		store: PlanBoardStore;
+		store: TaskBoardStore;
 	} = $props();
 
 	let title = $state('');

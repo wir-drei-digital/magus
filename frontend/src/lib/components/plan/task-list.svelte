@@ -13,9 +13,9 @@
 	import PriorityBadge from './priority-badge.svelte';
 	import ReadyBadge from './ready-badge.svelte';
 	import AssigneeChip from './assignee-chip.svelte';
-	import { isReady, isStale, type PlanBoardStore } from './plan-board-store.svelte';
+	import { isReady, isStale, type TaskBoardStore } from './task-board-store.svelte';
 
-	let { store }: { store: PlanBoardStore } = $props();
+	let { store }: { store: TaskBoardStore } = $props();
 
 	let newTitle = $state('');
 	let adding = $state(false);

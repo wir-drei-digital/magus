@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *
  * Runs under the existing vitest config (environment: 'node'); the sveltekit()
  * vite plugin compiles the `.svelte.ts` runes module so $state/$derived work
- * without jsdom (mirrors plan-board-store.svelte.test.ts). The api.ts seam is
+ * without jsdom (mirrors task-board-store.svelte.test.ts). The api.ts seam is
  * mocked so no network is touched.
  */
 
@@ -28,7 +28,7 @@ vi.mock('$lib/ash/api', () => ({
 	markBrainPageDelivered: (...args: unknown[]) => markBrainPageDelivered(...args),
 	undeliverBrainPage: (...args: unknown[]) => undeliverBrainPage(...args),
 	myAgents: (...args: unknown[]) => myAgents(...args),
-	// plan-board-store.svelte (imported transitively for isReady/isStale) also
+	// task-board-store.svelte (imported transitively for isReady/isStale) also
 	// pulls these from the api module; stub them so the import resolves.
 	planTasks: vi.fn(),
 	createPlanTask: vi.fn(),

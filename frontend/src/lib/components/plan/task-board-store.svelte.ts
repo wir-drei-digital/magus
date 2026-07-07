@@ -10,7 +10,7 @@
  * Mirrors the prompts/tasks-companion pattern: a thin class of `$state` fields
  * with async methods, optimistic local writes reconciled from the server row,
  * and a refetch on error. Live cross-client updates (other agents claiming /
- * moving cards) are wired in plan-board.svelte: it subscribes to the plan's
+ * moving cards) are wired in task-board.svelte: it subscribes to the plan's
  * task channel and calls `load()` on each `task.*` event (B6).
  */
 import {
@@ -116,7 +116,7 @@ function byPriorityThenPosition(a: PlanTask, b: PlanTask): number {
 	return (a.position ?? 0) - (b.position ?? 0);
 }
 
-export class PlanBoardStore {
+export class TaskBoardStore {
 	brainPageId = $state('');
 	tasks = $state<PlanTask[]>([]);
 	loading = $state(true);

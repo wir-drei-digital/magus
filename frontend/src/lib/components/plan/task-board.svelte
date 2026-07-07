@@ -6,11 +6,11 @@
 	import AddTaskDialog from './add-task-dialog.svelte';
 	import { untrack } from 'svelte';
 	import {
-		PlanBoardStore,
+		TaskBoardStore,
 		loadBoardView,
 		saveBoardView,
 		type BoardView
-	} from './plan-board-store.svelte';
+	} from './task-board-store.svelte';
 	import { joinPlanTasks } from '$lib/realtime/task-updates';
 
 	let { brainPageId }: { brainPageId: string } = $props();
@@ -19,7 +19,7 @@
 	// between plan pages reloads cleanly (mirrors the prompts $effect-load).
 	// untrack: the initial construction reads the prop for its seed value only;
 	// the $effect below owns re-creation + reload when the id actually changes.
-	let store = $state(untrack(() => new PlanBoardStore(brainPageId)));
+	let store = $state(untrack(() => new TaskBoardStore(brainPageId)));
 	let view = $state<BoardView>(untrack(() => loadBoardView(brainPageId)));
 	let addOpen = $state(false);
 
@@ -33,7 +33,7 @@
 			void store.load();
 			return;
 		}
-		store = new PlanBoardStore(id);
+		store = new TaskBoardStore(id);
 		view = loadBoardView(id);
 		void store.load();
 	});
