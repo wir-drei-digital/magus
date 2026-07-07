@@ -210,4 +210,51 @@ defmodule Magus.Agents.Tools.Brain.BrainGuideTest do
       assert error =~ "page"
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # set_brain_guide
+  # ---------------------------------------------------------------------------
+
+  describe "set_brain_guide action" do
+    test "writes the brain's constitution and a subsequent get_guide returns it" do
+      %{user: user, brain: brain} = setup_brain()
+      page = create_page!(brain.id, "Notes", user)
+
+      context = default_context(user, brain.id)
+
+      assert {:ok, result} =
+               BrainGuide.run(
+                 %{action: "set_brain_guide", instructions: "Always cite your sources."},
+                 context
+               )
+
+      assert result.action == "set_brain_guide"
+      assert result.brain_id == brain.id
+
+      assert {:ok, guide_result} =
+               BrainGuide.run(%{action: "get_guide", page_id: page.id}, context)
+
+      assert guide_result.constitution =~ "Always cite your sources."
+    end
+
+    test "errors when instructions is missing" do
+      %{user: user, brain: brain} = setup_brain()
+      context = default_context(user, brain.id)
+
+      assert {:ok, %{error: error}} =
+               BrainGuide.run(%{action: "set_brain_guide"}, context)
+
+      assert error =~ "instructions"
+    end
+
+    test "errors when instructions is blank" do
+      %{user: user, brain: brain} = setup_brain()
+      context = default_context(user, brain.id)
+
+      assert {:ok, %{error: error}} =
+               BrainGuide.run(%{action: "set_brain_guide", instructions: "   "}, context)
+
+      assert error =~ "instructions"
+    end
+  end
 end
