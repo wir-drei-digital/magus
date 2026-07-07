@@ -28,7 +28,7 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPage do
   defp do_load(page_id) do
     with {:ok, page} <- Ash.get(Magus.Brain.Page, page_id, load: [:brain], authorize?: false),
          {:ok, user_id} <- resolve_user_id(page) do
-      body = page.body || ""
+      body = body_without_frontmatter(page.body || "")
 
       {:ok,
        %{
@@ -45,6 +45,19 @@ defmodule Magus.SuperBrain.Workers.ExtractBrainPage do
       {:error, %Ash.Error.Query.NotFound{}} -> {:error, :page_not_found}
       {:error, _} = err -> err
       _ -> {:error, :page_not_found}
+    end
+  end
+
+  # Strips the leading YAML frontmatter block (icon/tags/instructions/type/
+  # etc.) so it never reaches the extraction LLM: `instructions:` in
+  # particular is meta-guidance about the page, not knowledge to extract.
+  # Falls back to the raw body when the frontmatter block is malformed
+  # (`Frontmatter.parse/1` returns `{:error, :invalid_frontmatter}`) rather
+  # than failing the extraction job over unrelated formatting.
+  defp body_without_frontmatter(body) do
+    case Magus.Brain.Frontmatter.parse(body) do
+      {:error, :invalid_frontmatter} -> body
+      {_matter, rest} -> rest
     end
   end
 
