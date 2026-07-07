@@ -50,13 +50,18 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain do
       caller can detect rename drift.
     - list_tags: All tags in scope with page counts. Optional:
       brain_id (omit or pass nil to span every accessible brain).
-    - list_curation_candidates: Cheap, body-free maintenance scan of
-      one brain for an automated curator. Returns metadata only (no
-      page bodies): drifted (parent/index pages whose children changed
-      after the parent was last edited), stale (untouched longer than
-      stale_after_days), orphans (no inbound wikilinks), and
-      recently_changed. Optional: brain_id, stale_after_days (default
-      30), recent_days (default 7), limit (per-signal cap, default 20).
+    - list_curation_candidates: Cheap maintenance scan of one brain for
+      an automated curator. Returns metadata only, never page bodies
+      (off_template reads bodies internally to diff headings, but its
+      output stays metadata-only too): drifted (parent/index pages
+      whose children changed after the parent was last edited), stale
+      (untouched longer than stale_after_days), orphans (no inbound
+      wikilinks), recently_changed, untyped (content pages with no
+      frontmatter type), off_template (typed pages missing a heading
+      their type's template declares), and unfiled (root pages with no
+      parent and no inbound link). Optional: brain_id, stale_after_days
+      (default 30), recent_days (default 7), limit (per-signal cap,
+      default 20).
     - read_page: Read a page's full body. Required one of: page_id,
       page_title. Optional: start_line, end_line (1-indexed, inclusive)
       to read a slice with line-number prefixes.
@@ -229,7 +234,7 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain do
 
   def summarize_output(%{action: "list_curation_candidates", counts: c}),
     do:
-      "Curation candidates: #{c.drifted} drifted, #{c.stale} stale, #{c.orphans} orphan(s), #{c.recently_changed} recently changed"
+      "Curation candidates: #{c.drifted} drifted, #{c.stale} stale, #{c.orphans} orphan(s), #{c.recently_changed} recently changed, #{c.untyped} untyped, #{c.off_template} off_template, #{c.unfiled} unfiled"
 
   def summarize_output(%{summary: summary}), do: summary
   def summarize_output(%{hint: hint}) when is_binary(hint), do: hint
@@ -724,7 +729,7 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain do
     page_query =
       Magus.Brain.Page
       |> Ash.Query.filter(brain_id == ^brain_id)
-      |> Ash.Query.select([:id, :title, :parent_page_id, :updated_at])
+      |> Ash.Query.select([:id, :title, :parent_page_id, :updated_at, :kind, :frontmatter])
 
     case Ash.read(page_query, actor: user) do
       {:ok, []} ->
@@ -738,12 +743,15 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain do
         stale = stale_candidates(pages, now, stale_after_days)
         orphans = orphan_candidates(pages, linked_targets)
         recent = recent_candidates(pages, now, recent_days)
+        untyped = untyped_candidates(pages)
+        unfiled = unfiled_candidates(pages, linked_targets)
+        off_template = off_template_candidates(pages, brain_id, limit, user)
 
         # `count` is the deduped UNION of the actionable signals (a page can be
         # both stale and an orphan but counts once). recently_changed is
         # informational, not "needs curation", so it is excluded from count.
         total =
-          [drifted, stale, orphans]
+          [drifted, stale, orphans, untyped, unfiled, off_template]
           |> Enum.flat_map(fn list -> Enum.map(list, & &1.page_id) end)
           |> Enum.uniq()
           |> length()
@@ -757,14 +765,20 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain do
              drifted: length(drifted),
              stale: length(stale),
              orphans: length(orphans),
-             recently_changed: length(recent)
+             recently_changed: length(recent),
+             untyped: length(untyped),
+             off_template: length(off_template),
+             unfiled: length(unfiled)
            },
            drifted: Enum.take(drifted, limit),
            stale: Enum.take(stale, limit),
            orphans: Enum.take(orphans, limit),
            recently_changed: Enum.take(recent, limit),
+           untyped: Enum.take(untyped, limit),
+           off_template: Enum.take(off_template, limit),
+           unfiled: Enum.take(unfiled, limit),
            hint:
-             "Metadata only — no page bodies. Read just the pages you intend to act on with read_brain.read_page. 'drifted' = parent/index pages whose children changed after the parent was last edited; what to do about each signal is decided by your instructions."
+             "Metadata only — no page bodies. Read just the pages you intend to act on with read_brain.read_page. 'drifted' = parent/index pages whose children changed after the parent was last edited; 'untyped' = content pages with no frontmatter type; 'off_template' = typed pages missing headings their type's template declares; 'unfiled' = root pages with no parent and no inbound link; what to do about each signal is decided by your instructions."
          }}
 
       {:error, err} ->
@@ -785,11 +799,22 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain do
       action: "list_curation_candidates",
       brain_id: brain_id,
       count: 0,
-      counts: %{drifted: 0, stale: 0, orphans: 0, recently_changed: 0},
+      counts: %{
+        drifted: 0,
+        stale: 0,
+        orphans: 0,
+        recently_changed: 0,
+        untyped: 0,
+        off_template: 0,
+        unfiled: 0
+      },
       drifted: [],
       stale: [],
       orphans: [],
       recently_changed: [],
+      untyped: [],
+      off_template: [],
+      unfiled: [],
       hint: "This brain has no pages yet."
     }
   end
@@ -883,6 +908,137 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain do
         updated_at: DateTime.to_iso8601(&1.updated_at)
       }
     )
+  end
+
+  # Content pages (`kind: :page`, i.e. not templates) with a blank or missing
+  # frontmatter `type`. Metadata-only: `frontmatter` is already in the
+  # curation query's select, so no extra read.
+  defp untyped_candidates(pages) do
+    pages
+    |> Enum.filter(&(&1.kind == :page and blank?(page_type(&1))))
+    |> Enum.sort_by(& &1.updated_at, {:desc, DateTime})
+    |> Enum.map(&%{page_id: &1.id, title: &1.title || "Untitled"})
+  end
+
+  # Root-level orphans: no parent AND no inbound wikilink. A page with a
+  # parent is "filed" under it regardless of backlinks, so this is a strict
+  # subset of `orphan_candidates/2` (parent-less orphans only).
+  defp unfiled_candidates(pages, linked_targets) do
+    pages
+    |> Enum.filter(&is_nil(&1.parent_page_id))
+    |> Enum.reject(&MapSet.member?(linked_targets, &1.id))
+    |> Enum.sort_by(& &1.updated_at, {:desc, DateTime})
+    |> Enum.map(&%{page_id: &1.id, title: &1.title || "Untitled"})
+  end
+
+  # Cheap heading-set diff against the page's type template, no LLM. Bounded
+  # to `limit` typed pages so the body reads (the one place this scan departs
+  # from metadata-only) stay capped regardless of brain size. For each
+  # candidate: resolve its template by case-insensitive title match against
+  # `frontmatter["type"]` (same rule as `brain_guide.ex`'s
+  # `resolve_type_template/3`), then flag it if the template declares a
+  # heading the page's body doesn't have. Pages whose type has no matching
+  # template are skipped (nothing to diff against).
+  defp off_template_candidates(pages, brain_id, limit, user) do
+    typed =
+      pages
+      |> Enum.filter(&(&1.kind == :page and not blank?(page_type(&1))))
+      |> Enum.sort_by(& &1.updated_at, {:desc, DateTime})
+      |> Enum.take(limit)
+
+    case typed do
+      [] ->
+        []
+
+      _ ->
+        templates =
+          case Brain.templates_for_brain(brain_id, actor: user) do
+            {:ok, templates} -> templates
+            _ -> []
+          end
+
+        template_headings_by_title =
+          Map.new(templates, fn t -> {String.downcase(t.title || ""), heading_set(t.body)} end)
+
+        bodies_by_id = page_bodies(Enum.map(typed, & &1.id), user)
+
+        typed
+        |> Enum.flat_map(fn page ->
+          type = page_type(page)
+          template_headings = Map.get(template_headings_by_title, String.downcase(type))
+
+          case template_headings do
+            nil ->
+              []
+
+            declared ->
+              page_headings = heading_set(Map.get(bodies_by_id, page.id))
+              missing = MapSet.difference(declared, page_headings)
+
+              if MapSet.size(missing) == 0 do
+                []
+              else
+                [
+                  %{
+                    page_id: page.id,
+                    title: page.title || "Untitled",
+                    type: type,
+                    missing_headings: Enum.sort(MapSet.to_list(missing))
+                  }
+                ]
+              end
+          end
+        end)
+    end
+  end
+
+  # `frontmatter["type"]`, trimmed. Mirrors `brain_guide.ex`'s `page_type/1`.
+  defp page_type(%{frontmatter: fm}) when is_map(fm) do
+    case Map.get(fm, "type") do
+      type when is_binary(type) -> String.trim(type)
+      _ -> nil
+    end
+  end
+
+  defp page_type(_), do: nil
+
+  # Loads just the `body` for the given page ids, bounded to the typed pages
+  # `off_template_candidates/4` actually checks (not the whole brain).
+  defp page_bodies(page_ids, user) do
+    Magus.Brain.Page
+    |> Ash.Query.filter(id in ^page_ids)
+    |> Ash.Query.select([:id, :body])
+    |> Ash.read(actor: user)
+    |> case do
+      {:ok, pages} -> Map.new(pages, &{&1.id, &1.body})
+      _ -> %{}
+    end
+  end
+
+  # ATX section headings (`##` through `######`), text trimmed, `#` markers
+  # stripped. Excludes level-1 (`# Title`): every template and every page
+  # opens with its own `# <own title>` line, which never matches across a
+  # template/instance pair by design (a page's title isn't the template's
+  # title) — diffing it would flag every typed page as off_template
+  # regardless of its actual sections. Level is otherwise ignored for the
+  # diff (a template's `## Method` matches a page's `### Method` just as
+  # well) since the goal is "does the section exist", not exact structural
+  # parity.
+  defp heading_set(body) when is_binary(body) do
+    body
+    |> String.split("\n")
+    |> Enum.map(&heading_text/1)
+    |> Enum.reject(&is_nil/1)
+    |> MapSet.new()
+  end
+
+  defp heading_set(_), do: MapSet.new()
+
+  defp heading_text(line) do
+    case Regex.run(~r/^\#{2,6}\s+(.+?)\s*$/, line) do
+      [_, text] -> text
+      nil -> nil
+    end
   end
 
   # ---------------------------------------------------------------------------
