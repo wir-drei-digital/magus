@@ -4,7 +4,7 @@
 	/**
 	 * A resolved assignee, independent of the raw task fields so the chip stays
 	 * pure and testable. The board derives this from a task + a current-user /
-	 * custom-agent lookup (see `resolveAssignee` in `plan-board.svelte.ts`).
+	 * custom-agent lookup (see `resolveAssignee` in `task-board-store.svelte.ts`).
 	 *
 	 *  - `human`    → a circular initials avatar + name ("You" for self).
 	 *  - `external` → a terminal-styled monospace chip (e.g. `claude-code`),

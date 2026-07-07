@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
  * (stranded) flag the tree and the overview surface.
  *
  * Runs under the vitest `node` env; the sveltekit() vite plugin compiles the
- * `.svelte.ts` runes module (mirrors plan-board-store.svelte.test.ts).
+ * `.svelte.ts` runes module (mirrors task-board-store.svelte.test.ts).
  */
 
 import { buildPlanTree, type PlanTreeNode, isStranded } from './plan-tree-store.svelte';

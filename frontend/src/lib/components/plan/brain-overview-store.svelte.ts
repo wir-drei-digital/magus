@@ -37,7 +37,7 @@ import {
 import { session } from '$lib/stores/session.svelte';
 import type { Assignee } from './assignee-chip.svelte';
 import { resolveAssignee, assigneeKey, assigneeName, assigneeTypeLabel } from './assignee';
-import { isReady, isStale, LEASE_EXPIRING_MS } from './plan-board-store.svelte';
+import { isReady, isStale, LEASE_EXPIRING_MS } from './task-board-store.svelte';
 import { buildPlanTree, isStranded, type PlanTreeNode } from './plan-tree-store.svelte';
 
 export type { PlanTreeNode };

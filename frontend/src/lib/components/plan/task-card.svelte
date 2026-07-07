@@ -9,8 +9,8 @@
 		isReady,
 		isStale,
 		leaseExpiresInMinutes,
-		type PlanBoardStore
-	} from './plan-board-store.svelte';
+		type TaskBoardStore
+	} from './task-board-store.svelte';
 
 	let {
 		task,
@@ -18,7 +18,7 @@
 		ondragstart
 	}: {
 		task: PlanTask;
-		store: PlanBoardStore;
+		store: TaskBoardStore;
 		ondragstart?: (event: DragEvent, task: PlanTask) => void;
 	} = $props();
 

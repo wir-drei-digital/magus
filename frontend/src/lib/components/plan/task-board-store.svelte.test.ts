@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
- * Logic coverage for the plan-board store: status groupings, the ready/stale
+ * Logic coverage for the task-board store: status groupings, the ready/stale
  * derivations both views render from, assignee resolution (id → chip
  * descriptor), and the optimistic claim / status-change / add-task flows with
  * server reconciliation + refetch-on-error.
@@ -33,7 +33,7 @@ vi.mock('$lib/stores/session.svelte', () => ({
 }));
 
 import {
-	PlanBoardStore,
+	TaskBoardStore,
 	isReady,
 	isStale,
 	isAssigned,
@@ -43,7 +43,7 @@ import {
 	loadBoardView,
 	saveBoardView,
 	type BoardView
-} from './plan-board-store.svelte';
+} from './task-board-store.svelte';
 import type { PlanTask } from '$lib/ash/api';
 
 function task(overrides: Partial<PlanTask> & { id: string }): PlanTask {
@@ -182,7 +182,7 @@ describe('board-view persistence', () => {
 });
 
 // ─── Store: loading + groupings ──────────────────────────────────────────────
-describe('PlanBoardStore groupings', () => {
+describe('TaskBoardStore groupings', () => {
 	it('groups tasks by status and computes counts + readiness', async () => {
 		planTasks.mockResolvedValue(
 			ok([
@@ -196,7 +196,7 @@ describe('PlanBoardStore groupings', () => {
 			])
 		);
 
-		const board = new PlanBoardStore('page-1');
+		const board = new TaskBoardStore('page-1');
 		await board.load();
 
 		expect(board.loading).toBe(false);
@@ -223,14 +223,14 @@ describe('PlanBoardStore groupings', () => {
 				task({ id: 'normal', status: 'open', priority: 'normal', ready: false, position: 1 })
 			])
 		);
-		const board = new PlanBoardStore('page-1');
+		const board = new TaskBoardStore('page-1');
 		await board.load();
 		expect(board.todo.map((t) => t.id)).toEqual(['urgent', 'normal', 'low']);
 	});
 
 	it('reports a load error', async () => {
 		planTasks.mockResolvedValue(err('boom'));
-		const board = new PlanBoardStore('page-1');
+		const board = new TaskBoardStore('page-1');
 		await board.load();
 		expect(board.loading).toBe(false);
 		expect(board.loadError).toBe('boom');
@@ -241,7 +241,7 @@ describe('PlanBoardStore groupings', () => {
 describe('resolveAssignee', () => {
 	it('maps each assignee field to the right chip descriptor', async () => {
 		planTasks.mockResolvedValue(ok([]));
-		const board = new PlanBoardStore('page-1');
+		const board = new TaskBoardStore('page-1');
 		await board.load(); // loads the agent-name lookup (Atlas)
 
 		expect(board.resolveAssignee(task({ id: 't' }))).toBeNull();
@@ -271,7 +271,7 @@ describe('resolveAssignee', () => {
 describe('claim', () => {
 	it('optimistically moves a ready task into In Progress, then reconciles', async () => {
 		planTasks.mockResolvedValue(ok([task({ id: 'ready', status: 'open', ready: true })]));
-		const board = new PlanBoardStore('page-1');
+		const board = new TaskBoardStore('page-1');
 		await board.load();
 
 		let resolveClaim!: (v: unknown) => void;
@@ -296,7 +296,7 @@ describe('claim', () => {
 
 	it('refetches to roll back when the claim fails (lost race)', async () => {
 		planTasks.mockResolvedValueOnce(ok([task({ id: 'ready', status: 'open', ready: true })]));
-		const board = new PlanBoardStore('page-1');
+		const board = new TaskBoardStore('page-1');
 		await board.load();
 
 		claimPlanTask.mockResolvedValue(err('already claimed'));
@@ -322,7 +322,7 @@ describe('claim', () => {
 		sessionModule.session.user = null;
 
 		planTasks.mockResolvedValue(ok([task({ id: 'ready', status: 'open', ready: true })]));
-		const board = new PlanBoardStore('page-1');
+		const board = new TaskBoardStore('page-1');
 		await board.load();
 		await board.claim(board.todo[0]);
 		expect(claimPlanTask).not.toHaveBeenCalled();
@@ -334,7 +334,7 @@ describe('claim', () => {
 describe('setStatus', () => {
 	it('optimistically applies a status change (drag between columns)', async () => {
 		planTasks.mockResolvedValue(ok([task({ id: 'wip', status: 'in_progress' })]));
-		const board = new PlanBoardStore('page-1');
+		const board = new TaskBoardStore('page-1');
 		await board.load();
 
 		updatePlanTask.mockResolvedValue(ok(task({ id: 'wip', status: 'done' })));
@@ -347,7 +347,7 @@ describe('setStatus', () => {
 
 	it('ignores a no-op status change to the same status', async () => {
 		planTasks.mockResolvedValue(ok([task({ id: 'wip', status: 'in_progress' })]));
-		const board = new PlanBoardStore('page-1');
+		const board = new TaskBoardStore('page-1');
 		await board.load();
 		await board.setStatus(board.inProgress[0], 'in_progress');
 		expect(updatePlanTask).not.toHaveBeenCalled();
@@ -357,7 +357,7 @@ describe('setStatus', () => {
 describe('addTask', () => {
 	it('creates and appends a task; trims and ignores blanks', async () => {
 		planTasks.mockResolvedValue(ok([]));
-		const board = new PlanBoardStore('page-1');
+		const board = new TaskBoardStore('page-1');
 		await board.load();
 
 		await board.addTask('   ');
