@@ -23,7 +23,8 @@ defmodule Magus.LiveE2E.BrainGuidesTest do
       user: user,
       model: model
     } do
-      %{brain: brain, topic_page: topic_page} = seed_brain_with_guide(user)
+      %{brain: brain, topic_page: topic_page, existing_page: existing_page} =
+        seed_brain_with_guide(user)
 
       conversation = create_conversation(user, model)
       subscribe_to_agent(conversation.id)
@@ -59,7 +60,7 @@ defmodule Magus.LiveE2E.BrainGuidesTest do
       # 1) The brain grew (a new page was created) or an existing seeded page
       # absorbed the note (its body changed). Either shows the agent wrote
       # the note into the brain rather than just replying in chat.
-      seeded_ids = MapSet.new([topic_page.id])
+      seeded_ids = MapSet.new([topic_page.id, existing_page.id])
       new_pages = Enum.reject(pages, &MapSet.member?(seeded_ids, &1.id))
 
       assert new_pages != [] or pages_changed_since_seed?(pages, topic_page),
@@ -175,7 +176,7 @@ defmodule Magus.LiveE2E.BrainGuidesTest do
         actor: user
       )
 
-    %{brain: brain, template: template, topic_page: topic_page}
+    %{brain: brain, template: template, topic_page: topic_page, existing_page: existing_page}
   end
 
   # ---------------------------------------------------------------------------
