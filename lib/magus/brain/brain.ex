@@ -36,10 +36,9 @@ defmodule Magus.Brain do
       rpc_action :move_brain_page, :move_to_parent
       rpc_action :trash_brain_page, :soft_delete
 
-      # Delivery lifecycle (project-state iteration). The SPA reads :lifecycle /
+      # Delivery lifecycle (project-state iteration). The SPA reads
       # :delivered_at / :delivery_ref directly off the page schema (all public)
-      # via the existing tree reads; these expose the writes + the stranded read.
-      rpc_action :brain_stranded_plans, :stranded_plans
+      # via the existing tree reads; these expose the writes.
       rpc_action :set_brain_page_spec, :set_spec
       rpc_action :mark_brain_page_delivered, :mark_delivered
       rpc_action :undeliver_brain_page, :undeliver

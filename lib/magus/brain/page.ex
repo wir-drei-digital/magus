@@ -333,40 +333,6 @@ defmodule Magus.Brain.Page do
       prepare build(sort: [position: :asc])
     end
 
-    read :plans_for_spec do
-      description "The :plan pages that implement a given :spec page (reverse of :spec_page)."
-      argument :spec_page_id, :uuid, allow_nil?: false
-
-      filter expr(
-               spec_page_id == ^arg(:spec_page_id) and is_nil(deleted_at) and
-                 ^no_trashed_ancestor()
-             )
-
-      prepare build(sort: [position: :asc])
-    end
-
-    read :stranded_plans do
-      description """
-      Anti-stranding detector: :plan pages in a brain whose computed lifecycle
-      is :done but were never delivered (delivered_at unset). Excludes :active,
-      :delivered, trashed pages, and non-:plan pages.
-
-      `lifecycle` is an Elixir-evaluated calc (recursive over child phases), so
-      it cannot be a SQL filter. The SQL filter narrows to candidate :plan pages
-      and the preparation loads `:lifecycle` and keeps only the `:done` ones.
-      """
-
-      argument :brain_id, :uuid, allow_nil?: false
-
-      filter expr(
-               brain_id == ^arg(:brain_id) and kind == :plan and is_nil(delivered_at) and
-                 is_nil(deleted_at) and ^no_trashed_ancestor()
-             )
-
-      prepare Magus.Brain.Page.Preparations.FilterDonePlans
-      prepare build(sort: [position: :asc])
-    end
-
     read :trashed do
       description """
       Deletion roots in the trash, workspace-scoped via
@@ -532,8 +498,6 @@ defmodule Magus.Brain.Page do
              :by_title_in_brain_ci,
              :root_pages,
              :children_of,
-             :plans_for_spec,
-             :stranded_plans,
              :trashed
            ]) do
       authorize_if {Magus.Brain.Checks.BrainAccessFilter, path: :direct, min_role: :viewer}
@@ -683,13 +647,6 @@ defmodule Magus.Brain.Page do
     calculate :prosemirror, :map do
       public? true
       calculation Magus.Brain.Page.Calculations.Prosemirror
-    end
-
-    # Delivery lifecycle for :plan pages: :draft -> :active -> :done ->
-    # :delivered. :done is the recursive task rollup; :delivered is the explicit
-    # gate (delivered_at). See the calc module for the exact predicate.
-    calculate :lifecycle, :atom, {Magus.Brain.Page.Calculations.Lifecycle, []} do
-      public? true
     end
   end
 
