@@ -39,12 +39,21 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
       result. Required one of: page_id, page_title. Required:
       instructions. Merges into the page's existing frontmatter (does
       not clobber `type`, `tags`, or any other key).
+    - define_type: Creates or updates a per-type template page (a
+      `:template` page titled `type_name`). Optional: brain_id
+      (auto-resolved from context when omitted). Required: type_name,
+      template_body. Optional: description, merged into the template
+      page's `description` frontmatter (surfaces in the brain's types
+      index). Upserts by case-insensitive title match against the
+      brain's existing template pages, so calling it again with the
+      same type_name updates that template instead of creating a
+      duplicate.
     """,
     schema: [
       action: [
-        type: {:in, ["get_guide", "set_brain_guide", "set_page_guide"]},
+        type: {:in, ["get_guide", "set_brain_guide", "set_page_guide", "define_type"]},
         required: true,
-        doc: "Action to perform: get_guide | set_brain_guide | set_page_guide"
+        doc: "Action to perform: get_guide | set_brain_guide | set_page_guide | define_type"
       ],
       brain_id: [
         type: {:or, [:string, nil]},
@@ -62,6 +71,21 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
         default: nil,
         doc:
           "set_brain_guide: the brain's constitution. set_page_guide: the page's section guide."
+      ],
+      type_name: [
+        type: {:or, [:string, nil]},
+        default: nil,
+        doc: "define_type: the type's name (also the template page's title)"
+      ],
+      template_body: [
+        type: {:or, [:string, nil]},
+        default: nil,
+        doc: "define_type: the template page's markdown body"
+      ],
+      description: [
+        type: {:or, [:string, nil]},
+        default: nil,
+        doc: "define_type: optional description, merged into the template page's frontmatter"
       ]
     ]
 
@@ -74,7 +98,7 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
   import Magus.Agents.Tools.Helpers,
     only: [validate_context: 2, get_param: 2, tool_error: 3]
 
-  @valid_actions ~w(get_guide set_brain_guide set_page_guide)
+  @valid_actions ~w(get_guide set_brain_guide set_page_guide define_type)
 
   def display_name, do: "Reading brain guide..."
 
@@ -93,6 +117,11 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
   def summarize_output(%{action: "set_brain_guide"}), do: "Updated brain guide"
 
   def summarize_output(%{action: "set_page_guide"}), do: "Updated page guide"
+
+  def summarize_output(%{action: "define_type", type: type}) when is_binary(type),
+    do: "Defined type: #{type}"
+
+  def summarize_output(%{action: "define_type"}), do: "Defined type"
 
   def summarize_output(_), do: "Completed"
 
@@ -195,6 +224,45 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # define_type
+  # ---------------------------------------------------------------------------
+
+  defp dispatch("define_type", params, ctx, context) do
+    type_name = get_param(params, :type_name)
+    template_body = get_param(params, :template_body)
+
+    cond do
+      blank?(type_name) ->
+        {:ok, %{error: "Missing required parameter: type_name"}}
+
+      blank?(template_body) ->
+        {:ok, %{error: "Missing required parameter: template_body"}}
+
+      true ->
+        description = get_param(params, :description)
+
+        with {:ok, brain_id} <- BrainResolver.resolve_brain_id(context, params),
+             {:ok, composed_body} <- compose_template_body(template_body, description) do
+          upsert_template(brain_id, type_name, composed_body, ctx)
+        else
+          {:error, :invalid_frontmatter} ->
+            {:ok,
+             %{
+               error:
+                 "The provided template_body has malformed YAML frontmatter that can't be " <>
+                   "safely merged with description. Fix the frontmatter block and retry."
+             }}
+
+          {:error, msg} when is_binary(msg) ->
+            {:ok, %{error: msg}}
+
+          {:error, err} ->
+            {:ok, %{error: tool_error("define type", err, nil)}}
+        end
+    end
+  end
+
   defp save_page_guide(page, {:error, :invalid_frontmatter}, _ctx) do
     {:ok,
      %{
@@ -239,6 +307,77 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
                "Verify page_id with read_brain list_pages."
              )
          }}
+    end
+  end
+
+  # Merges `description` into `template_body`'s frontmatter when present;
+  # otherwise returns the body unchanged. `Frontmatter.put/3` creates a
+  # frontmatter block if one doesn't already exist.
+  defp compose_template_body(template_body, description) do
+    if blank?(description) do
+      {:ok, template_body}
+    else
+      case Frontmatter.put(template_body, "description", description) do
+        {:error, :invalid_frontmatter} = error -> error
+        composed when is_binary(composed) -> {:ok, composed}
+      end
+    end
+  end
+
+  # Upserts the `:template` page titled `type_name` (case-insensitive match
+  # against the brain's existing templates, mirroring `find_template_by_type`
+  # below): writes the composed body to the existing page when found, else
+  # creates a fresh `:template` page and writes the body to it.
+  defp upsert_template(brain_id, type_name, composed_body, ctx) do
+    with {:ok, templates} <- Brain.templates_for_brain(brain_id, actor: ctx.user) do
+      case find_template_by_type(templates, type_name) do
+        %{} = existing ->
+          write_template_body(existing, type_name, composed_body, ctx)
+
+        nil ->
+          create_template(brain_id, type_name, composed_body, ctx)
+      end
+    else
+      {:error, err} -> {:ok, %{error: tool_error("define type", err, nil)}}
+    end
+  end
+
+  defp create_template(brain_id, type_name, composed_body, ctx) do
+    with {:ok, page} <-
+           Brain.create_page(brain_id, %{title: type_name, kind: :template}, actor: ctx.user) do
+      write_template_body(page, type_name, composed_body, ctx)
+    else
+      {:error, err} -> {:ok, %{error: tool_error("define type", err, nil)}}
+    end
+  end
+
+  defp write_template_body(page, type_name, composed_body, ctx) do
+    case Brain.update_page_body(
+           page,
+           %{body: composed_body, base_version: page.lock_version},
+           actor: ctx.user
+         ) do
+      {:ok, updated} ->
+        {:ok, %{action: "define_type", type: type_name, page_id: updated.id}}
+
+      {:error, %Ash.Error.Invalid{errors: errors}} = err ->
+        case Enum.find(errors, &match?(%VersionConflict{}, &1)) do
+          %VersionConflict{} ->
+            {:ok,
+             %{
+               error:
+                 "Concurrent edit detected while defining type '#{type_name}'. " <>
+                   "The template page changed under you; re-read and retry.",
+               conflict: true,
+               page_id: page.id
+             }}
+
+          nil ->
+            {:ok, %{error: tool_error("define type", err, nil)}}
+        end
+
+      {:error, err} ->
+        {:ok, %{error: tool_error("define type", err, nil)}}
     end
   end
 

@@ -464,4 +464,171 @@ defmodule Magus.Agents.Tools.Brain.BrainGuideTest do
       assert reloaded.body =~ "# X"
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # define_type
+  # ---------------------------------------------------------------------------
+
+  describe "define_type action" do
+    test "creates a :template page listed by templates_for_brain and excluded from list_pages" do
+      %{user: user, brain: brain} = setup_brain()
+      context = default_context(user, brain.id)
+
+      assert {:ok, result} =
+               BrainGuide.run(
+                 %{
+                   action: "define_type",
+                   type_name: "Meeting Note",
+                   template_body: "# Meeting Note\n\nAttendees, agenda, action items."
+                 },
+                 context
+               )
+
+      assert result.action == "define_type"
+      assert result.type == "Meeting Note"
+      assert is_binary(result.page_id)
+
+      {:ok, templates} = Brain.templates_for_brain(brain.id, actor: user)
+      assert Enum.any?(templates, &(&1.id == result.page_id and &1.title == "Meeting Note"))
+
+      {:ok, pages} = Brain.list_pages(brain.id, actor: user)
+      refute Enum.any?(pages, &(&1.id == result.page_id))
+
+      {:ok, page} = Brain.get_page(result.page_id, actor: user)
+      assert page.kind == :template
+      assert page.body =~ "Attendees, agenda, action items."
+    end
+
+    test "calling it again with the same type_name updates the same page (no duplicate)" do
+      %{user: user, brain: brain} = setup_brain()
+      context = default_context(user, brain.id)
+
+      assert {:ok, first} =
+               BrainGuide.run(
+                 %{
+                   action: "define_type",
+                   type_name: "Meeting Note",
+                   template_body: "# Meeting Note\n\nOriginal template body."
+                 },
+                 context
+               )
+
+      assert {:ok, second} =
+               BrainGuide.run(
+                 %{
+                   action: "define_type",
+                   type_name: "Meeting Note",
+                   template_body: "# Meeting Note\n\nRevised template body."
+                 },
+                 context
+               )
+
+      assert second.page_id == first.page_id
+
+      {:ok, templates} = Brain.templates_for_brain(brain.id, actor: user)
+
+      matching = Enum.filter(templates, &(String.downcase(&1.title || "") == "meeting note"))
+      assert length(matching) == 1
+
+      {:ok, page} = Brain.get_page(first.page_id, actor: user)
+      assert page.body =~ "Revised template body."
+      refute page.body =~ "Original template body."
+    end
+
+    test "upserts case-insensitively against an existing template title" do
+      %{user: user, brain: brain} = setup_brain()
+      context = default_context(user, brain.id)
+
+      assert {:ok, first} =
+               BrainGuide.run(
+                 %{
+                   action: "define_type",
+                   type_name: "Meeting Note",
+                   template_body: "# Meeting Note\n\nOriginal."
+                 },
+                 context
+               )
+
+      assert {:ok, second} =
+               BrainGuide.run(
+                 %{
+                   action: "define_type",
+                   type_name: "meeting note",
+                   template_body: "# meeting note\n\nUpdated via different casing."
+                 },
+                 context
+               )
+
+      assert second.page_id == first.page_id
+    end
+
+    test "merges description into the template's frontmatter and it surfaces via get_guide's types index" do
+      %{user: user, brain: brain} = setup_brain()
+      context = default_context(user, brain.id)
+
+      assert {:ok, result} =
+               BrainGuide.run(
+                 %{
+                   action: "define_type",
+                   type_name: "Paper",
+                   template_body: "# Paper\n\nSome generic first line.",
+                   description: "A template for summarizing a research paper."
+                 },
+                 context
+               )
+
+      {:ok, page} = Brain.get_page(result.page_id, actor: user)
+      assert page.frontmatter["description"] == "A template for summarizing a research paper."
+
+      # The description surfaces in the types index (Guide.build_types),
+      # which get_guide's caller assembles for any page in the brain.
+      other_page = create_page!(brain.id, "Some Page", user)
+
+      assert {:ok, guide_result} =
+               BrainGuide.run(%{action: "get_guide", page_id: other_page.id}, context)
+
+      # get_guide itself only returns the page's own matching type_template,
+      # not the full types index; exercise the shared Guide module directly
+      # (the same computation Magus.Agents.Context.BrainContext renders).
+      {:ok, brain_record} = Brain.get_brain(brain.id, actor: user)
+      {:ok, pages} = Brain.list_pages(brain.id, actor: user)
+      guide = Magus.Brain.Guide.for_page(brain_record, other_page, pages, user)
+
+      assert Enum.any?(
+               guide.types,
+               &(&1.title == "Paper" and
+                   &1.description == "A template for summarizing a research paper.")
+             )
+
+      # get_guide's own result stays unaffected by this assertion path;
+      # sanity-check it still runs without error.
+      assert guide_result.action == "get_guide"
+    end
+
+    test "errors when type_name is missing" do
+      %{user: user, brain: brain} = setup_brain()
+      context = default_context(user, brain.id)
+
+      assert {:ok, %{error: error}} =
+               BrainGuide.run(
+                 %{action: "define_type", template_body: "# Body"},
+                 context
+               )
+
+      assert error =~ "type_name"
+    end
+
+    test "errors when template_body is missing" do
+      %{user: user, brain: brain} = setup_brain()
+      context = default_context(user, brain.id)
+
+      assert {:ok, %{error: error}} =
+               BrainGuide.run(
+                 %{action: "define_type", type_name: "Meeting Note"},
+                 context
+               )
+
+      assert error =~ "template_body"
+    end
+  end
 end
