@@ -39,9 +39,16 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Curation do
   # brain) in memory. `limit` caps the OUTPUT per signal, not the scan itself.
   # That trade is intentional for a periodic maintenance pass.
   defp curation_candidates(brain_id, stale_after_days, recent_days, limit, user) do
+    # `kind != :template` excludes reusable starting-point pages from every
+    # curation signal below. Templates are parentless and unlinked by
+    # construction (nothing wikilinks a template, and templates don't nest
+    # under a parent), so without this filter they would wrongly surface as
+    # both orphans and unfiled. `off_template_candidates/4` fetches template
+    # BODIES separately via `Magus.Brain.templates_for_brain/2` (the diff
+    # target, not a diff candidate), which is unaffected by this filter.
     page_query =
       Magus.Brain.Page
-      |> Ash.Query.filter(brain_id == ^brain_id)
+      |> Ash.Query.filter(brain_id == ^brain_id and kind != :template)
       |> Ash.Query.select([:id, :title, :parent_page_id, :updated_at, :kind, :frontmatter])
 
     case Ash.read(page_query, actor: user) do

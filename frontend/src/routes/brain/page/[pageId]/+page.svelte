@@ -521,7 +521,9 @@
 				     its body (the kanban/list board) claims up to ~55% of the pane
 				     with its own scroll when expanded. -->
 				{#if pageData.kind === 'page'}
-					<TaskBottomBar brainId={pageData.brain.id} brainPageId={pageData.id} />
+					<!-- brainId is non-null here: this branch only renders once pageData
+					     (which seeded brainId) has loaded, matching the pageId! precedent above. -->
+					<TaskBottomBar brainId={brainId!} brainPageId={pageData.id} />
 				{/if}
 
 				<BrainFilePickerDialog

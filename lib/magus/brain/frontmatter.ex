@@ -17,14 +17,14 @@ defmodule Magus.Brain.Frontmatter do
   This module:
 
     * parses the frontmatter into a map (via `yaml_front_matter`),
-    * normalizes the known keys (`icon`, `tags`, `aliases`),
+    * normalizes the known keys (`icon`, `tags`, `aliases`, `instructions`,
+      `type`),
     * preserves unknown keys opaquely so future schema additions are
       non-breaking,
     * serializes a known-keys map back into a YAML block via `dump/1`.
 
-  In Phase A this module is defined but unused; Phase C wires it into the
-  `Page.update_body` after-action pipeline to populate the `frontmatter`
-  jsonb cache column.
+  Wired into the `Page.update_body` after-action pipeline to populate the
+  `frontmatter` jsonb cache column.
   """
 
   @known_keys ~w(icon tags aliases created modified instructions type)
