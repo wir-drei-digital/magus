@@ -14,8 +14,10 @@ Phase 2 (Claims v1, merged) made claims the first-class knowledge unit and
 deliberately stored `asserted_at`, `valid_from`, and `valid_to` "for the
 temporal phase," but the retrieval ranker never uses them: `retrieval.ex`
 still stubs `latest_evidence_at: DateTime.utc_now()` with the comment
-"temporal recency is deferred," and `search_claims/2` ranks purely on
-`vector_similarity x trust_tier`. So two claims that state different values
+"temporal recency is deferred," and `search_claims/2` returns claims in raw
+pgvector KNN order (trust tier only filters inclusion in
+`Claim.top_ids_by_embedding`; nothing rescores). So two claims that state
+different values
 for the same fact ("Aurora ships Q3", later "Aurora ships Q4") both surface,
 ranked only by text similarity to the query, with no notion that the second
 supersedes the first.
@@ -125,10 +127,16 @@ Claim B supersedes claim A (both in-window, both accessible) when either:
 
 - **Value-change (functional predicates):** `A.subject_key == B.subject_key`
   AND `A.predicate == B.predicate` AND `B.predicate in
-  Ontology.single_valued_predicates()` AND B is newer. "Newer" is
-  `asserted_at` descending, tie-broken by `valid_from` (nil sorts oldest)
-  then `id`. This covers both a changed object (Q3 -> Q4) and a re-assertion
-  of the same object. It is the rule the `temporal` xfail exercises.
+  Ontology.single_valued_predicates()` AND both claims have `affirms`
+  polarity AND B is newer. "Newer" is `asserted_at` descending (nil sorts
+  oldest; every write path stamps it, but the pure module stays total),
+  tie-broken by `valid_from` (nil sorts oldest) then `id`. This covers both
+  a changed object (Q3 -> Q4) and a re-assertion of the same object. It is
+  the rule the `temporal` xfail exercises. The `affirms`-only restriction is
+  load-bearing: a newer "Aurora does NOT ship in Q3" (`denies`) must not
+  supersede "Aurora ships in Q4"; a denial makes no positive value claim, so
+  it participates only in polarity-flip on its exact triple, and it can
+  itself only be superseded the same way (a newer `affirms` on that triple).
 - **Polarity flip (any predicate):** `A.subject_key == B.subject_key` AND
   `A.predicate == B.predicate` AND `A.object_key == B.object_key` AND
   `A.polarity != B.polarity` AND B is newer. A direct affirm-then-negate on
@@ -159,19 +167,42 @@ half-life) but the claim path never had:
 recency_factor = 0.5 + 0.5 * :math.exp(-age_days * ln(2) / 90)
 ```
 
-Age is `max(0, now - asserted_at)` in days. The factor lives in `[0.5, 1.0]`:
-a nudge, not a cliff, so a slightly older but strongly-matching claim still
-beats a fresh weak one. `asserted_at` is the episode `extracted_at` proxy
-Claims v1 stores; this phase keeps that proxy and documents it as the ordering
-signal.
+Age is `max(0, now - asserted_at)` in days; a nil `asserted_at` takes the
+floor factor 0.5. The factor lives in `[0.5, 1.0]`: a nudge, not a cliff, so
+a slightly older but strongly-matching claim still beats a fresh weak one.
+`asserted_at` is the extraction-time stamp Claims v1 writes
+(`DateTime.utc_now()` at claim write inside the extraction, a proxy for when
+the statement was made); this phase keeps that proxy and documents it as the
+ordering signal.
 
 ### The claim score
 
-`search_claims` keeps its existing score shape with one factor added:
+Today the claim path has no explicit score: `search_claims` returns claims in
+pgvector KNN order, and trust tier only gates inclusion. (The
+`vector_similarity x trust_tier_multiplier x ...` product exists only on the
+entity path, `score_canonicals`, which is out of scope.) This phase
+introduces an explicit per-claim score, used for ordering only, not exposed
+in the return:
 
 ```
 score = vector_similarity x trust_tier_multiplier x recency_factor
 ```
+
+Mechanics this implies:
+
+- `Claim.top_ids_by_embedding` (or a sibling query) returns
+  `(id, similarity)` pairs instead of bare ids; similarity is
+  `1 - cosine_distance`, clamped to `[0, 1]`.
+- The group-completion read computes the same similarity expression for its
+  rows in the same query, so completions are scoreable even though they never
+  went through the KNN.
+- A claim with a nil embedding scores similarity 0.0, and the completion read
+  must NOT filter out nil embeddings (the KNN does): a nil-embedding
+  superseder still supersedes and still appears in `current`, just ranked
+  last.
+- Trust tier becomes a rank multiplier in addition to the existing inclusion
+  filter (`Ontology.trust_tier_multiplier/1`: instruction 1.5, evidence 1.0),
+  mirroring the entity path.
 
 Superseded and expired claims are excluded from the ranked `current` result
 (not merely down-weighted), so they can never crowd out a current fact, and
@@ -185,22 +216,32 @@ claim is orthogonal to a query that matches the stale one, exactly the
 steps:
 
 1. **Candidates:** the existing pgvector KNN over accessible claims
-   (`Claim.top_ids_by_embedding` + `load_claims_in_order`), unchanged.
+   (`Claim.top_ids_by_embedding` + `load_claims_in_order`), same filters and
+   order, now also surfacing each hit's similarity (see The claim score).
 2. **Group completion:** collect the `(subject_key, predicate)` pairs (and the
    `(subject_key, predicate, object_key)` triples for polarity) among the
    candidates, then one batched read of ALL accessible claims in those groups
    (`graph_name in ^accessible AND subject_key in ^keys AND predicate in
    ^preds`, loaded with `:episode`). This surfaces the superseders the KNN
    missed. It is one extra query per retrieval, batched, and scoped to the
-   same accessor allow-list, so it cannot leak.
+   same accessor allow-list, so it cannot leak. The `subject_key in ... AND
+   predicate in ...` form over-fetches the cross product when candidates have
+   heterogeneous subjects and predicates; after resolution, drop any claim
+   that was not a candidate and does not share an exact group with one, so
+   completion can promote a superseder but never introduce an unrelated group
+   into the ranked result.
 
 Then `Temporal.resolve(candidates ++ completions, now: now)` yields
 `current` / `historic`; `search_claims` returns `current` ranked by score.
 
 `search_claims/2` gains an option `include_historic: false` (default). When
-`true` (the dossier passes this), the result also carries the `historic`
-claims with their reason so callers can render a history trail. The kill
-switch, tier filter, and accessible-graph allow-list are unchanged.
+`true` (the context builder passes this to render superseded trailers), the
+result also carries the `historic` claims with their reason so callers can
+render history. With the default, the return stays a plain claim list, so the
+existing callers (`tools/search.ex`, the context builder pre-change) keep
+working unchanged. The kill switch, tier filter, and accessible-graph
+allow-list are unchanged. The dossier does not go through `search_claims` at
+all (see Surfacing).
 
 ## Surfacing
 
@@ -212,9 +253,13 @@ switch, tier filter, and accessible-graph allow-list are unchanged.
   per-message caps.
 - **`get_dossier`** (`dossier.ex` + `get_dossier.ex`): each group shows the
   current value plus a short history trail, e.g. `occurs_at Q4 (current);
-  history: Q3 [superseded]`. Expired facts are labeled `[expired]`. The pure
-  `Dossier` module gains the current-vs-historic split; `get_dossier` passes
-  `include_historic: true` when fetching claims and threads `now` in.
+  history: Q3 [superseded]`. Expired facts are labeled `[expired]`. The tool
+  does not use `search_claims`: it already fetches every claim for the entity
+  key via the `:for_entity_keys` read, which is history-complete by
+  construction. So `get_dossier` only threads `now` in and runs
+  `Temporal.resolve` over the raw claim structs (before mapping to the
+  reduced dossier-claim shape); the pure `Dossier` module gains the
+  current-vs-historic split in its output.
 
 ## Eval
 
@@ -237,8 +282,16 @@ Builds on the Claims v1 eval framework.
     accessor-relativity property that justified approach A.
 - The deterministic subject seeds these with authored `asserted_at` /
   `valid_from` / `valid_to` and passes a fixed `now` through to
-  `Temporal.resolve`. The eval `Fixture` gains `asserted_at` / `valid_from` /
-  `valid_to` / `now` fields; the benchmark forwards `now`.
+  `Temporal.resolve`. The eval `Fixture` claim entries gain `asserted_at` /
+  `valid_from` / `valid_to` (the subject today stamps `DateTime.utc_now()`
+  and the parser drops the authored values) plus an optional `graph`
+  discriminator, defaulting to the accessor's `memories:user:<id>`:
+  `temporal_accessor` needs it to seed the superseder in a graph outside the
+  allow-list, which the current `seed_claims` (one hardcoded graph) cannot
+  express. Off-graph claims keep `source_user_id` = the fixture user and get
+  their own episode in that graph, so the subject's `reset/1` sweep (which
+  deletes by `source_user_id`) still cleans them up. The case gains a `now`
+  field; the benchmark forwards it into the subject ctx.
 - The live subject adds one real-embedding temporal case behind `:e2e_live`.
 - `Temporal` gets direct pure unit tests (each supersedence rule, validity
   partition, recency monotonicity, tie-breaking, empty input).
@@ -281,8 +334,9 @@ deterministic, and keeps `Temporal` pure.
   `graph_name` and `subject_key` columns (predicate is filtered in-row, not
   indexed) and scoped to the retrieved groups; if telemetry shows cost,
   approach B (materialization) is the escalation, out of scope now.
-- **`asserted_at` is a proxy** (episode `extracted_at`), so re-extraction of
-  old content stamps it "now" and can reorder history. Mitigation: documented;
+- **`asserted_at` is a proxy** (stamped at extraction write time), so
+  re-extraction of old content stamps it "now" and can reorder history.
+  Mitigation: documented;
   source-derived timestamps are a later refinement; supersedence still
   prefers the most-recently-extracted statement, which is the correct default
   for "what does the system currently believe."
@@ -294,8 +348,10 @@ deterministic, and keeps `Temporal` pure.
 
 1. `Ontology.single_valued_predicates/0` (seed `occurs_at`) + `Magus.SuperBrain.Temporal`
    pure module + unit tests.
-2. `search_claims/2`: two-step group-completion fetch, `Temporal.resolve`
-   integration, `:now` and `:include_historic` options + tests.
+2. `search_claims/2`: surface similarity from the KNN and completion queries
+   (the explicit claim score), two-step group-completion fetch,
+   `Temporal.resolve` integration, `:now` and `:include_historic` options +
+   tests.
 3. Context block superseded-trailer + expired omission + tests.
 4. `Dossier` current-vs-historic split + `get_dossier` history trail + tests.
 5. Eval: `Fixture` temporal fields + `now` threading; flip the `temporal`
