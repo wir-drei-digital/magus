@@ -394,6 +394,96 @@ defmodule Magus.Agents.Context.SuperBrainRagContextTest do
     end
   end
 
+  describe "superseded trailers" do
+    defp temporal_claim(overrides) do
+      Map.merge(
+        %{
+          subject_key: "aurora",
+          subject_name: "Aurora",
+          subject_type: "project",
+          object_key: "q4",
+          object_name: "Q4",
+          predicate: "occurs_at",
+          polarity: :affirms,
+          claim_text: "Aurora now ships in Q4.",
+          asserted_at: ~U[2026-06-01 00:00:00Z],
+          episode: nil
+        },
+        Map.new(overrides)
+      )
+    end
+
+    test "a superseded prior renders as a (was: X) trailer on the current line" do
+      current = temporal_claim(%{})
+
+      prior =
+        temporal_claim(%{
+          object_key: "q3",
+          object_name: "Q3",
+          claim_text: "Aurora ships in Q3.",
+          asserted_at: ~U[2026-05-01 00:00:00Z]
+        })
+
+      block =
+        Magus.Agents.Context.SuperBrainRagContext.format_with_claims(
+          [],
+          [current],
+          [%{claim: prior, reason: :superseded}]
+        )
+
+      assert block =~ ~s(- "Aurora now ships in Q4.")
+      assert block =~ "(was: Q3)"
+    end
+
+    test "expired and future historic claims produce no trailer and no line" do
+      current = temporal_claim(%{})
+
+      expired =
+        temporal_claim(%{
+          object_key: "q3",
+          object_name: "Q3",
+          claim_text: "Aurora ships in Q3.",
+          asserted_at: ~U[2026-05-01 00:00:00Z]
+        })
+
+      block =
+        Magus.Agents.Context.SuperBrainRagContext.format_with_claims(
+          [],
+          [current],
+          [%{claim: expired, reason: :expired}]
+        )
+
+      refute block =~ "(was:"
+      refute block =~ "Aurora ships in Q3."
+    end
+
+    test "a superseded re-assertion of the same object renders no trailer" do
+      current = temporal_claim(%{})
+
+      same_object_prior =
+        temporal_claim(%{
+          claim_text: "Aurora ships in Q4 for sure.",
+          asserted_at: ~U[2026-05-01 00:00:00Z]
+        })
+
+      block =
+        Magus.Agents.Context.SuperBrainRagContext.format_with_claims(
+          [],
+          [current],
+          [%{claim: same_object_prior, reason: :superseded}]
+        )
+
+      refute block =~ "(was:"
+    end
+
+    test "format_with_claims/2 still works (historic defaults to empty)" do
+      block =
+        Magus.Agents.Context.SuperBrainRagContext.format_with_claims([], [temporal_claim(%{})])
+
+      assert block =~ ~s(- "Aurora now ships in Q4.")
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Helpers
   # ---------------------------------------------------------------------------

@@ -62,17 +62,18 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
             _ -> []
           end
 
-        {:ok, claims} =
+        {:ok, %{current: claims, historic: historic}} =
           Retrieval.search_claims(user,
             query_embedding: embedding,
             workspace_context: workspace_context,
-            limit: @max_claims
+            limit: @max_claims,
+            include_historic: true
           )
 
         if entities == [] and claims == [] do
           nil
         else
-          format_with_claims(entities, claims)
+          format_with_claims(entities, claims, historic)
         end
 
       _ ->
@@ -113,9 +114,12 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
   # subject_key matches no retrieved entity ("orphans") are still surfaced
   # under their own subject header so claim-text recall is never silently
   # dropped when the vector-recalled subject is not among the top entities.
-  def format_with_claims(entities, claims) do
+  # Historic entries with reason `:superseded` render as a compact `(was: X)` trailer
+  # on the current line of their group; expired and future entries are omitted entirely.
+  def format_with_claims(entities, claims, historic \\ []) do
     claims = Enum.take(claims, @max_claims)
     titles = resolve_titles_for_claims(claims)
+    superseded = superseded_by_group(historic)
     by_subject = Enum.group_by(claims, & &1.subject_key)
     entity_keys = entities |> Enum.map(&Naming.key(Map.get(&1, :name))) |> MapSet.new()
 
@@ -123,13 +127,13 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
       Enum.map(entities, fn e ->
         key = e |> Map.get(:name) |> Naming.key()
         entity_claims = Map.get(by_subject, key, []) |> Enum.take(@max_claims_per_entity)
-        render_entity_section(e, entity_claims, titles)
+        render_entity_section(e, entity_claims, titles, superseded)
       end)
 
     orphan_sections =
       by_subject
       |> Enum.reject(fn {k, _group} -> MapSet.member?(entity_keys, k) end)
-      |> Enum.map(fn {_k, group} -> render_orphan_section(group, titles) end)
+      |> Enum.map(fn {_k, group} -> render_orphan_section(group, titles, superseded) end)
 
     sections = Enum.join(entity_sections ++ orphan_sections, "\n\n")
 
@@ -145,7 +149,7 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
   # A claim group whose subject was NOT among the retrieved entities. Render it
   # under its own header (from the claim's own subject_name/subject_type) so the
   # recalled claim text still reaches the model.
-  defp render_orphan_section(group, titles) do
+  defp render_orphan_section(group, titles, superseded) do
     first = hd(group)
     name = first.subject_name
     type = Map.get(first, :subject_type) || "?"
@@ -154,18 +158,18 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
       group
       |> Enum.take(@max_claims_per_entity)
       |> group_conflicts()
-      |> Enum.map(&claim_line(&1, titles))
+      |> Enum.map(&claim_line(&1, titles, superseded))
 
     "## #{name} [#{type}]\n" <> Enum.join(lines, "\n")
   end
 
-  defp render_entity_section(e, [], _titles), do: format_super_entity(e, %{})
+  defp render_entity_section(e, [], _titles, _superseded), do: format_super_entity(e, %{})
 
-  defp render_entity_section(e, entity_claims, titles) do
+  defp render_entity_section(e, entity_claims, titles, superseded) do
     name = Map.get(e, :name) || "?"
     type = Map.get(e, :primary_type) || Map.get(e, :type) || "?"
     header = "## #{name} [#{type}]"
-    lines = entity_claims |> group_conflicts() |> Enum.map(&claim_line(&1, titles))
+    lines = entity_claims |> group_conflicts() |> Enum.map(&claim_line(&1, titles, superseded))
     header <> "\n" <> Enum.join(lines, "\n")
   end
 
@@ -185,12 +189,40 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
     end)
   end
 
-  defp claim_line({:single, c}, titles) do
-    "- \"#{c.claim_text}\" (#{cite(c, titles)})"
+  defp claim_line({:single, c}, titles, superseded) do
+    "- \"#{c.claim_text}\" (#{cite(c, titles)})#{was_trailer(c, superseded)}"
   end
 
-  defp claim_line({:conflict, [a, b | _]}, titles) do
+  defp claim_line({:conflict, [a, b | _]}, titles, _superseded) do
     "- CONFLICT: \"#{a.claim_text}\" (#{cite(a, titles)}) vs \"#{b.claim_text}\" (#{cite(b, titles)})"
+  end
+
+  # Newest superseded prior per (subject_key, predicate) group, for the
+  # "(was: X)" trailer. Only :superseded entries produce trailers; expired
+  # and future claims are omitted from the block entirely.
+  defp superseded_by_group(historic) do
+    historic
+    |> Enum.filter(&(&1.reason == :superseded))
+    |> Enum.group_by(fn %{claim: c} -> {c.subject_key, c.predicate} end)
+    |> Map.new(fn {group_key, entries} ->
+      newest =
+        entries
+        |> Enum.map(& &1.claim)
+        |> Enum.max_by(&(&1.asserted_at || ~U[1970-01-01 00:00:00Z]), DateTime)
+
+      {group_key, newest}
+    end)
+  end
+
+  defp was_trailer(c, superseded) do
+    case Map.get(superseded, {c.subject_key, c.predicate}) do
+      nil ->
+        ""
+
+      prior ->
+        # A superseded re-assertion of the same object needs no trailer.
+        if prior.object_key == c.object_key, do: "", else: " (was: #{prior.object_name})"
+    end
   end
 
   defp cite(%{episode: %{resource_type: rt, resource_id: id}}, titles) do
