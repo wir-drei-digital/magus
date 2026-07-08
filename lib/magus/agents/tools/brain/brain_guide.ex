@@ -181,7 +181,7 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
          {:ok, page} <- BrainResolver.resolve_page(context, params, brain_id),
          {:ok, pages} <- Brain.list_pages(brain_id, actor: ctx.user) do
       guide = Guide.for_page(brain, page, pages, ctx.user)
-      type_template = resolve_type_template(brain_id, page, ctx.user)
+      type_template = Guide.type_template_for(brain_id, page, ctx.user)
 
       {:ok,
        %{
@@ -413,12 +413,12 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
   end
 
   # Upserts the `:template` page titled `type_name` (case-insensitive match
-  # against the brain's existing templates, mirroring `find_template_by_type`
-  # below): writes the composed body to the existing page when found, else
-  # creates a fresh `:template` page and writes the body to it.
+  # against the brain's existing templates, via `Guide.find_template_by_type/2`):
+  # writes the composed body to the existing page when found, else creates a
+  # fresh `:template` page and writes the body to it.
   defp upsert_template(brain_id, type_name, composed_body, ctx) do
     with {:ok, templates} <- Brain.templates_for_brain(brain_id, actor: ctx.user) do
-      case find_template_by_type(templates, type_name) do
+      case Guide.find_template_by_type(templates, type_name) do
         %{} = existing ->
           write_template_body(existing, type_name, composed_body, ctx)
 
@@ -477,27 +477,4 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
   # Resolves the page's frontmatter `type` (if present) to the `:template`
   # page in the same brain whose title matches case-insensitively. Returns
   # nil when the page has no type or no template title matches.
-  defp resolve_type_template(brain_id, page, actor) do
-    with type when is_binary(type) and type != "" <- page_type(page),
-         {:ok, templates} <- Brain.templates_for_brain(brain_id, actor: actor),
-         template when not is_nil(template) <- find_template_by_type(templates, type) do
-      %{page_id: template.id, title: template.title}
-    else
-      _ -> nil
-    end
-  end
-
-  defp page_type(%{frontmatter: fm}) when is_map(fm) do
-    case Map.get(fm, "type") do
-      type when is_binary(type) -> String.trim(type)
-      _ -> nil
-    end
-  end
-
-  defp page_type(_), do: nil
-
-  defp find_template_by_type(templates, type) do
-    lowered = String.downcase(type)
-    Enum.find(templates, fn t -> is_binary(t.title) and String.downcase(t.title) == lowered end)
-  end
 end

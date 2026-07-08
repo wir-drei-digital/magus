@@ -2483,6 +2483,44 @@ export async function brainPageChildren<Fields extends BrainPageChildrenFields>(
 }
 
 
+export type BrainPageGuideInput = {
+  pageId: UUID;
+};
+
+export type InferBrainPageGuideResult = Record<string, any>;
+
+export type BrainPageGuideResult = | { success: true; data: InferBrainPageGuideResult; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on Page
+ *
+ * @ashActionType :action
+ */
+export async function brainPageGuide(
+  config: {
+  tenant?: string;
+  input: BrainPageGuideInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<BrainPageGuideResult> {
+  const payload = {
+    action: "brain_page_guide",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeActionRpcRequest<BrainPageGuideResult>(
+    payload,
+    config
+  );
+}
+
+
 export type BrainPageVersionBodyInput = {
   pageId: UUID;
   versionId: UUID;

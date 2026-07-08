@@ -2643,6 +2643,52 @@ export function getBrainPage(id: string): Promise<RpcResult<BrainPageDetail>> {
 	);
 }
 
+export type PageGuideSection = { pageId: string; title: string; instructions: string };
+
+export type PageGuide = {
+	/** Brain-wide instructions (`brain.instructions`), soft-capped server-side. */
+	constitution: string | null;
+	/** Inherited `instructions:` frontmatter, root -> page (nearest last). */
+	sectionGuides: PageGuideSection[];
+	/** The page's `type:` frontmatter value. */
+	pageType: string | null;
+	/** The template page backing `pageType`, when one exists. */
+	typeTemplate: { pageId: string; title: string | null } | null;
+};
+
+/**
+ * Effective Guide for a page's location: what the agent operates under when
+ * working on this page. Generic-action RPC, so keys arrive snake_case and are
+ * reshaped here (same pattern as brainPageVersionDiff).
+ */
+export async function getBrainPageGuide(pageId: string): Promise<RpcResult<PageGuide>> {
+	const result = await run<Record<string, unknown> | null>((opts) =>
+		rpc.brainPageGuide({ input: { pageId }, ...opts })
+	);
+	if (!result.success) return result;
+	const data = result.data ?? {};
+	const rawSections = Array.isArray(data.section_guides) ? data.section_guides : [];
+	const rawTemplate = (data.type_template ?? null) as Record<string, unknown> | null;
+	return {
+		success: true,
+		data: {
+			constitution: typeof data.constitution === 'string' ? data.constitution : null,
+			sectionGuides: rawSections.map((section: Record<string, unknown>) => ({
+				pageId: String(section.page_id ?? ''),
+				title: String(section.title ?? 'Untitled'),
+				instructions: String(section.instructions ?? '')
+			})),
+			pageType: typeof data.page_type === 'string' ? data.page_type : null,
+			typeTemplate: rawTemplate
+				? {
+						pageId: String(rawTemplate.page_id ?? ''),
+						title: typeof rawTemplate.title === 'string' ? rawTemplate.title : null
+					}
+				: null
+		}
+	};
+}
+
 export type PageBacklink = {
 	id: string;
 	targetTitleAtLinkTime: string;

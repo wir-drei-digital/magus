@@ -23,7 +23,7 @@ defmodule Magus.Brain.Guide do
 
   @constitution_line_cap 200
 
-  @type section_guide :: %{title: String.t(), instructions: String.t()}
+  @type section_guide :: %{page_id: String.t(), title: String.t(), instructions: String.t()}
   @type type_entry :: %{title: String.t(), description: String.t()}
 
   @type t :: %{
@@ -56,6 +56,58 @@ defmodule Magus.Brain.Guide do
   @spec empty?(t()) :: boolean()
   def empty?(%{constitution: nil, section_guides: [], types: []}), do: true
   def empty?(_), do: false
+
+  @doc """
+  The page's declared type: the trimmed `type:` frontmatter value, or nil.
+  """
+  @spec page_type(Ash.Resource.record() | map()) :: String.t() | nil
+  def page_type(%{frontmatter: fm}) when is_map(fm) do
+    case Map.get(fm, "type") do
+      type when is_binary(type) ->
+        case String.trim(type) do
+          "" -> nil
+          trimmed -> trimmed
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  def page_type(_), do: nil
+
+  @doc """
+  Resolves the page's type to its template page (a `:template` page whose
+  title matches the type, case-insensitively). Returns `%{page_id, title}`
+  or nil when the page is untyped or no template exists for the type.
+
+  Shared by the `brain_guide` tool's `get_guide` and the SPA-facing
+  `guide_for_page` action so both resolve identically.
+  """
+  @spec type_template_for(String.t(), Ash.Resource.record() | map(), term()) ::
+          %{page_id: String.t(), title: String.t() | nil} | nil
+  def type_template_for(brain_id, page, actor) do
+    with type when is_binary(type) <- page_type(page),
+         {:ok, templates} <- Brain.templates_for_brain(brain_id, actor: actor),
+         template when not is_nil(template) <- find_template_by_type(templates, type) do
+      %{page_id: template.id, title: template.title}
+    else
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Finds the template page whose title matches `type` case-insensitively,
+  or nil. Types are matched to templates by title everywhere (get_guide,
+  define_type upsert, off_template curation), so the matching rule lives
+  in one place.
+  """
+  @spec find_template_by_type([Ash.Resource.record()], String.t()) ::
+          Ash.Resource.record() | nil
+  def find_template_by_type(templates, type) do
+    lowered = String.downcase(type)
+    Enum.find(templates, fn t -> is_binary(t.title) and String.downcase(t.title) == lowered end)
+  end
 
   # ----- constitution -----
 
@@ -98,7 +150,7 @@ defmodule Magus.Brain.Guide do
     end)
     |> Enum.filter(fn {_p, instructions} -> present?(instructions) end)
     |> Enum.map(fn {p, instructions} ->
-      %{title: p.title || "Untitled", instructions: String.trim(instructions)}
+      %{page_id: p.id, title: p.title || "Untitled", instructions: String.trim(instructions)}
     end)
   end
 

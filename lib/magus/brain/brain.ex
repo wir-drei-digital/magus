@@ -32,6 +32,7 @@ defmodule Magus.Brain do
       rpc_action :create_brain_page, :create
       rpc_action :brain_page_version_diff, :version_diff
       rpc_action :brain_page_version_body, :version_body
+      rpc_action :brain_page_guide, :guide_for_page
       rpc_action :rename_brain_page, :update_title
       rpc_action :update_brain_page_body, :update_body
       rpc_action :move_brain_page, :move_to_parent
@@ -107,6 +108,7 @@ defmodule Magus.Brain do
       define :list_root_pages, action: :root_pages, args: [:brain_id]
       define :list_children_pages, action: :children_of, args: [:parent_page_id]
       define :move_page_to_parent, action: :move_to_parent
+      define :page_guide, action: :guide_for_page, args: [:page_id]
     end
 
     resource Magus.Brain.Block do

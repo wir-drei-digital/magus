@@ -2,10 +2,12 @@
 	import { base } from '$app/paths';
 	import { ChevronDown, ChevronUp, ExternalLink, FileText, History } from '@lucide/svelte';
 	import {
+		getBrainPageGuide,
 		listBrainPageVersions,
 		listPageSources,
 		type BrainPageVersion,
 		type PageBacklink,
+		type PageGuide,
 		type PageSourceEntry
 	} from '$lib/ash/api';
 	import { outlineFromDoc, type OutlineEntry } from '$lib/brain/outline';
@@ -36,14 +38,15 @@
 		showTasks?: boolean;
 	} = $props();
 
-	type Tab = 'tasks' | 'outline' | 'sources' | 'related' | 'activity';
+	type Tab = 'tasks' | 'outline' | 'sources' | 'related' | 'activity' | 'guide';
 	// The document tabs keep their order; Tasks leads when present because it's
 	// the interactive panel, so expanding the bar opens it first on a content page.
 	const DOC_TABS: { id: Tab; label: string }[] = [
 		{ id: 'outline', label: 'Outline' },
 		{ id: 'sources', label: 'Sources' },
 		{ id: 'related', label: 'Related' },
-		{ id: 'activity', label: 'Activity' }
+		{ id: 'activity', label: 'Activity' },
+		{ id: 'guide', label: 'Guide' }
 	];
 	const tabs = $derived(
 		showTasks ? [{ id: 'tasks' as Tab, label: 'Tasks' }, ...DOC_TABS] : DOC_TABS
@@ -55,6 +58,7 @@
 	let outline = $state<OutlineEntry[]>([]);
 	let sources = $state<PageSourceEntry[] | null>(null);
 	let versions = $state<BrainPageVersion[] | null>(null);
+	let guide = $state<PageGuide | null>(null);
 
 	// Debounce outline recompute: walking the full ProseMirror doc on every
 	// keystroke (revision bump) lags large pages. ~150ms is imperceptible on open.
@@ -74,6 +78,7 @@
 		activeTab = null;
 		sources = null;
 		versions = null;
+		guide = null;
 	});
 
 	function select(tab: Tab) {
@@ -86,6 +91,11 @@
 		if (activeTab === 'activity' && versions === null) {
 			void listBrainPageVersions(pageId).then((result) => {
 				if (result.success) versions = result.data;
+			});
+		}
+		if (activeTab === 'guide' && guide === null) {
+			void getBrainPageGuide(pageId).then((result) => {
+				if (result.success) guide = result.data;
 			});
 		}
 	}
@@ -209,6 +219,60 @@
 							</li>
 						{/each}
 					</ul>
+				{/if}
+			{:else if activeTab === 'guide'}
+				{#if guide === null}
+					<p class="text-xs text-muted-foreground">Loading…</p>
+				{:else if !guide.constitution && guide.sectionGuides.length === 0 && !guide.pageType}
+					<p class="text-xs text-muted-foreground">
+						No guide yet. The agent writes one as this brain takes shape; you can also ask it to
+						set instructions for the brain or this section.
+					</p>
+				{:else}
+					<!-- Mirrors the agent's Brain Guide context block: constitution, then
+					     inherited section guides (root to page, nearest last), then type. -->
+					<div class="space-y-3" data-testid="brain-guide-panel">
+						{#if guide.constitution}
+							<section>
+								<h4 class="mb-1 text-xs font-medium text-foreground">Brain constitution</h4>
+								<p class="text-xs whitespace-pre-wrap text-secondary-foreground">
+									{guide.constitution}
+								</p>
+							</section>
+						{/if}
+						{#each guide.sectionGuides as section (section.pageId)}
+							<section>
+								<h4 class="mb-1 text-xs font-medium text-foreground">
+									{#if section.pageId === pageId}
+										This page
+									{:else}
+										From <a href="{base}/brain/page/{section.pageId}" class="hover:text-primary"
+											>{section.title}</a
+										>
+									{/if}
+								</h4>
+								<p class="text-xs whitespace-pre-wrap text-secondary-foreground">
+									{section.instructions}
+								</p>
+							</section>
+						{/each}
+						{#if guide.pageType}
+							<section class="flex items-center gap-1.5 text-xs text-muted-foreground">
+								<span>Type:</span>
+								<span class="rounded bg-secondary px-1.5 py-0.5 text-secondary-foreground">
+									{guide.pageType}
+								</span>
+								{#if guide.typeTemplate}
+									<a
+										href="{base}/brain/page/{guide.typeTemplate.pageId}"
+										class="hover:text-primary"
+									>
+										template: {guide.typeTemplate.title ?? 'Untitled'}
+									</a>
+								{/if}
+							</section>
+						{/if}
+					</div>
 				{/if}
 			{:else if activeTab === 'activity'}
 				{#if versions === null}

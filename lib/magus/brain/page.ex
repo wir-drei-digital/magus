@@ -410,6 +410,37 @@ defmodule Magus.Brain.Page do
       end
     end
 
+    action :guide_for_page, :map do
+      description """
+      The effective Guide for a page's location, for the SPA's bottom-bar
+      Guide tab: the brain constitution, inherited section guides (root to
+      page, nearest last), the page's declared type, and its type template
+      when one exists. Mirrors the agent-facing `brain_guide get_guide`
+      assembly (`Magus.Brain.Guide`), so the UI shows exactly what the
+      agent operates under. Authorization is delegated to `get_page/2`.
+      """
+
+      argument :page_id, :uuid, allow_nil?: false
+
+      run fn input, context ->
+        actor = context.actor
+
+        with {:ok, page} <- Magus.Brain.get_page(input.arguments.page_id, actor: actor),
+             {:ok, brain} <- Magus.Brain.get_brain(page.brain_id, actor: actor),
+             {:ok, pages} <- Magus.Brain.list_pages(page.brain_id, actor: actor) do
+          guide = Magus.Brain.Guide.for_page(brain, page, pages, actor)
+
+          {:ok,
+           %{
+             constitution: guide.constitution,
+             section_guides: guide.section_guides,
+             page_type: Magus.Brain.Guide.page_type(page),
+             type_template: Magus.Brain.Guide.type_template_for(brain.id, page, actor)
+           }}
+        end
+      end
+    end
+
     action :version_body, :string do
       description """
       Full markdown snapshot of one version, for restore: the client writes
@@ -508,7 +539,7 @@ defmodule Magus.Brain.Page do
     # Generic actions — page access is checked via get_page/2 inside the run
     # (and :save_prosemirror additionally writes through the editor-gated
     # update_body action).
-    policy action([:versions, :version_diff, :version_body, :save_prosemirror]) do
+    policy action([:versions, :version_diff, :version_body, :save_prosemirror, :guide_for_page]) do
       authorize_if always()
     end
   end
