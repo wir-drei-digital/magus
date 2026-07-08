@@ -25,9 +25,10 @@ Consequences of this framing:
 
 - Direction **B**: repair + structural simplification (user answer 2026-07-08).
 - Remove the Hebbian association layer entirely.
-- Remove `MemoryVersion` and `UserProfileVersion`; **hard deletes are acceptable** (user's words), so soft-delete goes too.
+- Remove `MemoryVersion`; **hard deletes are acceptable** (user's words), so soft-delete goes too.
 - Existing misfiled personal-bucket rows are left as-is (no reliable provenance to re-bucket them); users delete them via the settings UI.
 - Second-round decisions (user, 2026-07-08): the nightly **distiller becomes the sole ambient curator** of durable facts (the promotion pipeline is removed rather than tuned); the **90-day decay is removed entirely** along with the `last_accessed_at` touch machinery; local-memory growth is bounded by enforcing the existing per-conversation cap instead.
+- Third-round decision (user, 2026-07-08): **keep `UserProfileVersion`** for now. Watching how a profile evolves over time is interesting, the write volume is tiny (one snapshot per distill or reset), and it may back a future profile-history view. `MemoryVersion` still goes.
 
 ## Design
 
@@ -76,7 +77,8 @@ Accepted tradeoff: facts distilled into the profile lose row granularity in the 
 | `Magus.Memory.MemoryAssociation` (+ `memory_associations` table) | Also delete `SameWorkspace` validation, domain interfaces (`create_memory_association`, `reinforce_association`, `get_associations_for_memory`, `get_association_between`), the association-expansion layer and `reinforce_co_retrieved/1` in `BuildMemoryContext` (`lib/magus/agents/actions/build_memory_context.ex:355-435`), and the three `memory_association*_test.exs` files. |
 | `Magus.Memory.MemoryVersion` (+ `memory_versions` table) | Also delete `Memory.Changes.CreateVersion` and its wiring on `:create`, `:set`, `:clear`, `:promote_to_user`. Optimistic locking (`lock_version`) stays. |
 | `Magus.Memory.MemorySource` (+ `memory_sources` table) | Zero rows ever written; no writer exists. |
-| `Magus.Memory.UserProfileVersion` (+ `user_profile_versions` table) | Also delete `UserProfile.Changes.CreateVersion` and its wiring on `:set_document` and `:clear`. Profile "Reset" keeps working, it just stops snapshotting. |
+
+`Magus.Memory.UserProfileVersion` is explicitly **kept** (third-round decision): profile snapshots on distill and reset continue, as a record of how the profile evolves.
 
 **Columns dropped from `memories`:**
 
@@ -94,7 +96,7 @@ Accepted tradeoff: facts distilled into the profile lose row granularity in the 
 **Additional call sites in the removal checklist** (compile-breaking if missed):
 
 - `lib/magus/accounts/data_export.ex` (`memories/1`): drop the `[:versions, :sources]` load, the `is_active == true` filter, and the `structured_data` / `confidence` fields from the export map.
-- A repo-wide grep for `is_active`, `confidence`, `structured_data`, `deactivate_memory`, `last_accessed_at`, `touch_accessed`, `promote_memory_to_user`, `PromoteMemoryCandidates`, `MergeMemories`, `MemoryVersion`, `MemorySource`, `MemoryAssociation`, `UserProfileVersion` is part of the implementation plan's final verification, not left to chance.
+- A repo-wide grep for `is_active`, `confidence`, `structured_data`, `deactivate_memory`, `last_accessed_at`, `touch_accessed`, `promote_memory_to_user`, `PromoteMemoryCandidates`, `MergeMemories`, `MemoryVersion`, `MemorySource`, `MemoryAssociation` is part of the implementation plan's final verification, not left to chance.
 
 **Soft delete becomes hard delete.**
 
@@ -132,13 +134,13 @@ Watermark all-turns extraction with Oban retries; semantic dedup at extraction (
   - extraction cap eviction destroys the least recently updated local rows once a conversation exceeds `max_memories_per_conversation`;
   - hard-delete then re-create with the same name succeeds under the new unique indexes;
   - invariant: no background process deletes user-scope rows (only explicit user or agent destroys touch the user bucket).
-- Existing test files updated or removed accordingly (`memory_test.exs` versioning assertions, `build_memory_context*` association layers, `memory_actions_test.exs` extraction scope cases, `user_profile_clear_test.exs` version snapshots, RPC policy test rename).
+- Existing test files updated or removed accordingly (`memory_test.exs` versioning assertions, `build_memory_context*` association layers, `memory_actions_test.exs` extraction scope cases, RPC policy test rename). `user_profile_clear_test.exs` and its version-snapshot assertions stay as-is.
 - Standard gates: `mix precommit`, `MIX_ENV=test mix compile --warnings-as-errors`, SPA `npm run check` + `npm run test:unit` + `npm run format:check`.
 
 ## Phasing
 
 - **Phase 1 (correctness):** section 1 plus extraction going local-only and the `set_memory` default flip. No migrations. Shippable alone (the promotion pipeline keeps running unchanged until Phase 2 removes it).
-- **Phase 2 (simplification):** section 3 plus the curator change in section 2. One `mix ash.codegen` migration wave (pre-clean inactive rows, drop four tables, drop four columns, drop the `[conversation_id, last_accessed_at]` index, rebuild three unique indexes), the destroy policy bypass, the `RetractResource` worker, the distiller input change with promotion/merge/decay removal, cap enforcement, and the RPC/SPA rename.
+- **Phase 2 (simplification):** section 3 plus the curator change in section 2. One `mix ash.codegen` migration wave (pre-clean inactive rows, drop three tables, drop four columns, drop the `[conversation_id, last_accessed_at]` index, rebuild three unique indexes), the destroy policy bypass, the `RetractResource` worker, the distiller input change with promotion/merge/decay removal, cap enforcement, and the RPC/SPA rename.
 
 One implementation plan covers both phases; work happens on a worktree branch because of the migration surface.
 
