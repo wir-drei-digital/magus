@@ -112,10 +112,13 @@ module never does I/O.
 Resolution order:
 
 1. **Validity partition.** A claim is `:expired` when `valid_to != nil and
-   valid_to < now`; `:future` when `valid_from != nil and valid_from > now`;
-   otherwise in-window. Expired and future claims go straight to `historic`
-   with their reason. `valid_from` / `valid_to` are nullable; a claim with
-   neither is always in-window.
+   DateTime.compare(valid_to, now) == :lt`; `:future` when `valid_from != nil
+   and DateTime.compare(valid_from, now) == :gt`; otherwise in-window. (All
+   DateTime ordering in the module goes through `DateTime.compare/2` or
+   sorters given the `DateTime` module, never bare `<` / `>`, which compare
+   struct terms.) Expired and future claims go straight to `historic` with
+   their reason. `valid_from` / `valid_to` are nullable; a claim with neither
+   is always in-window.
 2. **Supersedence** over the in-window claims (see rules below): the winner of
    each group is `current`, the losers go to `historic` with reason
    `:superseded`.
@@ -126,17 +129,19 @@ Resolution order:
 Claim B supersedes claim A (both in-window, both accessible) when either:
 
 - **Value-change (functional predicates):** `A.subject_key == B.subject_key`
-  AND `A.predicate == B.predicate` AND `B.predicate in
-  Ontology.single_valued_predicates()` AND both claims have `affirms`
-  polarity AND B is newer. "Newer" is `asserted_at` descending (nil sorts
-  oldest; every write path stamps it, but the pure module stays total),
-  tie-broken by `valid_from` (nil sorts oldest) then `id`. This covers both
-  a changed object (Q3 -> Q4) and a re-assertion of the same object. It is
-  the rule the `temporal` xfail exercises. The `affirms`-only restriction is
-  load-bearing: a newer "Aurora does NOT ship in Q3" (`denies`) must not
-  supersede "Aurora ships in Q4"; a denial makes no positive value claim, so
-  it participates only in polarity-flip on its exact triple, and it can
-  itself only be superseded the same way (a newer `affirms` on that triple).
+  AND `A.predicate == B.predicate` AND
+  `Ontology.single_valued_predicate?(B.predicate)` AND both claims have
+  `:affirms` polarity AND B is newer. "Newer" is `asserted_at` descending
+  (nil sorts oldest; every write path stamps it, but the pure module stays
+  total), tie-broken by `valid_from` (nil sorts oldest) then `id` descending
+  (arbitrary but pins a deterministic total order). This covers both a
+  changed object (Q3 -> Q4) and a re-assertion of the same object. It is the
+  rule the `temporal` xfail exercises. The `:affirms`-only restriction is
+  load-bearing: a newer "Aurora does NOT ship in Q3" (`:negates`, the only
+  other value `Claim.polarity` allows) must not supersede "Aurora ships in
+  Q4"; a negation makes no positive value claim, so it participates only in
+  polarity-flip on its exact triple, and it can itself only be superseded
+  the same way (a newer `:affirms` on that triple).
 - **Polarity flip (any predicate):** `A.subject_key == B.subject_key` AND
   `A.predicate == B.predicate` AND `A.object_key == B.object_key` AND
   `A.polarity != B.polarity` AND B is newer. A direct affirm-then-negate on
@@ -152,10 +157,15 @@ Multi-valued facts (e.g. `relates_to`, `mentions`) never supersede by value;
 their objects all stay current and are ordered by recency only.
 
 `Ontology.single_valued_predicates/0` is a new curated set, seeded with
-`occurs_at` (an event or deadline has one time). It is intentionally small and
-conservative: expanding it is an eval-tuned knob, and a wrong inclusion would
-suppress legitimately-coexisting facts, so predicates are added only with a
-supporting eval case. Everything not in the set is multi-valued.
+`occurs_at` (an event or deadline has one time), consumed through
+`Ontology.single_valued_predicate?/1`. The membership check must live behind
+that function because of a type seam: `Claim.predicate` is a string column
+while the existing ontology predicate lists are atoms (`~w(...)a`), so a raw
+`predicate in atom_set` test would silently never match; the helper accepts
+binary or atom and compares in string space. The set is intentionally small
+and conservative: expanding it is an eval-tuned knob, and a wrong inclusion
+would suppress legitimately-coexisting facts, so predicates are added only
+with a supporting eval case. Everything not in the set is multi-valued.
 
 ### Recency
 
@@ -167,8 +177,8 @@ half-life) but the claim path never had:
 recency_factor = 0.5 + 0.5 * :math.exp(-age_days * ln(2) / 90)
 ```
 
-Age is `max(0, now - asserted_at)` in days; a nil `asserted_at` takes the
-floor factor 0.5. The factor lives in `[0.5, 1.0]`: a nudge, not a cliff, so
+Age is `max(0, DateTime.diff(now, asserted_at)) / 86_400` (fractional days);
+a nil `asserted_at` takes the floor factor 0.5. The factor lives in `[0.5, 1.0]`: a nudge, not a cliff, so
 a slightly older but strongly-matching claim still beats a fresh weak one.
 `asserted_at` is the extraction-time stamp Claims v1 writes
 (`DateTime.utc_now()` at claim write inside the extraction, a proxy for when
@@ -231,17 +241,28 @@ steps:
    completion can promote a superseder but never introduce an unrelated group
    into the ranked result.
 
-Then `Temporal.resolve(candidates ++ completions, now: now)` yields
-`current` / `historic`; `search_claims` returns `current` ranked by score.
+The completion read re-fetches the candidates themselves (every candidate
+sits in its own group), so the two lists are deduplicated by id before
+resolution, keeping the candidate entry:
+`Enum.uniq_by(candidates ++ completions, & &1.id)`. Then
+`Temporal.resolve(deduped, now: now)` yields `current` / `historic`;
+`search_claims` returns `current` ranked by score.
 
-`search_claims/2` gains an option `include_historic: false` (default). When
-`true` (the context builder passes this to render superseded trailers), the
-result also carries the `historic` claims with their reason so callers can
-render history. With the default, the return stays a plain claim list, so the
-existing callers (`tools/search.ex`, the context builder pre-change) keep
-working unchanged. The kill switch, tier filter, and accessible-graph
-allow-list are unchanged. The dossier does not go through `search_claims` at
-all (see Surfacing).
+`search_claims/2` gains an option `include_historic: false` (default). The
+return shapes are exact:
+
+- Default: `{:ok, [Claim.t()]}`, the ranked `current` claims. This is the
+  same plain list the existing callers pattern-match today
+  (`tools/search.ex`, the context builder pre-change), so they keep working
+  unchanged.
+- `include_historic: true` (the context builder passes this to render
+  superseded trailers):
+  `{:ok, %{current: [Claim.t()], historic: [%{claim: Claim.t(), reason:
+  :superseded | :expired | :future}]}}`, `current` ranked identically to the
+  default shape.
+
+The kill switch, tier filter, and accessible-graph allow-list are unchanged.
+The dossier does not go through `search_claims` at all (see Surfacing).
 
 ## Surfacing
 
@@ -346,8 +367,9 @@ deterministic, and keeps `Temporal` pure.
 
 ## Build sequence (for the implementation plan)
 
-1. `Ontology.single_valued_predicates/0` (seed `occurs_at`) + `Magus.SuperBrain.Temporal`
-   pure module + unit tests.
+1. `Ontology.single_valued_predicates/0` (seed `occurs_at`) +
+   `Ontology.single_valued_predicate?/1` (binary or atom, string-space
+   compare) + `Magus.SuperBrain.Temporal` pure module + unit tests.
 2. `search_claims/2`: surface similarity from the KNN and completion queries
    (the explicit claim score), two-step group-completion fetch,
    `Temporal.resolve` integration, `:now` and `:include_historic` options +
