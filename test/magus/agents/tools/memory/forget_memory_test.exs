@@ -32,8 +32,8 @@ defmodule Magus.Agents.Tools.Memory.ForgetMemoryTest do
     end
   end
 
-  describe "deactivating memories" do
-    test "deactivates existing user memory" do
+  describe "destroying memories" do
+    test "destroys existing user memory" do
       %{user: user, context: context} = create_test_context()
 
       # Create a user memory
@@ -52,13 +52,13 @@ defmodule Magus.Agents.Tools.Memory.ForgetMemoryTest do
       assert result.name == "dark_mode"
       assert result.scope == "user"
 
-      # Verify memory is deactivated (lookup should fail with not found)
+      # Verify memory is hard-deleted (lookup should fail with not found)
       actor = %Magus.Accounts.User{id: user.id}
 
       assert {:error, _} = Memory.get_user_memory_by_name(nil, "dark_mode", actor: actor)
     end
 
-    test "deactivates existing local memory" do
+    test "destroys existing local memory" do
       %{user: user, conversation: conversation, context: context} = create_test_context()
 
       # Create a local memory
@@ -77,11 +77,57 @@ defmodule Magus.Agents.Tools.Memory.ForgetMemoryTest do
       assert result.name == "temp_note"
       assert result.scope == "local"
 
-      # Verify memory is deactivated
+      # Verify memory is hard-deleted
       assert {:error, _} =
                Memory.get_memory_by_name(conversation.id, "temp_note",
                  actor: %Magus.Agents.Support.AiAgent{}
                )
+    end
+
+    test "ForgetMemory as ai_actor hard-deletes the memory" do
+      user = generate(user())
+      {:ok, conv} = Chat.create_conversation(%{}, actor: user)
+
+      {:ok, memory} =
+        Memory.create_memory(conv.id, user.id, "gone", %{content: %{}, summary: "s"},
+          actor: %Magus.Agents.Support.AiAgent{}
+        )
+
+      context = %{user_id: user.id, conversation_id: conv.id}
+
+      assert {:ok, %{status: "forgotten"}} =
+               ForgetMemory.run(%{name: "gone", scope: "local"}, context)
+
+      assert {:error, _} = Magus.Memory.get_memory(memory.id, authorize?: false)
+    end
+
+    test "hard-delete then re-create with the same name succeeds" do
+      %{user: user, conversation: conversation, context: context} = create_test_context()
+
+      {:ok, _} =
+        Memory.create_memory(
+          conversation.id,
+          user.id,
+          "again",
+          %{summary: "First version"},
+          actor: %Magus.Agents.Support.AiAgent{}
+        )
+
+      params = %{name: "again", scope: "local"}
+      assert {:ok, %{status: "forgotten"}} = ForgetMemory.run(params, context)
+
+      # Unique index is no longer blocked by a soft-deleted row: the second
+      # create with the same name in the same conversation must succeed.
+      assert {:ok, second} =
+               Memory.create_memory(
+                 conversation.id,
+                 user.id,
+                 "again",
+                 %{summary: "Second version"},
+                 actor: %Magus.Agents.Support.AiAgent{}
+               )
+
+      assert second.name == "again"
     end
 
     test "defaults scope to local" do

@@ -218,7 +218,7 @@ defmodule Magus.Agents.Actions.ConsolidateMemories do
   end
 
   @doc """
-  Decay (deactivate) memories that haven't been accessed in the threshold period.
+  Decay (hard-delete) memories that haven't been accessed in the threshold period.
   """
   def decay_stale_memories(user_id, threshold_days) do
     cutoff = DateTime.add(DateTime.utc_now(), -threshold_days, :day)
@@ -234,14 +234,14 @@ defmodule Magus.Agents.Actions.ConsolidateMemories do
       {:ok, memories} ->
         memories
         |> Enum.reduce(0, fn memory, count ->
-          case Memory.deactivate_memory(memory, actor: @actor) do
-            {:ok, _} ->
-              Logger.debug("ConsolidateMemories: deactivated stale memory '#{memory.name}'")
+          case Memory.destroy_memory(memory, actor: @actor) do
+            :ok ->
+              Logger.debug("ConsolidateMemories: destroyed stale memory '#{memory.name}'")
               count + 1
 
             {:error, error} ->
               Logger.warning(
-                "ConsolidateMemories: failed to deactivate memory #{memory.id}: #{inspect(error)}"
+                "ConsolidateMemories: failed to destroy memory #{memory.id}: #{inspect(error)}"
               )
 
               count

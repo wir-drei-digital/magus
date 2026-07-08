@@ -27,6 +27,10 @@ defmodule Magus.Memory.Memory.Changes.BroadcastMemoryEvent do
     end)
   end
 
+  # For a destroy action, `after_action` receives the destroyed record
+  # struct (not persisted anymore) as `record`, which is exactly what
+  # Signals.memory_deleted/2 needs to broadcast.
+
   defp determine_event_type(changeset) do
     case changeset.action.type do
       :create -> :created

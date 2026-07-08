@@ -328,23 +328,23 @@ defmodule Magus.Agents.Actions.MergeMemories do
     source_names = Enum.map(source_memories, & &1.name) |> Enum.join(", ")
 
     # Wrap in transaction to ensure atomicity: either the merge fully succeeds
-    # (sources deactivated + new memory created) or nothing changes.
-    # Sources are deactivated first to avoid unique name identity conflicts.
+    # (sources destroyed + new memory created) or nothing changes.
+    # Sources are destroyed first to avoid unique name identity conflicts.
     # We pass return_notifications?: true to collect notifications and send
     # them after the transaction commits (Ash can't deliver inside a txn).
     Magus.Repo.transaction(fn ->
       notifications = []
 
-      # Step 1: Deactivate all source memories
+      # Step 1: Destroy all source memories
       notifications =
         Enum.reduce(source_memories, notifications, fn memory, acc ->
-          case Memory.deactivate_memory(memory,
+          case Memory.destroy_memory(memory,
                  actor: @actor,
                  return_notifications?: true
                ) do
-            {:ok, _, notifs} -> acc ++ notifs
-            {:ok, _} -> acc
-            {:error, error} -> Magus.Repo.rollback({:deactivate_failed, memory.id, error})
+            {:ok, notifs} -> acc ++ notifs
+            :ok -> acc
+            {:error, error} -> Magus.Repo.rollback({:destroy_failed, memory.id, error})
           end
         end)
 

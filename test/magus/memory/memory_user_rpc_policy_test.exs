@@ -27,7 +27,7 @@ defmodule Magus.Memory.MemoryUserRpcPolicyTest do
     refute Enum.any?(theirs, &(&1.user_id == user.id))
   end
 
-  test "a user can deactivate their own memory but not another's" do
+  test "a user can destroy their own memory but not another's" do
     user = generate(user())
     other = generate(user())
 
@@ -37,11 +37,9 @@ defmodule Magus.Memory.MemoryUserRpcPolicyTest do
       )
 
     assert {:error, _} =
-             mem |> Ash.Changeset.for_update(:deactivate, %{}, actor: other) |> Ash.update()
+             mem |> Ash.Changeset.for_destroy(:destroy, %{}, actor: other) |> Ash.destroy()
 
-    assert {:ok, deac} =
-             mem |> Ash.Changeset.for_update(:deactivate, %{}, actor: user) |> Ash.update()
-
-    assert deac.is_active == false
+    assert :ok =
+             mem |> Ash.Changeset.for_destroy(:destroy, %{}, actor: user) |> Ash.destroy()
   end
 end

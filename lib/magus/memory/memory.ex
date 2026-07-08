@@ -19,7 +19,7 @@ defmodule Magus.Memory do
   typescript_rpc do
     resource Magus.Memory.Memory do
       rpc_action :list_user_memories, :user_for_user
-      rpc_action :deactivate_user_memory, :deactivate
+      rpc_action :destroy_user_memory, :destroy
     end
 
     resource Magus.Memory.UserProfile do
@@ -33,7 +33,7 @@ defmodule Magus.Memory do
 
   Uses direct SQL to avoid triggering CreateVersion/BroadcastMemoryEvent/optimistic_lock.
   """
-  # Intentionally raw SQL: this must NOT run through the :set/:deactivate
+  # Intentionally raw SQL: this must NOT run through the :set/:destroy
   # actions, which would create a MemoryVersion, broadcast PubSub, and bump
   # lock_version on every semantic-retrieval and search-tool touch.
   def touch_accessed(memory_ids) when is_list(memory_ids) and memory_ids != [] do
@@ -104,7 +104,7 @@ defmodule Magus.Memory do
       define :create_memory, action: :create, args: [:conversation_id, :user_id, :name]
       define :set_memory, action: :set, args: [:content]
       define :clear_memory, action: :clear
-      define :deactivate_memory, action: :deactivate
+      define :destroy_memory, action: :destroy
       define :get_memory, action: :read, get_by: [:id]
       define :list_memories_for_conversation, action: :for_conversation, args: [:conversation_id]
       define :get_most_recent_memory, action: :most_recent, args: [:conversation_id]

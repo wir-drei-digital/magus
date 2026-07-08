@@ -94,8 +94,6 @@ defmodule Magus.Memory.Memory do
   end
 
   actions do
-    defaults [:destroy]
-
     read :read do
       primary? true
       pagination keyset?: true, required?: false
@@ -194,9 +192,10 @@ defmodule Magus.Memory.Memory do
       change Magus.Memory.Memory.Changes.BroadcastMemoryEvent
     end
 
-    update :deactivate do
+    destroy :destroy do
+      primary? true
       require_atomic? false
-      change set_attribute(:is_active, false)
+
       change Magus.Memory.Memory.Changes.BroadcastMemoryEvent
     end
 
@@ -407,7 +406,7 @@ defmodule Magus.Memory.Memory do
 
   policies do
     # AI Agent can perform all memory operations for extraction
-    bypass action_type([:read, :create, :update]) do
+    bypass action_type([:read, :create, :update, :destroy]) do
       authorize_if Magus.Checks.IsAiAgent
     end
 

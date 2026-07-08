@@ -101,7 +101,7 @@ defmodule Magus.Agents.Actions.MergeMemoriesTest do
       assert "IDE Settings" in active_names
     end
 
-    test "deactivates source memories and creates version entry after merge" do
+    test "destroys source memories and creates version entry after merge" do
       user = generate(user())
 
       memories =
@@ -138,10 +138,9 @@ defmodule Magus.Agents.Actions.MergeMemoriesTest do
 
       {:ok, _} = MergeMemories.run(%{user_id: user.id, skip_local: true}, %{})
 
-      # All source memories should be deactivated
+      # All source memories should be hard-deleted
       for mem <- memories do
-        {:ok, reloaded} = Memory.get_memory(mem.id, authorize?: false)
-        refute reloaded.is_active
+        assert {:error, _} = Memory.get_memory(mem.id, authorize?: false)
       end
 
       # New merged memory should exist with a version entry

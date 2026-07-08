@@ -168,8 +168,8 @@ defmodule Magus.Memory.MemoryTest do
     end
   end
 
-  describe "Memory.deactivate" do
-    test "soft deletes by setting is_active to false" do
+  describe "Memory.destroy" do
+    test "destroy hard-deletes the row" do
       user = generate(user())
       {:ok, conversation} = Chat.create_conversation(%{}, actor: user)
 
@@ -177,19 +177,19 @@ defmodule Magus.Memory.MemoryTest do
         Memory.create_memory(
           conversation.id,
           user.id,
-          "Deactivate Test",
+          "Destroy Test",
           %{},
           actor: user
         )
 
       assert memory.is_active == true
 
-      {:ok, deactivated} = Memory.deactivate_memory(memory, actor: user)
+      assert :ok = Memory.destroy_memory(memory, actor: user)
 
-      assert deactivated.is_active == false
+      assert {:error, _} = Memory.get_memory(memory.id, actor: user)
     end
 
-    test "deactivated memory not returned by for_conversation" do
+    test "destroyed memory not returned by for_conversation" do
       user = generate(user())
       {:ok, conversation} = Chat.create_conversation(%{}, actor: user)
 
@@ -202,7 +202,7 @@ defmodule Magus.Memory.MemoryTest do
           actor: user
         )
 
-      {:ok, _deactivated} = Memory.deactivate_memory(memory, actor: user)
+      assert :ok = Memory.destroy_memory(memory, actor: user)
 
       {:ok, memories} = Memory.list_memories_for_conversation(conversation.id, actor: user)
 
@@ -281,7 +281,7 @@ defmodule Magus.Memory.MemoryTest do
       assert second.name == "Shared Name"
     end
 
-    test "allows reusing name after deactivation" do
+    test "allows reusing name after destroy" do
       user = generate(user())
       {:ok, conversation} = Chat.create_conversation(%{}, actor: user)
 
@@ -294,7 +294,7 @@ defmodule Magus.Memory.MemoryTest do
           actor: user
         )
 
-      {:ok, _deactivated} = Memory.deactivate_memory(first, actor: user)
+      assert :ok = Memory.destroy_memory(first, actor: user)
 
       {:ok, second} =
         Memory.create_memory(
@@ -307,6 +307,33 @@ defmodule Magus.Memory.MemoryTest do
 
       assert second.name == "Reusable Name"
       assert second.content == %{"new" => true}
+    end
+
+    test "hard-delete then re-create with the same name succeeds" do
+      user = generate(user())
+      {:ok, conversation} = Chat.create_conversation(%{}, actor: user)
+
+      {:ok, first} =
+        Memory.create_memory(
+          conversation.id,
+          user.id,
+          "again",
+          %{},
+          actor: user
+        )
+
+      assert :ok = Memory.destroy_memory(first, actor: user)
+
+      {:ok, second} =
+        Memory.create_memory(
+          conversation.id,
+          user.id,
+          "again",
+          %{},
+          actor: user
+        )
+
+      assert second.name == "again"
     end
   end
 
@@ -557,7 +584,7 @@ defmodule Magus.Memory.MemoryTest do
       {:error, %Ash.Error.Forbidden{}} = Memory.clear_memory(memory, actor: user2)
     end
 
-    test "user cannot deactivate another user's user-scope memory" do
+    test "user cannot destroy another user's user-scope memory" do
       user1 = generate(user())
       user2 = generate(user())
 
@@ -570,8 +597,8 @@ defmodule Magus.Memory.MemoryTest do
           actor: user1
         )
 
-      # User2 trying to deactivate user1's memory should fail with Forbidden
-      {:error, %Ash.Error.Forbidden{}} = Memory.deactivate_memory(memory, actor: user2)
+      # User2 trying to destroy user1's memory should fail with Forbidden
+      {:error, %Ash.Error.Forbidden{}} = Memory.destroy_memory(memory, actor: user2)
     end
   end
 
@@ -907,7 +934,7 @@ defmodule Magus.Memory.MemoryTest do
       assert mem2.custom_agent_id == agent2.id
     end
 
-    test "deactivated agent memory allows name reuse", %{user: user, agent: agent} do
+    test "destroyed agent memory allows name reuse", %{user: user, agent: agent} do
       {:ok, first} =
         Memory.create_agent_memory(
           user.id,
@@ -916,7 +943,7 @@ defmodule Magus.Memory.MemoryTest do
           actor: user
         )
 
-      {:ok, _deactivated} = Memory.deactivate_memory(first, actor: user)
+      assert :ok = Memory.destroy_memory(first, actor: user)
 
       {:ok, second} =
         Memory.create_agent_memory(
@@ -930,16 +957,16 @@ defmodule Magus.Memory.MemoryTest do
       assert second.content == %{"new" => true}
     end
 
-    test "for_agent excludes deactivated memories", %{user: user, agent: agent} do
+    test "for_agent excludes destroyed memories", %{user: user, agent: agent} do
       {:ok, mem} =
         Memory.create_agent_memory(
           user.id,
           agent.id,
-          %{name: "Will Deactivate"},
+          %{name: "Will Destroy"},
           actor: user
         )
 
-      {:ok, _deactivated} = Memory.deactivate_memory(mem, actor: user)
+      assert :ok = Memory.destroy_memory(mem, actor: user)
 
       {:ok, agent_memories} =
         Memory.list_agent_memories(agent.id, authorize?: false)

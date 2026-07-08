@@ -438,8 +438,8 @@ defmodule MagusWeb.AgentsLive.Components.KnowledgeSectionComponent do
   def handle_event("delete_memory", _params, socket) do
     memory = socket.assigns.selected_memory
 
-    case Magus.Memory.deactivate_memory(memory, actor: current_user(socket)) do
-      {:ok, _} ->
+    case Magus.Memory.destroy_memory(memory, actor: current_user(socket)) do
+      :ok ->
         socket =
           socket
           |> assign(view: :list, selected_memory: nil, associations: [], form: nil)

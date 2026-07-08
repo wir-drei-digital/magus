@@ -98,13 +98,13 @@ defmodule Magus.Agents.Tools.Memory.ForgetMemory do
   defp forget_memory(name, scope, ctx) do
     case find_memory_by_name(name, scope, ctx) do
       {:ok, memory} ->
-        case Memory.deactivate_memory(memory, actor: ai_actor()) do
-          {:ok, _} ->
-            Logger.debug("ForgetMemory: deactivated '#{name}' (#{scope})")
+        case Memory.destroy_memory(memory, actor: ai_actor()) do
+          :ok ->
+            Logger.debug("ForgetMemory: destroyed '#{name}' (#{scope})")
             {:ok, %{status: "forgotten", name: name, scope: scope}}
 
           {:error, error} ->
-            Logger.warning("ForgetMemory: deactivation failed - #{inspect(error)}")
+            Logger.warning("ForgetMemory: destroy failed - #{inspect(error)}")
             {:ok, %{error: "Failed to forget memory: #{inspect(error)}"}}
         end
 

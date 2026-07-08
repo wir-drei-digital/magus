@@ -357,13 +357,13 @@ defmodule Magus.Agents.CustomAgent do
     end
 
     action :delete_agent_memory, :map do
-      description "Deactivate (delete) an agent memory."
+      description "Delete (hard-delete) an agent memory."
       argument :memory_id, :uuid, allow_nil?: false
 
       run fn input, context ->
         with {:ok, memory} <-
                Magus.Memory.get_memory(input.arguments.memory_id, actor: context.actor),
-             {:ok, _} <- Magus.Memory.deactivate_memory(memory, actor: context.actor) do
+             :ok <- Magus.Memory.destroy_memory(memory, actor: context.actor) do
           {:ok, %{id: input.arguments.memory_id}}
         end
       end
