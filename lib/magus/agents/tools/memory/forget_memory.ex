@@ -11,9 +11,9 @@ defmodule Magus.Agents.Tools.Memory.ForgetMemory do
     description: """
     Forget (deactivate) a memory by its exact name. Use this when the user explicitly asks you to forget something.
 
-    SCOPE determines where to look:
-    - "user" (default): User-wide memories.
-    - "local": Conversation-specific memories.
+    SCOPE determines where to look, mirroring where you would have saved it:
+    - "local" (default): Anything about this conversation or project.
+    - "user": Durable, user-wide memories available everywhere.
 
     The memory name must match exactly. If you're unsure of the name, use search_memories first to find it.
     """,
@@ -26,8 +26,8 @@ defmodule Magus.Agents.Tools.Memory.ForgetMemory do
       scope: [
         type: :string,
         required: false,
-        default: "user",
-        doc: "Memory scope: 'local' or 'user'"
+        default: "local",
+        doc: "Memory scope: 'local' (default) or 'user'"
       ]
     ]
 
@@ -42,7 +42,9 @@ defmodule Magus.Agents.Tools.Memory.ForgetMemory do
       find_memory_by_name: 3,
       ai_actor: 0,
       enforce_global_read_isolation: 2,
-      enforce_global_write_isolation: 2
+      enforce_global_write_isolation: 2,
+      resolve_user_bucket: 1,
+      bucket_error_message: 1
     ]
 
   import Magus.Agents.Tools.Helpers, only: [get_param: 2, get_param: 3]
@@ -56,7 +58,7 @@ defmodule Magus.Agents.Tools.Memory.ForgetMemory do
 
   @impl true
   def run(params, context) do
-    scope = get_param(params, :scope, "user")
+    scope = get_param(params, :scope, "local")
 
     with {:ok, scope} <- validate_scope(scope),
          {:ok, scope} <- enforce_global_read_isolation(scope, context),
@@ -67,18 +69,31 @@ defmodule Magus.Agents.Tools.Memory.ForgetMemory do
           _ -> [:user_id, :conversation_id]
         end
 
-      case validate_context(context, required_fields) do
-        {:ok, ctx} ->
-          name = get_param(params, :name)
-          forget_memory(name, scope, ctx)
-
-        {:error, message} ->
-          {:ok, %{error: message}}
+      with {:ok, ctx} <- validate_context(context, required_fields),
+           {:ok, ctx} <- put_user_bucket(ctx, context, scope) do
+        name = get_param(params, :name)
+        forget_memory(name, scope, ctx)
+      else
+        {:error, message} -> {:ok, %{error: message}}
       end
     else
       {:error, message} -> {:ok, %{error: message}}
     end
   end
+
+  # For user scope, resolve the workspace bucket from the conversation (the
+  # tool context value is only a fallback) and pin it into ctx so the lookup
+  # uses the same bucket. Resolution reads from the original tool context,
+  # since validate_context/2 strips ctx down to only the scope's
+  # required_fields.
+  defp put_user_bucket(ctx, context, "user") do
+    case resolve_user_bucket(context) do
+      {:ok, workspace_id} -> {:ok, Map.put(ctx, :workspace_id, workspace_id)}
+      {:error, reason} -> {:error, bucket_error_message(reason)}
+    end
+  end
+
+  defp put_user_bucket(ctx, _context, _scope), do: {:ok, ctx}
 
   defp forget_memory(name, scope, ctx) do
     case find_memory_by_name(name, scope, ctx) do

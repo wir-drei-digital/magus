@@ -31,6 +31,9 @@ defmodule Magus.Agents.Tools.Memory.UpdateProfile do
 
   import Magus.Agents.Tools.Helpers, only: [validate_context: 2, get_param: 2, ai_actor: 0]
 
+  import Magus.Agents.Tools.Memory.Helpers,
+    only: [resolve_user_bucket: 1, bucket_error_message: 1]
+
   def display_name, do: "Update Profile"
 
   def summarize_output(%{status: status}), do: "Profile note #{status}"
@@ -39,17 +42,22 @@ defmodule Magus.Agents.Tools.Memory.UpdateProfile do
   @impl true
   def run(params, context) do
     with {:ok, ctx} <- validate_context(context, [:user_id, :conversation_id]) do
-      user_id = to_string(ctx.user_id)
-      note = get_param(params, :note)
-      workspace_id = Memory.workspace_id_for_conversation(ctx.conversation_id)
+      case resolve_user_bucket(context) do
+        {:ok, workspace_id} ->
+          user_id = to_string(ctx.user_id)
+          note = get_param(params, :note)
 
-      with {:ok, profile} <- get_or_create(user_id, workspace_id),
-           {:ok, updated} <- Memory.add_profile_note(profile, note, actor: ai_actor()) do
-        {:ok, %{status: "queued", pending_notes: length(updated.pending_notes)}}
-      else
+          with {:ok, profile} <- get_or_create(user_id, workspace_id),
+               {:ok, updated} <- Memory.add_profile_note(profile, note, actor: ai_actor()) do
+            {:ok, %{status: "queued", pending_notes: length(updated.pending_notes)}}
+          else
+            {:error, reason} ->
+              Logger.warning("UpdateProfile: failed to queue note - #{inspect(reason)}")
+              {:error, "Failed to queue profile note: #{inspect(reason)}"}
+          end
+
         {:error, reason} ->
-          Logger.warning("UpdateProfile: failed to queue note - #{inspect(reason)}")
-          {:error, "Failed to queue profile note: #{inspect(reason)}"}
+          {:ok, %{error: bucket_error_message(reason)}}
       end
     end
   end

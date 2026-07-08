@@ -84,22 +84,23 @@ defmodule Magus.Agents.Tools.Memory.ForgetMemoryTest do
                )
     end
 
-    test "defaults scope to user" do
-      %{user: user, context: context} = create_test_context()
+    test "defaults scope to local" do
+      %{user: user, conversation: conversation, context: context} = create_test_context()
 
       {:ok, _} =
-        Memory.create_user_memory(
+        Memory.create_memory(
+          conversation.id,
           user.id,
-          nil,
           "timezone",
           %{summary: "CET timezone"},
           actor: %Magus.Agents.Support.AiAgent{}
         )
 
-      # No scope param — should default to user
+      # No scope param — should default to local
       params = %{name: "timezone"}
       assert {:ok, result} = ForgetMemory.run(params, context)
       assert result.status == "forgotten"
+      assert result.scope == "local"
     end
   end
 
@@ -144,12 +145,12 @@ defmodule Magus.Agents.Tools.Memory.ForgetMemoryTest do
 
   describe "double-forget" do
     test "returns not_found when forgetting an already-forgotten memory" do
-      %{user: user, context: context} = create_test_context()
+      %{user: user, conversation: conversation, context: context} = create_test_context()
 
       {:ok, _} =
-        Memory.create_user_memory(
+        Memory.create_memory(
+          conversation.id,
           user.id,
-          nil,
           "temp",
           %{summary: "Temporary"},
           actor: %Magus.Agents.Support.AiAgent{}
@@ -267,6 +268,24 @@ defmodule Magus.Agents.Tools.Memory.ForgetMemoryTest do
       params = %{name: "test"}
       assert {:ok, result} = ForgetMemory.run(params, %{})
       assert result.error =~ "Missing required context"
+    end
+  end
+
+  describe "user-scope workspace bucketing" do
+    test "user-scope forget resolves the workspace bucket from the conversation" do
+      user = generate(user())
+      workspace = generate(workspace(actor: user))
+      {:ok, conv} = Chat.create_conversation(%{workspace_id: workspace.id}, actor: user)
+
+      {:ok, _} =
+        Memory.create_user_memory(user.id, workspace.id, "ws-fact", %{content: %{}, summary: "s"},
+          actor: %Magus.Agents.Support.AiAgent{}
+        )
+
+      context = %{user_id: user.id, conversation_id: conv.id}
+
+      assert {:ok, %{status: "forgotten"}} =
+               ForgetMemory.run(%{name: "ws-fact", scope: "user"}, context)
     end
   end
 end

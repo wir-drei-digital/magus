@@ -67,7 +67,9 @@ defmodule Magus.Agents.Tools.Memory.SearchMemories do
       format_datetime: 1,
       ai_actor: 0,
       validate_list_scope: 1,
-      enforce_global_read_isolation: 2
+      enforce_global_read_isolation: 2,
+      resolve_user_bucket: 1,
+      bucket_error_message: 1
     ]
 
   import Magus.Agents.Tools.Helpers, only: [get_param: 2, get_param: 3]
@@ -95,28 +97,41 @@ defmodule Magus.Agents.Tools.Memory.SearchMemories do
           _ -> [:conversation_id]
         end
 
-      case validate_context(context, required_fields) do
-        {:ok, ctx} ->
-          query = get_param(params, :query)
-          limit = get_param(params, :limit, 5)
+      with {:ok, ctx} <- validate_context(context, required_fields),
+           {:ok, ctx} <- put_user_bucket(ctx, context, scope) do
+        query = get_param(params, :query)
+        limit = get_param(params, :limit, 5)
 
-          Logger.debug("SearchMemories: executing",
-            query: query,
-            scope: scope,
-            conversation_id: Map.get(ctx, :conversation_id),
-            user_id: Map.get(ctx, :user_id)
-          )
+        Logger.debug("SearchMemories: executing",
+          query: query,
+          scope: scope,
+          conversation_id: Map.get(ctx, :conversation_id),
+          user_id: Map.get(ctx, :user_id)
+        )
 
-          kind = get_param(params, :kind)
-          search_memories(query, limit, scope, ctx, kind)
-
-        {:error, message} ->
-          {:ok, %{error: message}}
+        kind = get_param(params, :kind)
+        search_memories(query, limit, scope, ctx, kind)
+      else
+        {:error, message} -> {:ok, %{error: message}}
       end
     else
       {:error, message} -> {:ok, %{error: message}}
     end
   end
+
+  # For "user" and "all" scopes (both read a user-memory bucket), resolve the
+  # workspace bucket from the conversation (the tool context value is only a
+  # fallback) and pin it into ctx so the search uses the same bucket.
+  # Resolution reads from the original tool context, since validate_context/2
+  # strips ctx down to only the scope's required_fields.
+  defp put_user_bucket(ctx, context, scope) when scope in ["user", "all"] do
+    case resolve_user_bucket(context) do
+      {:ok, workspace_id} -> {:ok, Map.put(ctx, :workspace_id, workspace_id)}
+      {:error, reason} -> {:error, bucket_error_message(reason)}
+    end
+  end
+
+  defp put_user_bucket(ctx, _context, _scope), do: {:ok, ctx}
 
   defp search_memories(query, limit, scope, ctx, kind) do
     case EmbeddingModel.embed(query) do
