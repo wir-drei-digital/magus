@@ -32,8 +32,11 @@ Consequences of this framing:
 
 **Tools derive the bucket from the conversation; the context value is only a fallback.**
 
-- `set_memory`, `search_memories`, and `forget_memory`: for user-scope operations, resolve the bucket via `Magus.Memory.workspace_id_for_conversation(ctx.conversation_id)` when `conversation_id` is present in the tool context (the pattern `update_profile` already uses at `lib/magus/agents/tools/memory/update_profile.ex:44`). Fall back to `ctx.workspace_id` only when there is no conversation in context. The same derivation applies to the upsert lookup in `Magus.Agents.Tools.Memory.Helpers.find_memory_by_name/3`.
-- Required context keys for user scope become `[:user_id, :conversation_id]`-or-`[:user_id, :workspace_id-key-present]`: concretely, `validate_context` keeps requiring `:user_id`, and the workspace resolution helper raises a tool error (returned as `{:ok, %{error: ...}}`) if neither `conversation_id` nor a `workspace_id` key is available, instead of silently writing to Personal.
+- A single resolver, `Magus.Agents.Tools.Memory.Helpers.resolve_user_bucket(ctx)`, owns bucket resolution for all user-scope tool operations (`set_memory`, `search_memories`, `forget_memory`, including the upsert lookup in `find_memory_by_name/3`). Its contract distinguishes the three cases the current helpers collapse:
+  - `ctx.conversation_id` present and the conversation exists: `{:ok, conversation.workspace_id}` (`nil` here legitimately means a personal conversation). Backed by a new tagged variant `Magus.Memory.fetch_workspace_id_for_conversation/1` returning `{:ok, workspace_id | nil} | {:error, :not_found}`; the existing nil-collapsing `workspace_id_for_conversation/1` is not used by tools anymore.
+  - `ctx.conversation_id` present but the conversation lookup fails: `{:error, :conversation_not_found}`. This becomes a tool error result, never a silent Personal write.
+  - No `conversation_id`: fall back to the context value only if the key is actually present (`Map.has_key?(ctx, :workspace_id)`, checking both atom and string keys); a present `nil` is an explicit Personal choice. If neither key exists: `{:error, :no_bucket_context}`, returned as a tool error.
+- `update_profile` switches to the same resolver for consistency.
 - Extraction (`lib/magus/agents/actions/extract_turn_memories.ex:214`) already derives correctly; unchanged.
 - No changes to conversation creation: SPA (`frontend/src/lib/stores/workbench.svelte.ts:376`) and classic both pass the active workspace already.
 
@@ -46,7 +49,7 @@ Consequences of this framing:
 
 **The user bucket is fed by exactly two curated paths.**
 
-- Nightly `PromoteMemoryCandidates` (unchanged: >= 2 conversations, 0.85 embedding similarity, LLM validation; `promote_to_user` preserves the workspace bucket).
+- Nightly `PromoteMemoryCandidates` (gate unchanged: >= 2 conversations, 0.85 embedding similarity, LLM validation; `promote_to_user` preserves the workspace bucket). The `:promote_to_user` action itself gains the side effects it currently lacks: `BroadcastMemoryEvent` (as `memory_updated`) and the Super Brain extraction enqueue, since the memory is user-scoped from that point on and must enter the graph like any other user-scope write.
 - Profile distillation (`DistillUserProfile`, unchanged) plus `update_profile` pending notes.
 
 **`set_memory` defaults to local.**
@@ -70,15 +73,23 @@ Consequences of this framing:
 | Column | Notes |
 |---|---|
 | `is_active` | Soft-delete replaced by hard delete (below). |
-| `confidence` | Never used for ranking or filtering; remove from tool params (`set_memory`), search-tool output, `USER_MEMORY_FIELDS` + the confidence line in the settings expand panel (`frontend/src/routes/settings/memory/+page.svelte`). |
+| `confidence` | Never used for ranking or filtering; remove from tool params (`set_memory`), search-tool output, `USER_MEMORY_FIELDS` + the confidence line in the settings expand panel (`frontend/src/routes/settings/memory/+page.svelte`), the custom-agent `update_agent_memory` action argument and `memory_map/1` output (`lib/magus/agents/custom_agent.ex:338`), and the corresponding agent-memory types/wrappers in `frontend/src/lib/ash/api.ts` (around line 3444). |
 | `structured_data` | Accepted, never read. Remove from tool params and action accepts. |
 
 `kind` stays (visible in the UI, gives the distiller light structure). `last_accessed_at`, `summary_embedding`, `lock_version` stay.
 
+**Additional call sites in the removal checklist** (compile-breaking if missed):
+
+- `lib/magus/accounts/data_export.ex` (`memories/1`): drop the `[:versions, :sources]` load, the `is_active == true` filter, and the `structured_data` / `confidence` fields from the export map.
+- A repo-wide grep for `is_active`, `confidence`, `structured_data`, `deactivate_memory`, `MemoryVersion`, `MemorySource`, `MemoryAssociation`, `UserProfileVersion` is part of the implementation plan's final verification, not left to chance.
+
 **Soft delete becomes hard delete.**
 
-- The `:deactivate` action is replaced by a custom `:destroy` action carrying `BroadcastMemoryEvent` (so `memory_deleted` PubSub still fires) and the Super Brain re-extract enqueue where applicable (graphs are disposable; brief staleness from deleted rows is acceptable and healed by the migration sweeper).
+- The `:deactivate` action is replaced by a custom `:destroy` action carrying `BroadcastMemoryEvent` (so `memory_deleted` PubSub still fires) and the Super Brain retraction enqueue (below).
+- **Policy change:** the AI-agent bypass on the memory resource currently covers only `[:read, :create, :update]` (`lib/magus/memory/memory_resource.ex:408`); `:destroy` joins the bypass, otherwise `ForgetMemory` (which acts as `ai_actor()`) and the consolidation decay path would be denied. User-initiated destroys via RPC stay covered by the existing creator-only destroy policy.
+- **Super Brain retraction (destroy must actually forget):** deactivation today leaves derived graph data untouched, and `ExtractMemory.load/1` returns `:memory_not_found` for deleted rows, so re-extraction cannot heal anything. Destroy therefore enqueues a new `Magus.SuperBrain.Workers.RetractResource` job with `(resource_type: :memory, resource_id)`. The worker: (1) deletes the Postgres `Episode` rows for that resource, which cascades to `Claim` rows via the existing `on_delete: :delete` reference, removing the facts from claims-backed retrieval (dossier, trust tiers); (2) best-effort `DETACH DELETE`s the matching `(:Episode {resource_id})` node in the routed L1 graph (orphaned entity nodes are acceptable). L2 super-graph edges derived from the deleted claims may persist until the next replay or migration sweep; that residual staleness is explicitly accepted and bounded, because the canonical claims store is already clean. The worker is generic over `resource_type` so future hard-delete paths (drafts, files) can reuse it.
 - All `is_active == true` filters drop out of the read actions. The three unique identities lose their `is_active` predicate and become partial-on-scope unique indexes: `[conversation_id, name] WHERE scope = 'local'`, `[user_id, workspace_id, name] (nils_distinct: false) WHERE scope = 'user'`, `[custom_agent_id, name] WHERE scope = 'agent'`.
+- **Migration pre-clean:** before dropping the `is_active` column and rebuilding the unique indexes, the migration runs `DELETE FROM memories WHERE is_active = false`; otherwise old inactive duplicates can violate the new scope-only indexes.
 - Callers updated: `ForgetMemory` tool, nightly decay in `ConsolidateMemories` (stale memories after 90 days unaccessed are now deleted, not deactivated), merge cleanup in `MergeMemories`, the `deactivate_user_memory` RPC becomes `destroy_user_memory` (SPA `deactivateUserMemory` wrapper and the settings-page delete follow; UI copy must say the deletion is permanent).
 - `mix ash_typescript.codegen` regenerates `ash_rpc.ts` after the RPC change.
 
@@ -92,7 +103,7 @@ Watermark all-turns extraction with Oban retries; semantic dedup at extraction (
 - Conversation-creation UX around workspace context (wiring verified correct in SPA and classic).
 - Any classic-workbench UI changes.
 - Per-workspace memory toggles, admin profile flags (unchanged from the 2026-07-04 settings design).
-- Brains / Super Brain changes (graphs remain derived and rebuildable).
+- Brains / Super Brain changes beyond the new `RetractResource` retraction worker (graphs remain derived and rebuildable).
 
 ## Verification
 
@@ -100,7 +111,11 @@ Watermark all-turns extraction with Oban retries; semantic dedup at extraction (
 - **New regression tests:**
   - user-scope `set_memory` in a workspace conversation lands in that workspace bucket even when the tool context omits `workspace_id` (pins the reported bug);
   - user-scope `set_memory` with neither `conversation_id` nor `workspace_id` in context returns a tool error, not a Personal-bucket write;
+  - user-scope `set_memory` with a `conversation_id` whose conversation does not exist returns a tool error, not a Personal-bucket write;
   - extraction never creates `scope: :user` rows;
+  - `ForgetMemory` (as `ai_actor()`) successfully destroys a memory (pins the destroy policy bypass);
+  - destroying a memory enqueues `RetractResource`, and the worker deletes the matching `Episode` rows (claims cascade) and issues the graph episode delete;
+  - `promote_to_user` broadcasts and enqueues Super Brain extraction;
   - hard-delete then re-create with the same name succeeds under the new unique indexes;
   - decay deletes (not deactivates) stale memories.
 - Existing test files updated or removed accordingly (`memory_test.exs` versioning assertions, `build_memory_context*` association layers, `memory_actions_test.exs` extraction scope cases, `user_profile_clear_test.exs` version snapshots, RPC policy test rename).
@@ -109,7 +124,7 @@ Watermark all-turns extraction with Oban retries; semantic dedup at extraction (
 ## Phasing
 
 - **Phase 1 (correctness):** section 1 + section 2. No migrations. Shippable alone.
-- **Phase 2 (simplification):** section 3. One `mix ash.codegen` migration wave (drop three + one tables, drop three columns, rebuild three unique indexes) plus the RPC/SPA rename.
+- **Phase 2 (simplification):** section 3. One `mix ash.codegen` migration wave (pre-clean inactive rows, drop four tables, drop three columns, rebuild three unique indexes), the destroy policy bypass, the `RetractResource` worker, and the RPC/SPA rename.
 
 One implementation plan covers both phases; work happens on a worktree branch because of the migration surface.
 
