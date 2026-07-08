@@ -214,17 +214,47 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
           |> Enum.map(&normalize_extraction/1)
 
         {applied, skipped} = apply_extractions(extractions, conversation_id, user_id)
+        evicted = enforce_conversation_cap(conversation_id)
 
         Logger.debug(
-          "ExtractTurnMemories: Applied #{applied}, skipped #{skipped} for conversation #{conversation_id}"
+          "ExtractTurnMemories: Applied #{applied}, skipped #{skipped}, evicted #{evicted} " <>
+            "for conversation #{conversation_id}"
         )
 
         {:ok,
-         %{extractions_applied: applied, extractions_skipped: skipped, usage: response.usage}}
+         %{
+           extractions_applied: applied,
+           extractions_skipped: skipped,
+           memories_evicted: evicted,
+           usage: response.usage
+         }}
 
       {:error, error} ->
         Logger.warning("ExtractTurnMemories: LLM extraction failed: #{inspect(error)}")
         {:error, error}
+    end
+  end
+
+  # Deterministic growth bound: the per-conversation cap replaces time-based
+  # decay. Oldest-by-update evicted first, through the real destroy action so
+  # PubSub and Super Brain retraction fire.
+  defp enforce_conversation_cap(conversation_id) do
+    cap = Magus.Config.max_memories_per_conversation()
+
+    case Memory.list_memories_for_conversation(conversation_id, actor: @actor) do
+      {:ok, memories} when length(memories) > cap ->
+        memories
+        |> Enum.sort_by(& &1.updated_at, {:asc, DateTime})
+        |> Enum.take(length(memories) - cap)
+        |> Enum.reduce(0, fn memory, count ->
+          case Memory.destroy_memory(memory, actor: @actor) do
+            :ok -> count + 1
+            {:error, _} -> count
+          end
+        end)
+
+      _ ->
+        0
     end
   end
 
