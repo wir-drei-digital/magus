@@ -260,4 +260,34 @@ defmodule Magus.Agents.Context.CompanionPreambleTest do
 
     refute preamble =~ "### Brain Guide"
   end
+
+  test "skips the brain section when explicit pane metadata already selected the same page" do
+    user = generate(user())
+    {:ok, brain} = Magus.Brain.create_brain(%{title: "B"}, actor: user)
+    {:ok, page} = Magus.Brain.create_page(brain.id, %{title: "Same Page"}, actor: user)
+
+    {:ok, conv} =
+      Magus.Chat.find_or_create_companion_conversation(:brain_page, page.id, actor: user)
+
+    # BrainContext injects the tree/body/Guide for the selected page; the
+    # preamble must not add a second copy.
+    assert "" =
+             CompanionPreamble.build(%{
+               conversation_id: conv.id,
+               user: user,
+               selected_brain_page_id: page.id
+             })
+
+    # A DIFFERENT selected page keeps the companion section (two subjects).
+    other = Ash.UUIDv7.generate()
+
+    preamble =
+      CompanionPreamble.build(%{
+        conversation_id: conv.id,
+        user: user,
+        selected_brain_page_id: other
+      })
+
+    assert preamble =~ "Active companion context"
+  end
 end

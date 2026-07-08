@@ -221,11 +221,15 @@ defmodule Magus.Agents.Context.Builder do
     # Companion preamble identifies the file/brain page this conversation is
     # paired with, so the agent treats it as the implicit subject and knows
     # which tool to call to read it. Returns "" for non-companion conversations.
+    # `selected_brain_page_id` lets the preamble skip its brain section when
+    # explicit pane metadata already covers the same page (BrainContext
+    # injects it above) so the tree/body/Guide never appear twice.
     companion_preamble =
       CompanionPreamble.build(%{
         conversation_id: conversation.id,
         user: user,
-        workspace_id: safe_get(conversation, :workspace_id)
+        workspace_id: safe_get(conversation, :workspace_id),
+        selected_brain_page_id: if(is_map(selections), do: selections[:brain_page_id])
       })
 
     # Order is intentional: wakeup orients an autonomous agent in time;

@@ -484,14 +484,19 @@ defmodule Magus.Agents.Tools.Brain.EditBrain.PageContent do
           brain = load_brain(updated, ctx)
           maybe_open_brain_pane(context, brain.id, updated.id)
 
-          {:ok,
-           %{
-             action: "write_page",
-             page_id: updated.id,
-             page_title: updated.title,
-             mode: mode_label,
-             current: build_current(brain, updated)
-           }}
+          payload = %{
+            action: "write_page",
+            page_id: updated.id,
+            page_title: updated.title,
+            mode: mode_label,
+            current: build_current(brain, updated)
+          }
+
+          # Just-in-time steering for pure-tool flows: a write is a filing
+          # decision, so the location's Guide rides on the result even when
+          # no companion/pane injected it up front. Nil (no guide) adds
+          # nothing.
+          {:ok, put_guide(payload, brain, updated, ctx)}
 
         {:error, %VersionConflict{} = conflict} ->
           {:ok, conflict_payload("write page (#{mode_label})", conflict, page.id, ctx)}
@@ -514,6 +519,15 @@ defmodule Magus.Agents.Tools.Brain.EditBrain.PageContent do
   defp retry_kind_for_write(:prepend), do: :write_prepend
   defp retry_kind_for_write(:replace), do: :write_replace
   defp retry_kind_for_write(:create), do: :write_create
+
+  # Attaches the location's Guide block to a tool payload (no-op when the
+  # brain has no guide). See BrainContext.tool_guide_section/3.
+  defp put_guide(payload, brain, page, ctx) do
+    case Magus.Agents.Context.BrainContext.tool_guide_section(brain, page, ctx.user) do
+      nil -> payload
+      guide -> Map.put(payload, :guide, guide)
+    end
+  end
 
   # Strip an exact rogue leading `# {title}` heading so we never duplicate
   # the page title inside the body. Leaves a non-matching H1 (different

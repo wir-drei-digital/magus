@@ -52,6 +52,35 @@ defmodule Magus.Agents.Context.BrainContext do
   end
 
   @doc """
+  Guide block for TOOL RESULTS: loads only the metadata the ancestor walk
+  needs (no bodies) and renders `guide_section/4`.
+
+  Just-in-time steering for pure-tool flows: when no pane or companion
+  injected the Guide up front, entering a location via `read_page` or
+  writing via `write_page` surfaces that location's rules with the result,
+  CLAUDE.md-style.
+  """
+  @spec tool_guide_section(Ash.Resource.record() | nil, Ash.Resource.record() | nil, term()) ::
+          String.t() | nil
+  def tool_guide_section(brain, page, actor) when is_map(brain) and is_map(page) do
+    require Ash.Query
+
+    pages =
+      Brain.Page
+      |> Ash.Query.filter(brain_id == ^brain.id and is_nil(deleted_at) and kind != :template)
+      |> Ash.Query.select([:id, :title, :parent_page_id, :position, :frontmatter, :kind])
+      |> Ash.read(actor: actor)
+      |> case do
+        {:ok, pages} -> pages
+        _ -> []
+      end
+
+    guide_section(brain, page, pages, actor)
+  end
+
+  def tool_guide_section(_brain, _page, _actor), do: nil
+
+  @doc """
   Formatted "### Available brains" section listing the actor's brains
   (title + id), or `nil` when the actor has none. `workspace_id` scopes the
   lookup the same way the agent brain tools do (nil = personal brains).

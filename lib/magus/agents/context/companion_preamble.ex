@@ -17,13 +17,21 @@ defmodule Magus.Agents.Context.CompanionPreamble do
   @spec build(map()) :: String.t()
   def build(%{conversation_id: conv_id, user: %{} = user} = args) do
     workspace_id = Map.get(args, :workspace_id)
+    selected_page_id = Map.get(args, :selected_brain_page_id)
 
     case Magus.Chat.get_companion_by_conversation(conv_id, actor: user) do
       {:ok, %{resource_type: :file, resource_id: id}} ->
         build_file_section(id, user)
 
       {:ok, %{resource_type: :brain_page, resource_id: id}} ->
-        build_brain_page_section(id, user, workspace_id)
+        # When explicit pane metadata already selected this same page,
+        # BrainContext injects the tree/body/Guide for it — skip the
+        # preamble so the subject context never appears twice.
+        if selected_page_id && to_string(selected_page_id) == to_string(id) do
+          ""
+        else
+          build_brain_page_section(id, user, workspace_id)
+        end
 
       _ ->
         ""

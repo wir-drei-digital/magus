@@ -64,6 +64,16 @@
 
 	const tab = $derived(workbench.tabForConversation(conversationId));
 
+	// A docked brain-page companion pane scopes the agent: the store sends the
+	// page id as message metadata, so the server injects that brain's Guide +
+	// page context and the brain tools auto-target it. Cleared when the pane
+	// closes or shows a non-brain companion.
+	$effect(() => {
+		const companion = tab?.companion ?? null;
+		if (!store) return;
+		store.companionBrainPageId = companion?.type === 'brain_page' ? companion.id : null;
+	});
+
 	function openCompanion(forConversationId: string, spec: CompanionSpec) {
 		const target = workbench.tabForConversation(forConversationId);
 		if (target) void workbench.setCompanion(target.id, spec);

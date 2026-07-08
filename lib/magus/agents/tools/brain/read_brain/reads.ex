@@ -353,6 +353,15 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Reads do
           payload
         end
 
+      # Just-in-time steering for pure-tool flows: opening a page surfaces
+      # its location's Guide with the result, so the agent follows the
+      # brain's conventions even when no companion/pane injected them.
+      payload =
+        case Magus.Agents.Context.BrainContext.tool_guide_section(brain, page, ctx.user) do
+          nil -> payload
+          guide -> Map.put(payload, :guide, guide)
+        end
+
       {:ok, payload}
     else
       {:error, msg} when is_binary(msg) -> {:ok, %{error: msg}}

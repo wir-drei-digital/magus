@@ -223,6 +223,29 @@ defmodule Magus.Agents.Tools.Brain.EditBrainTest do
       assert result.mode == "create"
       assert is_binary(result.page_id)
       assert read_page_body!(result.page_id, user) =~ "Hello world."
+
+      # No Guide in this bare brain, so no guide key rides on the result.
+      refute Map.has_key?(result, :guide)
+    end
+
+    test "a write carries the brain's Guide with the result (just-in-time steering)" do
+      %{user: user, brain: brain} = setup_brain()
+
+      {:ok, _} =
+        Brain.set_brain_instructions(brain, %{instructions: "One concept per page."}, actor: user)
+
+      ctx = %{user_id: user.id, user: user, brain_id: brain.id}
+
+      assert {:ok, result} =
+               EditBrain.run(
+                 %{"action" => "write_page", "title" => "Guided Page", "body" => "Content."},
+                 ctx
+               )
+
+      # A write is a filing decision: pure-tool flows (no companion/pane
+      # injection) see the location's rules with the result.
+      assert result.guide =~ "### Brain Guide"
+      assert result.guide =~ "One concept per page."
     end
 
     test "strips a rogue leading `# Title` heading matching the page title" do

@@ -1025,6 +1025,31 @@ defmodule Magus.Agents.Tools.Brain.ReadBrainTest do
       assert result.current.page_id == page.id
     end
 
+    test "carries the brain's Guide with the result (just-in-time steering)" do
+      %{context: ctx, page: page, brain: brain, user: user} =
+        setup_brain_with_page("# Title\n\nBody.")
+
+      {:ok, _} =
+        Brain.set_brain_instructions(brain, %{instructions: "One concept per page."}, actor: user)
+
+      assert {:ok, result} =
+               ReadBrain.run(%{"action" => "read_page", "page_id" => page.id}, ctx)
+
+      # Pure-tool flows have no companion/pane injection, so opening a page
+      # surfaces its location's Guide with the result.
+      assert result.guide =~ "### Brain Guide"
+      assert result.guide =~ "One concept per page."
+    end
+
+    test "omits the guide key when the brain has no Guide" do
+      %{context: ctx, page: page} = setup_brain_with_page("# Title\n\nBody.")
+
+      assert {:ok, result} =
+               ReadBrain.run(%{"action" => "read_page", "page_id" => page.id}, ctx)
+
+      refute Map.has_key?(result, :guide)
+    end
+
     test "supports start_line / end_line slicing with line-number prefixes" do
       body = Enum.map_join(1..6, "\n", fn i -> "line #{i}" end)
       %{context: ctx, page: page} = setup_brain_with_page(body)

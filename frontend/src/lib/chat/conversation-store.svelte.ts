@@ -185,6 +185,15 @@ export class ConversationStore {
 		filename: string | null;
 	} | null>(null);
 
+	/**
+	 * The brain page docked as this tab's companion pane (chat route keeps it
+	 * in sync with the workbench tab). Unlike the one-shot selections above it
+	 * persists across sends: every message carries `brain_page_id` metadata
+	 * while the pane is open, so the agent gets the brain's Guide + page
+	 * context injected and the brain tools auto-target that page's brain.
+	 */
+	companionBrainPageId = $state<string | null>(null);
+
 	get hasSelections(): boolean {
 		return (
 			this.messageSelections.length > 0 ||
@@ -273,6 +282,12 @@ export class ConversationStore {
 				text: this.brainSelection.text,
 				page_title: this.brainSelection.title
 			};
+		}
+		if (this.companionBrainPageId) {
+			// Page id only; the server resolves the brain id (see
+			// Preflight.explicit_brain_refs/1) and injects the Brain Guide +
+			// page context via BrainContext.
+			metadata.brain_page_id = this.companionBrainPageId;
 		}
 		return Object.keys(metadata).length > 0 ? metadata : null;
 	}

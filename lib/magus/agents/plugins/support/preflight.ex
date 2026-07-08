@@ -414,8 +414,7 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
       # fallback feeds ONLY the tool context, not the Builder selections
       # below — CompanionPreamble already injects the tree/body/Guide for
       # companions, and selections would make BrainContext inject them twice.
-      explicit_brain_id = data[:brain_id] || data["brain_id"]
-      explicit_brain_page_id = data[:brain_page_id] || data["brain_page_id"]
+      {explicit_brain_id, explicit_brain_page_id} = explicit_brain_refs(data)
 
       {hint_brain_id, hint_brain_page_id} =
         if explicit_brain_id do
@@ -538,11 +537,7 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
            |> Ash.Query.filter(conversation_id == ^conversation_id)
            |> Ash.Query.select([:id, :resource_type, :resource_id])
            |> Ash.read_one(authorize?: false),
-         {:ok, %{brain_id: brain_id}} <-
-           Magus.Brain.Page
-           |> Ash.Query.filter(id == ^page_id and is_nil(deleted_at))
-           |> Ash.Query.select([:id, :brain_id])
-           |> Ash.read_one(authorize?: false) do
+         brain_id when is_binary(brain_id) <- brain_id_for_page(page_id) do
       {brain_id, page_id}
     else
       _ -> {nil, nil}
@@ -550,6 +545,37 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
   end
 
   def companion_brain_hints(_), do: {nil, nil}
+
+  @doc false
+  # Explicit brain refs from the message metadata. The SPA's docked
+  # brain-page companion pane sends only `brain_page_id` (the CompanionSpec
+  # carries no brain id), so a page-only ref resolves its brain server-side.
+  # Returns {brain_id, page_id} or {nil, nil}.
+  def explicit_brain_refs(data) do
+    brain_id = data[:brain_id] || data["brain_id"]
+    page_id = data[:brain_page_id] || data["brain_page_id"]
+
+    cond do
+      is_binary(brain_id) -> {brain_id, page_id}
+      is_binary(page_id) -> {brain_id_for_page(page_id), page_id}
+      true -> {nil, nil}
+    end
+  end
+
+  # Metadata-only system read (id + brain_id, no body); the resulting hint is
+  # workspace-validated by BrainResolver on use, and page/brain data reads
+  # stay actor-gated downstream.
+  defp brain_id_for_page(page_id) do
+    require Ash.Query
+
+    case Magus.Brain.Page
+         |> Ash.Query.filter(id == ^page_id and is_nil(deleted_at))
+         |> Ash.Query.select([:id, :brain_id])
+         |> Ash.read_one(authorize?: false) do
+      {:ok, %{brain_id: brain_id}} -> brain_id
+      _ -> nil
+    end
+  end
 
   defp load_conversation_context(_conversation_id, %{id: _} = conversation_context) do
     {:ok, conversation_context}

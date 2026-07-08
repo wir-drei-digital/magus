@@ -342,6 +342,33 @@ describe('composer context pills → message metadata', () => {
 		store.stop();
 	});
 
+	it('a docked brain-page companion sends brain_page_id and persists across sends', async () => {
+		const store = await startedStore();
+		store.companionBrainPageId = 'page-42';
+
+		expect(await store.send('first')).toBe(true);
+		expect(sendUserMessage).toHaveBeenCalledWith('conv-1', 'first', [], {
+			brain_page_id: 'page-42'
+		});
+
+		// Unlike one-shot selection pills, the dock persists: the NEXT send
+		// carries it too (the pane is still open). Each turn must complete
+		// (idle) or the follow-up would enqueue instead of sending.
+		fire('state.change', { state: 'idle' });
+		expect(await store.send('second')).toBe(true);
+		expect(sendUserMessage).toHaveBeenLastCalledWith('conv-1', 'second', [], {
+			brain_page_id: 'page-42'
+		});
+
+		// Closing the pane stops the metadata.
+		store.companionBrainPageId = null;
+		fire('state.change', { state: 'idle' });
+		expect(await store.send('third')).toBe(true);
+		expect(sendUserMessage).toHaveBeenLastCalledWith('conv-1', 'third', [], null);
+
+		store.stop();
+	});
+
 	it('keeps pills when the send fails so the user can retry', async () => {
 		const store = await startedStore();
 		store.addSelection({ kind: 'brain', text: 'keep me', title: null });

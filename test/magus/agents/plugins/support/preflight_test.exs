@@ -241,4 +241,29 @@ defmodule Magus.Agents.Plugins.Support.PreflightTest do
       assert {nil, nil} = Preflight.companion_brain_hints(conv)
     end
   end
+
+  describe "explicit_brain_refs/1" do
+    test "page-only metadata resolves the brain id server-side" do
+      user = generate(user())
+      {:ok, brain} = Magus.Brain.create_brain(%{title: "Docked"}, actor: user)
+      {:ok, page} = Magus.Brain.create_page(brain.id, %{title: "Pane"}, actor: user)
+
+      # The SPA's docked companion pane sends only brain_page_id (the
+      # CompanionSpec carries no brain id).
+      assert {brain_id, page_id} = Preflight.explicit_brain_refs(%{"brain_page_id" => page.id})
+      assert brain_id == brain.id
+      assert page_id == page.id
+    end
+
+    test "explicit brain_id passes through untouched" do
+      assert {"b-1", "p-1"} =
+               Preflight.explicit_brain_refs(%{"brain_id" => "b-1", "brain_page_id" => "p-1"})
+    end
+
+    test "no refs and unresolvable page both yield {nil, nil}" do
+      assert {nil, nil} = Preflight.explicit_brain_refs(%{})
+
+      assert {nil, _} = Preflight.explicit_brain_refs(%{"brain_page_id" => Ash.UUIDv7.generate()})
+    end
+  end
 end
