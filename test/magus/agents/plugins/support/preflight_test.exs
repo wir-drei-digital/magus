@@ -70,6 +70,69 @@ defmodule Magus.Agents.Plugins.Support.PreflightTest do
     Jido.Signal.new!("message.user", payload)
   end
 
+  describe "recovery retry preamble" do
+    setup do
+      user = generate(user())
+      :ok = ensure_active_subscription(user)
+      conversation = generate(conversation(actor: user))
+
+      %{user: user, conversation: conversation}
+    end
+
+    test "recovery_retry appends a do-not-redo note to initial_messages", %{
+      user: user,
+      conversation: conversation
+    } do
+      jido_agent = build_agent(conversation, user)
+
+      signal =
+        make_signal(%{
+          text: "do the big task",
+          message_id: Ash.UUIDv7.generate(),
+          mode: :chat,
+          recovery_retry: true
+        })
+
+      assert {:ok, {:continue, react_signal}} =
+               Preflight.build_react_signal(signal, jido_agent, :chat)
+
+      last_text = react_signal.data.initial_messages |> List.last() |> message_text()
+      assert last_text =~ "interrupted"
+      assert last_text =~ "not redo"
+    end
+
+    test "normal turns get no recovery note", %{user: user, conversation: conversation} do
+      jido_agent = build_agent(conversation, user)
+
+      signal =
+        make_signal(%{
+          text: "do the big task",
+          message_id: Ash.UUIDv7.generate(),
+          mode: :chat
+        })
+
+      assert {:ok, {:continue, react_signal}} =
+               Preflight.build_react_signal(signal, jido_agent, :chat)
+
+      refute Enum.any?(react_signal.data.initial_messages, fn msg ->
+               message_text(msg) =~ "not redo"
+             end)
+    end
+  end
+
+  # initial_messages entries are %ReqLLM.Message{} with content either a
+  # binary or a list of ContentParts; flatten to text for assertions.
+  defp message_text(%ReqLLM.Message{content: content}) when is_binary(content), do: content
+
+  defp message_text(%ReqLLM.Message{content: parts}) when is_list(parts) do
+    Enum.map_join(parts, " ", fn
+      %{text: text} when is_binary(text) -> text
+      _ -> ""
+    end)
+  end
+
+  defp message_text(_), do: ""
+
   describe "run_source threading" do
     setup do
       user = generate(user())

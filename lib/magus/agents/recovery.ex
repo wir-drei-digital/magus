@@ -114,7 +114,10 @@ defmodule Magus.Agents.Recovery do
             "Recovery: re-dispatching message #{message.id} for conversation #{conversation_id}"
           )
 
-          Magus.Agents.Dispatcher.dispatch_user_message(message)
+          # Flagged as a recovery retry: Preflight appends a note telling the
+          # model that the interrupted attempt's tool results are already in
+          # its history, so completed work is not redone.
+          Magus.Agents.Dispatcher.dispatch_recovery_retry(message)
 
           trace_recovery(
             conversation_id,
@@ -235,7 +238,29 @@ defmodule Magus.Agents.Recovery do
           "Recovery: failed to mark #{error_count}/#{count} streaming messages as error"
         )
       end
+
+      create_interruption_event(conversation_id)
     end
+  end
+
+  # A visible :event message so the user sees WHY their response stopped
+  # (max transparency: the interruption is stated in the conversation, not
+  # just inferred from an errored bubble). Created only when the sweep found
+  # stuck rows, which naturally dedupes the checkpoint-time sweep and the
+  # thaw-time sweep (whichever runs second finds nothing). Best effort.
+  defp create_interruption_event(conversation_id) do
+    Magus.Chat.create_event_message(
+      "The response was interrupted by a restart. It will be retried automatically when the conversation resumes.",
+      conversation_id,
+      %{metadata: %{"event_kind" => "turn_interrupted"}},
+      authorize?: false
+    )
+
+    :ok
+  rescue
+    e ->
+      Logger.warning("Recovery: could not create interruption event: #{Exception.message(e)}")
+      :ok
   end
 
   # Try to find the specific interrupted message by ID first,

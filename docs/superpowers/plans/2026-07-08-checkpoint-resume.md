@@ -1,5 +1,7 @@
 # Checkpoint-Resume for Agentic Turns Implementation Plan
 
+> **STATUS: DEFERRED (2026-07-08).** After critique (config-fingerprint fragility, write amplification, no coverage for AgentRun-driven turns), the team chose the lightweight alternative first: interrupted turns are re-dispatched with a visible `turn_interrupted` event message and a `recovery_retry` context note telling the model not to redo work whose tool results are already in history (see `Magus.Agents.Dispatcher.dispatch_recovery_retry/1`, `Preflight.maybe_append_recovery_note`, `Recovery.create_interruption_event`). Revisit this plan only if the preamble approach proves insufficient: non-idempotent tool duplication in practice, or models demonstrably redoing expensive completed work.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A deploy or crash mid-turn resumes the ReAct run from its last checkpoint instead of re-dispatching the whole turn from scratch.

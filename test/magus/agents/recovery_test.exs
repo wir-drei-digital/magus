@@ -35,14 +35,27 @@ defmodule Magus.Agents.RecoveryTest do
       spawn(fn ->
         {:ok, _} = Registry.register(registry_name, agent_id, nil)
         send(test_pid, :registered)
-
-        receive do
-          :stop -> :ok
-        end
+        forward_casts(test_pid)
       end)
 
     assert_receive :registered
     fake_agent_pid
+  end
+
+  # Forwards GenServer casts (the dispatched signals) to the test process so
+  # tests can assert on what Recovery/Dispatcher actually sent the agent.
+  defp forward_casts(test_pid) do
+    receive do
+      :stop ->
+        :ok
+
+      {:"$gen_cast", payload} ->
+        send(test_pid, {:agent_cast, payload})
+        forward_casts(test_pid)
+
+      _other ->
+        forward_casts(test_pid)
+    end
   end
 
   describe "maybe_recover/1" do
@@ -112,6 +125,44 @@ defmodule Magus.Agents.RecoveryTest do
         event: "agent_signal",
         payload: %{type: "state.change", state: :running}
       }
+    end
+  end
+
+  describe "sweep_streaming_messages/1 interruption event" do
+    test "creates a visible event message when it sweeps stuck rows", %{
+      user: user,
+      conversation: conversation
+    } do
+      message = generate(message(actor: user, conversation_id: conversation.id, text: "Hi"))
+
+      {:ok, _streaming} =
+        message
+        |> Ash.Changeset.for_update(:update, %{})
+        |> Ash.Changeset.force_change_attribute(:status, :streaming)
+        |> Ash.Changeset.force_change_attribute(:complete, false)
+        |> Ash.update(authorize?: false)
+
+      :ok = Recovery.sweep_streaming_messages(to_string(conversation.id))
+
+      events =
+        Magus.Chat.Message
+        |> Ash.Query.filter(conversation_id == ^conversation.id and message_type == :event)
+        |> Ash.read!(authorize?: false)
+
+      assert [event] = events
+      assert event.metadata["event_kind"] == "turn_interrupted"
+      assert event.text =~ "interrupted"
+    end
+
+    test "creates no event when there is nothing to sweep", %{conversation: conversation} do
+      :ok = Recovery.sweep_streaming_messages(to_string(conversation.id))
+
+      events =
+        Magus.Chat.Message
+        |> Ash.Query.filter(conversation_id == ^conversation.id and message_type == :event)
+        |> Ash.read!(authorize?: false)
+
+      assert events == []
     end
   end
 
@@ -191,6 +242,23 @@ defmodule Magus.Agents.RecoveryTest do
       result = Recovery.recover_interrupted_turn(conversation_id, m1.id)
 
       assert result == {:dispatched, m1.id}
+    end
+
+    test "the re-dispatched signal is marked as a recovery retry", %{
+      user: user,
+      conversation: conversation
+    } do
+      conversation_id = to_string(conversation.id)
+
+      m1 = generate(message(actor: user, conversation_id: conversation.id, text: "Only message"))
+
+      register_fake_agent(conversation_id)
+
+      assert {:dispatched, _} = Recovery.recover_interrupted_turn(conversation_id, m1.id)
+
+      assert_receive {:agent_cast, {:signal, signal}}, 2_000
+      assert signal.type == "message.user"
+      assert signal.data[:recovery_retry] == true
     end
   end
 

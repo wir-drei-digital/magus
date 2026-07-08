@@ -159,6 +159,29 @@ defmodule Magus.Agents.DispatcherTest do
       assert signal_data.conversation_context.id == conversation.id
     end
 
+    test "forwards a recovery_retry flag from message metadata" do
+      user = generate(user())
+
+      {:ok, conversation} =
+        Chat.create_conversation(%{title: "Recovery retry test"}, actor: user)
+
+      message = %{
+        id: Ash.UUID.generate(),
+        conversation_id: conversation.id,
+        created_by_id: user.id,
+        text: "Hello",
+        attachments: [],
+        mode: nil,
+        selected_model_id: nil,
+        metadata: %{"recovery_retry" => true}
+      }
+
+      routed = %{model_keys: %{chat: "openrouter:test-model"}, routing_reason: :manual}
+      signal_data = Dispatcher.build_signal_data(message, conversation, routed)
+
+      assert signal_data.recovery_retry == true
+    end
+
     test "conversation_context includes preloaded relationships for Preflight reuse" do
       user = generate(user())
 

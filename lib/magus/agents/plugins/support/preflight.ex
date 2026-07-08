@@ -499,6 +499,8 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
           []
         end
 
+      safe_initial = maybe_append_recovery_note(safe_initial, data)
+
       runtime_overrides = build_runtime_overrides(conversation, model)
 
       %{
@@ -523,6 +525,28 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
           llm_opts: nil,
           initial_messages: []
         }
+    end
+  end
+
+  @recovery_note """
+  (system note: Your previous attempt to answer this request was interrupted \
+  by a server restart. Results of tools you already ran are in the \
+  conversation history above. Do not redo completed work; continue from \
+  where the attempt left off and produce the final answer.)\
+  """
+
+  # Appends the recovery note for retried turns so the model does not redo
+  # tool work whose results the interrupted attempt already persisted. Only
+  # appended when initial_messages is non-empty: making an empty list
+  # non-empty would flip the runner's append-query branch and drop the
+  # user's question from the thread.
+  defp maybe_append_recovery_note(initial_messages, data) do
+    retry? = data[:recovery_retry] == true or data["recovery_retry"] == true
+
+    if retry? and is_list(initial_messages) and initial_messages != [] do
+      initial_messages ++ [ReqLLM.Context.user(@recovery_note)]
+    else
+      initial_messages
     end
   end
 

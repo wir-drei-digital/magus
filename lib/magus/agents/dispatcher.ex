@@ -34,6 +34,19 @@ defmodule Magus.Agents.Dispatcher do
   end
 
   @doc """
+  Re-dispatches an interrupted message flagged as a recovery retry.
+
+  The flag rides through the signal into Preflight, which appends a note to
+  the LLM context telling the model that tool results from the interrupted
+  attempt are already in its history and completed work must not be redone.
+  """
+  @spec dispatch_recovery_retry(map()) :: {:ok, dispatch_result()} | {:error, term()}
+  def dispatch_recovery_retry(%{conversation_id: conversation_id} = message) do
+    metadata = Map.put(message.metadata || %{}, "recovery_retry", true)
+    dispatch_message(%{message | metadata: metadata}, conversation_id, nil)
+  end
+
+  @doc """
   Dispatch a message to the conversation agent.
 
   The `_user_id` parameter is unused (the user is resolved from the loaded
@@ -68,6 +81,7 @@ defmodule Magus.Agents.Dispatcher do
       routing_reason: routed.routing_reason,
       model_keys: Helpers.normalize_model_keys(routed.model_keys),
       conversation_context: conversation,
+      recovery_retry: metadata["recovery_retry"] == true or metadata[:recovery_retry] == true,
       draft_selection: metadata["draft_selection"] || metadata[:draft_selection],
       brain_selection: metadata["brain_selection"] || metadata[:brain_selection],
       pdf_selection: metadata["pdf_selection"] || metadata[:pdf_selection],
