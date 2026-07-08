@@ -66,7 +66,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
           tool_max_retries: non_neg_integer(),
           tool_retry_backoff_ms: non_neg_integer(),
           observability: map(),
-          runtime_adapter: true,
           runtime_task_supervisor: pid() | atom() | nil,
           agent_id: String.t() | nil
         }
@@ -90,7 +89,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
   @start :ai_react_start
   @cancel :ai_react_cancel
   @steer :ai_react_steer
-  @request_error :ai_react_request_error
   @register_tool :ai_react_register_tool
   @unregister_tool :ai_react_unregister_tool
   @set_tool_context :ai_react_set_tool_context
@@ -114,10 +112,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
   @doc "Returns the action atom for request cancellation."
   @spec cancel_action() :: :ai_react_cancel
   def cancel_action, do: @cancel
-
-  @doc "Returns the action atom for handling request rejections."
-  @spec request_error_action() :: :ai_react_request_error
-  def request_error_action, do: @request_error
 
   @doc "Returns the action atom for updating tool context."
   @spec set_tool_context_action() :: :ai_react_set_tool_context
@@ -164,16 +158,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
         }),
       doc: "Inject mid-turn steer messages into the active run",
       name: "ai.react.steer"
-    },
-    @request_error => %{
-      schema:
-        Zoi.object(%{
-          request_id: Zoi.string(),
-          reason: Zoi.atom(),
-          message: Zoi.string()
-        }),
-      doc: "Handle request rejection event",
-      name: "ai.react.request_error"
     },
     @register_tool => %{
       schema: Zoi.object(%{tool_module: Zoi.atom()}),
@@ -234,7 +218,9 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
       {"ai.react.query", {:strategy_cmd, @start}},
       {"ai.react.cancel", {:strategy_cmd, @cancel}},
       {"ai.react.steer", {:strategy_cmd, @steer}},
-      {"ai.request.error", {:strategy_cmd, @request_error}},
+      # Consumed by InboundPlugin (busy-rejection broadcast); the strategy
+      # itself has nothing to do with it.
+      {"ai.request.error", Jido.Actions.Control.Noop},
       {"ai.react.register_tool", {:strategy_cmd, @register_tool}},
       {"ai.react.unregister_tool", {:strategy_cmd, @unregister_tool}},
       {"ai.react.set_tool_context", {:strategy_cmd, @set_tool_context}},
@@ -311,7 +297,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
       max_iterations: config[:max_iterations],
       streaming: config[:streaming],
       request_policy: config[:request_policy],
-      runtime_adapter: true,
       tool_timeout_ms: config[:tool_timeout_ms],
       tool_max_retries: config[:tool_max_retries],
       tool_retry_backoff_ms: config[:tool_retry_backoff_ms],
@@ -350,7 +335,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
         thread: Thread.new(system_prompt: config[:system_prompt]),
         run_thread: nil,
         pending_tool_calls: [],
-        final_answer: nil,
         result: nil,
         current_llm_call_id: nil,
         termination_reason: nil,
@@ -445,9 +429,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
 
       @steer ->
         process_steer(agent, params)
-
-      @request_error ->
-        process_request_error(agent, params)
 
       @register_tool ->
         process_register_tool(agent, params)
@@ -708,21 +689,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
         end
     end
   end
-
-  defp process_request_error(agent, %{request_id: request_id, reason: reason, message: message}) do
-    state = StratState.get(agent, %{})
-
-    new_state =
-      Map.put(state, :last_request_error, %{
-        request_id: request_id,
-        reason: reason,
-        message: message
-      })
-
-    {put_strategy_state(agent, new_state), []}
-  end
-
-  defp process_request_error(agent, _params), do: {agent, []}
 
   defp process_register_tool(agent, %{tool_module: module}) when is_atom(module) do
     state = StratState.get(agent, %{})
@@ -1767,7 +1733,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
       tool_timeout_ms: Keyword.get(opts, :tool_timeout_ms, 15_000),
       tool_max_retries: Keyword.get(opts, :tool_max_retries, 1),
       tool_retry_backoff_ms: Keyword.get(opts, :tool_retry_backoff_ms, 200),
-      runtime_adapter: true,
       runtime_task_supervisor: Keyword.get(opts, :runtime_task_supervisor),
       observability:
         Map.merge(

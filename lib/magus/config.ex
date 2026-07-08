@@ -25,8 +25,7 @@ defmodule Magus.Config do
 
       # config/config.exs
       config :magus, :agents,
-        conversation_idle_timeout: 10 * 60 * 1000,
-        memory_idle_timeout: 60 * 60 * 1000
+        conversation_idle_timeout: 10 * 60 * 1000
   """
 
   # =============================================================================
@@ -34,35 +33,15 @@ defmodule Magus.Config do
   # =============================================================================
 
   @doc """
-  Returns the idle timeout for the given agent type.
+  Returns the idle timeout for conversation agents.
 
-  After this duration of inactivity, the agent will hibernate to PostgreSQL.
-
-  ## Agent Types
-
-  - `:conversation` - 5 minutes (frequent access expected)
-  - `:memory` - 30 minutes (persists across conversations)
-  - `:input` - 10 minutes (integration message processing)
-
-  ## Examples
-
-      iex> Magus.Config.agent_idle_timeout(:conversation)
-      300_000
-
-      iex> Magus.Config.agent_idle_timeout(:memory)
-      1_800_000
+  After this duration without an attachment (open viewer or in-flight run),
+  the agent hibernates to PostgreSQL. Active runs hold an attachment, so an
+  agent is never hibernated mid-turn by this timeout.
   """
-  @spec agent_idle_timeout(:conversation | :memory | :input) :: pos_integer()
+  @spec agent_idle_timeout(:conversation) :: pos_integer()
   def agent_idle_timeout(:conversation) do
     get(:agents, :conversation_idle_timeout, 5 * 60 * 1000)
-  end
-
-  def agent_idle_timeout(:memory) do
-    get(:agents, :memory_idle_timeout, 30 * 60 * 1000)
-  end
-
-  def agent_idle_timeout(:input) do
-    get(:agents, :input_idle_timeout, 10 * 60 * 1000)
   end
 
   @doc """

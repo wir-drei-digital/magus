@@ -128,7 +128,21 @@ config :magus, :agents,
   # detected by the per-request chunk-gap receive_timeout (10 min), so this is
   # only a generous backstop; long reasoning phases (e.g. GLM) stream well past
   # the old 5-minute value and must not be cut off.
-  llm_stream_timeout_ms: 1_800_000
+  llm_stream_timeout_ms: 1_800_000,
+  # Transient LLM errors (408/429/5xx, transport failures, timeouts) are
+  # retried with exponential backoff (base * 2^attempt) before failing the
+  # turn. Set max retries to 0 to disable.
+  llm_transient_max_retries: 3,
+  llm_transient_retry_backoff_ms: 1_000,
+  # Liveness ticker for in-flight turns (ReAct runner + media generation):
+  # touches AgentRun heartbeats and broadcasts turn.keepalive so silent
+  # phases (long tools, unstreamed thinking) don't read as a dead agent.
+  turn_keepalive_interval_ms: 15_000,
+  # ReAct checkpoint tokens serialize the whole runtime state at every
+  # LLM/tool boundary; nothing consumes them until the checkpoint-resume plan
+  # (docs/superpowers/plans/2026-07-08-checkpoint-resume.md) is executed, so
+  # emission stays off.
+  emit_checkpoints: false
 
 config :magus, Oban,
   engine: Oban.Engines.Basic,
