@@ -271,6 +271,147 @@ defmodule Magus.Agents.Strategies.ReactStrategy.RunnerLifecycleTest do
     end
   end
 
+  describe "transient LLM error retry" do
+    setup do
+      original = Application.get_env(:magus, :agents, [])
+
+      Application.put_env(
+        :magus,
+        :agents,
+        Keyword.merge(original, llm_transient_max_retries: 2, llm_transient_retry_backoff_ms: 1)
+      )
+
+      on_exit(fn -> Application.put_env(:magus, :agents, original) end)
+      :ok
+    end
+
+    test "a transient provider error is retried and the turn completes" do
+      Magus.Test.Mocks.LLMMock
+      |> expect(:stream_text, fn _model, _messages, _opts ->
+        {:error, %{status: 429, message: "rate limited"}}
+      end)
+      |> expect(:stream_text, fn _model, _messages, _opts ->
+        MockResponses.stream_text_response("recovered")
+      end)
+
+      config =
+        Config.new(%{
+          model: "mock:test-model",
+          tools: [],
+          max_iterations: 5,
+          streaming: true
+        })
+
+      events =
+        Runner.stream("q", config, request_id: "req_retry1", run_id: "run_retry1")
+        |> Enum.to_list()
+
+      completed = Enum.find(events, &(&1.kind == :request_completed))
+      assert completed, "expected the turn to complete after a retry"
+      assert completed.data.result == "recovered"
+    end
+
+    test "a non-retryable provider error fails the turn immediately" do
+      Magus.Test.Mocks.LLMMock
+      |> expect(:stream_text, fn _model, _messages, _opts ->
+        {:error, %{error: %{message: "invalid api key", type: "auth_error"}}}
+      end)
+
+      config =
+        Config.new(%{
+          model: "mock:test-model",
+          tools: [],
+          max_iterations: 5,
+          streaming: true
+        })
+
+      events =
+        Runner.stream("q", config, request_id: "req_retry2", run_id: "run_retry2")
+        |> Enum.to_list()
+
+      assert Enum.any?(events, &(&1.kind == :request_failed))
+      refute Enum.any?(events, &(&1.kind == :request_completed))
+    end
+  end
+
+  describe "max_iterations wrap-up" do
+    test "hitting the iteration limit produces a real final answer, not a canned string" do
+      Magus.Test.Mocks.LLMMock
+      |> expect(:stream_text, fn _model, _messages, _opts ->
+        MockResponses.stream_text_with_tool_call("Working...", "quick_tool", %{})
+      end)
+      |> expect(:stream_text, fn _model, messages, opts ->
+        # Wrap-up call: no tools, with an iteration-limit instruction.
+        assert Keyword.get(opts, :tools, []) == []
+
+        assert Enum.any?(messages, fn msg ->
+                 content = msg[:content] || msg["content"]
+                 is_binary(content) and content =~ "iteration limit"
+               end)
+
+        MockResponses.stream_text_response("Here is where I got before the limit")
+      end)
+
+      config =
+        Config.new(%{
+          model: "mock:test-model",
+          tools: [__MODULE__.QuickTool],
+          max_iterations: 1,
+          streaming: true
+        })
+
+      events =
+        Runner.stream("Big task", config, request_id: "req_iter1", run_id: "run_iter1")
+        |> Enum.to_list()
+
+      completed = Enum.find(events, &(&1.kind == :request_completed))
+      assert completed.data.termination_reason == :max_iterations
+      assert completed.data.result == "Here is where I got before the limit"
+    end
+  end
+
+  describe "cancellation during a tool round" do
+    test "cancel kills the in-flight tool instead of waiting it out" do
+      test_pid = self()
+
+      stub(Magus.Test.Mocks.LLMMock, :stream_text, fn _model, _messages, _opts ->
+        MockResponses.stream_text_with_tool_call("Running...", "hanging_tool", %{})
+      end)
+
+      config =
+        Config.new(%{
+          model: "mock:test-model",
+          tools: [__MODULE__.HangingTool],
+          max_iterations: 5,
+          streaming: true,
+          # Far above the tool's 5s sleep: only cancellation can end it early.
+          tool_timeout_ms: 30_000,
+          tool_max_retries: 0,
+          tool_retry_backoff_ms: 0
+        })
+
+      consumer =
+        Task.async(fn ->
+          Runner.stream("q", config, request_id: "req_cancel1", run_id: "run_cancel1")
+          |> Enum.map(fn event ->
+            send(test_pid, {:ev, event.kind})
+            event
+          end)
+        end)
+
+      assert_receive {:ev, :tool_started}, 2_000
+
+      send(consumer.pid, {:react_stream_cancel, :user_cancelled})
+
+      # The 5s hanging tool must not be waited out.
+      result = Task.yield(consumer, 2_000)
+      assert result != nil, "cancellation did not interrupt the in-flight tool round"
+
+      {:ok, events} = result
+      assert Enum.any?(events, &(&1.kind == :request_cancelled))
+    end
+  end
+
   describe "runner chain teardown" do
     test "killing the stream consumer kills the coordinator task" do
       stub(Magus.Test.Mocks.LLMMock, :stream_text, fn _model, _messages, _opts ->

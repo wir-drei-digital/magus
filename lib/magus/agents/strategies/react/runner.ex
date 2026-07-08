@@ -182,27 +182,14 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
         {state, config, context} = run_pending_tool_round(state, owner, ref, config, context)
         run_loop(state, owner, ref, config, context)
 
-      # TODO: Better handling -> give LLMs a heads up that they exceeded maximum iterations.
       state.iteration > config.max_iterations ->
-        state
-        |> State.put_status(:completed)
-        |> State.put_result("Maximum iterations reached without a final answer.")
-        |> then(fn completed ->
-          {completed, _} =
-            emit_event(completed, owner, ref, :request_completed, %{
-              result: completed.result,
-              termination_reason: :max_iterations,
-              usage: completed.usage
-            })
-
-          completed
-        end)
+        run_wrap_up(state, owner, ref, config, context, :max_iterations)
 
       # Per-run token budget: once cumulative usage crosses the cap, give the
       # LLM exactly one tool-less wrap-up call instead of a hard stop, so
       # work-in-progress surfaces as a final answer.
       budget_exceeded?(state, context) ->
-        run_budget_wrap_up(state, owner, ref, config, context)
+        run_wrap_up(state, owner, ref, config, context, :budget_exceeded)
 
       true ->
         case run_llm_step(state, owner, ref, config, context) do
@@ -245,11 +232,24 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
   # :budget_exceeded so plugins can mark the AgentRun accordingly.
   # ---------------------------------------------------------------------------
 
-  @budget_wrap_up_instruction """
-  The token budget for this run is exhausted. Provide your best final answer \
-  now from the work completed so far. Do not request any tools. If the task \
-  is unfinished, summarize your progress and clearly state what remains.\
-  """
+  @wrap_up_instructions %{
+    budget_exceeded: """
+    The token budget for this run is exhausted. Provide your best final answer \
+    now from the work completed so far. Do not request any tools. If the task \
+    is unfinished, summarize your progress and clearly state what remains.\
+    """,
+    max_iterations: """
+    You have reached the iteration limit for this run. Provide your best final \
+    answer now from the work completed so far. Do not request any tools. If \
+    the task is unfinished, summarize your progress and clearly state what \
+    remains.\
+    """
+  }
+
+  @wrap_up_fallback_results %{
+    budget_exceeded: "Token budget exhausted before a final answer could be produced.",
+    max_iterations: "Maximum iterations reached without a final answer."
+  }
 
   defp budget_cap(context) when is_map(context) do
     cap = context[:max_tokens_per_run] || context["max_tokens_per_run"]
@@ -258,8 +258,8 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
 
   defp budget_cap(_context), do: nil
 
-  defp budget_wrap_up_mode?(context),
-    do: is_map(context) and context[:__budget_wrap_up__] == true
+  defp wrap_up_reason(context) when is_map(context), do: context[:__wrap_up_reason__]
+  defp wrap_up_reason(_context), do: nil
 
   defp budget_exceeded?(%State{} = state, context) do
     case budget_cap(context) do
@@ -277,14 +277,18 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
     end
   end
 
-  defp run_budget_wrap_up(%State{} = state, owner, ref, %Config{} = config, context) do
+  # One final tool-less LLM call so work-in-progress surfaces as a real
+  # answer when a run hits a resource stop (token budget, iteration limit).
+  # If even the wrap-up call fails, the turn still COMPLETES with a canned
+  # result rather than failing: the work done so far already happened.
+  defp run_wrap_up(%State{} = state, owner, ref, %Config{} = config, context, reason) do
     Logger.warning(
-      "[Runner] Token budget exceeded (cap #{inspect(budget_cap(context))}, " <>
-        "usage #{inspect(state.usage)}); running tool-less wrap-up step"
+      "[Runner] #{reason} for run #{state.run_id} (usage #{inspect(state.usage)}); " <>
+        "running tool-less wrap-up step"
     )
 
-    state = apply_steer_texts(state, [@budget_wrap_up_instruction])
-    context = Map.put(context, :__budget_wrap_up__, true)
+    state = apply_steer_texts(state, [Map.fetch!(@wrap_up_instructions, reason)])
+    context = Map.put(context, :__wrap_up_reason__, reason)
 
     case run_llm_step(state, owner, ref, config, context) do
       {:final_answer, completed} ->
@@ -295,8 +299,27 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
       {:tool_calls, state, _tool_calls} ->
         state
 
-      {:error, state, reason, error_type} ->
-        fail_state(state, owner, ref, reason, error_type)
+      {:error, state, error_reason, _error_type} ->
+        Logger.warning(
+          "[Runner] wrap-up call failed (#{inspect(error_reason)}); " <>
+            "completing with fallback result"
+        )
+
+        fallback = Map.fetch!(@wrap_up_fallback_results, reason)
+
+        completed =
+          state
+          |> State.put_status(:completed)
+          |> State.put_result(fallback)
+
+        {completed, _} =
+          emit_event(completed, owner, ref, :request_completed, %{
+            result: fallback,
+            termination_reason: reason,
+            usage: completed.usage
+          })
+
+        completed
     end
   end
 
@@ -441,9 +464,9 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
 
         {state, _token} = emit_checkpoint(state, owner, ref, config, :after_llm)
 
-        wrap_up? = budget_wrap_up_mode?(context)
+        wrap_up_reason = wrap_up_reason(context)
 
-        case not wrap_up? and Turn.needs_tools?(turn) do
+        case is_nil(wrap_up_reason) and Turn.needs_tools?(turn) do
           true ->
             {:tool_calls, State.put_status(state, :awaiting_tools), turn.tool_calls}
 
@@ -455,14 +478,14 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
 
             completion_data = %{
               result: turn.text,
-              termination_reason: if(wrap_up?, do: :budget_exceeded, else: :final_answer),
+              termination_reason: wrap_up_reason || :final_answer,
               usage: completed.usage
             }
 
             # The Event kind enum is closed upstream, so the budget outcome
             # rides inside request_completed instead of a dedicated kind.
             completion_data =
-              if wrap_up? do
+              if wrap_up_reason == :budget_exceeded do
                 Map.put(completion_data, :max_tokens_per_run, budget_cap(context))
               else
                 completion_data
@@ -481,7 +504,7 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
   end
 
   defp request_turn(%State{} = state, owner, ref, %Config{} = config, messages, llm_opts) do
-    request_turn(state, owner, ref, config, messages, llm_opts, 0)
+    request_turn(state, owner, ref, config, messages, llm_opts, 0, 0)
   end
 
   # Re-asks the LLM when it returns a blank final answer (no text + no tool
@@ -490,7 +513,22 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
   # end a turn with only reasoning, or with nothing at all. Bounded by
   # `:empty_response_max_retries` with an exponential backoff so a model that
   # is genuinely silent eventually surfaces rather than looping forever.
-  defp request_turn(%State{} = state, owner, ref, %Config{} = config, messages, llm_opts, attempt) do
+  #
+  # Transient provider/transport errors (429, 5xx, timeouts, connection
+  # drops) get their own bounded retry with exponential backoff, so one
+  # network blip deep into a long run does not kill the whole turn. Safe to
+  # retry: an LLM request has no side effects. A retry re-emits :llm_started
+  # so any partially streamed text from the failed attempt is reset in the UI.
+  defp request_turn(
+         %State{} = state,
+         owner,
+         ref,
+         %Config{} = config,
+         messages,
+         llm_opts,
+         attempt,
+         transient_attempt
+       ) do
     result =
       case config.streaming do
         false ->
@@ -511,13 +549,92 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
           )
 
           empty_response_backoff(attempt)
-          request_turn(next_state, owner, ref, config, messages, llm_opts, attempt + 1)
+          request_turn(next_state, owner, ref, config, messages, llm_opts, attempt + 1, 0)
         else
           tag_empty_retries(result, attempt)
         end
 
+      {:error, %State{} = error_state, reason, _error_type} ->
+        max_transient = llm_transient_max_retries()
+
+        if transient_llm_error?(reason) and transient_attempt < max_transient do
+          Logger.warning(
+            "[Runner] Transient LLM error from #{inspect(config.model)} " <>
+              "(attempt #{transient_attempt + 1}/#{max_transient + 1}): " <>
+              "#{inspect(reason)}; retrying"
+          )
+
+          llm_transient_backoff(transient_attempt)
+
+          {retry_state, _} =
+            emit_event(error_state, owner, ref, :llm_started, %{
+              call_id: error_state.llm_call_id,
+              model: config.model,
+              transient_retry: transient_attempt + 1
+            })
+
+          request_turn(
+            retry_state,
+            owner,
+            ref,
+            config,
+            messages,
+            llm_opts,
+            attempt,
+            transient_attempt + 1
+          )
+        else
+          result
+        end
+
       _ ->
         tag_empty_retries(result, attempt)
+    end
+  end
+
+  # Conservative transient-error classification: known retryable HTTP
+  # statuses, transport-level failures, and timeout shapes. Everything else
+  # (auth, validation, quota exhaustion without retry-after semantics) fails
+  # the turn immediately.
+  @transient_reason_atoms [:timeout, :closed, :econnrefused, :econnreset, :nxdomain]
+
+  defp transient_llm_error?(reason) when is_atom(reason) and not is_nil(reason),
+    do: reason in @transient_reason_atoms
+
+  defp transient_llm_error?(%_{} = reason) do
+    module_name = Atom.to_string(reason.__struct__)
+
+    String.contains?(module_name, "Transport") or
+      Map.get(reason, :reason) in @transient_reason_atoms or
+      transient_status_value?(Map.get(reason, :status))
+  end
+
+  defp transient_llm_error?(reason) when is_map(reason) do
+    transient_status_value?(reason[:status] || reason["status"]) or
+      (reason[:type] || reason["type"]) in [:timeout, ReqLLM.Error.API.Stream]
+  end
+
+  defp transient_llm_error?(_reason), do: false
+
+  defp transient_status_value?(status),
+    do: is_integer(status) and (status in [408, 429] or status in 500..504)
+
+  defp llm_transient_max_retries do
+    :magus
+    |> Application.get_env(:agents, [])
+    |> Keyword.get(:llm_transient_max_retries, 3)
+    |> normalize_retry_count()
+  end
+
+  defp llm_transient_backoff(transient_attempt) do
+    base =
+      :magus
+      |> Application.get_env(:agents, [])
+      |> Keyword.get(:llm_transient_retry_backoff_ms, 1_000)
+      |> normalize_backoff()
+
+    if base > 0 do
+      Process.sleep(base * trunc(:math.pow(2, transient_attempt)))
     end
   end
 
@@ -569,7 +686,7 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
   defp llm_stream_timeout_ms do
     :magus
     |> Application.get_env(:agents, [])
-    |> Keyword.get(:llm_stream_timeout_ms, 300_000)
+    |> Keyword.get(:llm_stream_timeout_ms, 1_800_000)
     |> normalize_timeout()
   end
 
@@ -859,10 +976,10 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
     Map.get(map, key, Map.get(map, Atom.to_string(key)))
   end
 
-  # The budget wrap-up call must not offer tools: the model is being asked to
+  # The wrap-up call must not offer tools: the model is being asked to
   # answer from what it already has.
   defp maybe_strip_tools_for_wrap_up(opts, context) do
-    if budget_wrap_up_mode?(context) do
+    if wrap_up_reason(context) do
       opts
       |> Keyword.delete(:tools)
       |> Keyword.delete(:tool_choice)
@@ -984,23 +1101,31 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
         )
       end)
 
-    results =
-      pending
-      |> Task.async_stream(
-        fn call -> execute_tool_with_retries(call, config, context) end,
-        ordered: true,
-        max_concurrency: config.tool_exec.concurrency,
-        timeout: :infinity
-      )
-      |> Enum.zip(pending)
-      |> Enum.map(fn
-        {{:ok, result}, _call} ->
-          result
+    # The round runs in its own task so this process stays responsive to
+    # cancellation: a cancel arriving mid-round brutally kills the in-flight
+    # tool tasks instead of waiting them out (a hanging tool would otherwise
+    # pin the turn until its timeout despite the user having cancelled).
+    round_task =
+      Task.async(fn ->
+        pending
+        |> Task.async_stream(
+          fn call -> execute_tool_with_retries(call, config, context) end,
+          ordered: true,
+          max_concurrency: config.tool_exec.concurrency,
+          timeout: :infinity
+        )
+        |> Enum.zip(pending)
+        |> Enum.map(fn
+          {{:ok, result}, _call} ->
+            result
 
-        {{:exit, reason}, call} ->
-          error = {:error, %{type: :task_exit, reason: inspect(reason)}}
-          {call, error, 1, 0}
+          {{:exit, reason}, call} ->
+            error = {:error, %{type: :task_exit, reason: inspect(reason)}}
+            {call, error, 1, 0}
+        end)
       end)
+
+    results = await_tool_round(round_task, state, ref)
 
     {state, thread} =
       Enum.reduce(results, {state, state.thread}, fn
@@ -1045,6 +1170,21 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
 
     {state, _token} = emit_checkpoint(state, owner, ref, config, :after_tools)
     {state, config, context}
+  end
+
+  defp await_tool_round(%Task{ref: task_ref} = round_task, state, ref) do
+    receive do
+      {:react_cancel, ^ref, reason} ->
+        Task.shutdown(round_task, :brutal_kill)
+        throw({:cancelled, state, reason})
+
+      {^task_ref, results} ->
+        Process.demonitor(task_ref, [:flush])
+        results
+
+      {:DOWN, ^task_ref, :process, _pid, down_reason} ->
+        exit({:tool_round_crashed, down_reason})
+    end
   end
 
   defp run_pending_tool_round(%State{} = state, owner, ref, %Config{} = config, context) do

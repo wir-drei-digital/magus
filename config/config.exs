@@ -124,9 +124,11 @@ config :magus, :agents,
   # exponential backoff (base * 2^attempt). Set max retries to 0 to disable.
   empty_response_max_retries: 3,
   empty_response_retry_backoff_ms: 500,
-  # Wall-clock ceiling for consuming a single streamed LLM turn. Guards against
-  # a provider stream that stalls without ever closing (a "stuck" turn).
-  llm_stream_timeout_ms: 300_000
+  # Wall-clock ceiling for consuming a single streamed LLM turn. Hangs are
+  # detected by the per-request chunk-gap receive_timeout (10 min), so this is
+  # only a generous backstop; long reasoning phases (e.g. GLM) stream well past
+  # the old 5-minute value and must not be cut off.
+  llm_stream_timeout_ms: 1_800_000
 
 config :magus, Oban,
   engine: Oban.Engines.Basic,

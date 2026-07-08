@@ -1445,7 +1445,11 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
       streaming: config[:streaming],
       req_http_options: req_http_options,
       llm_opts: llm_opts,
-      llm_timeout_ms: config[:llm_timeout_ms] || 300_000,
+      # Per-request receive_timeout: the max gap between stream chunks before
+      # the request is treated as hung. 10 minutes tolerates reasoning models
+      # that think silently before the first chunk; true hangs are still
+      # detected within this window and retried by the runner.
+      llm_timeout_ms: config[:llm_timeout_ms] || 600_000,
       tool_timeout_ms: config[:tool_timeout_ms],
       tool_max_retries: config[:tool_max_retries],
       tool_retry_backoff_ms: config[:tool_retry_backoff_ms],
