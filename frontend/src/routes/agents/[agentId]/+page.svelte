@@ -218,13 +218,11 @@
 	// Edit form, seeded whenever a memory is opened.
 	let editSummary = $state('');
 	let editKind = $state('general');
-	let editConfidence = $state(100);
 	$effect(() => {
 		const m = selectedMemory;
 		if (m) {
 			editSummary = m.summary ?? '';
 			editKind = m.kind;
-			editConfidence = Math.round(m.confidence * 100);
 		}
 	});
 
@@ -237,13 +235,12 @@
 		});
 	}
 
-	async function saveMemory(summary: string, kind: string, confidence: number) {
+	async function saveMemory(summary: string, kind: string) {
 		if (!selectedMemory) return;
 		const result = await updateAgentMemory({
 			memoryId: selectedMemory.id,
 			summary: summary.trim() || null,
-			kind,
-			confidence
+			kind
 		});
 		if (result.success) {
 			selectedMemory = result.data;
@@ -986,15 +983,8 @@
 									{/each}
 								</select>
 							</Field>
-							<Field label="Confidence: {editConfidence}%">
-								<input type="range" min="0" max="100" bind:value={editConfidence} class="w-64" />
-							</Field>
 							<div class="flex items-center gap-3 pt-1">
-								<Button
-									onclick={() => void saveMemory(editSummary, editKind, editConfidence / 100)}
-								>
-									Save changes
-								</Button>
+								<Button onclick={() => void saveMemory(editSummary, editKind)}>Save changes</Button>
 								<Button
 									variant="destructive"
 									data-testid="delete-memory"
@@ -1028,7 +1018,7 @@
 								{#each memories as memory (memory.id)}
 									<button
 										type="button"
-										class="flex items-start justify-between gap-2 rounded-lg bg-secondary/60 px-3 py-2 text-left transition-colors hover:bg-accent/60"
+										class="flex items-start gap-2 rounded-lg bg-secondary/60 px-3 py-2 text-left transition-colors hover:bg-accent/60"
 										onclick={() => (selectedMemory = memory)}
 									>
 										<span class="min-w-0">
@@ -1047,9 +1037,6 @@
 													{memory.summary}
 												</span>
 											{/if}
-										</span>
-										<span class="shrink-0 text-xs text-muted-foreground">
-											{Math.round(memory.confidence * 100)}%
 										</span>
 									</button>
 								{/each}

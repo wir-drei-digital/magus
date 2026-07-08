@@ -1442,15 +1442,13 @@ export type MCPServerCredentialAttributesOnlySchema = {
 // Memory Schema
 export type MemoryResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "summary" | "content" | "scope" | "confidence" | "kind" | "structuredData" | "updatedAt" | "workspaceId";
+  __primitiveFields: "id" | "name" | "summary" | "content" | "scope" | "kind" | "updatedAt" | "workspaceId";
   id: UUIDv7;
   name: string;
   summary: string | null;
   content: Record<string, any> | null;
   scope: "agent" | "local" | "user";
-  confidence: number;
   kind: "fact" | "general" | "goal" | "habit" | "hypothesis" | "observation" | "preference" | "reflection" | "summary" | "topic";
-  structuredData: Record<string, any> | null;
   updatedAt: UtcDateTimeUsec;
   workspaceId: UUID | null;
   workspace: { __type: "Relationship"; __resource: WorkspaceResourceSchema | null; };
@@ -1460,15 +1458,13 @@ export type MemoryResourceSchema = {
 
 export type MemoryAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "name" | "summary" | "content" | "scope" | "confidence" | "kind" | "structuredData" | "updatedAt" | "workspaceId";
+  __primitiveFields: "id" | "name" | "summary" | "content" | "scope" | "kind" | "updatedAt" | "workspaceId";
   id: UUIDv7;
   name: string;
   summary: string | null;
   content: Record<string, any> | null;
   scope: "agent" | "local" | "user";
-  confidence: number;
   kind: "fact" | "general" | "goal" | "habit" | "hypothesis" | "observation" | "preference" | "reflection" | "summary" | "topic";
-  structuredData: Record<string, any> | null;
   updatedAt: UtcDateTimeUsec;
   workspaceId: UUID | null;
 };
@@ -5572,27 +5568,10 @@ export type MemoryFilterInput = {
     in?: Array<"agent" | "local" | "user">;
   };
 
-  confidence?: {
-    eq?: number;
-    notEq?: number;
-    greaterThan?: number;
-    greaterThanOrEqual?: number;
-    lessThan?: number;
-    lessThanOrEqual?: number;
-    in?: Array<number>;
-  };
-
   kind?: {
     eq?: "fact" | "general" | "goal" | "habit" | "hypothesis" | "observation" | "preference" | "reflection" | "summary" | "topic";
     notEq?: "fact" | "general" | "goal" | "habit" | "hypothesis" | "observation" | "preference" | "reflection" | "summary" | "topic";
     in?: Array<"fact" | "general" | "goal" | "habit" | "hypothesis" | "observation" | "preference" | "reflection" | "summary" | "topic">;
-  };
-
-  structuredData?: {
-    eq?: Record<string, any>;
-    notEq?: Record<string, any>;
-    in?: Array<Record<string, any>>;
-    isNil?: boolean;
   };
 
   updatedAt?: {
@@ -7103,7 +7082,7 @@ export type MCPServerFilterField = (typeof mCPServerFilterFields)[number];
 export const mCPServerCredentialFilterFields = ["id", "authKind", "oauthExpiresAt", "status", "mcpServerId", "userId", "mcpServer", "user"] as const;
 export type MCPServerCredentialFilterField = (typeof mCPServerCredentialFilterFields)[number];
 
-export const memoryFilterFields = ["id", "name", "summary", "content", "scope", "confidence", "kind", "structuredData", "updatedAt", "workspaceId", "workspace"] as const;
+export const memoryFilterFields = ["id", "name", "summary", "content", "scope", "kind", "updatedAt", "workspaceId", "workspace"] as const;
 export type MemoryFilterField = (typeof memoryFilterFields)[number];
 
 export const userProfileFilterFields = ["id", "document", "tokenEstimate", "lastDistilledAt"] as const;
@@ -7269,7 +7248,7 @@ export type MCPServerSortField = (typeof mCPServerSortFields)[number];
 export const mCPServerCredentialSortFields = ["id", "authKind", "oauthExpiresAt", "status", "mcpServerId", "userId"] as const;
 export type MCPServerCredentialSortField = (typeof mCPServerCredentialSortFields)[number];
 
-export const memorySortFields = ["id", "name", "summary", "content", "scope", "confidence", "kind", "structuredData", "updatedAt", "workspaceId"] as const;
+export const memorySortFields = ["id", "name", "summary", "content", "scope", "kind", "updatedAt", "workspaceId"] as const;
 export type MemorySortField = (typeof memorySortFields)[number];
 
 export const userProfileSortFields = ["id", "document", "tokenEstimate", "lastDistilledAt"] as const;

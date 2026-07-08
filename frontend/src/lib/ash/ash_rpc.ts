@@ -2014,7 +2014,6 @@ export type UpdateAgentMemoryInput = {
   memoryId: UUID;
   summary?: string | null;
   kind: string;
-  confidence: number;
 };
 
 export type InferUpdateAgentMemoryResult = Record<string, any>;
@@ -9882,40 +9881,32 @@ export async function upsertMcpStaticHeaders<Fields extends UpsertMcpStaticHeade
 }
 
 
-export type DeactivateUserMemoryFields = UnifiedFieldSelection<MemoryResourceSchema>[];
-
-export type InferDeactivateUserMemoryResult<
-  Fields extends DeactivateUserMemoryFields | undefined,
-> = InferResult<MemoryResourceSchema, Fields>;
-
-export type DeactivateUserMemoryResult<Fields extends DeactivateUserMemoryFields | undefined = undefined> = | { success: true; data: InferDeactivateUserMemoryResult<Fields>; }
+export type DestroyUserMemoryResult = | { success: true; data: {}; }
 | { success: false; errors: AshRpcError[]; }
 
 ;
 
 /**
- * Update an existing Memory
+ * Delete a Memory
  *
- * @ashActionType :update
+ * @ashActionType :destroy
  */
-export async function deactivateUserMemory<Fields extends DeactivateUserMemoryFields | undefined = undefined>(
+export async function destroyUserMemory(
   config: {
   tenant?: string;
   identity: UUIDv7;
-  fields?: Fields;
   headers?: Record<string, string>;
   fetchOptions?: RequestInit;
   customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 }
-): Promise<DeactivateUserMemoryResult<Fields extends undefined ? [] : Fields>> {
+): Promise<DestroyUserMemoryResult> {
   const payload = {
-    action: "deactivate_user_memory",
+    action: "destroy_user_memory",
     ...(config.tenant !== undefined && { tenant: config.tenant }),
-    identity: config.identity,
-    ...(config.fields !== undefined && { fields: config.fields })
+    identity: config.identity
   };
 
-  return executeActionRpcRequest<DeactivateUserMemoryResult<Fields extends undefined ? [] : Fields>>(
+  return executeActionRpcRequest<DestroyUserMemoryResult>(
     payload,
     config
   );

@@ -6,7 +6,7 @@
 		updateMemorySetting,
 		updateProfileSetting,
 		listUserMemories,
-		deactivateUserMemory,
+		destroyUserMemory,
 		getUserProfile,
 		clearUserProfile,
 		type UserMemory,
@@ -68,11 +68,11 @@
 	async function removeMemory(m: UserMemory) {
 		const ok = await confirmAction({
 			title: 'Delete this memory?',
-			description: `"${m.name}" will be removed from your memory.`,
+			description: `"${m.name}" will be permanently deleted.`,
 			confirmLabel: 'Delete'
 		});
 		if (!ok) return;
-		const result = await deactivateUserMemory(m.id);
+		const result = await destroyUserMemory(m.id);
 		if (result.success) memories = memories.filter((x) => x.id !== m.id);
 	}
 
@@ -214,8 +214,6 @@
 								<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
 									<dt class="text-muted-foreground">Scope</dt>
 									<dd>{m.scope}</dd>
-									<dt class="text-muted-foreground">Confidence</dt>
-									<dd>{Math.round(m.confidence * 100)}%</dd>
 								</dl>
 								{#if hasContent(m)}
 									<p class="mt-2 text-xs text-muted-foreground">Content</p>

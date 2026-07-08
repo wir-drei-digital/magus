@@ -340,7 +340,6 @@ export type UserMemory = {
 	summary: string | null;
 	kind: string | null;
 	scope: 'agent' | 'local' | 'user';
-	confidence: number;
 	content: Record<string, unknown> | null;
 	updatedAt: string | null;
 };
@@ -351,7 +350,6 @@ const USER_MEMORY_FIELDS: rpc.ListUserMemoriesFields = [
 	'summary',
 	'kind',
 	'scope',
-	'confidence',
 	'content',
 	'updatedAt'
 ];
@@ -366,12 +364,13 @@ export async function listUserMemories(
 	return { success: true, data: (result.data ?? []) as UserMemory[] };
 }
 
-export async function deactivateUserMemory(memoryId: string): Promise<RpcResult<{ id: string }>> {
-	const result = await run<Record<string, unknown> | null>((opts) =>
-		rpc.deactivateUserMemory({ identity: memoryId, fields: ['id'], ...opts })
+/** Hard-deletes the memory (no soft-delete: destroy returns no fields). */
+export async function destroyUserMemory(memoryId: string): Promise<RpcResult<{ id: string }>> {
+	const result = await run<Record<string, never> | null>((opts) =>
+		rpc.destroyUserMemory({ identity: memoryId, ...opts })
 	);
 	if (!result.success) return result;
-	return { success: true, data: { id: String((result.data ?? {}).id ?? memoryId) } };
+	return { success: true, data: { id: memoryId } };
 }
 
 export type UserProfileDoc = {
@@ -3441,13 +3440,12 @@ export async function listAvailableSkills(): Promise<RpcResult<AvailableSkill[]>
 
 // ─── Agent Knowledge section: memories + brain/collection grants ─────────────
 
-/** An agent-scoped memory (confidence is 0..1). Generic action → snake-ish keys. */
+/** An agent-scoped memory. Generic action → snake-ish keys. */
 export type AgentMemory = {
 	id: string;
 	name: string;
 	summary: string | null;
 	kind: string;
-	confidence: number;
 };
 
 function toAgentMemory(m: Record<string, unknown>): AgentMemory {
@@ -3455,8 +3453,7 @@ function toAgentMemory(m: Record<string, unknown>): AgentMemory {
 		id: String(m.id ?? ''),
 		name: String(m.name ?? ''),
 		summary: typeof m.summary === 'string' ? m.summary : null,
-		kind: String(m.kind ?? 'general'),
-		confidence: typeof m.confidence === 'number' ? m.confidence : 1
+		kind: String(m.kind ?? 'general')
 	};
 }
 
@@ -3472,7 +3469,6 @@ export async function updateAgentMemory(input: {
 	memoryId: string;
 	summary: string | null;
 	kind: string;
-	confidence: number;
 }): Promise<RpcResult<AgentMemory>> {
 	const result = await run<Record<string, unknown> | null>((opts) =>
 		rpc.updateAgentMemory({ input, ...opts })
