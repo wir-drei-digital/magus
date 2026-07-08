@@ -2,8 +2,7 @@
  * Collapse + edit/dirty/save state for the brain constitution panel (the
  * `brain.instructions` field: a brain-wide, always-on markdown guide the
  * agent reads on every turn). A power-user affordance, so it defaults
- * collapsed; the collapsed choice persists per brain in `localStorage`
- * (mirrors `TaskBottomBarStore`).
+ * collapsed; the collapsed choice persists per brain in `localStorage`.
  *
  * The save itself is injected (`save: (draft) => Promise<boolean>`) rather
  * than calling the RPC directly, so this module stays pure logic: the view

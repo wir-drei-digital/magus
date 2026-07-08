@@ -10,13 +10,15 @@
 	} from '$lib/ash/api';
 	import { outlineFromDoc, type OutlineEntry } from '$lib/brain/outline';
 	import { relativeTime } from '$lib/time';
+	import TaskBoard from '$lib/components/plan/task-board.svelte';
 
 	let {
 		pageId,
 		backlinks,
 		getDoc,
 		revision = 0,
-		onViewVersion
+		onViewVersion,
+		showTasks = false
 	}: {
 		pageId: string;
 		backlinks: PageBacklink[];
@@ -26,15 +28,26 @@
 		revision?: number;
 		/** Opens the diff overlay for a version (classic view_version). */
 		onViewVersion?: (versionId: string) => void;
+		/**
+		 * Content pages (kind === 'page') get a Tasks tab that hosts the task
+		 * board. Tasks live on the page, so the board docks inside this bar
+		 * instead of a second bottom bar. Templates and other kinds omit it.
+		 */
+		showTasks?: boolean;
 	} = $props();
 
-	type Tab = 'outline' | 'sources' | 'related' | 'activity';
-	const TABS: { id: Tab; label: string }[] = [
+	type Tab = 'tasks' | 'outline' | 'sources' | 'related' | 'activity';
+	// The document tabs keep their order; Tasks leads when present because it's
+	// the interactive panel, so expanding the bar opens it first on a content page.
+	const DOC_TABS: { id: Tab; label: string }[] = [
 		{ id: 'outline', label: 'Outline' },
 		{ id: 'sources', label: 'Sources' },
 		{ id: 'related', label: 'Related' },
 		{ id: 'activity', label: 'Activity' }
 	];
+	const tabs = $derived(
+		showTasks ? [{ id: 'tasks' as Tab, label: 'Tasks' }, ...DOC_TABS] : DOC_TABS
+	);
 
 	// Classic parity: collapsed until a tab is clicked.
 	let activeTab = $state<Tab | null>(null);
@@ -99,7 +112,7 @@
 
 <div class="flex shrink-0 flex-col border-t" data-testid="brain-bottom-bar">
 	<div class="flex items-center gap-1 px-3">
-		{#each TABS as tab (tab.id)}
+		{#each tabs as tab (tab.id)}
 			<button
 				type="button"
 				class="border-b-2 px-2 py-1.5 text-xs transition-colors {activeTab === tab.id
@@ -117,7 +130,7 @@
 			type="button"
 			class="rounded p-1 text-muted-foreground hover:text-foreground"
 			aria-label={activeTab ? 'Collapse panel' : 'Expand panel'}
-			onclick={() => (activeTab = activeTab ? null : 'outline')}
+			onclick={() => (activeTab = activeTab ? null : tabs[0].id)}
 		>
 			{#if activeTab}
 				<ChevronDown class="size-3.5" />
@@ -127,7 +140,13 @@
 		</button>
 	</div>
 
-	{#if activeTab}
+	{#if activeTab === 'tasks'}
+		<!-- The board manages its own header, summary, and internal scroll; cap
+		     the dock height so a long list never pushes the editor off-screen. -->
+		<div class="flex max-h-[min(50vh,420px)] min-h-0 flex-col" data-testid="brain-tasks">
+			<TaskBoard brainPageId={pageId} />
+		</div>
+	{:else if activeTab}
 		<div class="wb-scroll h-[180px] overflow-y-auto border-t px-3 py-2">
 			{#if activeTab === 'outline'}
 				{#if outline.length === 0}
