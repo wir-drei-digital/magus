@@ -2,16 +2,17 @@ defmodule Magus.Agents.Actions.DistillUserProfile do
   @moduledoc """
   Rewrites the distilled user profile document (Hermes-style working memory).
 
-  Reads the current document, the bucket's active user-scope memories, and
-  pending agent notes, then asks the LLM to REWRITE the whole document under
-  a hard token cap. Rewriting (not merging) is the mechanism that resolves
-  contradictions and drops completed or one-off information. Runs from the
-  daily ConsolidateMemories pass; safe to call ad hoc.
+  Reads the current document, recent local memories from the bucket's
+  conversations (since the last distillation), and pending agent notes, then
+  asks the LLM to REWRITE the whole document under a hard token cap.
+  Rewriting (not merging) is the mechanism that resolves contradictions and
+  drops completed or one-off information. Runs from the daily
+  ConsolidateMemories pass; safe to call ad hoc.
   """
 
   use Jido.Action,
     name: "distill_user_profile",
-    description: "Rewrites the distilled user profile document from user-scope memories",
+    description: "Rewrites the distilled user profile document from recent local memories",
     schema: [
       user_id: [type: :string, required: true, doc: "User ID"],
       workspace_id: [
@@ -30,7 +31,7 @@ defmodule Magus.Agents.Actions.DistillUserProfile do
 
   @actor %AiAgent{}
   @max_chars 3200
-  @max_memories 50
+  @max_memories 100
 
   @output_schema %{
     "type" => "object",
@@ -51,7 +52,7 @@ defmodule Magus.Agents.Actions.DistillUserProfile do
     model = params["model"] || Config.extraction_model()
 
     with {:ok, profile} <- get_or_create_profile(user_id, workspace_id),
-         memories = load_memories(user_id, workspace_id),
+         memories = load_memories(user_id, workspace_id, profile.last_distilled_at),
          {:ok, document, usage} <- generate_document(model, profile, memories),
          {:ok, updated} <-
            Memory.set_profile_document(profile, %{document: document}, actor: @actor) do
@@ -87,11 +88,35 @@ defmodule Magus.Agents.Actions.DistillUserProfile do
     end
   end
 
-  defp load_memories(user_id, workspace_id) do
-    actor = %Magus.Accounts.User{id: user_id}
+  # Local memories are the distiller's raw feed: recent rows from the bucket's
+  # conversations since the last distillation (capped). User-bucket rows are
+  # explicit writes that are injected directly each turn and are not part of
+  # the distiller input.
+  defp load_memories(user_id, workspace_id, since) do
+    require Ash.Query
 
-    case Memory.list_user_memories(workspace_id, actor: actor) do
-      {:ok, memories} -> Enum.take(memories, @max_memories)
+    query =
+      Memory.Memory
+      |> Ash.Query.filter(user_id == ^user_id and scope == :local)
+      |> Ash.Query.sort(updated_at: :desc)
+      |> Ash.Query.limit(@max_memories)
+
+    query =
+      if is_nil(workspace_id) do
+        Ash.Query.filter(query, is_nil(workspace_id))
+      else
+        Ash.Query.filter(query, workspace_id == ^workspace_id)
+      end
+
+    query =
+      if since do
+        Ash.Query.filter(query, updated_at > ^since)
+      else
+        query
+      end
+
+    case Ash.read(query, actor: @actor) do
+      {:ok, memories} -> memories
       _ -> []
     end
   end
@@ -139,7 +164,7 @@ defmodule Magus.Agents.Actions.DistillUserProfile do
 
     #{if profile.document == "", do: "(empty)", else: profile.document}
 
-    ## Stored User Memories (most recent first)
+    ## Recent Conversation Memories (most recent first)
 
     #{format_memories(memories)}
 

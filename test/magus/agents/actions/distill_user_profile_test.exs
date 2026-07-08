@@ -12,16 +12,55 @@ defmodule Magus.Agents.Actions.DistillUserProfileTest do
 
   @ai %AiAgent{}
 
-  test "rewrites the profile from memories and pending notes, draining notes" do
+  test "distills from recent local memories in the matching bucket" do
     user = generate(user())
+    conv = generate(conversation(actor: user))
+
+    {:ok, _} =
+      Magus.Memory.create_memory(
+        conv.id,
+        user.id,
+        "Lisbon move",
+        %{content: %{}, summary: "User moved to Lisbon"},
+        actor: user
+      )
 
     {:ok, _} =
       Magus.Memory.create_user_memory(
         user.id,
         nil,
+        "Old fact",
+        %{content: %{}, summary: "Old fact"},
+        actor: @ai
+      )
+
+    expect(LLMMock, :generate_object, fn _model, prompt, _schema, _opts ->
+      assert prompt =~ "Lisbon move"
+      refute prompt =~ "Old fact"
+      assert prompt =~ "Recent Conversation Memories"
+
+      MockResponses.generate_object_response(%{
+        "document" => "## Current Focus\nLives in Lisbon."
+      })
+    end)
+
+    assert {:ok, %{document: doc}} =
+             DistillUserProfile.run(%{user_id: to_string(user.id), workspace_id: nil}, %{})
+
+    assert doc =~ "Lisbon"
+  end
+
+  test "rewrites the profile from memories and pending notes, draining notes" do
+    user = generate(user())
+    conv = generate(conversation(actor: user))
+
+    {:ok, _} =
+      Magus.Memory.create_memory(
+        conv.id,
+        user.id,
         "Preferred Stack",
         %{content: %{}, summary: "Prefers Elixir and Phoenix for all projects"},
-        actor: @ai
+        actor: user
       )
 
     {:ok, profile} =
