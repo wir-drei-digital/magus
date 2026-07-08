@@ -2,9 +2,10 @@ defmodule Magus.Agents.Tools.Memory.HelpersTest do
   @moduledoc """
   Tests for the shared memory tools helper functions.
   """
-  use ExUnit.Case, async: true
+  use Magus.ResourceCase, async: true
 
   alias Magus.Agents.Tools.Memory.Helpers
+  alias Magus.Chat
 
   describe "get_context_value/2" do
     test "returns value for atom key" do
@@ -171,6 +172,58 @@ defmodule Magus.Agents.Tools.Memory.HelpersTest do
       assert {:ok, extracted} = Helpers.validate_context(context, [:user_id, :conversation_id])
       assert extracted.user_id == "123"
       assert extracted.conversation_id == "456"
+    end
+  end
+
+  describe "resolve_user_bucket/1" do
+    test "derives the bucket from a workspace conversation" do
+      user = generate(user())
+      workspace = generate(workspace(actor: user))
+      {:ok, conv} = Chat.create_conversation(%{workspace_id: workspace.id}, actor: user)
+
+      assert {:ok, ws} = Helpers.resolve_user_bucket(%{conversation_id: conv.id})
+      assert ws == workspace.id
+    end
+
+    test "derives nil (personal) from a personal conversation" do
+      user = generate(user())
+      {:ok, conv} = Chat.create_conversation(%{}, actor: user)
+
+      assert {:ok, nil} = Helpers.resolve_user_bucket(%{conversation_id: conv.id})
+    end
+
+    test "conversation takes precedence over a stale ctx workspace_id" do
+      user = generate(user())
+      {:ok, conv} = Chat.create_conversation(%{}, actor: user)
+
+      assert {:ok, nil} =
+               Helpers.resolve_user_bucket(%{
+                 conversation_id: conv.id,
+                 workspace_id: Ash.UUID.generate()
+               })
+    end
+
+    test "invalid conversation id is an error, never a silent personal write" do
+      assert {:error, :conversation_not_found} =
+               Helpers.resolve_user_bucket(%{conversation_id: Ash.UUID.generate()})
+    end
+
+    test "falls back to an explicitly present workspace_id key" do
+      ws = Ash.UUID.generate()
+      assert {:ok, ^ws} = Helpers.resolve_user_bucket(%{workspace_id: ws})
+    end
+
+    test "a present nil workspace_id is an explicit personal choice" do
+      assert {:ok, nil} = Helpers.resolve_user_bucket(%{workspace_id: nil})
+    end
+
+    test "string keys work" do
+      ws = Ash.UUID.generate()
+      assert {:ok, ^ws} = Helpers.resolve_user_bucket(%{"workspace_id" => ws})
+    end
+
+    test "no bucket context at all is an error" do
+      assert {:error, :no_bucket_context} = Helpers.resolve_user_bucket(%{user_id: "x"})
     end
   end
 end

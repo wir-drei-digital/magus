@@ -150,4 +150,46 @@ defmodule Magus.Agents.Tools.Memory.Helpers do
     do: {:error, "This agent cannot create or modify global memories. Use scope 'local' instead."}
 
   def enforce_global_write_isolation(scope, _context), do: {:ok, scope}
+
+  @doc """
+  Resolve the user-memory workspace bucket for a tool invocation.
+
+  The conversation is the source of truth: when the tool context carries a
+  conversation_id, the bucket is that conversation's workspace (nil for a
+  personal conversation), and a bad conversation id is an error rather than
+  a silent fall-through to the personal bucket. Without a conversation, a
+  workspace_id KEY must be present in the context (a present nil is an
+  explicit personal choice).
+  """
+  @spec resolve_user_bucket(map()) ::
+          {:ok, String.t() | nil}
+          | {:error, :conversation_not_found}
+          | {:error, :no_bucket_context}
+  def resolve_user_bucket(ctx) when is_map(ctx) do
+    conversation_id = Map.get(ctx, :conversation_id) || Map.get(ctx, "conversation_id")
+
+    cond do
+      is_binary(conversation_id) and conversation_id != "" ->
+        case Magus.Memory.fetch_workspace_id_for_conversation(conversation_id) do
+          {:ok, ws} -> {:ok, ws}
+          {:error, :not_found} -> {:error, :conversation_not_found}
+        end
+
+      Map.has_key?(ctx, :workspace_id) ->
+        {:ok, Map.get(ctx, :workspace_id)}
+
+      Map.has_key?(ctx, "workspace_id") ->
+        {:ok, Map.get(ctx, "workspace_id")}
+
+      true ->
+        {:error, :no_bucket_context}
+    end
+  end
+
+  @doc "Human-readable tool error for a failed bucket resolution."
+  def bucket_error_message(:conversation_not_found),
+    do: "Could not resolve the conversation for this memory operation. Try again."
+
+  def bucket_error_message(:no_bucket_context),
+    do: "Missing workspace context for a user-scoped memory operation."
 end
