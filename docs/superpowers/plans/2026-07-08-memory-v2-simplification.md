@@ -1212,12 +1212,16 @@ git commit -m "feat(spa): memory v2 client updates (hard delete, drop confidence
 
 - [ ] **Step 4 (controller step, needs .env + network): LongMemEval regression tripwire.** Follow `docs/superpowers/plans/2026-07-04-memory-eval-baselines.md`: run the LongMemEval-S benchmark at limit 18 via `Magus.Eval.Runner` with `Magus.Eval.Benchmarks.LongMemEval` against the eval partition. Compare against the 3/18 hardened baseline in `eval/results/longmemeval.jsonl`. A drop to <= 1/18 blocks merge; 2-4/18 is within noise, note it. This step is run by the controller (needs OPENROUTER_API_KEY and the dataset download), not by an implementer subagent.
 
-- [ ] **Step 5:** Update `docs/system/05-memory-system.md` to match v2 (scopes unchanged; extraction local-only; distiller sole curator; hard deletes; cap instead of decay; no associations/versions/sources). Rewrite the affected sections directly from the spec's design sections 1-3.
+- [ ] **Step 5: Documentation pass (system + user-facing).** User request 2026-07-08: update the system and user docs as well.
+- Rewrite `docs/system/05-memory-system.md` to match v2 (scopes unchanged; extraction local-only; distiller sole curator; user bucket explicit-only; hard deletes with Super Brain retraction; per-conversation cap instead of decay; no associations/versions/sources/confidence/structured_data; UserProfileVersion kept). Rewrite the affected sections directly from the spec's design sections 1-3.
+- Update the memory-layer section of `docs/system/03-llm-context-assembly.md` (the association layer and last_accessed_at touching no longer exist; layers are key recency + semantic + optional profile).
+- Grep-driven touch-up: `grep -rn "association\|decay\|promot\|deactivat\|is_active\|confidence" docs/system/` and fix every memory-related statement that v2 invalidated (00-overview.md, 01-conversation-flow.md, 15-super-brain.md and others mention memory; only correct falsified claims, do not rewrite unrelated content).
+- Agent/user-facing guidance: `grep -rln "set_memory\|search_memories\|forget_memory\|memory" priv/skills/` and update every skill that instructs agents on memory scope usage to match v2 semantics (local is the default; user scope only on explicit cross-cutting signals; deletes are permanent). Skills are loaded into agent prompts, so stale guidance here actively fights the new tool defaults.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git commit -m "docs(memory): update system doc for memory v2" -- docs/system/05-memory-system.md
+git commit -m "docs(memory): update system and skill docs for memory v2" -- docs/system/ priv/skills/
 ```
 
 ---
