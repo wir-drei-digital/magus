@@ -182,6 +182,29 @@ describe('busy lifecycle (state.change / response.complete / error)', () => {
 	});
 });
 
+describe('turn.keepalive re-arms the stuck-turn watchdog', () => {
+	it('keepalives during silent phases keep busy armed past the stuck timeout', async () => {
+		vi.useFakeTimers();
+		const store = await startedStore();
+
+		fire('state.change', { state: 'thinking' });
+		expect(store.busy).toBe(true);
+
+		// A silent tool phase with keepalives: 4 minutes pass, but a
+		// keepalive lands every 60s. Busy must survive the 120s stuck timer.
+		for (let i = 0; i < 4; i++) {
+			vi.advanceTimersByTime(60_000);
+			fire('turn.keepalive');
+		}
+		expect(store.busy).toBe(true);
+
+		// True silence (turn died without a terminal event): the watchdog
+		// clears busy after 120s as before.
+		vi.advanceTimersByTime(121_000);
+		expect(store.busy).toBe(false);
+	});
+});
+
 describe('queued.* channel handlers → reducer wiring', () => {
 	it('queued.enqueue_message appends to queued', async () => {
 		const store = await startedStore();

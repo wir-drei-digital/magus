@@ -48,9 +48,18 @@ defmodule Magus.Agents.Strategies.React.TokenAccumulator do
     end
   end
 
+  # Accepts both OpenAI-style prompt/completion keys and ReqLLM-style
+  # input/output keys (the runner's cumulative State.usage uses the latter).
+  # Prompt/completion win when both styles are present.
   defp token_delta(usage) when is_map(usage) do
-    prompt = Map.get(usage, :prompt_tokens) || Map.get(usage, "prompt_tokens") || 0
-    completion = Map.get(usage, :completion_tokens) || Map.get(usage, "completion_tokens") || 0
+    prompt =
+      Map.get(usage, :prompt_tokens) || Map.get(usage, "prompt_tokens") ||
+        Map.get(usage, :input_tokens) || Map.get(usage, "input_tokens") || 0
+
+    completion =
+      Map.get(usage, :completion_tokens) || Map.get(usage, "completion_tokens") ||
+        Map.get(usage, :output_tokens) || Map.get(usage, "output_tokens") || 0
+
     (prompt || 0) + (completion || 0)
   end
 

@@ -9,6 +9,7 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
   alias Jido.AI.Reasoning.ReAct.{Config, Event, PendingToolCall, State, Token}
   alias Jido.AI.{Thread, Turn}
   alias Magus.Agents.Clients.LLM, as: LLMClient
+  alias Magus.Agents.Strategies.React.TokenAccumulator
   alias Magus.Agents.Support.ToolCallText
   alias Magus.Agents.Support.ToolsHelper
 
@@ -111,6 +112,7 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
     # and not inherited from the spawning worker, so set request_id/run_id here so
     # every `[Runner]` log line for this turn is greppable by request.
     Logger.metadata(request_id: state.request_id, run_id: state.run_id)
+    start_turn_keepalive(Keyword.get(opts, :context, %{}))
     initial_messages = Keyword.get(opts, :initial_messages)
 
     context =
@@ -196,6 +198,12 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
           completed
         end)
 
+      # Per-run token budget: once cumulative usage crosses the cap, give the
+      # LLM exactly one tool-less wrap-up call instead of a hard stop, so
+      # work-in-progress surfaces as a final answer.
+      budget_exceeded?(state, context) ->
+        run_budget_wrap_up(state, owner, ref, config, context)
+
       true ->
         case run_llm_step(state, owner, ref, config, context) do
           {:final_answer, state} ->
@@ -208,19 +216,87 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
             run_loop(state, owner, ref, config, context)
 
           {:error, state, reason, error_type} ->
-            state
-            |> State.put_status(:failed)
-            |> State.put_error(reason)
-            |> then(fn failed ->
-              {failed, _} =
-                emit_event(failed, owner, ref, :request_failed, %{
-                  error: reason,
-                  error_type: error_type
-                })
-
-              failed
-            end)
+            fail_state(state, owner, ref, reason, error_type)
         end
+    end
+  end
+
+  defp fail_state(%State{} = state, owner, ref, reason, error_type) do
+    state
+    |> State.put_status(:failed)
+    |> State.put_error(reason)
+    |> then(fn failed ->
+      {failed, _} =
+        emit_event(failed, owner, ref, :request_failed, %{
+          error: reason,
+          error_type: error_type
+        })
+
+      failed
+    end)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Per-run token budget. The cap rides in the runner context as
+  # :max_tokens_per_run (plumbed from CustomAgent by Preflight for
+  # AgentRun-driven turns); cumulative usage lives in State.usage. When the
+  # budget trips, the run gets ONE final LLM call with tools stripped and an
+  # explicit wrap-up instruction, then completes with termination_reason
+  # :budget_exceeded so plugins can mark the AgentRun accordingly.
+  # ---------------------------------------------------------------------------
+
+  @budget_wrap_up_instruction """
+  The token budget for this run is exhausted. Provide your best final answer \
+  now from the work completed so far. Do not request any tools. If the task \
+  is unfinished, summarize your progress and clearly state what remains.\
+  """
+
+  defp budget_cap(context) when is_map(context) do
+    cap = context[:max_tokens_per_run] || context["max_tokens_per_run"]
+    if is_integer(cap) and cap > 0, do: cap, else: nil
+  end
+
+  defp budget_cap(_context), do: nil
+
+  defp budget_wrap_up_mode?(context),
+    do: is_map(context) and context[:__budget_wrap_up__] == true
+
+  defp budget_exceeded?(%State{} = state, context) do
+    case budget_cap(context) do
+      nil ->
+        false
+
+      cap ->
+        {decision, _} =
+          TokenAccumulator.observe(
+            %{accumulated_tokens: 0, max_tokens_per_run: cap},
+            state.usage || %{}
+          )
+
+        decision == :stop_budget_exceeded
+    end
+  end
+
+  defp run_budget_wrap_up(%State{} = state, owner, ref, %Config{} = config, context) do
+    Logger.warning(
+      "[Runner] Token budget exceeded (cap #{inspect(budget_cap(context))}, " <>
+        "usage #{inspect(state.usage)}); running tool-less wrap-up step"
+    )
+
+    state = apply_steer_texts(state, [@budget_wrap_up_instruction])
+    context = Map.put(context, :__budget_wrap_up__, true)
+
+    case run_llm_step(state, owner, ref, config, context) do
+      {:final_answer, completed} ->
+        completed
+
+      # Unreachable in wrap-up mode (tools are stripped and needs_tools? is
+      # ignored), kept for exhaustiveness.
+      {:tool_calls, state, _tool_calls} ->
+        state
+
+      {:error, state, reason, error_type} ->
+        fail_state(state, owner, ref, reason, error_type)
     end
   end
 
@@ -307,6 +383,7 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
       |> Config.llm_opts()
       |> normalize_tool_choice()
       |> append_mcp_tools(context)
+      |> maybe_strip_tools_for_wrap_up(context)
 
     llm_started_at = System.monotonic_time(:millisecond)
 
@@ -364,7 +441,9 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
 
         {state, _token} = emit_checkpoint(state, owner, ref, config, :after_llm)
 
-        case Turn.needs_tools?(turn) do
+        wrap_up? = budget_wrap_up_mode?(context)
+
+        case not wrap_up? and Turn.needs_tools?(turn) do
           true ->
             {:tool_calls, State.put_status(state, :awaiting_tools), turn.tool_calls}
 
@@ -374,12 +453,23 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
               |> State.put_status(:completed)
               |> State.put_result(turn.text)
 
+            completion_data = %{
+              result: turn.text,
+              termination_reason: if(wrap_up?, do: :budget_exceeded, else: :final_answer),
+              usage: completed.usage
+            }
+
+            # The Event kind enum is closed upstream, so the budget outcome
+            # rides inside request_completed instead of a dedicated kind.
+            completion_data =
+              if wrap_up? do
+                Map.put(completion_data, :max_tokens_per_run, budget_cap(context))
+              else
+                completion_data
+              end
+
             {completed, _} =
-              emit_event(completed, owner, ref, :request_completed, %{
-                result: turn.text,
-                termination_reason: :final_answer,
-                usage: completed.usage
-              })
+              emit_event(completed, owner, ref, :request_completed, completion_data)
 
             {:final_answer, completed}
         end
@@ -481,6 +571,57 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
     |> Application.get_env(:agents, [])
     |> Keyword.get(:llm_stream_timeout_ms, 300_000)
     |> normalize_timeout()
+  end
+
+  # ---------------------------------------------------------------------------
+  # Turn keepalive — a ticker that, for the whole turn, periodically touches
+  # AgentRun liveness and broadcasts turn.keepalive. This covers the silent
+  # phases (long tool calls, unstreamed thinking) where no signals flow:
+  # without it, CleanupStale falsely times out runs after 2 minutes of tool
+  # silence and the SPA watchdog clears its busy state. The ticker MONITORS
+  # the coordinator (a link would not work: the coordinator's normal exit at
+  # turn end does not propagate through links) and stops on its DOWN, so it
+  # dies with the turn on every exit path.
+  # ---------------------------------------------------------------------------
+  defp start_turn_keepalive(context) do
+    conversation_id =
+      is_map(context) && (context[:conversation_id] || context["conversation_id"])
+
+    interval = turn_keepalive_interval_ms()
+    coordinator = self()
+
+    if is_binary(conversation_id) and is_integer(interval) and interval > 0 do
+      spawn(fn ->
+        mon_ref = Process.monitor(coordinator)
+        turn_keepalive_loop(conversation_id, interval, mon_ref)
+      end)
+    end
+
+    :ok
+  end
+
+  defp turn_keepalive_loop(conversation_id, interval, mon_ref) do
+    receive do
+      {:DOWN, ^mon_ref, :process, _pid, _reason} -> :ok
+    after
+      interval ->
+        try do
+          Magus.Agents.RunLiveness.touch(conversation_id)
+          Magus.Agents.Signals.turn_keepalive(conversation_id)
+        rescue
+          _ -> :ok
+        catch
+          _, _ -> :ok
+        end
+
+        turn_keepalive_loop(conversation_id, interval, mon_ref)
+    end
+  end
+
+  defp turn_keepalive_interval_ms do
+    :magus
+    |> Application.get_env(:agents, [])
+    |> Keyword.get(:turn_keepalive_interval_ms, 15_000)
   end
 
   # ---------------------------------------------------------------------------
@@ -716,6 +857,18 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
 
   defp fetch_field(map, key) when is_map(map) do
     Map.get(map, key, Map.get(map, Atom.to_string(key)))
+  end
+
+  # The budget wrap-up call must not offer tools: the model is being asked to
+  # answer from what it already has.
+  defp maybe_strip_tools_for_wrap_up(opts, context) do
+    if budget_wrap_up_mode?(context) do
+      opts
+      |> Keyword.delete(:tools)
+      |> Keyword.delete(:tool_choice)
+    else
+      opts
+    end
   end
 
   # OpenRouter's translate_tool_choice_format assumes tool_choice is nil or a map.

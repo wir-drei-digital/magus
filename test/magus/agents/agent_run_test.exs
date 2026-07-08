@@ -105,6 +105,22 @@ defmodule Magus.Agents.AgentRunTest do
       assert run.completed_at != nil
     end
 
+    test "exceed_budget sets budget_exceeded status with the wrap-up result", %{parent: parent} do
+      run = sub_agent_run(source_conversation_id: parent.id)
+      {:ok, run} = Magus.Agents.start_agent_run(run, authorize?: false)
+
+      {:ok, run} =
+        Magus.Agents.exceed_budget_agent_run(
+          run,
+          %{result_text: "Partial result before the cap"},
+          authorize?: false
+        )
+
+      assert run.status == :budget_exceeded
+      assert run.result_text == "Partial result before the cap"
+      assert run.completed_at != nil
+    end
+
     test "cancel sets cancelled status", %{parent: parent} do
       run = sub_agent_run(source_conversation_id: parent.id)
       {:ok, run} = Magus.Agents.start_agent_run(run, authorize?: false)

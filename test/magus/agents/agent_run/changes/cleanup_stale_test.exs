@@ -157,15 +157,14 @@ defmodule Magus.Agents.AgentRun.Changes.CleanupStaleTest do
       }
     end
 
-    test "reaps despite alive process when run exceeds the hard duration cap", %{parent: parent} do
+    test "reaps a dead-process run even when its heartbeat is fresh", %{parent: parent} do
       # target_conversation_id is nil so target_process_alive?/1 short-circuits
-      # to false via the `nil` clause — this test instead exercises the
-      # duration-cap branch directly through should_reap?/3, since InstanceManager
-      # registration is unavailable in the test environment (see module test
-      # below). The integration path here proves the hard cap reaps even when
-      # `last_heartbeat_at` is fresh (i.e. NOT stale by the 2-minute heartbeat
-      # rule), as long as `started_at` is old enough — so it must go through
-      # the `:cleanup_stale` action directly rather than relying on `is_stale`.
+      # to false via the `nil` clause: the reap goes through the dead-process
+      # branch of should_reap?/3 (InstanceManager registration is unavailable
+      # in the test environment; the opt-in duration ceiling is covered by the
+      # should_reap?/3 unit tests below). This proves the reap machinery works
+      # end-to-end through the `:cleanup_stale` action even when
+      # `last_heartbeat_at` is fresh.
       run =
         sub_agent_run(
           source_conversation_id: parent.id,
@@ -229,16 +228,19 @@ defmodule Magus.Agents.AgentRun.Changes.CleanupStaleTest do
       refute CleanupStale.should_reap?(run, true, now)
     end
 
-    test "alive process + old run (exceeds hard cap) -> reap", %{now: now, old_run: run} do
-      assert CleanupStale.should_reap?(run, true, now)
+    test "alive process + old run -> skip (no duration ceiling by default)", %{
+      now: now,
+      old_run: run
+    } do
+      refute CleanupStale.should_reap?(run, true, now)
     end
 
-    test "alive process + run exactly at the cap boundary -> reap", %{now: now} do
-      run = %{started_at: DateTime.add(now, -30, :minute)}
-      assert CleanupStale.should_reap?(run, true, now)
+    test "alive process + very old run -> still skipped by default", %{now: now} do
+      run = %{started_at: DateTime.add(now, -6 * 60, :minute)}
+      refute CleanupStale.should_reap?(run, true, now)
     end
 
-    test "respects a configured max_run_duration_minutes override", %{now: now} do
+    test "respects an opt-in max_run_duration_minutes ceiling", %{now: now} do
       original = Application.get_env(:magus, :agents, [])
       Application.put_env(:magus, :agents, Keyword.put(original, :max_run_duration_minutes, 5))
 

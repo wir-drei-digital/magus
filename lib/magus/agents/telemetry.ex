@@ -22,7 +22,7 @@ defmodule Magus.Agents.Telemetry do
 
   require Logger
 
-  @run_events [:enqueued, :started, :completed, :failed, :timed_out]
+  @run_events [:enqueued, :started, :completed, :failed, :timed_out, :budget_exceeded]
   @wake_events [:urgent, :skipped]
 
   @doc """

@@ -830,6 +830,16 @@ export class ConversationStore {
 			});
 		}
 
+		// Liveness heartbeat from the ReAct runner during silent turn phases
+		// (long tool calls, unstreamed thinking). Only re-arms the stuck-turn
+		// watchdog: without it, 120s of signal silence clears the busy state
+		// while the agent is still working.
+		channel.on('turn.keepalive', () => {
+			if (this.busy) {
+				this.#armWatchdog();
+			}
+		});
+
 		for (const event of [
 			'message.create',
 			'message.send_user_message',

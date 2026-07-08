@@ -407,6 +407,15 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
       base_tool_context =
         Map.put(base_tool_context, :workspace_id, conversation.workspace_id)
 
+      # Per-run token budget: AgentRun-driven turns carry the target custom
+      # agent's max_tokens_per_run into the runner context, where the ReAct
+      # loop enforces it with a wrap-up step. Interactive turns stay uncapped.
+      base_tool_context =
+        case run_budget_cap(data, conversation) do
+          nil -> base_tool_context
+          cap -> Map.put(base_tool_context, :max_tokens_per_run, cap)
+        end
+
       # Enrich base tool context with brain IDs from signal data (explicit
       # pane metadata), falling back to the conversation's brain-page
       # companion link: a companion chat IS the brain pane, so the tools get
@@ -514,6 +523,30 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
           llm_opts: nil,
           initial_messages: []
         }
+    end
+  end
+
+  @doc """
+  Resolves the per-run token cap for a turn.
+
+  Returns the target custom agent's `max_tokens_per_run` when the message
+  payload is AgentRun-driven (carries a `run_id`) and the conversation's
+  custom agent declares a positive cap; `nil` otherwise (interactive turns
+  are never capped). Pure: tolerates missing/NotLoaded custom_agent.
+  """
+  def run_budget_cap(data, conversation) do
+    run_id = is_map(data) && (data[:run_id] || data["run_id"])
+
+    cap =
+      case conversation do
+        %{custom_agent: %{max_tokens_per_run: cap}} -> cap
+        _ -> nil
+      end
+
+    if is_binary(run_id) and run_id != "" and is_integer(cap) and cap > 0 do
+      cap
+    else
+      nil
     end
   end
 

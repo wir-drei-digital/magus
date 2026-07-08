@@ -46,7 +46,7 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
     case find_active_run(agent, signal) do
       {:ok, run} ->
         result_text = extract_result_text(signal, agent)
-        complete_run(run, result_text)
+        complete_run(run, result_text, completion_outcome(agent))
 
       :not_run ->
         :ok
@@ -120,7 +120,26 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
     :not_run
   end
 
-  defp complete_run(run, result_text) do
+  @doc false
+  # The turn's terminal condition rides in the strategy's termination_reason:
+  # a budget-terminated turn still completes normally (the runner runs a
+  # tool-less wrap-up call for a final answer), but its AgentRun must be
+  # marked :budget_exceeded rather than :complete so autonomy budgets stay
+  # auditable.
+  def completion_outcome(agent) do
+    strategy_state =
+      case agent do
+        %{state: %{__strategy__: strategy}} when is_map(strategy) -> strategy
+        _ -> %{}
+      end
+
+    case strategy_state[:termination_reason] do
+      :budget_exceeded -> :budget_exceeded
+      _ -> :complete
+    end
+  end
+
+  defp complete_run(run, result_text, outcome) do
     run =
       if run.status == :pending do
         case Magus.Agents.start_agent_run(run, authorize?: false) do
@@ -131,9 +150,22 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
         run
       end
 
-    case Magus.Agents.complete_agent_run(run, %{result_text: result_text}, authorize?: false) do
+    mark_terminal =
+      case outcome do
+        :budget_exceeded ->
+          &Magus.Agents.exceed_budget_agent_run(&1, %{result_text: &2}, authorize?: false)
+
+        :complete ->
+          &Magus.Agents.complete_agent_run(&1, %{result_text: &2}, authorize?: false)
+      end
+
+    case mark_terminal.(run, result_text) do
       {:ok, completed_run} ->
-        Telemetry.run_event(:completed, completed_run)
+        Telemetry.run_event(
+          if(outcome == :budget_exceeded, do: :budget_exceeded, else: :completed),
+          completed_run
+        )
+
         update_spawn_output(completed_run)
         publish_completion(completed_run, result_text)
         RunOrchestrator.maybe_start_next(completed_run.target_conversation_id)

@@ -15,6 +15,17 @@ defmodule Magus.Agents.Strategies.ReactStrategy.RunnerLifecycleTest.HangingTool 
   end
 end
 
+# An instant tool for budget tests.
+defmodule Magus.Agents.Strategies.ReactStrategy.RunnerLifecycleTest.QuickTool do
+  @moduledoc false
+  use Jido.Action,
+    name: "quick_tool",
+    description: "Completes instantly",
+    schema: []
+
+  def run(_params, _context), do: {:ok, %{done: true}}
+end
+
 # A deliberately slow tool that declares its own execution timeout, overriding
 # the run-level tool_timeout_ms.
 defmodule Magus.Agents.Strategies.ReactStrategy.RunnerLifecycleTest.SlowToolWithOverride do
@@ -128,6 +139,135 @@ defmodule Magus.Agents.Strategies.ReactStrategy.RunnerLifecycleTest do
         )
 
       assert {:ok, %{finished: true}} = completed.data.result
+    end
+  end
+
+  describe "turn keepalive" do
+    test "broadcasts turn.keepalive while the turn runs and stops when it ends" do
+      conversation_id = Ecto.UUID.generate()
+
+      original = Application.get_env(:magus, :agents, [])
+      Application.put_env(:magus, :agents, Keyword.put(original, :turn_keepalive_interval_ms, 50))
+      on_exit(fn -> Application.put_env(:magus, :agents, original) end)
+
+      stub(Magus.Test.Mocks.LLMMock, :stream_text, fn _model, _messages, _opts ->
+        Process.sleep(300)
+        MockResponses.stream_text_response("done")
+      end)
+
+      MagusWeb.Endpoint.subscribe("agents:#{conversation_id}")
+
+      config =
+        Config.new(%{
+          model: "mock:test-model",
+          tools: [],
+          max_iterations: 5,
+          streaming: true
+        })
+
+      events =
+        Runner.stream("q", config,
+          request_id: "req_ka1",
+          run_id: "run_ka1",
+          context: %{conversation_id: conversation_id}
+        )
+        |> Enum.to_list()
+
+      assert Enum.any?(events, &(&1.kind == :request_completed))
+
+      # At least one keepalive must have been broadcast during the 300ms turn.
+      # The same tick also touches RunLiveness, so the broadcast doubles as
+      # evidence the liveness touch ran.
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "agent_signal",
+        payload: %{type: "turn.keepalive"}
+      }
+
+      # The ticker must die with the turn. A tick in flight at coordinator
+      # exit may still land (link teardown is async), so let stragglers
+      # settle, drain, then expect silence for several intervals.
+      Process.sleep(100)
+      drain_keepalives()
+      refute_receive %Phoenix.Socket.Broadcast{payload: %{type: "turn.keepalive"}}, 200
+    end
+
+    defp drain_keepalives do
+      receive do
+        %Phoenix.Socket.Broadcast{payload: %{type: "turn.keepalive"}} -> drain_keepalives()
+      after
+        0 -> :ok
+      end
+    end
+  end
+
+  describe "token budget wrap-up" do
+    test "an over-budget run gets one tool-less wrap-up call and completes as budget_exceeded" do
+      Magus.Test.Mocks.LLMMock
+      |> expect(:stream_text, fn _model, _messages, _opts ->
+        # Blows straight through the 100-token cap.
+        MockResponses.stream_text_with_tool_call("Working...", "quick_tool", %{},
+          output_tokens: 500
+        )
+      end)
+      |> expect(:stream_text, fn _model, messages, opts ->
+        # The wrap-up call must not offer tools and must carry the wrap-up
+        # instruction as the trailing user message.
+        assert Keyword.get(opts, :tools, []) == []
+
+        assert Enum.any?(messages, fn msg ->
+                 content = msg[:content] || msg["content"]
+                 is_binary(content) and content =~ "budget"
+               end)
+
+        MockResponses.stream_text_response("Best answer with what I have")
+      end)
+
+      config =
+        Config.new(%{
+          model: "mock:test-model",
+          tools: [__MODULE__.QuickTool],
+          max_iterations: 10,
+          streaming: true
+        })
+
+      events =
+        Runner.stream("Do a big task", config,
+          request_id: "req_budget1",
+          run_id: "run_budget1",
+          context: %{max_tokens_per_run: 100}
+        )
+        |> Enum.to_list()
+
+      # The already-requested tool round still runs (thread consistency),
+      # then the budget trips before the next planning step.
+      assert Enum.any?(events, &(&1.kind == :tool_completed))
+
+      completed = Enum.find(events, &(&1.kind == :request_completed))
+      assert completed.data.termination_reason == :budget_exceeded
+      assert completed.data.max_tokens_per_run == 100
+      assert completed.data.result == "Best answer with what I have"
+    end
+
+    test "runs without a cap never emit budget events" do
+      Magus.Test.Mocks.LLMMock
+      |> expect(:stream_text, fn _model, _messages, _opts ->
+        MockResponses.stream_text_response("done", output_tokens: 500_000)
+      end)
+
+      config =
+        Config.new(%{
+          model: "mock:test-model",
+          tools: [],
+          max_iterations: 5,
+          streaming: true
+        })
+
+      events =
+        Runner.stream("q", config, request_id: "req_budget2", run_id: "run_budget2")
+        |> Enum.to_list()
+
+      completed = Enum.find(events, &(&1.kind == :request_completed))
+      assert completed.data.termination_reason == :final_answer
     end
   end
 

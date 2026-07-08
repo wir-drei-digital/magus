@@ -97,6 +97,19 @@ defmodule Magus.Agents.Signals do
   end
 
   @doc """
+  Broadcast a liveness keepalive for an in-flight turn.
+
+  Emitted periodically by the ReAct runner while a turn executes, covering
+  the silent phases (long tool calls, unstreamed thinking) so clients can
+  keep their busy state armed instead of assuming the agent died.
+  """
+  def turn_keepalive(conversation_id) do
+    broadcast(conversation_id, %{
+      type: "turn.keepalive"
+    })
+  end
+
+  @doc """
   Broadcast response completion to the conversation.
 
   Signals that the full agent response cycle is done (all iterations complete).

@@ -47,4 +47,29 @@ defmodule Magus.Agents.Strategies.React.TokenAccumulatorTest do
     assert action == :continue
     assert new_state.accumulated_tokens == 100
   end
+
+  test "accepts ReqLLM-style input_tokens/output_tokens keys" do
+    state = %{accumulated_tokens: 0, max_tokens_per_run: 100}
+
+    {action, new_state} =
+      TokenAccumulator.observe(state, %{input_tokens: 60, output_tokens: 50})
+
+    assert action == :stop_budget_exceeded
+    assert new_state.accumulated_tokens == 110
+  end
+
+  test "prefers prompt/completion keys when both styles are present" do
+    state = %{accumulated_tokens: 0, max_tokens_per_run: 1000}
+
+    {action, new_state} =
+      TokenAccumulator.observe(state, %{
+        prompt_tokens: 10,
+        completion_tokens: 10,
+        input_tokens: 500,
+        output_tokens: 500
+      })
+
+    assert action == :continue
+    assert new_state.accumulated_tokens == 20
+  end
 end

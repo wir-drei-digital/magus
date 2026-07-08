@@ -11,13 +11,16 @@ defmodule Magus.Agents.AgentRun.Changes.CleanupStale do
 
   1. The target agent process is not alive (`target_process_alive?/1` is
      `false`) — the agent is definitely gone, reap immediately; or
-  2. The run has been going for longer than the hard duration cap
-     (`max_run_duration_minutes`, default 30 minutes) — even an alive,
-     actively-pinging agent gets reaped once it's run too long, as a backstop
-     against wedged/runaway runs.
+  2. An operator opted into a wall-clock ceiling via
+     `config :magus, :agents, max_run_duration_minutes: N` and the run has
+     exceeded it. There is NO ceiling by default: an alive, actively-pinging
+     run may take as long as it needs. Runaway protection comes from the
+     liveness heartbeat (the ReAct runner's turn keepalive pings continuously,
+     so a dead run goes stale within ~2 minutes), per-run token budgets, and
+     `max_iterations`.
 
-  Otherwise (alive process, within the cap) the reap is skipped and the run's
-  heartbeat is touched so the next sweep re-evaluates it fresh.
+  Otherwise (alive process) the reap is skipped and the run's heartbeat is
+  touched so the next sweep re-evaluates it fresh.
 
   When reaping:
   1. Mark run as :timed_out
@@ -32,8 +35,6 @@ defmodule Magus.Agents.AgentRun.Changes.CleanupStale do
   alias Magus.Agents.Support.AutonomyTrace
   alias Magus.Agents.Support.FailureStreak
   alias Magus.Agents.Telemetry
-
-  @default_max_run_duration_minutes 30
 
   @impl true
   def change(changeset, _opts, _context) do
@@ -66,7 +67,14 @@ defmodule Magus.Agents.AgentRun.Changes.CleanupStale do
   def should_reap?(_run, false = _alive?, _now), do: true
 
   def should_reap?(%{started_at: %DateTime{} = started_at}, true, now) do
-    DateTime.diff(now, started_at, :minute) >= max_run_duration_minutes()
+    case max_run_duration_minutes() do
+      minutes when is_integer(minutes) and minutes > 0 ->
+        DateTime.diff(now, started_at, :minute) >= minutes
+
+      # No ceiling configured: an alive run is never reaped by age.
+      _ ->
+        false
+    end
   end
 
   def should_reap?(_run, true, _now), do: false
@@ -74,7 +82,7 @@ defmodule Magus.Agents.AgentRun.Changes.CleanupStale do
   defp max_run_duration_minutes do
     :magus
     |> Application.get_env(:agents, [])
-    |> Keyword.get(:max_run_duration_minutes, @default_max_run_duration_minutes)
+    |> Keyword.get(:max_run_duration_minutes)
   end
 
   defp target_process_alive?(nil), do: false

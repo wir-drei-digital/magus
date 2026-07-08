@@ -10,6 +10,33 @@ defmodule Magus.Agents.Plugins.Support.PreflightTest do
 
   alias Magus.Agents.Plugins.Support.Preflight
 
+  describe "run_budget_cap/2" do
+    test "returns the custom agent's cap for run-driven turns" do
+      data = %{run_id: "run-1"}
+      conversation = %{custom_agent: %{max_tokens_per_run: 50_000}}
+
+      assert Preflight.run_budget_cap(data, conversation) == 50_000
+    end
+
+    test "nil without a run_id (interactive turns are uncapped)" do
+      conversation = %{custom_agent: %{max_tokens_per_run: 50_000}}
+      assert Preflight.run_budget_cap(%{}, conversation) == nil
+    end
+
+    test "nil when the agent has no cap or a zero cap" do
+      data = %{run_id: "run-1"}
+      assert Preflight.run_budget_cap(data, %{custom_agent: %{max_tokens_per_run: nil}}) == nil
+      assert Preflight.run_budget_cap(data, %{custom_agent: %{max_tokens_per_run: 0}}) == nil
+    end
+
+    test "nil when custom_agent is absent or not loaded" do
+      data = %{run_id: "run-1"}
+      assert Preflight.run_budget_cap(data, %{custom_agent: nil}) == nil
+      assert Preflight.run_budget_cap(data, %{custom_agent: %Ash.NotLoaded{}}) == nil
+      assert Preflight.run_budget_cap(data, nil) == nil
+    end
+  end
+
   # The Builder prepends the wakeup preamble only when source is :heartbeat
   # or :manual_trigger, so we look for a phrase from that preamble.
   @preamble_marker "list_inbox_events"

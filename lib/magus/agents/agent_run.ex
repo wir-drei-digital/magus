@@ -129,6 +129,16 @@ defmodule Magus.Agents.AgentRun do
       change Magus.Agents.AgentRun.Changes.CalculateDuration
     end
 
+    update :exceed_budget do
+      require_atomic? false
+
+      accept [:result_text]
+
+      change set_attribute(:status, :budget_exceeded)
+      change set_attribute(:completed_at, &DateTime.utc_now/0)
+      change Magus.Agents.AgentRun.Changes.CalculateDuration
+    end
+
     update :timeout do
       require_atomic? false
 

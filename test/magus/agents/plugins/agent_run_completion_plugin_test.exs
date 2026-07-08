@@ -136,6 +136,33 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPluginTest do
       assert updated_run.completed_at != nil
     end
 
+    test "marks AgentRun as budget_exceeded when the strategy terminated on budget" do
+      {_user, parent_conv, child_conv} = create_parent_and_child_conversations()
+      run = create_agent_run(parent_conv, child_conv)
+      {:ok, _} = Magus.Agents.start_agent_run(run.id, authorize?: false)
+
+      agent =
+        build_agent(child_conv.id, %{
+          __strategy__: %{
+            active_request_id: nil,
+            streaming_text: "Partial progress: steps 1-3 done, 4 remains.",
+            streaming_thinking: "",
+            pending_tool_calls: [],
+            termination_reason: :budget_exceeded
+          }
+        })
+
+      signal = make_signal("ai.request.completed", %{request_id: run.request_id})
+
+      assert {:ok, :continue} =
+               AgentRunCompletionPlugin.handle_signal(signal, build_context(agent))
+
+      {:ok, updated_run} = Magus.Agents.get_agent_run(run.id, authorize?: false)
+      assert updated_run.status == :budget_exceeded
+      assert updated_run.result_text == "Partial progress: steps 1-3 done, 4 remains."
+      assert updated_run.completed_at != nil
+    end
+
     test "marks AgentRun as complete with result from signal data when no streaming text" do
       {_user, parent_conv, child_conv} = create_parent_and_child_conversations()
       run = create_agent_run(parent_conv, child_conv)

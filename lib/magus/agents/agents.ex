@@ -153,6 +153,7 @@ defmodule Magus.Agents do
       define :heartbeat_agent_run, action: :heartbeat
       define :complete_agent_run, action: :complete
       define :fail_agent_run, action: :fail
+      define :exceed_budget_agent_run, action: :exceed_budget
       define :timeout_agent_run, action: :timeout
       define :cancel_agent_run, action: :cancel
       define :requeue_agent_run, action: :requeue
