@@ -80,17 +80,60 @@ defmodule Magus.Agents.Tools.Memory.SetMemoryTest do
       assert memory.content["day"] == "Friday"
     end
 
-    test "defaults scope to user" do
-      %{user: user, context: context} = create_test_context()
+    test "defaults scope to local" do
+      %{conversation: conversation, context: context} = create_test_context()
 
       params = %{name: "timezone", summary: "User is in CET"}
 
       assert {:ok, result} = SetMemory.run(params, context)
       assert result.status == "created"
-      assert result.scope == "user"
+      assert result.scope == "local"
+
+      assert {:ok, _} =
+               Memory.get_memory_by_name(conversation.id, "timezone",
+                 actor: %Magus.Agents.Support.AiAgent{}
+               )
+
+      assert {:error, _} =
+               Memory.get_user_memory_by_name(nil, "timezone",
+                 actor: %Magus.Accounts.User{id: context.user_id}
+               )
+    end
+  end
+
+  describe "user-scope workspace bucketing" do
+    test "user-scope write in a workspace conversation lands in that workspace bucket even when ctx omits workspace_id" do
+      user = generate(user())
+      workspace = generate(workspace(actor: user))
+      {:ok, conv} = Chat.create_conversation(%{workspace_id: workspace.id}, actor: user)
+
+      context = %{user_id: user.id, conversation_id: conv.id}
+      params = %{name: "lang", summary: "Always German", scope: "user"}
+
+      assert {:ok, %{status: "created"}} = SetMemory.run(params, context)
 
       actor = %Magus.Accounts.User{id: user.id}
-      assert {:ok, _} = Memory.get_user_memory_by_name(nil, "timezone", actor: actor)
+      assert {:ok, memory} = Memory.get_user_memory_by_name(workspace.id, "lang", actor: actor)
+      assert memory.workspace_id == workspace.id
+    end
+
+    test "user-scope write with an invalid conversation_id returns a tool error, not a personal write" do
+      user = generate(user())
+      context = %{user_id: user.id, conversation_id: Ash.UUID.generate()}
+      params = %{name: "x", summary: "y", scope: "user"}
+
+      assert {:ok, %{error: _}} = SetMemory.run(params, context)
+
+      actor = %Magus.Accounts.User{id: user.id}
+      assert {:error, _} = Memory.get_user_memory_by_name(nil, "x", actor: actor)
+    end
+
+    test "user-scope write with neither conversation_id nor workspace_id key errors" do
+      user = generate(user())
+      context = %{user_id: user.id}
+      params = %{name: "x", summary: "y", scope: "user"}
+
+      assert {:ok, %{error: _}} = SetMemory.run(params, context)
     end
   end
 
@@ -198,7 +241,7 @@ defmodule Magus.Agents.Tools.Memory.SetMemoryTest do
     end
 
     test "handles JSON-encoded content string from LLM" do
-      %{user: user, context: context} = create_test_context()
+      %{conversation: conversation, context: context} = create_test_context()
 
       params = %{
         name: "prefs",
@@ -208,8 +251,11 @@ defmodule Magus.Agents.Tools.Memory.SetMemoryTest do
 
       assert {:ok, %{status: "created"}} = SetMemory.run(params, context)
 
-      actor = %Magus.Accounts.User{id: user.id}
-      {:ok, memory} = Memory.get_user_memory_by_name(nil, "prefs", actor: actor)
+      {:ok, memory} =
+        Memory.get_memory_by_name(conversation.id, "prefs",
+          actor: %Magus.Agents.Support.AiAgent{}
+        )
+
       assert memory.content["theme"] == "dark"
     end
   end

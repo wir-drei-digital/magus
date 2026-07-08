@@ -13,12 +13,14 @@ defmodule Magus.Agents.Tools.Memory.SetMemory do
     Create or update a named memory. Use this when the user explicitly asks you to remember something.
 
     SCOPE determines where the memory lives:
-    - "user" (default): User-wide preferences, facts, and settings that apply everywhere.
-      Examples: "Remember I prefer TypeScript", "My timezone is CET".
-    - "local": Conversation-specific context that only matters here.
+    - "local" (default): Anything about this conversation or project.
       Examples: "Remember the deadline is Friday", "Note we chose option B".
+    - "user": ONLY for durable facts the user explicitly wants everywhere, signalled
+      by words like "always", "generally", "for all my projects", "remember this everywhere".
+      Examples: "Always answer in German", "I generally prefer TypeScript".
     - "agent": Custom-agent-scoped memories, only available to a specific agent.
 
+    When in doubt, use "local". Durable facts are consolidated automatically.
     If a memory with the same name already exists in the given scope, it will be updated.
     """,
     schema: [
@@ -41,8 +43,8 @@ defmodule Magus.Agents.Tools.Memory.SetMemory do
       scope: [
         type: :string,
         required: false,
-        default: "user",
-        doc: "Memory scope: 'local', 'user', or 'agent'"
+        default: "local",
+        doc: "Memory scope: 'local' (default), 'user', or 'agent'"
       ],
       confidence: [
         type: {:or, [:float, nil]},
@@ -72,7 +74,9 @@ defmodule Magus.Agents.Tools.Memory.SetMemory do
       validate_scope: 1,
       find_memory_by_name: 3,
       ai_actor: 0,
-      enforce_global_write_isolation: 2
+      enforce_global_write_isolation: 2,
+      resolve_user_bucket: 1,
+      bucket_error_message: 1
     ]
 
   import Magus.Agents.Tools.Helpers, only: [get_param: 2, get_param: 3]
@@ -86,7 +90,7 @@ defmodule Magus.Agents.Tools.Memory.SetMemory do
 
   @impl true
   def run(params, context) do
-    scope = get_param(params, :scope, "user")
+    scope = get_param(params, :scope, "local")
 
     with {:ok, scope} <- validate_scope(scope),
          {:ok, scope} <- enforce_global_write_isolation(scope, context) do
@@ -97,26 +101,40 @@ defmodule Magus.Agents.Tools.Memory.SetMemory do
           _ -> [:user_id, :conversation_id]
         end
 
-      case validate_context(context, required_fields) do
-        {:ok, ctx} ->
-          name = get_param(params, :name)
-          summary = get_param(params, :summary)
-          content = get_param(params, :content, %{}) |> ensure_map()
+      with {:ok, ctx} <- validate_context(context, required_fields),
+           {:ok, ctx} <- put_user_bucket(ctx, context, scope) do
+        name = get_param(params, :name)
+        summary = get_param(params, :summary)
+        content = get_param(params, :content, %{}) |> ensure_map()
 
-          confidence = get_param(params, :confidence)
-          kind = get_param(params, :kind)
-          structured_data = get_param(params, :structured_data)
-          extra_attrs = build_extra_attrs(confidence, kind, structured_data)
+        confidence = get_param(params, :confidence)
+        kind = get_param(params, :kind)
+        structured_data = get_param(params, :structured_data)
+        extra_attrs = build_extra_attrs(confidence, kind, structured_data)
 
-          upsert_memory(name, summary, content, scope, ctx, extra_attrs)
-
-        {:error, message} ->
-          {:ok, %{error: message}}
+        upsert_memory(name, summary, content, scope, ctx, extra_attrs)
+      else
+        {:error, message} -> {:ok, %{error: message}}
       end
     else
       {:error, message} -> {:ok, %{error: message}}
     end
   end
+
+  # For user scope, resolve the workspace bucket from the conversation (the
+  # tool context value is only a fallback) and pin it into ctx so both the
+  # upsert lookup and the create use the same bucket. Resolution reads from
+  # the original tool context, since validate_context/2 strips ctx down to
+  # only the scope's required_fields (conversation_id/workspace_id aren't
+  # required for "user" scope, but resolve_user_bucket/1 needs them).
+  defp put_user_bucket(ctx, context, "user") do
+    case resolve_user_bucket(context) do
+      {:ok, workspace_id} -> {:ok, Map.put(ctx, :workspace_id, workspace_id)}
+      {:error, reason} -> {:error, bucket_error_message(reason)}
+    end
+  end
+
+  defp put_user_bucket(ctx, _context, _scope), do: {:ok, ctx}
 
   defp upsert_memory(name, summary, content, scope, ctx, extra_attrs) do
     case find_memory_by_name(name, scope, ctx) do
