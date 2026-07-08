@@ -63,7 +63,8 @@ defmodule Magus.Eval.Benchmarks.SuperBrainRetrieval do
     fixture_payload = %{
       "fixture" => c["fixture"],
       "query_embedding" => c["query_embedding"],
-      "claim_query_embedding" => c["claim_query_embedding"]
+      "claim_query_embedding" => c["claim_query_embedding"],
+      "now" => c["now"]
     }
 
     %{

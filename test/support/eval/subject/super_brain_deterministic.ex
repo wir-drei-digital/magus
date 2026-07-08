@@ -62,18 +62,21 @@ defmodule Magus.Eval.Subject.SuperBrainDeterministic do
     {:ok,
      ctx
      |> Map.put(:query_embedding, query_embedding)
-     |> Map.put(:claim_query_embedding, expand(Map.get(decoded, "claim_query_embedding")))}
+     |> Map.put(:claim_query_embedding, expand(Map.get(decoded, "claim_query_embedding")))
+     |> Map.put(:now, parse_now(Map.get(decoded, "now")))}
   end
 
   @impl true
   def query(ctx, question) do
     if ctx[:claim_query_embedding] do
-      {:ok, claims} =
-        Retrieval.search_claims(ctx.user,
-          query_embedding: ctx.claim_query_embedding,
-          accessible_graphs: ["memories:user:#{ctx.user.id}"],
-          limit: 10
-        )
+      base_opts = [
+        query_embedding: ctx.claim_query_embedding,
+        accessible_graphs: ["memories:user:#{ctx.user.id}"],
+        limit: 10
+      ]
+
+      opts = if ctx[:now], do: Keyword.put(base_opts, :now, ctx.now), else: base_opts
+      {:ok, claims} = Retrieval.search_claims(ctx.user, opts)
 
       {:ok, %{answer: "", meta: %{retrieved: Enum.map(claims, &claim_triple/1)}}}
     else
@@ -220,39 +223,60 @@ defmodule Magus.Eval.Subject.SuperBrainDeterministic do
   defp expand(nil), do: nil
   defp expand(%{"hot" => _} = basis), do: Fixture.expand_basis(basis)
 
-  # Seeds `fixture.claims` into `memories:user:<id>` under one real Episode per
-  # case: `Claim.episode_id` is a hard DB foreign key, so a fabricated UUID
-  # would violate the constraint on insert. A no-op when the fixture carries
-  # no claims (entity-only cases behave exactly as before).
+  defp parse_now(nil), do: nil
+
+  defp parse_now(iso) when is_binary(iso) do
+    {:ok, dt, _offset} = DateTime.from_iso8601(iso)
+    dt
+  end
+
+  # Seeds `fixture.claims` under one real Episode per distinct graph:
+  # `Claim.episode_id` is a hard DB foreign key, so a fabricated UUID would
+  # violate the constraint on insert. The `graph` discriminator lets
+  # `temporal_accessor` seed a superseder OUTSIDE the accessor's allow-list
+  # (query/2 passes only memories:user:<id>); source_user_id stays the
+  # fixture user so reset/1's source_user_id sweep still deletes off-list
+  # rows. A no-op when the fixture carries no claims.
   defp seed_claims(_user, %{claims: []}), do: :ok
 
   defp seed_claims(user, fixture) do
-    graph = "memories:user:#{user.id}"
-    ep = seed_episode(graph, user.id)
+    default_graph = "memories:user:#{user.id}"
 
-    Enum.each(fixture.claims, fn c ->
-      {:ok, _} =
-        Claim
-        |> Ash.Changeset.for_create(:create, %{
-          graph_name: graph,
-          episode_id: ep.id,
-          source_user_id: user.id,
-          subject_name: c.subject,
-          subject_key: Naming.key(c.subject),
-          object_name: c.object,
-          object_key: Naming.key(c.object),
-          predicate: c.predicate,
-          polarity: String.to_existing_atom(c.polarity),
-          claim_text: c.claim_text,
-          confidence: c.confidence,
-          trust_tier: :evidence,
-          asserted_at: DateTime.utc_now(),
-          embedding: c.embedding && Fixture.expand_basis(c.embedding)
-        })
-        |> Ash.create(authorize?: false)
+    fixture.claims
+    |> Enum.group_by(&claim_graph(&1, default_graph))
+    |> Enum.each(fn {graph, claims} ->
+      ep = seed_episode(graph, user.id)
+      Enum.each(claims, &create_claim(&1, graph, ep.id, user.id))
     end)
 
     :ok
+  end
+
+  defp claim_graph(%{graph: nil}, default), do: default
+  defp claim_graph(%{graph: name}, _default), do: "eval:offlist:" <> name
+
+  defp create_claim(c, graph, episode_id, user_id) do
+    {:ok, _} =
+      Claim
+      |> Ash.Changeset.for_create(:create, %{
+        graph_name: graph,
+        episode_id: episode_id,
+        source_user_id: user_id,
+        subject_name: c.subject,
+        subject_key: Naming.key(c.subject),
+        object_name: c.object,
+        object_key: Naming.key(c.object),
+        predicate: c.predicate,
+        polarity: String.to_existing_atom(c.polarity),
+        claim_text: c.claim_text,
+        confidence: c.confidence,
+        trust_tier: :evidence,
+        asserted_at: c.asserted_at || DateTime.utc_now(),
+        valid_from: c.valid_from,
+        valid_to: c.valid_to,
+        embedding: c.embedding && Fixture.expand_basis(c.embedding)
+      })
+      |> Ash.create(authorize?: false)
   end
 
   # Claim.episode_id is a hard DB foreign key (belongs_to :episode,

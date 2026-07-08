@@ -136,7 +136,7 @@
   {
     "id": "temporal_ship_quarter",
     "category": "temporal",
-    "supported": false,
+    "supported": true,
     "target": "claims",
     "subjects": ["deterministic"],
     "query": "when does Aurora ship",
@@ -153,6 +153,142 @@
          "claim_text": "Aurora now ships in Q4.", "embedding": {"hot": 9}, "asserted_at": "2026-06-01T00:00:00Z"},
         {"subject": "Aurora", "predicate": "occurs_at", "object": "Q3",
          "claim_text": "Aurora ships in Q3.", "embedding": {"hot": 7}, "asserted_at": "2026-05-01T00:00:00Z"}
+      ]
+    }
+  },
+  {
+    "id": "temporal_expired_vendor",
+    "category": "temporal",
+    "supported": true,
+    "target": "claims",
+    "subjects": ["deterministic"],
+    "query": "which vendor does Aurora use",
+    "query_embedding": [0, 0, 0, 0, 0, 0, 0, 0],
+    "claim_query_embedding": { "hot": 11 },
+    "now": "2026-07-01T00:00:00Z",
+    "k": 1,
+    "expected": [
+      { "subject": "Aurora", "predicate": "relates_to", "object": "NewVendor" }
+    ],
+    "fixture": {
+      "entities": [
+        {
+          "key": "aurora",
+          "name": "Aurora",
+          "type": "project",
+          "embedding": [1, 0, 0, 0, 0, 0, 0, 0]
+        }
+      ],
+      "edges": [],
+      "sources": [],
+      "claims": [
+        {
+          "subject": "Aurora",
+          "predicate": "relates_to",
+          "object": "OldVendor",
+          "claim_text": "Aurora uses OldVendor for hosting.",
+          "embedding": { "hot": 11 },
+          "asserted_at": "2026-06-20T00:00:00Z",
+          "valid_to": "2026-06-30T00:00:00Z"
+        },
+        {
+          "subject": "Aurora",
+          "predicate": "relates_to",
+          "object": "NewVendor",
+          "claim_text": "Aurora uses NewVendor for hosting.",
+          "embedding": { "hot": 13 },
+          "asserted_at": "2026-06-25T00:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "id": "temporal_multivalued_vendors",
+    "category": "temporal",
+    "supported": true,
+    "target": "claims",
+    "subjects": ["deterministic"],
+    "query": "what does Aurora relate to",
+    "query_embedding": [0, 0, 0, 0, 0, 0, 0, 0],
+    "claim_query_embedding": { "hot": 17 },
+    "k": 2,
+    "expected": [
+      { "subject": "Aurora", "predicate": "relates_to", "object": "VendorA" },
+      { "subject": "Aurora", "predicate": "relates_to", "object": "VendorB" }
+    ],
+    "fixture": {
+      "entities": [
+        {
+          "key": "aurora",
+          "name": "Aurora",
+          "type": "project",
+          "embedding": [1, 0, 0, 0, 0, 0, 0, 0]
+        }
+      ],
+      "edges": [],
+      "sources": [],
+      "claims": [
+        {
+          "subject": "Aurora",
+          "predicate": "relates_to",
+          "object": "VendorA",
+          "claim_text": "Aurora relates to VendorA.",
+          "embedding": { "hot": 17 },
+          "asserted_at": "2026-05-01T00:00:00Z"
+        },
+        {
+          "subject": "Aurora",
+          "predicate": "relates_to",
+          "object": "VendorB",
+          "claim_text": "Aurora relates to VendorB.",
+          "embedding": { "hot": 19 },
+          "asserted_at": "2026-06-01T00:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "id": "temporal_accessor_ship_quarter",
+    "category": "temporal",
+    "supported": true,
+    "target": "claims",
+    "subjects": ["deterministic"],
+    "query": "when does Aurora ship",
+    "query_embedding": [0, 0, 0, 0, 0, 0, 0, 0],
+    "claim_query_embedding": { "hot": 23 },
+    "k": 1,
+    "expected": [
+      { "subject": "Aurora", "predicate": "occurs_at", "object": "Q3" }
+    ],
+    "fixture": {
+      "entities": [
+        {
+          "key": "aurora",
+          "name": "Aurora",
+          "type": "project",
+          "embedding": [1, 0, 0, 0, 0, 0, 0, 0]
+        }
+      ],
+      "edges": [],
+      "sources": [],
+      "claims": [
+        {
+          "subject": "Aurora",
+          "predicate": "occurs_at",
+          "object": "Q3",
+          "claim_text": "Aurora ships in Q3.",
+          "embedding": { "hot": 23 },
+          "asserted_at": "2026-05-01T00:00:00Z"
+        },
+        {
+          "subject": "Aurora",
+          "predicate": "occurs_at",
+          "object": "Q4",
+          "claim_text": "Aurora now ships in Q4.",
+          "embedding": { "hot": 29 },
+          "asserted_at": "2026-06-01T00:00:00Z",
+          "graph": "teammate"
+        }
       ]
     }
   }

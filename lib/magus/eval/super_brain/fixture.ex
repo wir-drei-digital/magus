@@ -64,8 +64,19 @@ defmodule Magus.Eval.SuperBrain.Fixture do
       polarity: Map.get(c, "polarity", "affirms"),
       embedding: Map.get(c, "embedding"),
       trust_tier: Map.get(c, "trust_tier", "evidence"),
-      confidence: Map.get(c, "confidence", 0.8)
+      confidence: Map.get(c, "confidence", 0.8),
+      asserted_at: parse_datetime(Map.get(c, "asserted_at")),
+      valid_from: parse_datetime(Map.get(c, "valid_from")),
+      valid_to: parse_datetime(Map.get(c, "valid_to")),
+      graph: Map.get(c, "graph")
     }
+  end
+
+  defp parse_datetime(nil), do: nil
+
+  defp parse_datetime(iso) when is_binary(iso) do
+    {:ok, dt, _offset} = DateTime.from_iso8601(iso)
+    dt
   end
 
   @doc "Expands a basis spec `%{\"hot\" => i}` to a `dim`-length one-hot vector."

@@ -61,4 +61,40 @@ defmodule Magus.Eval.SuperBrain.FixtureTest do
     assert length(vec) == 1536
     assert Enum.at(vec, 2) == 1.0
   end
+
+  test "claims parse temporal fields and the graph discriminator" do
+    raw = %{
+      "claims" => [
+        %{
+          "subject" => "Aurora",
+          "predicate" => "occurs_at",
+          "object" => "Q4",
+          "claim_text" => "Aurora now ships in Q4.",
+          "asserted_at" => "2026-06-01T00:00:00Z",
+          "valid_from" => "2026-06-01T00:00:00Z",
+          "valid_to" => "2026-12-31T00:00:00Z",
+          "graph" => "teammate"
+        },
+        %{
+          "subject" => "Aurora",
+          "predicate" => "occurs_at",
+          "object" => "Q3",
+          "claim_text" => "Aurora ships in Q3."
+        }
+      ]
+    }
+
+    fixture = Magus.Eval.SuperBrain.Fixture.parse(raw)
+    [with_temporal, without] = fixture.claims
+
+    assert with_temporal.asserted_at == ~U[2026-06-01 00:00:00Z]
+    assert with_temporal.valid_from == ~U[2026-06-01 00:00:00Z]
+    assert with_temporal.valid_to == ~U[2026-12-31 00:00:00Z]
+    assert with_temporal.graph == "teammate"
+
+    assert without.asserted_at == nil
+    assert without.valid_from == nil
+    assert without.valid_to == nil
+    assert without.graph == nil
+  end
 end
