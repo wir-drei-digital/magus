@@ -5,7 +5,9 @@
 
 ## Product framing
 
-Memory is the lightweight layer that keeps an agent *relevant*: who the user is, what is going on in this conversation, and a small set of durable user facts. It is not a knowledge store. Topic-specific knowledge lives in Brains (and the Super Brain graph), and the distilled **user profile** is the primary user-level artifact. Episodic memory rows exist to feed the profile and to give conversations continuity, nothing more.
+Memory is the lightweight layer that keeps an agent *relevant*: who the user is, what is going on in this conversation, and a small set of durable user facts. It is not a knowledge store. Topic-specific knowledge lives in Brains, and the distilled **user profile** is the primary user-level artifact. Episodic memory rows exist to feed the profile and to give conversations continuity, nothing more.
+
+The **Super Brain** sits above all of this as the smart-retrieval layer: it builds a graph of facts, claims, and relationships across resources (memories included). It is still in development, which cuts two ways for this spec: memory must be correct and useful entirely on its own (no retrieval feature here may depend on the graph), and integration points stay minimal and cheap (enqueue on write, retract on destroy) rather than deep, because the graph is a derived, disposable index that is still changing shape.
 
 Consequences of this framing:
 
