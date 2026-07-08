@@ -10,7 +10,6 @@ defmodule Magus.Memory do
   - **User** - Scoped to the user, available across all conversations
 
   Each memory has a confidence score, kind classification, and optional source tracking.
-  Memories form Hebbian associations (weighted edges) that are reinforced on co-retrieval.
   Each memory maintains a version history for debugging and rollback purposes.
   """
 
@@ -144,17 +143,6 @@ defmodule Magus.Memory do
 
     resource Magus.Memory.MemorySource do
       define :create_memory_source, action: :create, args: [:memory_id]
-    end
-
-    resource Magus.Memory.MemoryAssociation do
-      define :create_memory_association, action: :create, args: [:memory_a_id, :memory_b_id]
-      define :reinforce_association, action: :reinforce
-      define :get_associations_for_memory, action: :for_memory, args: [:memory_id]
-
-      define :get_association_between,
-        action: :between,
-        args: [:memory_a_id, :memory_b_id],
-        get?: true
     end
 
     resource Magus.Memory.UserProfile do

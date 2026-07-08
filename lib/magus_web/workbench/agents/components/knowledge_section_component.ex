@@ -28,7 +28,6 @@ defmodule MagusWeb.AgentsLive.Components.KnowledgeSectionComponent do
        view: :list,
        memories: [],
        selected_memory: nil,
-       associations: [],
        form: nil,
        kind_options: @kind_options,
        knowledge_sources: [],
@@ -319,30 +318,6 @@ defmodule MagusWeb.AgentsLive.Components.KnowledgeSectionComponent do
         </div>
       </.form>
 
-      <%!-- Associated Memories --%>
-      <div :if={@associations != []} class="space-y-2 pt-2">
-        <h4 class="text-sm font-medium text-base-content/70">{gettext("Associated Memories")}</h4>
-        <div
-          :for={assoc <- @associations}
-          class="flex items-center justify-between p-3 bg-base-200 rounded-lg"
-        >
-          <div class="min-w-0 flex-1">
-            <p class="text-sm font-medium truncate">
-              {linked_memory_name(assoc, @selected_memory.id)}
-            </p>
-            <p
-              :if={linked_memory_summary(assoc, @selected_memory.id)}
-              class="text-xs text-base-content/60 truncate"
-            >
-              {linked_memory_summary(assoc, @selected_memory.id)}
-            </p>
-          </div>
-          <span class="badge badge-sm badge-ghost ml-2 shrink-0">
-            {format_confidence(assoc.weight)}
-          </span>
-        </div>
-      </div>
-
       <%!-- Delete Button --%>
       <div class="pt-4 border-t border-base-300">
         <button
@@ -368,7 +343,7 @@ defmodule MagusWeb.AgentsLive.Components.KnowledgeSectionComponent do
   def handle_event("back_to_list", _params, socket) do
     socket =
       socket
-      |> assign(view: :list, selected_memory: nil, associations: [], form: nil)
+      |> assign(view: :list, selected_memory: nil, form: nil)
       |> load_memories()
 
     {:noreply, socket}
@@ -377,8 +352,6 @@ defmodule MagusWeb.AgentsLive.Components.KnowledgeSectionComponent do
   def handle_event("select_memory", %{"id" => id}, socket) do
     case Magus.Memory.get_memory(id, actor: current_user(socket)) do
       {:ok, memory} ->
-        associations = load_associations(memory.id, socket)
-
         form =
           to_form(
             %{
@@ -393,7 +366,6 @@ defmodule MagusWeb.AgentsLive.Components.KnowledgeSectionComponent do
          assign(socket,
            view: :detail,
            selected_memory: memory,
-           associations: associations,
            form: form
          )}
 
@@ -442,7 +414,7 @@ defmodule MagusWeb.AgentsLive.Components.KnowledgeSectionComponent do
       :ok ->
         socket =
           socket
-          |> assign(view: :list, selected_memory: nil, associations: [], form: nil)
+          |> assign(view: :list, selected_memory: nil, form: nil)
           |> load_memories()
           |> put_flash(:info, gettext("Memory deleted."))
 
@@ -651,16 +623,6 @@ defmodule MagusWeb.AgentsLive.Components.KnowledgeSectionComponent do
     )
   end
 
-  defp load_associations(memory_id, socket) do
-    case Magus.Memory.get_associations_for_memory(memory_id,
-           load: [:memory_a, :memory_b],
-           actor: current_user(socket)
-         ) do
-      {:ok, assocs} -> assocs
-      {:error, _} -> []
-    end
-  end
-
   defp current_user(socket) do
     # The parent passes user_id; we need the actor struct for authorization.
     # Convention: parent also passes current_user or we look it up.
@@ -722,20 +684,4 @@ defmodule MagusWeb.AgentsLive.Components.KnowledgeSectionComponent do
 
   defp parse_confidence(val) when is_integer(val), do: max(0, min(100, val)) / 100
   defp parse_confidence(_), do: 1.0
-
-  defp linked_memory_name(assoc, current_id) do
-    if assoc.memory_a_id == current_id do
-      assoc.memory_b.name
-    else
-      assoc.memory_a.name
-    end
-  end
-
-  defp linked_memory_summary(assoc, current_id) do
-    if assoc.memory_a_id == current_id do
-      assoc.memory_b.summary
-    else
-      assoc.memory_a.summary
-    end
-  end
 end

@@ -2,13 +2,11 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
   @moduledoc """
   Builds memory context for a conversation.
 
-  Builds a multi-layer hierarchy of memories:
+  Builds a two-layer hierarchy of memories:
   1. **Key** - Most recently updated memories (by updated_at)
   2. **Semantic** - Matched via embedding similarity to query
-  3. **Associated** - 1-hop association expansion from retrieved memories
 
   Supports three scopes: local (conversation), agent (custom agent), and global (user).
-  Co-retrieved memories are reinforced via Hebbian learning (fire-and-forget).
 
   ## Usage
 
@@ -23,7 +21,6 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
       context.formatted   # => Pre-formatted string for system prompt
       context.important    # => List of key memories
       context.semantic     # => List of semantically relevant memories
-      context.associated   # => List of association-expanded memories
       context.profile_document # => Distilled profile doc (string) or nil
   """
 
@@ -34,9 +31,6 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
 
   # Configuration
   @max_semantic_results 5
-  @max_associated_results 3
-  @max_reinforcement_pairs 10
-  @min_effective_assoc_weight 0.05
   @max_preview_chars 600
   @max_block_chars 6000
 
@@ -136,32 +130,15 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
         []
       end
 
-    # Layer 3: Association expansion (1-hop from retrieved memories)
-    all_retrieved = important ++ semantic
-    all_retrieved_ids = MapSet.new(all_retrieved, & &1.id)
-
-    associated =
-      if all_retrieved_ids != MapSet.new() do
-        expand_associations(all_retrieved_ids)
-      else
-        []
-      end
-
-    # Hebbian reinforcement (fire-and-forget)
-    all_memory_ids = (all_retrieved ++ associated) |> Enum.map(& &1.id) |> Enum.uniq()
-    reinforce_co_retrieved(all_memory_ids)
-
     # Build formatted context
     formatted =
-      format_context(important, semantic ++ associated, global_enabled,
-        profile_document: profile_document
-      )
+      format_context(important, semantic, global_enabled, profile_document: profile_document)
 
     # Whole-block budget: if full previews blow past the cap, re-render
     # summary-only. Full content stays reachable via the search_memories tool.
     formatted =
       if String.length(formatted) > @max_block_chars do
-        format_context(important, semantic ++ associated, global_enabled,
+        format_context(important, semantic, global_enabled,
           previews: false,
           profile_document: profile_document
         )
@@ -171,15 +148,14 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
 
     # Bump last_accessed_at only for semantically retrieved memories: they
     # were selected by relevance to the actual query, which is a real usage
-    # signal. Key (recency) and associated memories are injected ambiently
-    # every turn, so touching them would blur the signal even though no
-    # ambient process currently reads last_accessed_at for eviction.
+    # signal. Key (recency) memories are injected ambiently every turn, so
+    # touching them would blur the signal even though no ambient process
+    # currently reads last_accessed_at for eviction.
     touch_accessed_memories(Enum.map(semantic, & &1.id))
 
     %{
       important: important,
       semantic: semantic,
-      associated: associated,
       formatted: formatted,
       global_enabled: global_enabled,
       profile_document: profile_document
@@ -347,92 +323,6 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
         []
     end
   end
-
-  # ============================================================================
-  # Layer 3: Association Expansion
-  # ============================================================================
-
-  defp expand_associations(memory_ids) do
-    require Ash.Query
-    memory_id_list = MapSet.to_list(memory_ids)
-
-    # Batch query: fetch all associations where either side is in our set
-    associated_ids =
-      case Magus.Memory.MemoryAssociation
-           |> Ash.Query.filter(memory_a_id in ^memory_id_list or memory_b_id in ^memory_id_list)
-           |> Ash.read(authorize?: false) do
-        {:ok, assocs} ->
-          now = DateTime.utc_now()
-
-          assocs
-          |> Enum.flat_map(fn a ->
-            ew = Magus.Memory.MemoryAssociation.effective_weight(a, now)
-
-            cond do
-              ew < @min_effective_assoc_weight -> []
-              MapSet.member?(memory_ids, a.memory_a_id) -> [{a.memory_b_id, ew}]
-              MapSet.member?(memory_ids, a.memory_b_id) -> [{a.memory_a_id, ew}]
-              true -> []
-            end
-          end)
-          |> Enum.reject(fn {id, _w} -> MapSet.member?(memory_ids, id) end)
-          |> Enum.uniq_by(fn {id, _w} -> id end)
-          |> Enum.sort_by(fn {_id, w} -> w end, :desc)
-          |> Enum.take(@max_associated_results)
-          |> Enum.map(fn {id, _w} -> id end)
-
-        _ ->
-          []
-      end
-
-    # Batch query: fetch all associated memories at once
-    if associated_ids != [] do
-      case Magus.Memory.Memory
-           |> Ash.Query.filter(id in ^associated_ids and is_active == true)
-           |> Ash.read(authorize?: false) do
-        {:ok, memories} ->
-          Enum.map(memories, &Map.put(&1, :display_scope, &1.scope))
-
-        _ ->
-          []
-      end
-    else
-      []
-    end
-  rescue
-    e ->
-      Logger.warning("Failed to expand associations: #{Exception.message(e)}")
-      []
-  end
-
-  # ============================================================================
-  # Hebbian Reinforcement
-  # ============================================================================
-
-  defp reinforce_co_retrieved(memory_ids) when length(memory_ids) >= 2 do
-    Task.Supervisor.start_child(Magus.AgentLoopTaskSupervisor, fn ->
-      pairs = for a <- memory_ids, b <- memory_ids, a < b, do: {a, b}
-
-      # Only reinforce a reasonable number of pairs (avoid N^2 explosion).
-      # take_random instead of take: with >10 pairs, a deterministic prefix
-      # systematically reinforces the same low-UUID pairs every turn.
-      pairs
-      |> Enum.take_random(@max_reinforcement_pairs)
-      |> Enum.each(fn {a, b} ->
-        case Magus.Memory.get_association_between(a, b, authorize?: false) do
-          {:ok, assoc} when not is_nil(assoc) ->
-            Magus.Memory.reinforce_association(assoc, authorize?: false)
-
-          _ ->
-            Magus.Memory.create_memory_association(a, b, authorize?: false)
-        end
-      end)
-    end)
-  rescue
-    e -> Logger.warning("Failed to reinforce co-retrieved memories: #{Exception.message(e)}")
-  end
-
-  defp reinforce_co_retrieved(_), do: :ok
 
   # ============================================================================
   # Context Formatting

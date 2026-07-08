@@ -536,14 +536,6 @@ defmodule Magus.Memory.Memory do
 
     has_many :versions, Magus.Memory.MemoryVersion
     has_many :sources, Magus.Memory.MemorySource
-
-    has_many :associations_as_a, Magus.Memory.MemoryAssociation do
-      destination_attribute :memory_a_id
-    end
-
-    has_many :associations_as_b, Magus.Memory.MemoryAssociation do
-      destination_attribute :memory_b_id
-    end
   end
 
   calculations do
