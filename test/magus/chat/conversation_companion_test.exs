@@ -208,6 +208,36 @@ defmodule Magus.Chat.ConversationCompanionTest do
       assert {:error, _} =
                Chat.find_or_create_companion_conversation(:file, file.id, actor: stranger)
     end
+
+    test "a brain-page companion inherits the brain's workspace" do
+      user = generate(user())
+      ensure_workspace_plan(user)
+      workspace = generate(workspace(actor: user))
+
+      {:ok, brain} =
+        Magus.Brain.create_brain(%{title: "WS Brain", workspace_id: workspace.id}, actor: user)
+
+      {:ok, page} = Magus.Brain.create_page(brain.id, %{title: "Page"}, actor: user)
+
+      assert {:ok, conv} =
+               Chat.find_or_create_companion_conversation(:brain_page, page.id, actor: user)
+
+      # A page has no workspace_id of its own; the companion must inherit the
+      # brain's so the chat, the brain, and the agent share one workspace.
+      assert conv.workspace_id == workspace.id
+    end
+
+    test "a personal brain-page companion has no workspace" do
+      user = generate(user())
+
+      {:ok, brain} = Magus.Brain.create_brain(%{title: "Personal Brain"}, actor: user)
+      {:ok, page} = Magus.Brain.create_page(brain.id, %{title: "Page"}, actor: user)
+
+      assert {:ok, conv} =
+               Chat.find_or_create_companion_conversation(:brain_page, page.id, actor: user)
+
+      assert conv.workspace_id == nil
+    end
   end
 
   describe "unlink_companion_for_resource" do

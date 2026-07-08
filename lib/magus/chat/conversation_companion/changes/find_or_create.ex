@@ -97,11 +97,16 @@ defmodule Magus.Chat.ConversationCompanion.Changes.FindOrCreate do
   end
 
   defp load_resource(:file, id, opts), do: Magus.Files.get_file(id, opts)
-  defp load_resource(:brain_page, id, opts), do: Magus.Brain.get_page(id, opts)
+
+  # A brain page has no workspace_id of its own; it inherits its brain's. Load
+  # the brain so the companion conversation lands in the same workspace as the
+  # brain (companion chat, brain, and agent then all operate in one workspace).
+  defp load_resource(:brain_page, id, opts),
+    do: Magus.Brain.get_page(id, Keyword.put(opts, :load, [:brain]))
 
   defp create_conversation_for(resource, rt, actor, opts) do
     title = "About: #{resource_display_name(resource, rt)}"
-    workspace_id = Map.get(resource, :workspace_id)
+    workspace_id = resource_workspace_id(resource, rt)
     custom_agent_id = resolve_default_agent_id(workspace_id, actor)
 
     attrs =
@@ -136,6 +141,13 @@ defmodule Magus.Chat.ConversationCompanion.Changes.FindOrCreate do
       opts
     )
   end
+
+  # A file carries its own workspace_id; a brain page inherits its brain's (a
+  # page has no workspace_id attribute, so `Map.get(page, :workspace_id)` used to
+  # silently return nil and drop the companion into the personal workspace).
+  defp resource_workspace_id(%{workspace_id: ws}, :file), do: ws
+  defp resource_workspace_id(%{brain: %{workspace_id: ws}}, :brain_page), do: ws
+  defp resource_workspace_id(_resource, _rt), do: nil
 
   defp resource_display_name(%{name: name}, :file) when is_binary(name), do: name
   defp resource_display_name(%{title: t}, :brain_page) when is_binary(t) and t != "", do: t
