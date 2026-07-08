@@ -482,6 +482,59 @@ defmodule Magus.Agents.Context.SuperBrainRagContextTest do
 
       assert block =~ ~s(- "Aurora now ships in Q4.")
     end
+
+    test "a multi-valued polarity flip does not leak a trailer onto sibling objects" do
+      current_sibling =
+        temporal_claim(%{
+          predicate: "relates_to",
+          object_key: "vendorb",
+          object_name: "VendorB",
+          claim_text: "Aurora relates to VendorB."
+        })
+
+      flipped_prior =
+        temporal_claim(%{
+          predicate: "relates_to",
+          object_key: "vendora",
+          object_name: "VendorA",
+          claim_text: "Aurora relates to VendorA.",
+          asserted_at: ~U[2026-05-01 00:00:00Z]
+        })
+
+      block =
+        Magus.Agents.Context.SuperBrainRagContext.format_with_claims(
+          [],
+          [current_sibling],
+          [%{claim: flipped_prior, reason: :superseded}]
+        )
+
+      assert block =~ ~s(- "Aurora relates to VendorB.")
+      refute block =~ "(was:"
+    end
+
+    test "the trailer renders through the entity section path too" do
+      entity = %{name: "Aurora", primary_type: "project", sources: []}
+      current = temporal_claim(%{})
+
+      prior =
+        temporal_claim(%{
+          object_key: "q3",
+          object_name: "Q3",
+          claim_text: "Aurora ships in Q3.",
+          asserted_at: ~U[2026-05-01 00:00:00Z]
+        })
+
+      block =
+        Magus.Agents.Context.SuperBrainRagContext.format_with_claims(
+          [entity],
+          [current],
+          [%{claim: prior, reason: :superseded}]
+        )
+
+      assert block =~ "## Aurora [project]"
+      assert block =~ ~s(- "Aurora now ships in Q4.")
+      assert block =~ "(was: Q3)"
+    end
   end
 
   # ---------------------------------------------------------------------------

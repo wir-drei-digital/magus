@@ -271,7 +271,10 @@ The dossier does not go through `search_claims` at all (see Surfacing).
   append a compact trailer built from the historic claim's object:
   `- "Aurora ships in Q4." (page ..., 2026-06-12) (was: Q3)`. Expired claims
   are omitted from the block. This stays within the existing per-entity and
-  per-message caps.
+  per-message caps. Trailers render only for single-valued predicates,
+  because on multi-valued predicates the only superseded entries are
+  polarity flips on one exact triple, and a group-level trailer would
+  assert false history for sibling objects.
 - **`get_dossier`** (`dossier.ex` + `get_dossier.ex`): each group shows the
   current value plus a short history trail, e.g. `occurs_at Q4 (current);
   history: Q3 [superseded]`. Expired facts are labeled `[expired]`. The tool

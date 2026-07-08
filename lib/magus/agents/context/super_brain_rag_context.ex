@@ -18,6 +18,7 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
 
   alias Magus.Files.EmbeddingModel
   alias Magus.SuperBrain.Naming
+  alias Magus.SuperBrain.Ontology
   alias Magus.SuperBrain.Retrieval
 
   @max_results 8
@@ -200,9 +201,19 @@ defmodule Magus.Agents.Context.SuperBrainRagContext do
   # Newest superseded prior per (subject_key, predicate) group, for the
   # "(was: X)" trailer. Only :superseded entries produce trailers; expired
   # and future claims are omitted from the block entirely.
+  #
+  # Restricted to single-valued predicates: value-change semantics ("X used
+  # to be A, now it's B") only hold there. On a multi-valued predicate (e.g.
+  # `relates_to`) the only way a `:superseded` entry exists is a polarity
+  # flip on one exact triple (see `Temporal.polarity_flip?/2`), and grouping
+  # by `{subject_key, predicate}` would spill that single flipped object onto
+  # every sibling object in the group, asserting false history (e.g. a
+  # current "Aurora relates to VendorB" line rendering "(was: VendorA)").
   defp superseded_by_group(historic) do
     historic
-    |> Enum.filter(&(&1.reason == :superseded))
+    |> Enum.filter(
+      &(&1.reason == :superseded and Ontology.single_valued_predicate?(&1.claim.predicate))
+    )
     |> Enum.group_by(fn %{claim: c} -> {c.subject_key, c.predicate} end)
     |> Map.new(fn {group_key, entries} ->
       newest =

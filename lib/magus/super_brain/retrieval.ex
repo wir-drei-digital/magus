@@ -74,8 +74,10 @@ defmodule Magus.SuperBrain.Retrieval do
 
   @doc """
   Semantic search over the actor's claims (pgvector). Independent of super-graph
-  state: works during cold start and drift. Returns claims ordered by cosine
-  distance, loaded with `:episode` for provenance.
+  state: works during cold start and drift. Returns current claims ranked by
+  `vector_similarity x trust_tier_multiplier x recency_factor` (temporal
+  resolution excludes superseded and expired claims), loaded with `:episode`
+  for provenance.
 
   ## Options
 
