@@ -79,21 +79,25 @@ defmodule Magus.SuperBrain.Workers.ExtractMemory do
   # Graph routing
   # ---------------------------------------------------------------------------
 
-  defp route(%{scope: :user, workspace_id: nil, user_id: uid}) when is_binary(uid) do
+  @doc """
+  Public: RetractResource reuses the same routing at destroy time, when the
+  row is already gone from Postgres but the struct is still in memory.
+  """
+  def route(%{scope: :user, workspace_id: nil, user_id: uid}) when is_binary(uid) do
     {:ok, "memories:user:#{uid}", %{}}
   end
 
-  defp route(%{scope: :user, workspace_id: ws_id}) when is_binary(ws_id) do
+  def route(%{scope: :user, workspace_id: ws_id}) when is_binary(ws_id) do
     {:ok, "memories:workspace:#{ws_id}", %{}}
   end
 
-  defp route(%{scope: :agent, user_id: uid, custom_agent_id: agent_id})
-       when is_binary(uid) and is_binary(agent_id) do
+  def route(%{scope: :agent, user_id: uid, custom_agent_id: agent_id})
+      when is_binary(uid) and is_binary(agent_id) do
     {:ok, "memories:user:#{uid}", %{custom_agent_id: agent_id}}
   end
 
-  defp route(%{scope: :local}), do: {:error, :local_memory_not_extracted}
-  defp route(_), do: {:error, :unrouteable_memory}
+  def route(%{scope: :local}), do: {:error, :local_memory_not_extracted}
+  def route(_), do: {:error, :unrouteable_memory}
 
   # Memories carry a structured map in `content`. Prefer the canonical
   # `summary` upstream; this is only a fallback when summary is nil.

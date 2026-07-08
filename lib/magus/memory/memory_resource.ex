@@ -47,6 +47,30 @@ defmodule Magus.Memory.Memory do
 
   def enqueue_super_brain_extraction(_), do: :ok
 
+  @doc false
+  # Local memories are never extracted into a graph, so there is nothing to
+  # retract for them.
+  def enqueue_super_brain_retraction(%{scope: :local}), do: :ok
+
+  def enqueue_super_brain_retraction(%{id: id, scope: scope} = memory)
+      when scope in [:user, :agent] do
+    if Magus.SuperBrain.enabled?() do
+      graph_name =
+        case Magus.SuperBrain.Workers.ExtractMemory.route(memory) do
+          {:ok, graph_name, _extra} -> graph_name
+          _ -> nil
+        end
+
+      %{"resource_type" => "memory", "resource_id" => id, "graph_name" => graph_name}
+      |> Magus.SuperBrain.Workers.RetractResource.new()
+      |> Oban.insert()
+    else
+      :ok
+    end
+  end
+
+  def enqueue_super_brain_retraction(_), do: :ok
+
   postgres do
     table "memories"
     repo Magus.Repo
@@ -197,6 +221,13 @@ defmodule Magus.Memory.Memory do
       require_atomic? false
 
       change Magus.Memory.Memory.Changes.BroadcastMemoryEvent
+
+      change fn changeset, _context ->
+        Ash.Changeset.after_action(changeset, fn _cs, memory ->
+          enqueue_super_brain_retraction(memory)
+          {:ok, memory}
+        end)
+      end
     end
 
     read :for_conversation do
