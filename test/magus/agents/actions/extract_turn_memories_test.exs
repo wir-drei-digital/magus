@@ -65,11 +65,13 @@ defmodule Magus.Agents.Actions.ExtractTurnMemoriesTest do
       assert {:error, _} = result
     end
 
-    test "extracts memories from conversation turn" do
+    test "extracts memories from conversation turn, landing local regardless of LLM scope hints" do
       user = generate(user())
       conv = generate(conversation(actor: user))
 
-      # Mock the LLM response for memory extraction
+      # Mock the LLM response for memory extraction. The LLM may still emit a
+      # "scope" key (older prompt habit / model drift); the action ignores it
+      # entirely now, so both extractions must land as local memories.
       expect(LLMMock, :generate_object, fn _model, _prompt, _schema, _opts ->
         MockResponses.generate_object_response(%{
           "extractions" => [
@@ -122,6 +124,12 @@ defmodule Magus.Agents.Actions.ExtractTurnMemoriesTest do
 
       assert applied == 2
       assert skipped == 0
+
+      {:ok, local_memories} =
+        Magus.Memory.list_memories_for_conversation(conv.id, actor: user)
+
+      assert Enum.any?(local_memories, &(&1.name == "Coding Style"))
+      assert Enum.any?(local_memories, &(&1.name == "Current Project"))
     end
 
     test "extracts from a multi-turn window" do

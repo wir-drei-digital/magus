@@ -94,8 +94,7 @@ defmodule Magus.Eval.Subject.Live do
         user_id: to_string(ctx.user.id),
         conversation_id: to_string(ctx.conversation.id),
         user_message: user_text,
-        agent_response: agent_text,
-        allow_global_memories: true
+        agent_response: agent_text
       },
       %{}
     )

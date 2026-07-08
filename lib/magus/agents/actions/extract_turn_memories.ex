@@ -8,7 +8,10 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
 
   - Immediate facts and decisions from this turn
   - Updates to existing memories based on new information
-  - Scope determination (local vs global)
+
+  Every extraction lands as a **local** (conversation-scoped) memory; a
+  nightly distiller is responsible for promoting durable facts to
+  user-level memories, so this action no longer decides scope.
 
   ## Usage
 
@@ -22,11 +25,6 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
 
   The legacy single-turn `user_message`/`agent_response` pair is still
   accepted and is converted internally into a one-element `turns` list.
-
-  ## Scope Heuristics
-
-  - **User**: General preferences, coding style, communication preferences
-  - **Local**: Project context, current task, conversation-specific notes
   """
 
   use Jido.Action,
@@ -50,12 +48,7 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
         default: nil,
         doc: ~s(List of turn pairs: [%{"user" => text, "agent" => text}])
       ],
-      model: [type: {:or, [:string, nil]}, default: nil, doc: "Model key override"],
-      allow_global_memories: [
-        type: :boolean,
-        default: true,
-        doc: "Whether global memory extraction is allowed"
-      ]
+      model: [type: {:or, [:string, nil]}, default: nil, doc: "Model key override"]
     ]
 
   require Logger
@@ -92,11 +85,6 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
               "type" => "object",
               "description" => "Structured data to store"
             },
-            "scope" => %{
-              "type" => "string",
-              "enum" => ["local", "user"],
-              "description" => "local=this conversation, user=all conversations"
-            },
             "update_mode" => %{
               "type" => "string",
               "enum" => ["merge", "replace"],
@@ -108,7 +96,7 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
               "description" => "Why this was extracted"
             }
           },
-          "required" => ["name", "summary", "content", "scope", "reason"]
+          "required" => ["name", "summary", "content", "reason"]
         }
       }
     },
@@ -153,15 +141,7 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
         {:ok, %{extractions_applied: 0, extractions_skipped: 0}}
 
       true ->
-        allow_global = Map.get(params, "allow_global_memories", true)
-
-        case extract_and_apply(
-               user_id,
-               conversation_id,
-               turns,
-               model,
-               allow_global
-             ) do
+        case extract_and_apply(user_id, conversation_id, turns, model) do
           {:ok, result} ->
             {:ok, result}
 
@@ -202,18 +182,15 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
     end
   end
 
-  defp extract_and_apply(
-         user_id,
-         conversation_id,
-         turns,
-         model,
-         allow_global
-       ) do
+  defp extract_and_apply(user_id, conversation_id, turns, model) do
     Logger.debug("ExtractTurnMemories: Starting extraction for conversation #{conversation_id}")
 
+    # Workspace derivation stays solely to load the user-memory listing shown
+    # to the extractor as known facts to avoid re-extracting (memory-v2: the
+    # nightly distiller owns user-level durability, not per-turn extraction).
     workspace_id = Magus.Memory.workspace_id_for_conversation(conversation_id)
 
-    # Load existing memories for context (both local and global)
+    # Load existing memories for context (local for updates, user for dedup)
     local_memories = load_local_memories(conversation_id)
     user_memories = load_user_memories(user_id, workspace_id)
 
@@ -236,8 +213,7 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
           (response.object["extractions"] || [])
           |> Enum.map(&normalize_extraction/1)
 
-        {applied, skipped} =
-          apply_extractions(extractions, conversation_id, user_id, workspace_id, allow_global)
+        {applied, skipped} = apply_extractions(extractions, conversation_id, user_id)
 
         Logger.debug(
           "ExtractTurnMemories: Applied #{applied}, skipped #{skipped} for conversation #{conversation_id}"
@@ -269,109 +245,22 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
     end
   end
 
-  defp apply_extractions(extractions, conversation_id, user_id, workspace_id, allow_global) do
+  defp apply_extractions(extractions, conversation_id, user_id) do
     Enum.reduce(extractions, {0, 0}, fn extraction, {applied, skipped} ->
-      case apply_extraction(extraction, conversation_id, user_id, workspace_id, allow_global) do
+      case apply_extraction(extraction, conversation_id, user_id) do
         :applied -> {applied + 1, skipped}
         :skipped -> {applied, skipped + 1}
       end
     end)
   end
 
-  defp apply_extraction(extraction, conversation_id, user_id, workspace_id, allow_global) do
+  defp apply_extraction(extraction, conversation_id, user_id) do
     name = extraction["name"]
-    scope = extraction["scope"]
     content = extraction["content"]
     summary = extraction["summary"]
     update_mode = extraction["update_mode"]
 
-    case scope do
-      "user" when not allow_global ->
-        Logger.debug(
-          "ExtractTurnMemories: Downgrading user extraction '#{name}' to local (agent isolation)"
-        )
-
-        apply_local_extraction(name, content, summary, conversation_id, user_id, update_mode)
-
-      "user" ->
-        apply_user_extraction(name, content, summary, user_id, workspace_id, update_mode)
-
-      _ ->
-        apply_local_extraction(name, content, summary, conversation_id, user_id, update_mode)
-    end
-  end
-
-  defp apply_user_extraction(name, content, summary, user_id, workspace_id, update_mode) do
-    # Use a User struct as actor for functions that use actor(:id) for filtering
-    actor = %Magus.Accounts.User{id: user_id}
-
-    case Memory.get_user_memory_by_name(workspace_id, name, actor: actor) do
-      {:ok, memory} ->
-        new_content = resolve_content(memory.content, content, update_mode)
-
-        case Memory.set_memory(memory, new_content, %{summary: summary}, actor: @actor) do
-          {:ok, _updated} ->
-            Logger.debug("ExtractTurnMemories: Updated user memory '#{name}'")
-            :applied
-
-          {:error, error} ->
-            Logger.warning("ExtractTurnMemories: Failed to update user memory: #{inspect(error)}")
-
-            :skipped
-        end
-
-      {:error, %Ash.Error.Query.NotFound{}} ->
-        # Memory not found, create new one
-        create_user_memory(name, content, summary, user_id, workspace_id, update_mode)
-
-      {:error, %Ash.Error.Invalid{errors: errors}} ->
-        # Check if it's a not found error wrapped in Invalid
-        if Enum.any?(errors, &match?(%Ash.Error.Query.NotFound{}, &1)) do
-          create_user_memory(name, content, summary, user_id, workspace_id, update_mode)
-        else
-          Logger.warning("ExtractTurnMemories: Error looking up user memory: #{inspect(errors)}")
-
-          :skipped
-        end
-
-      {:error, _} ->
-        :skipped
-    end
-  end
-
-  defp create_user_memory(name, content, summary, user_id, workspace_id, update_mode) do
-    # Semantic dedup: check if a similar memory already exists
-    case find_similar_existing_user(summary, user_id, workspace_id) do
-      {:ok, existing} ->
-        new_content = resolve_content(existing.content, content, update_mode)
-
-        case Memory.set_memory(existing, new_content, %{summary: summary}, actor: @actor) do
-          {:ok, _} ->
-            Logger.debug("ExtractTurnMemories: Deduped user memory, updated '#{existing.name}'")
-            :applied
-
-          {:error, _} ->
-            :skipped
-        end
-
-      :none ->
-        case Memory.create_user_memory(
-               user_id,
-               workspace_id,
-               name,
-               %{content: content, summary: summary},
-               actor: @actor
-             ) do
-          {:ok, _memory} ->
-            Logger.debug("ExtractTurnMemories: Created user memory '#{name}'")
-            :applied
-
-          {:error, error} ->
-            Logger.warning("ExtractTurnMemories: Failed to create user memory: #{inspect(error)}")
-
-            :skipped
-        end
-    end
+    apply_local_extraction(name, content, summary, conversation_id, user_id, update_mode)
   end
 
   defp apply_local_extraction(name, content, summary, conversation_id, user_id, update_mode) do
@@ -453,7 +342,6 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
       "name" => to_string(extraction["name"] || extraction[:name] || ""),
       "summary" => to_string(extraction["summary"] || extraction[:summary] || ""),
       "content" => extraction["content"] || extraction[:content] || %{},
-      "scope" => to_string(extraction["scope"] || extraction[:scope] || "local"),
       "update_mode" =>
         normalize_update_mode(extraction["update_mode"] || extraction[:update_mode]),
       "reason" => to_string(extraction["reason"] || extraction[:reason] || "")
@@ -463,18 +351,18 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
   defp normalize_update_mode("replace"), do: "replace"
   defp normalize_update_mode(_), do: "merge"
 
-  defp build_prompt(local_memories, global_memories, turns) do
+  defp build_prompt(local_memories, user_memories, turns) do
     local_text = format_memories(local_memories, "Local")
-    global_text = format_memories(global_memories, "Global")
+    user_text = format_memories(user_memories, "User-level")
 
     """
-    ## Existing Memories
+    ## Existing Memories (this conversation)
 
-    ### Local (conversation-specific)
     #{local_text}
 
-    ### Global (user preferences)
-    #{global_text}
+    ## Known User-Level Facts (do NOT re-extract these)
+
+    #{user_text}
 
     ## Current Turns
 
@@ -482,15 +370,11 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
 
     ## Instructions
 
-    Extract any information worth remembering from these turns:
+    Extract information worth remembering for this conversation:
 
     1. **Facts**: Names, dates, preferences explicitly stated
     2. **Decisions**: Choices the user made or confirmed
     3. **Context**: Project details, tasks, goals mentioned
-
-    Determine scope:
-    - **user**: User preferences, coding style, communication preferences, general facts about the user
-    - **local**: Project context, current task, conversation-specific details
 
     If information updates an existing memory, use the exact same name.
 
@@ -525,18 +409,19 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
   defp system_prompt do
     """
     You are a memory extraction assistant. Analyze conversation turns and extract
-    information worth persisting.
+    information worth persisting for THIS conversation's continuity.
 
     Focus on:
     - Explicit statements of fact or preference
     - Decisions and commitments
-    - Important context for future conversations
+    - Project context the conversation will need later
     - Contradictions of existing memories (extract with update_mode "replace")
 
     Avoid extracting:
     - Hypotheticals or questions
     - Transient/temporary information
     - Information already captured (unless updating)
+    - Facts already listed under known user-level facts
 
     Be selective - only extract genuinely useful information.
     """
@@ -590,30 +475,6 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
     case EmbeddingModel.embed(summary) do
       {:ok, embedding} ->
         case Memory.search_memories(conversation_id, embedding, %{limit: 1}, actor: @actor) do
-          {:ok, [match | _]} ->
-            if similar_enough?(match.summary_embedding, embedding) do
-              {:ok, match}
-            else
-              :none
-            end
-
-          _ ->
-            :none
-        end
-
-      {:error, _} ->
-        :none
-    end
-  rescue
-    _ -> :none
-  end
-
-  defp find_similar_existing_user(summary, user_id, workspace_id) do
-    case EmbeddingModel.embed(summary) do
-      {:ok, embedding} ->
-        case Memory.search_user_memories(user_id, workspace_id, embedding, %{limit: 1},
-               actor: @actor
-             ) do
           {:ok, [match | _]} ->
             if similar_enough?(match.summary_embedding, embedding) do
               {:ok, match}

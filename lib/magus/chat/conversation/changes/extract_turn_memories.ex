@@ -78,14 +78,11 @@ defmodule Magus.Chat.Conversation.Changes.ExtractTurnMemories do
         advance_watermark(conversation, turns)
 
       true ->
-        allow_global = agent_allows_global_writes?(conversation)
-
         case ExtractAction.run(
                %{
                  user_id: to_string(conversation.user_id),
                  conversation_id: to_string(conversation.id),
-                 turns: Enum.map(turns, fn t -> %{"user" => t.user, "agent" => t.agent} end),
-                 allow_global_memories: allow_global
+                 turns: Enum.map(turns, fn t -> %{"user" => t.user, "agent" => t.agent} end)
                },
                %{}
              ) do
@@ -109,15 +106,6 @@ defmodule Magus.Chat.Conversation.Changes.ExtractTurnMemories do
          ) do
       {:ok, _} -> :ok
       {:error, reason} -> {:error, reason}
-    end
-  end
-
-  # Oban triggers provide bare conversations without preloads, so we
-  # explicitly load the custom_agent association here.
-  defp agent_allows_global_writes?(conversation) do
-    case Ash.load(conversation, [:custom_agent], authorize?: false) do
-      {:ok, %{custom_agent: %{can_write_global_memories: false}}} -> false
-      _ -> true
     end
   end
 
