@@ -148,4 +148,17 @@ defmodule Magus.SuperBrain.OntologyTest do
       assert Map.get(pairs, "prevents") == "causes"
     end
   end
+
+  describe "single_valued_predicates/0 and single_valued_predicate?/1" do
+    test "the curated set is seeded with occurs_at only, as strings" do
+      assert Magus.SuperBrain.Ontology.single_valued_predicates() == ["occurs_at"]
+    end
+
+    test "accepts binaries (how Claim stores predicate) and atoms (ontology lists)" do
+      assert Magus.SuperBrain.Ontology.single_valued_predicate?("occurs_at")
+      assert Magus.SuperBrain.Ontology.single_valued_predicate?(:occurs_at)
+      refute Magus.SuperBrain.Ontology.single_valued_predicate?("relates_to")
+      refute Magus.SuperBrain.Ontology.single_valued_predicate?(:relates_to)
+    end
+  end
 end

@@ -56,6 +56,14 @@ defmodule Magus.SuperBrain.Ontology do
 
   @instruction_sources ~w(user_curated memory_explicit)a
 
+  # Predicates whose subject can hold only one current object (functional
+  # attributes): a newer :affirms claim on the same (subject, predicate)
+  # supersedes an older one. Strings, because Claim.predicate is a string
+  # column. Deliberately tiny: a wrong inclusion suppresses
+  # legitimately-coexisting facts, so additions require a supporting eval
+  # case (see the temporal ranking spec).
+  @single_valued_predicates ~w(occurs_at)
+
   @low_confidence_threshold 0.25
   @instruction_confidence_threshold 0.9
   @contradiction_noise_threshold 3
@@ -139,6 +147,21 @@ defmodule Magus.SuperBrain.Ontology do
   def trust_tier_multiplier(:instruction), do: 1.5
   def trust_tier_multiplier(:evidence), do: 1.0
   def trust_tier_multiplier(:noise), do: 0.2
+
+  @doc "Curated set of single-valued (functional) predicates, as strings."
+  def single_valued_predicates, do: @single_valued_predicates
+
+  @doc """
+  Whether `predicate` is single-valued. Claim rows store `predicate` as a
+  string while the ontology predicate lists are atoms, so this accepts both
+  and compares in string space (a raw atom-set membership test against a
+  string predicate would silently never match).
+  """
+  def single_valued_predicate?(predicate) when is_atom(predicate),
+    do: predicate |> Atom.to_string() |> single_valued_predicate?()
+
+  def single_valued_predicate?(predicate) when is_binary(predicate),
+    do: predicate in @single_valued_predicates
 
   @doc """
   Map of predicates to their direct opposite.
