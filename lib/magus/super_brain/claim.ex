@@ -173,17 +173,20 @@ defmodule Magus.SuperBrain.Claim do
   end
 
   @doc """
-  Top-N claim ids by cosine distance to `embedding`, filtered to the given
-  `graph_names` allow-list and `tiers` (string trust tiers). Mirrors
-  `Magus.Files.Chunk.top_chunk_ids/3`: the vector is passed as a single Pgvector
-  binary parameter so the HNSW index is usable and the SQL string stays small.
+  Top-`limit` claims by cosine similarity to `embedding`, restricted to
+  `graph_names` and string `tiers`. Returns `{id, similarity}` pairs in
+  descending-similarity order; similarity is `1 - cosine_distance`, clamped
+  to [0.0, 1.0]. Nil-embedding claims cannot be KNN candidates and are
+  excluded here; `group_hits_by_embedding/5` includes them so a
+  not-yet-embedded superseder still participates in temporal resolution.
   """
-  @spec top_ids_by_embedding([float()], [String.t()], [String.t()], integer()) :: [binary()]
-  def top_ids_by_embedding([], _graph_names, _tiers, _limit), do: []
-  def top_ids_by_embedding(_embedding, [], _tiers, _limit), do: []
-  def top_ids_by_embedding(_embedding, _graph_names, [], _limit), do: []
+  @spec top_hits_by_embedding([float()], [String.t()], [String.t()], integer()) ::
+          [{binary(), float()}]
+  def top_hits_by_embedding([], _graph_names, _tiers, _limit), do: []
+  def top_hits_by_embedding(_embedding, [], _tiers, _limit), do: []
+  def top_hits_by_embedding(_embedding, _graph_names, [], _limit), do: []
 
-  def top_ids_by_embedding(embedding, graph_names, tiers, limit) do
+  def top_hits_by_embedding(embedding, graph_names, tiers, limit) do
     import Ecto.Query
 
     vector = Pgvector.new(embedding)
@@ -192,11 +195,61 @@ defmodule Magus.SuperBrain.Claim do
       where: not is_nil(c.embedding),
       where: c.graph_name in ^graph_names,
       where: c.trust_tier in ^tiers,
-      select: c.id,
+      select: {c.id, fragment("1 - (? <=> ?)", c.embedding, ^vector)},
       order_by: [asc: fragment("? <=> ?", c.embedding, ^vector)],
       limit: ^limit
     )
     |> Magus.Repo.all()
-    |> Enum.map(&Ecto.UUID.load!/1)
+    |> Enum.map(fn {id, similarity} ->
+      {Ecto.UUID.load!(id), clamp_similarity(similarity)}
+    end)
   end
+
+  @doc """
+  All claims in the `(subject_keys x predicates)` cross product, restricted
+  to `graph_names` and string `tiers`: the group-completion read that
+  surfaces superseders the KNN missed. Returns `{id, similarity}` pairs
+  (unordered); nil-embedding claims are INCLUDED with similarity 0.0.
+  Narrowed by the indexed graph_name and subject_key columns; predicate is
+  filtered in-row.
+  """
+  @spec group_hits_by_embedding(
+          [String.t()],
+          [String.t()],
+          [String.t()],
+          [String.t()],
+          [float()]
+        ) :: [{binary(), float()}]
+  def group_hits_by_embedding([], _keys, _preds, _tiers, _embedding), do: []
+  def group_hits_by_embedding(_graphs, [], _preds, _tiers, _embedding), do: []
+  def group_hits_by_embedding(_graphs, _keys, [], _tiers, _embedding), do: []
+  def group_hits_by_embedding(_graphs, _keys, _preds, [], _embedding), do: []
+
+  def group_hits_by_embedding(graph_names, subject_keys, predicates, tiers, embedding) do
+    import Ecto.Query
+
+    vector = Pgvector.new(embedding)
+
+    from(c in "super_brain_claims",
+      where: c.graph_name in ^graph_names,
+      where: c.trust_tier in ^tiers,
+      where: c.subject_key in ^subject_keys,
+      where: c.predicate in ^predicates,
+      select:
+        {c.id,
+         fragment(
+           "CASE WHEN ? IS NULL THEN NULL ELSE 1 - (? <=> ?) END",
+           c.embedding,
+           c.embedding,
+           ^vector
+         )}
+    )
+    |> Magus.Repo.all()
+    |> Enum.map(fn {id, similarity} ->
+      {Ecto.UUID.load!(id), clamp_similarity(similarity)}
+    end)
+  end
+
+  defp clamp_similarity(nil), do: 0.0
+  defp clamp_similarity(s), do: s |> max(0.0) |> min(1.0)
 end

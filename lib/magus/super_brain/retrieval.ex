@@ -91,22 +91,104 @@ defmodule Magus.SuperBrain.Retrieval do
       to both `search/2` and `search_claims/2` to avoid recomputing it
       twice. Defaults to `AccessibleGraphs.for_actor/2` with the super
       graphs rejected.
+    * `:now`: the resolution instant for validity windows and recency.
+      Defaults to `DateTime.utc_now()`; the deterministic eval pins it.
+    * `:include_historic`: when `true`, returns
+      `{:ok, %{current: claims, historic: [%{claim: c, reason: r}]}}` where
+      `reason` is `:superseded | :expired | :future`. Defaults to `false`
+      (plain `{:ok, claims}` list, ranked current only).
   """
   def search_claims(actor, opts) do
+    include_historic = Keyword.get(opts, :include_historic, false)
+
     if Magus.SuperBrain.enabled?() do
       embedding = Keyword.fetch!(opts, :query_embedding)
       limit = Keyword.get(opts, :limit, 10)
+      now = Keyword.get(opts, :now) || DateTime.utc_now()
 
       tiers =
         opts |> Keyword.get(:trust_tiers, @default_trust_tiers) |> Enum.map(&Atom.to_string/1)
 
       graphs = accessible_graphs(actor, opts)
 
-      ids = Magus.SuperBrain.Claim.top_ids_by_embedding(embedding, graphs, tiers, limit)
-      {:ok, load_claims_in_order(ids)}
+      candidate_hits =
+        Magus.SuperBrain.Claim.top_hits_by_embedding(embedding, graphs, tiers, limit)
+
+      candidate_ids = Enum.map(candidate_hits, &elem(&1, 0))
+      candidates = load_claims_in_order(candidate_ids)
+
+      completion_hits = completion_hits(candidates, graphs, tiers, embedding)
+
+      # The completion read re-fetches the candidates (each candidate sits in
+      # its own group); dedupe by id keeping the candidate entry.
+      all_hits = Enum.uniq_by(candidate_hits ++ completion_hits, &elem(&1, 0))
+      similarity_by_id = Map.new(all_hits)
+
+      candidate_id_set = MapSet.new(candidate_ids)
+
+      completion_only_ids =
+        completion_hits
+        |> Enum.map(&elem(&1, 0))
+        |> Enum.reject(&MapSet.member?(candidate_id_set, &1))
+        |> Enum.uniq()
+
+      claims = candidates ++ load_claims_in_order(completion_only_ids)
+
+      resolved = Magus.SuperBrain.Temporal.resolve(claims, now: now)
+
+      # The completion fetch is a (subject_key x predicate) cross product and
+      # can over-fetch groups no candidate belongs to; keep only claims that
+      # were candidates or share an exact group with one, so completion can
+      # promote a superseder but never introduce an unrelated group.
+      candidate_groups = MapSet.new(candidates, &{&1.subject_key, &1.predicate})
+
+      relevant? = fn c ->
+        MapSet.member?(candidate_id_set, c.id) or
+          MapSet.member?(candidate_groups, {c.subject_key, c.predicate})
+      end
+
+      current =
+        resolved.current
+        |> Enum.filter(fn %{claim: c} -> relevant?.(c) end)
+        |> Enum.map(fn %{claim: c, score_factors: %{recency: recency}} ->
+          similarity = Map.get(similarity_by_id, c.id, 0.0)
+          tier_mult = Magus.SuperBrain.Ontology.trust_tier_multiplier(c.trust_tier)
+          {c, similarity * tier_mult * recency}
+        end)
+        |> Enum.sort_by(&elem(&1, 1), :desc)
+        |> Enum.take(limit)
+        |> Enum.map(&elem(&1, 0))
+
+      if include_historic do
+        historic = Enum.filter(resolved.historic, fn %{claim: c} -> relevant?.(c) end)
+        {:ok, %{current: current, historic: historic}}
+      else
+        {:ok, current}
+      end
     else
-      {:ok, []}
+      if include_historic do
+        {:ok, %{current: [], historic: []}}
+      else
+        {:ok, []}
+      end
     end
+  end
+
+  # Group-completion inputs derived from the KNN candidates: the distinct
+  # subject_keys and predicates whose groups must be completed.
+  defp completion_hits([], _graphs, _tiers, _embedding), do: []
+
+  defp completion_hits(candidates, graphs, tiers, embedding) do
+    subject_keys = candidates |> Enum.map(& &1.subject_key) |> Enum.uniq()
+    predicates = candidates |> Enum.map(& &1.predicate) |> Enum.uniq()
+
+    Magus.SuperBrain.Claim.group_hits_by_embedding(
+      graphs,
+      subject_keys,
+      predicates,
+      tiers,
+      embedding
+    )
   end
 
   defp load_claims_in_order([]), do: []
