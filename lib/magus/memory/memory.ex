@@ -9,8 +9,7 @@ defmodule Magus.Memory do
   - **Agent** - Scoped to a custom agent, available across that agent's conversations
   - **User** - Scoped to the user, available across all conversations
 
-  Each memory has a confidence score, kind classification, and optional source tracking.
-  Each memory maintains a version history for debugging and rollback purposes.
+  Each memory has a kind classification.
   """
 
   use Ash.Domain, otp_app: :magus, extensions: [AshTypescript.Rpc]
@@ -26,31 +25,6 @@ defmodule Magus.Memory do
       rpc_action :clear_user_profile, :clear
     end
   end
-
-  @doc """
-  Bulk-update last_accessed_at for the given memory IDs.
-
-  Uses direct SQL to avoid triggering CreateVersion/BroadcastMemoryEvent/optimistic_lock.
-  """
-  # Intentionally raw SQL: this must NOT run through the :set/:destroy
-  # actions, which would create a MemoryVersion, broadcast PubSub, and bump
-  # lock_version on every semantic-retrieval and search-tool touch.
-  def touch_accessed(memory_ids) when is_list(memory_ids) and memory_ids != [] do
-    Magus.Repo.query!(
-      "UPDATE memories SET last_accessed_at = $1 WHERE id = ANY($2::uuid[])",
-      [
-        DateTime.utc_now(),
-        Enum.map(memory_ids, fn id ->
-          {:ok, binary} = Ecto.UUID.dump(to_string(id))
-          binary
-        end)
-      ]
-    )
-
-    :ok
-  end
-
-  def touch_accessed([]), do: :ok
 
   @doc """
   Returns the workspace_id for the given conversation_id, or nil if the
@@ -134,15 +108,6 @@ defmodule Magus.Memory do
       # Top memories by recency
       define :list_top_local, action: :top_local_by_recency, args: [:conversation_id]
       define :list_top_user, action: :top_user_by_recency, args: [:workspace_id]
-    end
-
-    resource Magus.Memory.MemoryVersion do
-      define :create_memory_version, action: :create
-      define :list_versions_for_memory, action: :for_memory, args: [:memory_id]
-    end
-
-    resource Magus.Memory.MemorySource do
-      define :create_memory_source, action: :create, args: [:memory_id]
     end
 
     resource Magus.Memory.UserProfile do

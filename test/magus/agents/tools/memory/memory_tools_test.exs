@@ -284,35 +284,6 @@ defmodule Magus.Agents.Tools.Memory.MemoryToolsTest do
       assert length(memories) == 2
     end
 
-    test "memory versions are tracked" do
-      %{user: user, conversation: conversation} = create_test_context()
-
-      # Create a memory
-      {:ok, memory} =
-        create_memory_via_domain(
-          conversation.id,
-          user.id,
-          "Versioned Memory",
-          summary: "Version 1",
-          content: %{"v" => 1}
-        )
-
-      # Update it multiple times
-      {:ok, memory} = Memory.set_memory(memory, %{"v" => 2}, %{summary: "Version 2"}, actor: user)
-
-      {:ok, _memory} =
-        Memory.set_memory(memory, %{"v" => 3}, %{summary: "Version 3"}, actor: user)
-
-      # Check versions
-      {:ok, updated_memory} =
-        Memory.get_memory_by_name(conversation.id, "Versioned Memory", actor: user)
-
-      {:ok, versions} = Memory.list_versions_for_memory(updated_memory.id, authorize?: false)
-
-      # Initial create + 2 updates = 3 versions
-      assert length(versions) == 3
-    end
-
     test "memories are sorted by recency" do
       %{user: user, conversation: conversation} = create_test_context()
 

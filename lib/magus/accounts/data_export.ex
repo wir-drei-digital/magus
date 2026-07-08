@@ -105,8 +105,7 @@ defmodule Magus.Accounts.DataExport do
 
   defp memories(user) do
     Magus.Memory.Memory
-    |> Ash.Query.filter(user_id == ^user.id and is_active == true)
-    |> Ash.Query.load([:versions, :sources])
+    |> Ash.Query.filter(user_id == ^user.id)
     |> Ash.read!(authorize?: false)
     |> Enum.map(fn m ->
       %{
@@ -116,34 +115,11 @@ defmodule Magus.Accounts.DataExport do
         summary: m.summary,
         content: m.content,
         kind: m.kind,
-        structured_data: m.structured_data,
-        confidence: m.confidence,
         conversation_id: m.conversation_id,
         custom_agent_id: m.custom_agent_id,
         workspace_id: m.workspace_id,
         inserted_at: m.inserted_at,
-        updated_at: m.updated_at,
-        versions:
-          Enum.map(m.versions || [], fn v ->
-            %{
-              version: v.version,
-              content: v.content,
-              summary: v.summary,
-              change_description: Map.get(v, :change_description),
-              changed_by: Map.get(v, :changed_by),
-              inserted_at: v.inserted_at
-            }
-          end),
-        sources:
-          Enum.map(m.sources || [], fn s ->
-            %{
-              source_type: s.source_type,
-              source_uri: s.source_uri,
-              title: s.title,
-              context_snippet: s.context_snippet,
-              inserted_at: s.inserted_at
-            }
-          end)
+        updated_at: m.updated_at
       }
     end)
   end

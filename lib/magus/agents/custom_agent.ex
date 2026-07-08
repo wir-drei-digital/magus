@@ -335,19 +335,17 @@ defmodule Magus.Agents.CustomAgent do
     end
 
     action :update_agent_memory, :map do
-      description "Edit an agent memory's summary / kind / confidence."
+      description "Edit an agent memory's summary / kind."
       argument :memory_id, :uuid, allow_nil?: false
       argument :summary, :string, allow_nil?: true
       argument :kind, :string, allow_nil?: false
-      argument :confidence, :float, allow_nil?: false
 
       run fn input, context ->
         with {:ok, memory} <-
                Magus.Memory.get_memory(input.arguments.memory_id, actor: context.actor),
              attrs = %{
                summary: input.arguments.summary,
-               kind: safe_memory_kind(input.arguments.kind),
-               confidence: clamp_confidence(input.arguments.confidence)
+               kind: safe_memory_kind(input.arguments.kind)
              },
              {:ok, updated} <-
                Magus.Memory.set_memory(memory, memory.content || %{}, attrs, actor: context.actor) do
@@ -1116,16 +1114,12 @@ defmodule Magus.Agents.CustomAgent do
       id: memory.id,
       name: memory.name,
       summary: memory.summary,
-      kind: to_string(memory.kind),
-      confidence: memory.confidence
+      kind: to_string(memory.kind)
     }
   end
 
   defp safe_memory_kind(kind) when kind in @memory_kinds, do: String.to_existing_atom(kind)
   defp safe_memory_kind(_), do: :general
-
-  defp clamp_confidence(value) when is_number(value), do: max(0.0, min(1.0, value / 1))
-  defp clamp_confidence(_), do: 1.0
 
   defp resource_type_atom("brain"), do: :brain
   defp resource_type_atom("knowledge_collection"), do: :knowledge_collection

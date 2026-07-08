@@ -11,7 +11,6 @@ defmodule Magus.Memory.Memory do
 
   Features:
   - Topic-based organization (name identifies the memory topic)
-  - Versioned history for debugging/rollback
   - Semantic search via summary embeddings
   - Optimistic locking for concurrent access
   - Scope hierarchy for cross-conversation learning
@@ -75,9 +74,9 @@ defmodule Magus.Memory.Memory do
     table "memories"
     repo Magus.Repo
 
-    identity_wheres_to_sql unique_name_per_conversation: "is_active = true AND scope = 'local'",
-                           unique_user_name_per_user: "is_active = true AND scope = 'user'",
-                           unique_name_per_agent: "is_active = true AND scope = 'agent'"
+    identity_wheres_to_sql unique_name_per_conversation: "scope = 'local'",
+                           unique_user_name_per_user: "scope = 'user'",
+                           unique_name_per_agent: "scope = 'agent'"
 
     references do
       reference :workspace, on_delete: :delete
@@ -125,7 +124,7 @@ defmodule Magus.Memory.Memory do
 
     create :create do
       description "Create a local (conversation-scoped) memory"
-      accept [:name, :summary, :content, :confidence, :kind, :structured_data]
+      accept [:name, :summary, :content, :kind]
 
       argument :conversation_id, :uuid, allow_nil?: false
       argument :user_id, :uuid, allow_nil?: false
@@ -134,14 +133,13 @@ defmodule Magus.Memory.Memory do
       change set_attribute(:user_id, arg(:user_id))
       change set_attribute(:scope, :local)
       change Magus.Memory.Memory.Changes.DeriveWorkspaceFromConversation
-      change Magus.Memory.Memory.Changes.CreateVersion
       change run_oban_trigger(:generate_embedding)
       change Magus.Memory.Memory.Changes.BroadcastMemoryEvent
     end
 
     create :create_user do
       description "Create a user-scoped memory"
-      accept [:name, :summary, :content, :confidence, :kind, :structured_data]
+      accept [:name, :summary, :content, :kind]
 
       argument :user_id, :uuid, allow_nil?: false
       argument :workspace_id, :uuid, allow_nil?: true
@@ -150,7 +148,6 @@ defmodule Magus.Memory.Memory do
       change set_attribute(:workspace_id, arg(:workspace_id))
       change set_attribute(:scope, :user)
       change set_attribute(:conversation_id, nil)
-      change Magus.Memory.Memory.Changes.CreateVersion
       change run_oban_trigger(:generate_embedding)
       change Magus.Memory.Memory.Changes.BroadcastMemoryEvent
 
@@ -164,7 +161,7 @@ defmodule Magus.Memory.Memory do
 
     create :create_agent do
       description "Create an agent-scoped memory"
-      accept [:name, :summary, :content, :confidence, :kind, :structured_data]
+      accept [:name, :summary, :content, :kind]
 
       argument :user_id, :uuid, allow_nil?: false
       argument :custom_agent_id, :uuid, allow_nil?: false
@@ -174,7 +171,6 @@ defmodule Magus.Memory.Memory do
       change set_attribute(:scope, :agent)
       change set_attribute(:conversation_id, nil)
       change Magus.Memory.Memory.Changes.DeriveWorkspaceFromCustomAgent
-      change Magus.Memory.Memory.Changes.CreateVersion
       change run_oban_trigger(:generate_embedding)
       change Magus.Memory.Memory.Changes.BroadcastMemoryEvent
 
@@ -187,10 +183,9 @@ defmodule Magus.Memory.Memory do
     end
 
     update :set do
-      accept [:content, :summary, :confidence, :kind, :structured_data]
+      accept [:content, :summary, :kind]
       require_atomic? false
 
-      change Magus.Memory.Memory.Changes.CreateVersion
       change run_oban_trigger(:generate_embedding)
       change Magus.Memory.Memory.Changes.BroadcastMemoryEvent
 
@@ -212,7 +207,6 @@ defmodule Magus.Memory.Memory do
     update :clear do
       require_atomic? false
       change set_attribute(:content, %{})
-      change Magus.Memory.Memory.Changes.CreateVersion
       change Magus.Memory.Memory.Changes.BroadcastMemoryEvent
     end
 
@@ -234,9 +228,7 @@ defmodule Magus.Memory.Memory do
       description "List local memories for a conversation"
       argument :conversation_id, :uuid, allow_nil?: false
 
-      filter expr(
-               conversation_id == ^arg(:conversation_id) and is_active == true and scope == :local
-             )
+      filter expr(conversation_id == ^arg(:conversation_id) and scope == :local)
 
       prepare build(sort: [updated_at: :desc])
     end
@@ -246,7 +238,7 @@ defmodule Magus.Memory.Memory do
       argument :workspace_id, :uuid, allow_nil?: true
 
       filter expr(
-               user_id == ^actor(:id) and is_active == true and scope == :user and
+               user_id == ^actor(:id) and scope == :user and
                  ((is_nil(workspace_id) and is_nil(^arg(:workspace_id))) or
                     workspace_id == ^arg(:workspace_id))
              )
@@ -258,7 +250,7 @@ defmodule Magus.Memory.Memory do
       argument :conversation_id, :uuid, allow_nil?: false
       get? true
 
-      filter expr(conversation_id == ^arg(:conversation_id) and is_active == true)
+      filter expr(conversation_id == ^arg(:conversation_id))
       prepare build(sort: [updated_at: :desc], limit: 1)
     end
 
@@ -271,7 +263,6 @@ defmodule Magus.Memory.Memory do
       filter expr(
                conversation_id == ^arg(:conversation_id) and
                  name == ^arg(:name) and
-                 is_active == true and
                  scope == :local
              )
     end
@@ -285,7 +276,6 @@ defmodule Magus.Memory.Memory do
       filter expr(
                user_id == ^actor(:id) and
                  name == ^arg(:name) and
-                 is_active == true and
                  scope == :user and
                  ((is_nil(workspace_id) and is_nil(^arg(:workspace_id))) or
                     workspace_id == ^arg(:workspace_id))
@@ -298,7 +288,6 @@ defmodule Magus.Memory.Memory do
 
       filter expr(
                conversation_id == ^arg(:conversation_id) and
-                 is_active == true and
                  scope == :local
              )
 
@@ -311,7 +300,6 @@ defmodule Magus.Memory.Memory do
 
       filter expr(
                user_id == ^actor(:id) and
-                 is_active == true and
                  scope == :user and
                  ((is_nil(workspace_id) and is_nil(^arg(:workspace_id))) or
                     workspace_id == ^arg(:workspace_id))
@@ -326,9 +314,7 @@ defmodule Magus.Memory.Memory do
       argument :query_embedding, {:array, :float}, allow_nil?: false
       argument :limit, :integer, default: 5
 
-      filter expr(
-               conversation_id == ^arg(:conversation_id) and is_active == true and scope == :local
-             )
+      filter expr(conversation_id == ^arg(:conversation_id) and scope == :local)
 
       prepare fn query, _context ->
         embedding = Ash.Query.get_argument(query, :query_embedding)
@@ -351,7 +337,7 @@ defmodule Magus.Memory.Memory do
       argument :limit, :integer, default: 5
 
       filter expr(
-               user_id == ^arg(:user_id) and is_active == true and scope == :user and
+               user_id == ^arg(:user_id) and scope == :user and
                  ((is_nil(workspace_id) and is_nil(^arg(:workspace_id))) or
                     workspace_id == ^arg(:workspace_id))
              )
@@ -373,9 +359,7 @@ defmodule Magus.Memory.Memory do
       description "List agent-scoped memories"
       argument :custom_agent_id, :uuid, allow_nil?: false
 
-      filter expr(
-               custom_agent_id == ^arg(:custom_agent_id) and is_active == true and scope == :agent
-             )
+      filter expr(custom_agent_id == ^arg(:custom_agent_id) and scope == :agent)
 
       prepare build(sort: [updated_at: :desc])
     end
@@ -389,7 +373,6 @@ defmodule Magus.Memory.Memory do
       filter expr(
                custom_agent_id == ^arg(:custom_agent_id) and
                  name == ^arg(:name) and
-                 is_active == true and
                  scope == :agent
              )
     end
@@ -400,9 +383,7 @@ defmodule Magus.Memory.Memory do
       argument :query_embedding, {:array, :float}, allow_nil?: false
       argument :limit, :integer, default: 5
 
-      filter expr(
-               custom_agent_id == ^arg(:custom_agent_id) and is_active == true and scope == :agent
-             )
+      filter expr(custom_agent_id == ^arg(:custom_agent_id) and scope == :agent)
 
       prepare fn query, _context ->
         embedding = Ash.Query.get_argument(query, :query_embedding)
@@ -469,12 +450,6 @@ defmodule Magus.Memory.Memory do
     attribute :summary_embedding, Magus.Files.Types.Vector
     attribute :content, :map, default: %{}, public?: true
     attribute :lock_version, :integer, default: 0, allow_nil?: false
-    attribute :is_active, :boolean, default: true
-
-    attribute :last_accessed_at, :utc_datetime_usec do
-      allow_nil? true
-      public? false
-    end
 
     attribute :scope, :atom do
       allow_nil? false
@@ -483,13 +458,6 @@ defmodule Magus.Memory.Memory do
       public? true
 
       description "Memory scope: :user (user-level), :local (conversation-level), or :agent (custom-agent-level)"
-    end
-
-    attribute :confidence, :float do
-      default 1.0
-      allow_nil? false
-      public? true
-      constraints min: 0.0, max: 1.0
     end
 
     attribute :kind, :atom do
@@ -511,12 +479,6 @@ defmodule Magus.Memory.Memory do
       public? true
     end
 
-    attribute :structured_data, :map do
-      allow_nil? true
-      public? true
-      description "Unvalidated JSON for kind-specific fields (deadlines, streaks, sources, etc.)"
-    end
-
     create_timestamp :inserted_at
 
     update_timestamp :updated_at do
@@ -533,9 +495,6 @@ defmodule Magus.Memory.Memory do
       public? true
       allow_nil? true
     end
-
-    has_many :versions, Magus.Memory.MemoryVersion
-    has_many :sources, Magus.Memory.MemorySource
   end
 
   calculations do
@@ -550,13 +509,12 @@ defmodule Magus.Memory.Memory do
 
   identities do
     identity :unique_name_per_conversation, [:conversation_id, :name],
-      where: expr(is_active == true and scope == :local)
+      where: expr(scope == :local)
 
     identity :unique_user_name_per_user, [:user_id, :workspace_id, :name],
-      where: expr(is_active == true and scope == :user),
+      where: expr(scope == :user),
       nils_distinct?: false
 
-    identity :unique_name_per_agent, [:custom_agent_id, :name],
-      where: expr(is_active == true and scope == :agent)
+    identity :unique_name_per_agent, [:custom_agent_id, :name], where: expr(scope == :agent)
   end
 end

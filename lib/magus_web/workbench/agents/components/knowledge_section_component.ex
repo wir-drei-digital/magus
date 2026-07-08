@@ -112,9 +112,6 @@ defmodule MagusWeb.AgentsLive.Components.KnowledgeSectionComponent do
               <span :if={memory.kind != :general} class="badge badge-xs badge-outline">
                 {memory.kind}
               </span>
-              <span :if={memory.confidence < 1.0} class="badge badge-xs badge-ghost">
-                {format_confidence(memory.confidence)}
-              </span>
             </div>
             <p :if={memory.summary} class="text-xs text-base-content/60 mt-1 truncate">
               {memory.summary}
@@ -295,22 +292,6 @@ defmodule MagusWeb.AgentsLive.Components.KnowledgeSectionComponent do
           </select>
         </div>
 
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text">
-              {gettext("Confidence")}: {format_slider_confidence(@form[:confidence].value)}
-            </span>
-          </label>
-          <input
-            type="range"
-            name="memory[confidence]"
-            min="0"
-            max="100"
-            value={@form[:confidence].value || 100}
-            class="range range-primary range-sm"
-          />
-        </div>
-
         <div class="flex items-center justify-end gap-2">
           <button type="submit" class="btn btn-primary btn-sm">
             {gettext("Save Changes")}
@@ -356,8 +337,7 @@ defmodule MagusWeb.AgentsLive.Components.KnowledgeSectionComponent do
           to_form(
             %{
               "summary" => memory.summary || "",
-              "kind" => to_string(memory.kind),
-              "confidence" => round(memory.confidence * 100)
+              "kind" => to_string(memory.kind)
             },
             as: "memory"
           )
@@ -379,8 +359,7 @@ defmodule MagusWeb.AgentsLive.Components.KnowledgeSectionComponent do
 
     attrs = %{
       summary: blank_to_nil(params["summary"]),
-      kind: safe_to_kind_atom(params["kind"]),
-      confidence: parse_confidence(params["confidence"])
+      kind: safe_to_kind_atom(params["kind"])
     }
 
     case Magus.Memory.set_memory(memory, memory.content || %{}, attrs,
@@ -391,8 +370,7 @@ defmodule MagusWeb.AgentsLive.Components.KnowledgeSectionComponent do
           to_form(
             %{
               "summary" => updated.summary || "",
-              "kind" => to_string(updated.kind),
-              "confidence" => round(updated.confidence * 100)
+              "kind" => to_string(updated.kind)
             },
             as: "memory"
           )
@@ -651,20 +629,6 @@ defmodule MagusWeb.AgentsLive.Components.KnowledgeSectionComponent do
     |> Enum.uniq()
   end
 
-  defp format_confidence(value) when is_float(value), do: "#{round(value * 100)}%"
-  defp format_confidence(value) when is_integer(value), do: "#{value}%"
-  defp format_confidence(_), do: "100%"
-
-  defp format_slider_confidence(val) when is_binary(val) do
-    case Integer.parse(val) do
-      {n, _} -> "#{n}%"
-      :error -> "100%"
-    end
-  end
-
-  defp format_slider_confidence(val) when is_integer(val), do: "#{val}%"
-  defp format_slider_confidence(_), do: "100%"
-
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(val), do: val
 
@@ -674,14 +638,4 @@ defmodule MagusWeb.AgentsLive.Components.KnowledgeSectionComponent do
     do: String.to_existing_atom(kind)
 
   defp safe_to_kind_atom(_), do: :general
-
-  defp parse_confidence(val) when is_binary(val) do
-    case Integer.parse(val) do
-      {n, _} -> max(0, min(100, n)) / 100
-      :error -> 1.0
-    end
-  end
-
-  defp parse_confidence(val) when is_integer(val), do: max(0, min(100, val)) / 100
-  defp parse_confidence(_), do: 1.0
 end

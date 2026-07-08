@@ -46,21 +46,11 @@ defmodule Magus.Agents.Tools.Memory.SetMemory do
         default: "local",
         doc: "Memory scope: 'local' (default), 'user', or 'agent'"
       ],
-      confidence: [
-        type: {:or, [:float, nil]},
-        default: nil,
-        doc: "Confidence score 0.0-1.0"
-      ],
       kind: [
         type: {:or, [:string, nil]},
         default: nil,
         doc:
           "Memory kind: general, fact, hypothesis, observation, summary, preference, goal, topic, habit, reflection"
-      ],
-      structured_data: [
-        type: {:or, [:map, nil]},
-        default: nil,
-        doc: "Structured metadata for the memory kind (e.g., deadlines, streaks, sources)"
       ]
     ]
 
@@ -107,10 +97,8 @@ defmodule Magus.Agents.Tools.Memory.SetMemory do
         summary = get_param(params, :summary)
         content = get_param(params, :content, %{}) |> ensure_map()
 
-        confidence = get_param(params, :confidence)
         kind = get_param(params, :kind)
-        structured_data = get_param(params, :structured_data)
-        extra_attrs = build_extra_attrs(confidence, kind, structured_data)
+        extra_attrs = build_extra_attrs(kind)
 
         upsert_memory(name, summary, content, scope, ctx, extra_attrs)
       else
@@ -227,18 +215,12 @@ defmodule Magus.Agents.Tools.Memory.SetMemory do
 
   @valid_kinds ~w(general fact hypothesis observation summary preference goal topic habit reflection)
 
-  defp build_extra_attrs(confidence, kind, structured_data) do
+  defp build_extra_attrs(kind) do
     %{}
-    |> then(fn attrs ->
-      if confidence, do: Map.put(attrs, :confidence, confidence), else: attrs
-    end)
     |> then(fn attrs ->
       if kind && kind in @valid_kinds,
         do: Map.put(attrs, :kind, String.to_existing_atom(kind)),
         else: attrs
-    end)
-    |> then(fn attrs ->
-      if structured_data, do: Map.put(attrs, :structured_data, structured_data), else: attrs
     end)
   end
 

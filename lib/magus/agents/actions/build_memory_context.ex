@@ -146,13 +146,6 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
         formatted
       end
 
-    # Bump last_accessed_at only for semantically retrieved memories: they
-    # were selected by relevance to the actual query, which is a real usage
-    # signal. Key (recency) memories are injected ambiently every turn, so
-    # touching them would blur the signal even though no ambient process
-    # currently reads last_accessed_at for eviction.
-    touch_accessed_memories(Enum.map(semantic, & &1.id))
-
     %{
       important: important,
       semantic: semantic,
@@ -464,13 +457,5 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
     else
       "*Tip: Create global memories with scope=\"global\" to persist preferences across all conversations.*"
     end
-  end
-
-  defp touch_accessed_memories([]), do: :ok
-
-  defp touch_accessed_memories(ids) do
-    Magus.Memory.touch_accessed(ids)
-  rescue
-    e -> Logger.warning("Failed to touch last_accessed_at: #{Exception.message(e)}")
   end
 end

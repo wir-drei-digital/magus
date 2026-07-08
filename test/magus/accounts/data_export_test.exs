@@ -116,7 +116,7 @@ defmodule Magus.Accounts.DataExportTest do
       assert id == folder.id
     end
 
-    test "exports memories with versions and sources" do
+    test "exports memories" do
       user = generate(user())
       {:ok, conv} = Magus.Chat.create_conversation(%{title: "C"}, actor: user)
 
@@ -136,8 +136,7 @@ defmodule Magus.Accounts.DataExportTest do
       assert exported.name == "preferences"
       assert exported.summary == "I like X"
       assert exported.content == %{"a" => 1}
-      assert is_list(exported.versions)
-      assert is_list(exported.sources)
+      assert exported.conversation_id == conv.id
     end
 
     test "exports brains with pages including body, frontmatter, tags, and wikilinks" do

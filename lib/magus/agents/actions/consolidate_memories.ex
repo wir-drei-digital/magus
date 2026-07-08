@@ -113,12 +113,12 @@ defmodule Magus.Agents.Actions.ConsolidateMemories do
     end)
   end
 
-  # Returns distinct workspace_id values across the user's active memories.
-  # Always includes at least nil (the personal-context bucket) so a user with
-  # no memories yet still gets a single iteration.
+  # Returns distinct workspace_id values across the user's memories. Always
+  # includes at least nil (the personal-context bucket) so a user with no
+  # memories yet still gets a single iteration.
   defp workspace_buckets_for(user_id) do
     case Memory.Memory
-         |> Ash.Query.filter(user_id == ^user_id and is_active == true)
+         |> Ash.Query.filter(user_id == ^user_id)
          |> Ash.Query.select([:workspace_id])
          |> Ash.read(authorize?: false) do
       {:ok, []} -> [nil]

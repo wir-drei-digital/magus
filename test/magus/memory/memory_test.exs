@@ -4,7 +4,6 @@ defmodule Magus.Memory.MemoryTest do
 
   Tests cover:
   - Memory CRUD operations
-  - Version creation on updates
   - Deep merge behavior for update_content
   - Validation boundaries (content size, summary length)
   - Identity constraint (unique name per conversation)
@@ -33,29 +32,7 @@ defmodule Magus.Memory.MemoryTest do
       assert memory.name == "Test Memory"
       assert memory.content == %{"key" => "value"}
       assert memory.summary == "A test memory"
-      assert memory.is_active == true
       assert memory.lock_version == 0
-    end
-
-    test "creates initial version on create" do
-      user = generate(user())
-      {:ok, conversation} = Chat.create_conversation(%{}, actor: user)
-
-      {:ok, memory} =
-        Memory.create_memory(
-          conversation.id,
-          user.id,
-          "Versioned Memory",
-          %{content: %{"data" => "initial"}, summary: "Initial version"},
-          actor: user
-        )
-
-      {:ok, versions} = Memory.list_versions_for_memory(memory.id, authorize?: false)
-
-      assert length(versions) == 1
-      version = hd(versions)
-      assert version.content == %{"data" => "initial"}
-      assert version.version == 0
     end
 
     test "enqueues embedding job when summary provided" do
@@ -120,30 +97,6 @@ defmodule Magus.Memory.MemoryTest do
 
       assert updated.lock_version == 1
     end
-
-    test "creates new version on update" do
-      user = generate(user())
-      {:ok, conversation} = Chat.create_conversation(%{}, actor: user)
-
-      {:ok, memory} =
-        Memory.create_memory(
-          conversation.id,
-          user.id,
-          "Version Test",
-          %{content: %{"v" => 0}},
-          actor: user
-        )
-
-      {:ok, _updated} =
-        Memory.set_memory(memory, %{"v" => 1}, actor: user)
-
-      {:ok, versions} = Memory.list_versions_for_memory(memory.id, authorize?: false)
-
-      assert length(versions) == 2
-      [latest, _initial] = versions
-      assert latest.content == %{"v" => 1}
-      assert latest.version == 1
-    end
   end
 
   describe "Memory.clear" do
@@ -181,8 +134,6 @@ defmodule Magus.Memory.MemoryTest do
           %{},
           actor: user
         )
-
-      assert memory.is_active == true
 
       assert :ok = Memory.destroy_memory(memory, actor: user)
 
@@ -602,8 +553,8 @@ defmodule Magus.Memory.MemoryTest do
     end
   end
 
-  describe "confidence and kind" do
-    test "creates memory with default confidence and kind" do
+  describe "kind" do
+    test "creates memory with default kind" do
       user = generate(user())
       {:ok, conversation} = Chat.create_conversation(%{}, actor: user)
 
@@ -616,11 +567,10 @@ defmodule Magus.Memory.MemoryTest do
           actor: user
         )
 
-      assert memory.confidence == 1.0
       assert memory.kind == :general
     end
 
-    test "creates memory with custom confidence and kind" do
+    test "creates memory with custom kind" do
       user = generate(user())
       {:ok, conversation} = Chat.create_conversation(%{}, actor: user)
 
@@ -629,11 +579,10 @@ defmodule Magus.Memory.MemoryTest do
           conversation.id,
           user.id,
           "Custom Fields",
-          %{confidence: 0.7, kind: :hypothesis},
+          %{kind: :hypothesis},
           actor: user
         )
 
-      assert memory.confidence == 0.7
       assert memory.kind == :hypothesis
     end
 
@@ -641,7 +590,18 @@ defmodule Magus.Memory.MemoryTest do
       user = generate(user())
       {:ok, conversation} = Chat.create_conversation(%{}, actor: user)
 
-      for kind <- [:general, :fact, :hypothesis, :observation, :summary, :preference] do
+      for kind <- [
+            :general,
+            :fact,
+            :hypothesis,
+            :observation,
+            :summary,
+            :preference,
+            :goal,
+            :topic,
+            :habit,
+            :reflection
+          ] do
         {:ok, memory} =
           Memory.create_memory(
             conversation.id,
@@ -655,7 +615,7 @@ defmodule Magus.Memory.MemoryTest do
       end
     end
 
-    test "updates confidence and kind via set" do
+    test "updates kind via set" do
       user = generate(user())
       {:ok, conversation} = Chat.create_conversation(%{}, actor: user)
 
@@ -664,7 +624,7 @@ defmodule Magus.Memory.MemoryTest do
           conversation.id,
           user.id,
           "Update Fields",
-          %{content: %{"data" => true}, confidence: 0.5, kind: :hypothesis},
+          %{content: %{"data" => true}, kind: :hypothesis},
           actor: user
         )
 
@@ -672,139 +632,11 @@ defmodule Magus.Memory.MemoryTest do
         Memory.set_memory(
           memory,
           %{"data" => true, "more" => true},
-          %{confidence: 0.9, kind: :fact},
+          %{kind: :fact},
           actor: user
         )
 
-      assert updated.confidence == 0.9
       assert updated.kind == :fact
-    end
-  end
-
-  describe "kinds and structured_data" do
-    setup do
-      user = generate(user())
-      {:ok, conversation} = Chat.create_conversation(%{}, actor: user)
-      %{user: user, conversation: conversation}
-    end
-
-    test "creates memory with goal kind", %{user: user, conversation: conversation} do
-      memory =
-        Memory.create_memory!(
-          conversation.id,
-          user.id,
-          "my_goal",
-          %{
-            content: %{text: "Learn figure drawing"},
-            summary: "Art goal",
-            kind: :goal,
-            structured_data: %{
-              deadline: "2026-06-01",
-              status: "active",
-              progress: 0,
-              milestones: ["gesture drawing", "anatomy basics", "full figure"]
-            }
-          },
-          actor: user
-        )
-
-      assert memory.kind == :goal
-      assert memory.structured_data["deadline"] == "2026-06-01"
-      assert memory.structured_data["milestones"] |> length() == 3
-    end
-
-    test "creates memory with habit kind", %{user: user, conversation: conversation} do
-      memory =
-        Memory.create_memory!(
-          conversation.id,
-          user.id,
-          "daily_drawing",
-          %{
-            content: %{text: "30 min figure drawing daily"},
-            summary: "Drawing habit",
-            kind: :habit,
-            structured_data: %{frequency: "daily", target: 30, streak: 0, last_completed: nil}
-          },
-          actor: user
-        )
-
-      assert memory.kind == :habit
-      assert memory.structured_data["frequency"] == "daily"
-    end
-
-    test "creates memory with topic kind", %{user: user, conversation: conversation} do
-      memory =
-        Memory.create_memory!(
-          conversation.id,
-          user.id,
-          "color_theory",
-          %{
-            content: %{text: "Notes on color theory"},
-            summary: "Color theory research",
-            kind: :topic,
-            structured_data: %{sources: [], confidence: 0.7}
-          },
-          actor: user
-        )
-
-      assert memory.kind == :topic
-    end
-
-    test "creates memory with reflection kind", %{user: user, conversation: conversation} do
-      memory =
-        Memory.create_memory!(
-          conversation.id,
-          user.id,
-          "week_1_reflection",
-          %{
-            content: %{text: "First week went well"},
-            summary: "Week 1 review",
-            kind: :reflection,
-            structured_data: %{period: "weekly", date: "2026-03-29"}
-          },
-          actor: user
-        )
-
-      assert memory.kind == :reflection
-    end
-
-    test "structured_data defaults to nil", %{user: user, conversation: conversation} do
-      memory =
-        Memory.create_memory!(
-          conversation.id,
-          user.id,
-          "plain_memory",
-          %{
-            content: %{text: "just text"},
-            summary: "Plain"
-          },
-          actor: user
-        )
-
-      assert memory.structured_data == nil
-    end
-
-    test "updates structured_data via set", %{user: user, conversation: conversation} do
-      memory =
-        Memory.create_memory!(
-          conversation.id,
-          user.id,
-          "updatable",
-          %{
-            content: %{text: "goal"},
-            summary: "A goal",
-            kind: :goal,
-            structured_data: %{progress: 0}
-          },
-          actor: user
-        )
-
-      updated =
-        Memory.set_memory!(memory, %{text: "goal"}, %{structured_data: %{progress: 50}},
-          actor: user
-        )
-
-      assert updated.structured_data["progress"] == 50
     end
   end
 
@@ -841,16 +673,15 @@ defmodule Magus.Memory.MemoryTest do
       assert memory.name == "Agent Knowledge"
     end
 
-    test "creates agent memory with confidence and kind", %{user: user, agent: agent} do
+    test "creates agent memory with kind", %{user: user, agent: agent} do
       {:ok, memory} =
         Memory.create_agent_memory(
           user.id,
           agent.id,
-          %{name: "Agent Fact", confidence: 0.8, kind: :fact},
+          %{name: "Agent Fact", kind: :fact},
           actor: user
         )
 
-      assert memory.confidence == 0.8
       assert memory.kind == :fact
     end
 

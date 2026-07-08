@@ -151,7 +151,6 @@ defmodule Magus.Agents.Tools.Memory.SearchMemories do
            actor: ai_actor()
          ) do
       {:ok, memories} ->
-        touch_memory_ids(memories)
         results = memories |> filter_by_kind(kind) |> Enum.map(&format_result(&1, "user"))
 
         {:ok,
@@ -178,7 +177,6 @@ defmodule Magus.Agents.Tools.Memory.SearchMemories do
              actor: ai_actor()
            ) do
         {:ok, memories} ->
-          touch_memory_ids(memories)
           memories |> filter_by_kind(kind) |> Enum.map(&format_result(&1, "local"))
 
         {:error, _} ->
@@ -196,7 +194,6 @@ defmodule Magus.Agents.Tools.Memory.SearchMemories do
              actor: ai_actor()
            ) do
         {:ok, memories} ->
-          touch_memory_ids(memories)
           memories |> filter_by_kind(kind) |> Enum.map(&format_result(&1, "user"))
 
         {:error, _} ->
@@ -220,7 +217,6 @@ defmodule Magus.Agents.Tools.Memory.SearchMemories do
            actor: ai_actor()
          ) do
       {:ok, memories} ->
-        touch_memory_ids(memories)
         results = memories |> filter_by_kind(kind) |> Enum.map(&format_result(&1, "agent"))
 
         {:ok,
@@ -242,7 +238,6 @@ defmodule Magus.Agents.Tools.Memory.SearchMemories do
            actor: ai_actor()
          ) do
       {:ok, memories} ->
-        touch_memory_ids(memories)
         results = memories |> filter_by_kind(kind) |> Enum.map(&format_result(&1, "local"))
 
         {:ok,
@@ -265,7 +260,6 @@ defmodule Magus.Agents.Tools.Memory.SearchMemories do
       summary: memory.summary,
       scope: scope,
       kind: to_string(memory.kind),
-      confidence: memory.confidence,
       updated_at: format_datetime(memory.updated_at)
     }
   end
@@ -280,10 +274,4 @@ defmodule Magus.Agents.Tools.Memory.SearchMemories do
   end
 
   defp filter_by_kind(memories, _invalid_kind), do: memories
-
-  defp touch_memory_ids(memories) do
-    Enum.map(memories, & &1.id) |> Magus.Memory.touch_accessed()
-  rescue
-    _ -> :ok
-  end
 end

@@ -9,14 +9,8 @@ defmodule Magus.Agents.Actions.BuildMemoryContextFormatTest do
       summary: Keyword.get(opts, :summary, "summary of #{name}"),
       content: Keyword.get(opts, :content, %{}),
       display_scope: Keyword.get(opts, :scope, :local),
-      kind: Keyword.get(opts, :kind, :general),
-      confidence: Keyword.get(opts, :confidence, 0.7)
+      kind: Keyword.get(opts, :kind, :general)
     }
-  end
-
-  test "confidence is never rendered" do
-    out = BuildMemoryContext.format_context([mem("A", confidence: 0.7)], [], true)
-    refute out =~ "confidence"
   end
 
   test "content previews are capped at 600 chars" do
