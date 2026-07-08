@@ -4104,11 +4104,11 @@ export function brainPages(brainId: string): Promise<RpcResult<PageTreeNode[]>> 
 export type TypeEntry = {
 	id: string;
 	title: string;
-	/** First non-heading line of the template body (a template has no dedicated description field yet). */
+	/** Frontmatter `description:` (set by define_type) when present, else the first non-heading body line. */
 	description: string;
 };
 
-const TEMPLATE_FIELDS: rpc.BrainTemplatesFields = ['id', 'title', 'body'];
+const TEMPLATE_FIELDS: rpc.BrainTemplatesFields = ['id', 'title', 'body', 'frontmatter'];
 
 /** First non-empty, non-heading line of a markdown body (mirrors `Magus.Brain.Guide.first_body_line/1`). */
 function firstBodyLine(body: string | null): string {
@@ -4120,18 +4120,37 @@ function firstBodyLine(body: string | null): string {
 	return '';
 }
 
+/**
+ * Template description with the same precedence as `Magus.Brain.Guide.type_entry/1`:
+ * an explicit frontmatter `description:` (set deliberately via define_type) wins over
+ * the incidental first body line, so this view matches what the agent sees.
+ */
+function templateDescription(
+	frontmatter: Record<string, unknown> | null | undefined,
+	body: string | null
+): string {
+	const explicit = frontmatter?.['description'];
+	if (typeof explicit === 'string' && explicit.trim() !== '') return explicit.trim();
+	return firstBodyLine(body);
+}
+
 /** The brain's `:template` pages (the Guide's types index, rendered by `types-view.svelte`). */
 export async function templatesForBrain(brainId: string): Promise<RpcResult<TypeEntry[]>> {
-	const result = await run<{ id: string; title: string | null; body: string | null }[]>((opts) =>
-		rpc.brainTemplates({ input: { brainId }, fields: TEMPLATE_FIELDS, ...opts })
-	);
+	const result = await run<
+		{
+			id: string;
+			title: string | null;
+			body: string | null;
+			frontmatter: Record<string, unknown> | null;
+		}[]
+	>((opts) => rpc.brainTemplates({ input: { brainId }, fields: TEMPLATE_FIELDS, ...opts }));
 	if (!result.success) return result;
 	return {
 		success: true,
 		data: result.data.map((template) => ({
 			id: template.id,
 			title: template.title || 'Untitled',
-			description: firstBodyLine(template.body)
+			description: templateDescription(template.frontmatter, template.body)
 		}))
 	};
 }

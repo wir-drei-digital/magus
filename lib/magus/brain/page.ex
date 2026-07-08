@@ -591,6 +591,11 @@ defmodule Magus.Brain.Page do
 
     attribute :frontmatter, :map do
       description "Cached parsed YAML frontmatter for fast filtering without re-parsing body. Populated by the Phase C save pipeline."
+
+      # Public: the SPA reads template `description:` (set by define_type)
+      # from it. No new exposure — `body` is already public and contains the
+      # same frontmatter as text.
+      public? true
       allow_nil? false
       default %{}
     end

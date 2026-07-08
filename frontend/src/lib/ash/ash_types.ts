@@ -359,13 +359,14 @@ export type BrainAttributesOnlySchema = {
 // BrainPage Schema
 export type BrainPageResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "icon" | "kind" | "body" | "lockVersion" | "updatedAt" | "brainId" | "parentPageId" | "prosemirror";
+  __primitiveFields: "id" | "title" | "icon" | "kind" | "body" | "lockVersion" | "frontmatter" | "updatedAt" | "brainId" | "parentPageId" | "prosemirror";
   id: UUIDv7;
   title: string | null;
   icon: string | null;
   kind: "page" | "template";
   body: string | null;
   lockVersion: number;
+  frontmatter: Record<string, any>;
   updatedAt: UtcDateTimeUsec;
   brainId: UUID;
   parentPageId: UUID | null;
@@ -378,13 +379,14 @@ export type BrainPageResourceSchema = {
 
 export type BrainPageAttributesOnlySchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "title" | "icon" | "kind" | "body" | "lockVersion" | "updatedAt" | "brainId" | "parentPageId";
+  __primitiveFields: "id" | "title" | "icon" | "kind" | "body" | "lockVersion" | "frontmatter" | "updatedAt" | "brainId" | "parentPageId";
   id: UUIDv7;
   title: string | null;
   icon: string | null;
   kind: "page" | "template";
   body: string | null;
   lockVersion: number;
+  frontmatter: Record<string, any>;
   updatedAt: UtcDateTimeUsec;
   brainId: UUID;
   parentPageId: UUID | null;
@@ -3021,6 +3023,12 @@ export type BrainPageFilterInput = {
     lessThan?: number;
     lessThanOrEqual?: number;
     in?: Array<number>;
+  };
+
+  frontmatter?: {
+    eq?: Record<string, any>;
+    notEq?: Record<string, any>;
+    in?: Array<Record<string, any>>;
   };
 
   updatedAt?: {
@@ -7008,7 +7016,7 @@ export type MagusAgentsSlashCommandFilterField = (typeof magusAgentsSlashCommand
 export const brainFilterFields = ["id", "title", "description", "instructions", "icon", "color", "workspaceId", "isSharedToWorkspace", "workspace"] as const;
 export type BrainFilterField = (typeof brainFilterFields)[number];
 
-export const brainPageFilterFields = ["id", "title", "icon", "kind", "body", "lockVersion", "updatedAt", "brainId", "parentPageId", "prosemirror", "brain", "parentPage"] as const;
+export const brainPageFilterFields = ["id", "title", "icon", "kind", "body", "lockVersion", "frontmatter", "updatedAt", "brainId", "parentPageId", "prosemirror", "brain", "parentPage"] as const;
 export type BrainPageFilterField = (typeof brainPageFilterFields)[number];
 
 export const brainPageLinkFilterFields = ["id", "targetTitleAtLinkTime", "sourcePageId", "sourcePage"] as const;
@@ -7174,7 +7182,7 @@ export type MagusAgentsSlashCommandSortField = (typeof magusAgentsSlashCommandSo
 export const brainSortFields = ["id", "title", "description", "instructions", "icon", "color", "workspaceId", "isSharedToWorkspace"] as const;
 export type BrainSortField = (typeof brainSortFields)[number];
 
-export const brainPageSortFields = ["id", "title", "icon", "kind", "body", "lockVersion", "updatedAt", "brainId", "parentPageId", "prosemirror"] as const;
+export const brainPageSortFields = ["id", "title", "icon", "kind", "body", "lockVersion", "frontmatter", "updatedAt", "brainId", "parentPageId", "prosemirror"] as const;
 export type BrainPageSortField = (typeof brainPageSortFields)[number];
 
 export const brainPageLinkSortFields = ["id", "targetTitleAtLinkTime", "sourcePageId"] as const;
