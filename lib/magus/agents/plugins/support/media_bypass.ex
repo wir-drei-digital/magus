@@ -87,25 +87,40 @@ defmodule Magus.Agents.Plugins.Support.MediaBypass do
       ReqLLM.Context.new([ReqLLM.Context.user(text)])
   end
 
+  # Media generation bypasses the ReAct runner, so it gets no turn keepalive
+  # from the coordinator; without its own ticker, minutes-long generations
+  # go signal-silent and the SPA's stuck-turn watchdog clears the busy state
+  # while work is still running.
   defp dispatch_media_generation(agent, media_state, mode, conversation_id) do
     case mode do
       :image_generation ->
-        case MediaGenerator.generate_image(agent, media_state) do
-          {:ok, _agent, _state} ->
-            Logger.info("Image generation completed for #{conversation_id}")
-            Signals.state_change(conversation_id, :idle)
-            Signals.response_complete(conversation_id, %{})
+        # Runs synchronously in the agent process, so the ticker must be
+        # stopped explicitly (the watched process outlives the generation).
+        keepalive = Magus.Agents.Support.TurnKeepalive.start(conversation_id)
 
-          {:error, _agent, state, error} ->
-            MediaGenerator.broadcast_error_event(state, error, "image")
-            Signals.state_change(conversation_id, :idle)
-            Signals.response_complete(conversation_id, %{})
+        try do
+          case MediaGenerator.generate_image(agent, media_state) do
+            {:ok, _agent, _state} ->
+              Logger.info("Image generation completed for #{conversation_id}")
+              Signals.state_change(conversation_id, :idle)
+              Signals.response_complete(conversation_id, %{})
+
+            {:error, _agent, state, error} ->
+              MediaGenerator.broadcast_error_event(state, error, "image")
+              Signals.state_change(conversation_id, :idle)
+              Signals.response_complete(conversation_id, %{})
+          end
+        after
+          Magus.Agents.Support.TurnKeepalive.stop(keepalive)
         end
 
       :video_generation ->
         # Video generation uses async polling (up to 10 min) — run in a Task
         # so the agent process stays responsive to status checks and new signals.
+        # The keepalive watches the task, so it ends with it on any exit path.
         Task.Supervisor.start_child(Magus.AgentLoopTaskSupervisor, fn ->
+          Magus.Agents.Support.TurnKeepalive.start(conversation_id)
+
           case MediaGenerator.generate_video(agent, media_state) do
             {:ok, _agent, _state} ->
               Logger.info("Video generation completed for #{conversation_id}")

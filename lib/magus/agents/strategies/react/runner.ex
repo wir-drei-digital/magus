@@ -691,55 +691,19 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
     |> normalize_timeout()
   end
 
-  # ---------------------------------------------------------------------------
-  # Turn keepalive — a ticker that, for the whole turn, periodically touches
-  # AgentRun liveness and broadcasts turn.keepalive. This covers the silent
-  # phases (long tool calls, unstreamed thinking) where no signals flow:
-  # without it, CleanupStale falsely times out runs after 2 minutes of tool
-  # silence and the SPA watchdog clears its busy state. The ticker MONITORS
-  # the coordinator (a link would not work: the coordinator's normal exit at
-  # turn end does not propagate through links) and stops on its DOWN, so it
-  # dies with the turn on every exit path.
-  # ---------------------------------------------------------------------------
+  # Turn keepalive for the whole turn: covers the silent phases (long tool
+  # calls, unstreamed thinking) where no signals flow. Watches the
+  # coordinator (a link would not work: normal exits do not propagate), so
+  # it dies with the turn on every exit path.
   defp start_turn_keepalive(context) do
     conversation_id =
       is_map(context) && (context[:conversation_id] || context["conversation_id"])
 
-    interval = turn_keepalive_interval_ms()
-    coordinator = self()
-
-    if is_binary(conversation_id) and is_integer(interval) and interval > 0 do
-      spawn(fn ->
-        mon_ref = Process.monitor(coordinator)
-        turn_keepalive_loop(conversation_id, interval, mon_ref)
-      end)
+    if is_binary(conversation_id) do
+      Magus.Agents.Support.TurnKeepalive.start(conversation_id, watch: self())
     end
 
     :ok
-  end
-
-  defp turn_keepalive_loop(conversation_id, interval, mon_ref) do
-    receive do
-      {:DOWN, ^mon_ref, :process, _pid, _reason} -> :ok
-    after
-      interval ->
-        try do
-          Magus.Agents.RunLiveness.touch(conversation_id)
-          Magus.Agents.Signals.turn_keepalive(conversation_id)
-        rescue
-          _ -> :ok
-        catch
-          _, _ -> :ok
-        end
-
-        turn_keepalive_loop(conversation_id, interval, mon_ref)
-    end
-  end
-
-  defp turn_keepalive_interval_ms do
-    :magus
-    |> Application.get_env(:agents, [])
-    |> Keyword.get(:turn_keepalive_interval_ms, 15_000)
   end
 
   # ---------------------------------------------------------------------------
