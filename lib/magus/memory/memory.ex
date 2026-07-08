@@ -74,6 +74,30 @@ defmodule Magus.Memory do
     end
   end
 
+  @doc """
+  Tagged variant of `workspace_id_for_conversation/1`.
+
+  Distinguishes "personal conversation" ({:ok, nil}) from "conversation does
+  not exist" ({:error, :not_found}) so tool callers can refuse to silently
+  write to the personal bucket on a bad conversation id.
+  """
+  @spec fetch_workspace_id_for_conversation(String.t() | nil) ::
+          {:ok, String.t() | nil} | {:error, :not_found}
+  def fetch_workspace_id_for_conversation(nil), do: {:error, :not_found}
+
+  def fetch_workspace_id_for_conversation(conversation_id) do
+    require Ash.Query
+
+    case Magus.Chat.Conversation
+         |> Ash.Query.filter(id == ^conversation_id)
+         |> Ash.Query.select([:workspace_id])
+         |> Ash.read_one(authorize?: false) do
+      {:ok, %{workspace_id: ws}} -> {:ok, ws}
+      {:ok, nil} -> {:error, :not_found}
+      _ -> {:error, :not_found}
+    end
+  end
+
   resources do
     resource Magus.Memory.Memory do
       # Local (conversation-scoped) memory operations
