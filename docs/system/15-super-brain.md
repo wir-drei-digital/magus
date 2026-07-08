@@ -180,7 +180,9 @@ Claims are the actual sentences the entity graph was always missing. Where an `E
 
 The table has plain btree indexes on `graph_name`, `subject_key`, `object_key`, `episode_id`, and `source_user_id`, plus an HNSW cosine index on `embedding` (`m = 16, ef_construction = 64`), mirroring `file_chunks`' vector index settings exactly (Ash codegen cannot express either the vector column size or the HNSW index, so both are hand-written in the migration).
 
-`Claim.top_ids_by_embedding/4` is the raw-SQL KNN helper: it takes a query embedding, a `graph_names` allow-list, a `tiers` list, and a limit, wraps the embedding in a single `Pgvector` binary parameter (so the HNSW index is usable and the query string stays small, the same reason `Magus.Files.Chunk.top_chunk_ids/3` exists), and returns ordered claim ids. Callers then do a normal Ash `read` on those ids to load full rows (with `:episode`).
+`Claim.top_hits_by_embedding/4` is the raw-SQL KNN helper: it takes a query embedding, a `graph_names` allow-list, a `tiers` list, and a limit, wraps the embedding in a single `Pgvector` binary parameter (so the HNSW index is usable and the query string stays small, the same reason `Magus.Files.Chunk.top_chunk_ids/3` exists), and returns `{id, similarity}` pairs in descending-similarity order (similarity is 1 - cosine distance, clamped to [0, 1]). Callers load full rows by id via Ash read (with `:episode`).
+
+Temporal fields (`asserted_at`, `valid_from`, `valid_to`) drive query-time temporal ranking; see "Temporal ranking (current vs historic)" under the Retrieval Pipeline. `asserted_at` is stamped at extraction write time, so re-extracting old content restamps it: supersedence prefers the most-recently-extracted statement, the correct default for "what does the system currently believe".
 
 ### Authorization
 
@@ -269,6 +271,25 @@ super_graph_for(actor, workspace_context)
 Legacy fan-out (`legacy_fan_out_search/2`) is the iter2 retrieval path. It searches every Layer 1 graph in parallel via `Task.async_stream/3` (max 8, 5s timeout each), ranks via `Retrieval.Ranker.score/1`, and aggregates. The ranker formula is `similarity × tier_mult × graph_weight × source_weight × recency_decay × neighborhood_support` with a 90-day exponential half-life. This path is the safety net for cold-start and read-set drift.
 
 The enrichment step on the super-graph path also pulls 1-hop `:RELATES_TO` neighbors per result (`Retrieval.fetch_canonical_neighbors/2`) and surfaces each neighbor's `predicate`, `confidence`, `contested`, and decoded `predicate_breakdown`. The ranker does not use those fields itself; they are passed through to the LLM context so the prompt sees conflicting evidence (e.g. "supports: 2 / contradicts: 1") instead of only the modal predicate.
+
+### Temporal ranking (current vs historic)
+
+Claim retrieval is time-aware. `Magus.SuperBrain.Temporal` (pure, `now` injected, no I/O) resolves the accessor's accessible claims into `current` and `historic` at query time:
+
+1. **Validity partition**: `valid_to` before `now` marks a claim `:expired`; `valid_from` after `now` marks it `:future`. Both go historic.
+2. **Supersedence** (in-window claims only):
+   - Value-change: same `(subject_key, predicate)`, predicate in `Ontology.single_valued_predicates/0` (seeded with `occurs_at`), BOTH claims `:affirms`, newest wins. Checked via `Ontology.single_valued_predicate?/1` (string-space; `Claim.predicate` is a string, ontology lists are atoms).
+   - Polarity flip: opposite polarity on the exact same triple, newest wins.
+   - "Newer" = `asserted_at` desc, then `valid_from` desc (nil oldest), then id desc (UUIDv7, time-ordered).
+3. **Recency**: `0.5 + 0.5 * exp(-age_days * ln(2) / 90)` on `asserted_at`, floored at 0.5.
+
+`Retrieval.search_claims/2` runs a two-step fetch so the KNN cannot miss a superseder: pgvector candidates (`Claim.top_hits_by_embedding/4`, now returning `(id, similarity)` pairs), then one batched group-completion read of ALL accessible claims in the candidate `(subject_key, predicate)` groups (`Claim.group_hits_by_embedding/5`; nil-embedding claims included at similarity 0.0 so an unembedded superseder still resolves). Ranked score: `vector_similarity x trust_tier_multiplier x recency_factor`. Superseded and expired claims are excluded from the default result, never merely down-weighted.
+
+Because resolution runs over only the accessor's allow-listed graphs, supersedence is accessor-relative: a superseder in a graph the reader cannot access does not hide the claim they can read.
+
+Options: `:now` (pinned by the deterministic eval), `:include_historic` (default false; when true the return is `{:ok, %{current: [...], historic: [%{claim: c, reason: :superseded | :expired | :future}]}}`).
+
+Surfacing: the `<super_brain>` context block appends a `(was: X)` trailer to a current line whose group has a superseded prior (expired claims are omitted); `get_dossier` splits facts (current) from a `history` trail with per-entry status, resolving subject-side claims only (object-side groups are supersedence-incomplete by fetch construction).
 
 ## Per-episode `:RELATES_TO` aggregation in `BuildSuperIncremental`
 
@@ -385,7 +406,8 @@ For FalkorDB deployment, backups, snapshot/restore, and disaster recovery, see `
 | `lib/magus/super_brain/extraction/sanitizer.ex` | Atom-safe normalization for names/types/subtypes/predicates |
 | `lib/magus/super_brain/episode.ex` | Append-only extraction log with supersede chain |
 | `lib/magus/super_brain/super_graph.ex` | Per-accessor super graph metadata row |
-| `lib/magus/super_brain/claim.ex` | Propositional layer: one subject-predicate-object statement per row, with `top_ids_by_embedding/4` KNN helper |
+| `lib/magus/super_brain/claim.ex` | Propositional layer: one subject-predicate-object statement per row, with `top_hits_by_embedding/4` KNN helper |
+| `lib/magus/super_brain/temporal.ex` | Pure query-time temporal resolution (validity, supersedence, recency) |
 | `lib/magus/super_brain/naming.ex` | `key/1`: downcase + whitespace-collapse normalization shared by claim subject/object keys and canonical entity buckets |
 | `lib/magus/super_brain/graph_router.ex` | Resource → graph name resolution |
 | `lib/magus/super_brain/graph_weight.ex` | Per-graph and per-accessor weight overrides |
