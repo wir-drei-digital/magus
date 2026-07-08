@@ -35,8 +35,7 @@ defmodule Magus.Agents.Actions.ConsolidateMemoriesProfileTest do
         actor: @ai
       )
 
-    # ConsolidateMemories makes LLM calls for merge/promote steps too; stub
-    # everything generically and return a profile document when the distiller
+    # Stub generically and return a profile document when the distiller
     # schema is requested (it is the only schema requiring just "document").
     stub(LLMMock, :generate_object, fn _model, _prompt, schema, _opts ->
       if schema["required"] == ["document"] do
@@ -93,5 +92,26 @@ defmodule Magus.Agents.Actions.ConsolidateMemoriesProfileTest do
 
     assert {:ok, result} = ConsolidateMemories.run(%{user_id: to_string(user.id)}, %{})
     assert result.profiles_distilled == 0
+  end
+
+  test "consolidation never deletes user-scope rows, even ancient ones" do
+    user = generate(user())
+
+    {:ok, memory} =
+      Magus.Memory.create_user_memory(user.id, nil, "keep-me", %{content: %{}, summary: "s"},
+        actor: %Magus.Agents.Support.AiAgent{}
+      )
+
+    # Backdate far past the old 90-day decay window.
+    {:ok, uuid} = Ecto.UUID.dump(memory.id)
+
+    Magus.Repo.query!(
+      "UPDATE memories SET updated_at = now() - interval '200 days' WHERE id = $1",
+      [uuid]
+    )
+
+    {:ok, _} = Magus.Agents.Actions.ConsolidateMemories.run(%{user_id: user.id}, %{})
+
+    assert {:ok, _} = Magus.Memory.get_memory(memory.id, authorize?: false)
   end
 end

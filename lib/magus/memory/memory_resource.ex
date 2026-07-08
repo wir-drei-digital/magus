@@ -416,23 +416,6 @@ defmodule Magus.Memory.Memory do
         |> Ash.Query.limit(limit_val)
       end
     end
-
-    update :promote_to_user do
-      description "Promote a local memory to user scope"
-      require_atomic? false
-
-      validate fn changeset, _context ->
-        if changeset.data.scope == :user do
-          {:error, field: :scope, message: "Memory is already user-scoped"}
-        else
-          :ok
-        end
-      end
-
-      change set_attribute(:scope, :user)
-      change set_attribute(:conversation_id, nil)
-      change Magus.Memory.Memory.Changes.CreateVersion
-    end
   end
 
   policies do

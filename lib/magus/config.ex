@@ -157,14 +157,6 @@ defmodule Magus.Config do
     get(Magus.Memory, :extraction_message_threshold, 5)
   end
 
-  @doc """
-  Days after which unused memories are considered stale and may be deactivated.
-  """
-  @spec stale_memory_threshold_days() :: pos_integer()
-  def stale_memory_threshold_days do
-    get(Magus.Memory, :stale_threshold_days, 90)
-  end
-
   # =============================================================================
   # Integration Configuration
   # =============================================================================

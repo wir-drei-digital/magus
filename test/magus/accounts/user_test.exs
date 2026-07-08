@@ -874,12 +874,13 @@ defmodule Magus.Accounts.UserTest do
         Magus.Memory.create_memory(
           conv.id,
           user.id,
-          "Stale Memory",
+          "Ancient Memory",
           %{summary: "Very old context"},
           actor: %Magus.Agents.Support.AiAgent{}
         )
 
-      # Make the memory stale so consolidation has an observable effect.
+      # Backdate the memory far past the old (now-removed) 90-day decay
+      # window, to prove consolidation no longer deletes anything ambiently.
       stale_date = DateTime.add(DateTime.utc_now(), -100, :day)
       {:ok, uuid_binary} = Ecto.UUID.dump(memory.id)
 
@@ -900,9 +901,10 @@ defmodule Magus.Accounts.UserTest do
                )
                |> Ash.update()
 
-      # The stale memory was decayed, proving consolidation ran for this user.
+      # Consolidation ran (no crash on the AshOban call path) and never
+      # deletes memories ambiently, however old.
       {:ok, memories} = Magus.Memory.list_memories_for_conversation(conv.id, authorize?: false)
-      refute Enum.any?(memories, &(&1.name == "Stale Memory"))
+      assert Enum.any?(memories, &(&1.name == "Ancient Memory"))
     end
 
     test "is forbidden outside the AshOban context" do

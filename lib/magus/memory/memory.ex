@@ -123,9 +123,6 @@ defmodule Magus.Memory do
         action: :semantic_search_user,
         args: [:user_id, :workspace_id, :query_embedding]
 
-      # Scope management
-      define :promote_memory_to_user, action: :promote_to_user
-
       # Agent (custom-agent-scoped) memory operations
       define :create_agent_memory, action: :create_agent, args: [:user_id, :custom_agent_id]
       define :list_agent_memories, action: :for_agent, args: [:custom_agent_id]

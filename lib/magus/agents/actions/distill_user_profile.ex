@@ -191,12 +191,12 @@ defmodule Magus.Agents.Actions.DistillUserProfile do
     """
   end
 
-  # Mirrors PromoteMemoryCandidates/MergeMemories: this is a background
-  # maintenance action with no conversation, so `conversation_id` is omitted
-  # entirely rather than passed as `nil` (UsageRecorder defaults it to nil via
-  # `Keyword.get/3` either way). `record!/1` already never raises (it wraps
-  # `record/1`, which itself rescues everything and returns `{:error, e}`), so
-  # no local rescue is needed here.
+  # This is a background maintenance action with no conversation, so
+  # `conversation_id` is omitted entirely rather than passed as `nil`
+  # (UsageRecorder defaults it to nil via `Keyword.get/3` either way).
+  # `record!/1` already never raises (it wraps `record/1`, which itself
+  # rescues everything and returns `{:error, e}`), so no local rescue is
+  # needed here.
   defp record_usage(user_id, model_key, usage) do
     UsageRecorder.record!(
       user_id: user_id,

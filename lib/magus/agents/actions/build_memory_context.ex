@@ -172,8 +172,8 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
     # Bump last_accessed_at only for semantically retrieved memories: they
     # were selected by relevance to the actual query, which is a real usage
     # signal. Key (recency) and associated memories are injected ambiently
-    # every turn; touching them would make the 90-day decay in
-    # ConsolidateMemories self-refreshing and unreachable.
+    # every turn, so touching them would blur the signal even though no
+    # ambient process currently reads last_accessed_at for eviction.
     touch_accessed_memories(Enum.map(semantic, & &1.id))
 
     %{

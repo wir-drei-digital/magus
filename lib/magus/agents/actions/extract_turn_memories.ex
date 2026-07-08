@@ -54,7 +54,6 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
   require Logger
 
   alias Magus.Agents.Support.AiAgent
-  alias Magus.Agents.Actions.PromoteMemoryCandidates
   alias Magus.Agents.Config
   alias Magus.Agents.Persistence.UsageRecorder
   alias Magus.Agents.Clients.LLM, as: LLMClient
@@ -525,9 +524,20 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
 
   defp similar_enough?(embedding_a, embedding_b)
        when is_list(embedding_a) and is_list(embedding_b) do
-    PromoteMemoryCandidates.cosine_similarity(embedding_a, embedding_b) >
-      @dedup_similarity_threshold
+    cosine_similarity(embedding_a, embedding_b) > @dedup_similarity_threshold
   end
 
   defp similar_enough?(_, _), do: false
+
+  defp cosine_similarity(a, b) when is_list(a) and is_list(b) do
+    dot = Enum.zip(a, b) |> Enum.reduce(0.0, fn {x, y}, acc -> acc + x * y end)
+    norm_a = :math.sqrt(Enum.reduce(a, 0.0, fn x, acc -> acc + x * x end))
+    norm_b = :math.sqrt(Enum.reduce(b, 0.0, fn x, acc -> acc + x * x end))
+
+    if norm_a == 0.0 or norm_b == 0.0 do
+      0.0
+    else
+      dot / (norm_a * norm_b)
+    end
+  end
 end

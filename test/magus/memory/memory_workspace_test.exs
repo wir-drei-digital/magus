@@ -116,21 +116,6 @@ defmodule Magus.Memory.MemoryWorkspaceTest do
     end
   end
 
-  describe "promote_to_user" do
-    test "carries the source local memory's workspace_id" do
-      user = pro_user()
-      ws = ws(user)
-      {:ok, conv} = Chat.create_conversation(%{workspace_id: ws.id}, actor: user)
-      {:ok, local} = Memory.create_memory(conv.id, user.id, "tip", %{summary: "x"}, actor: user)
-
-      {:ok, promoted} = Memory.promote_memory_to_user(local, actor: user)
-
-      assert promoted.scope == :user
-      assert promoted.workspace_id == ws.id
-      assert is_nil(promoted.conversation_id)
-    end
-  end
-
   describe ":user memories are isolated per workspace on read" do
     setup do
       user = pro_user()
