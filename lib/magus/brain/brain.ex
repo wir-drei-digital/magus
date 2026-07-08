@@ -259,6 +259,8 @@ defmodule Magus.Brain do
         from(p in "brain_pages",
           where: p.brain_id in ^Enum.map(brain_ids, &Ecto.UUID.dump!/1),
           where: is_nil(p.deleted_at),
+          # Templates are meta, never knowledge hits.
+          where: p.kind != "template",
           where: fragment("search_vector @@ to_tsquery('english', ?)", ^tsquery),
           select: %{
             id: p.id,
@@ -380,6 +382,11 @@ defmodule Magus.Brain do
       on: p.id == c.page_id,
       where: not is_nil(c.embedding),
       where: p.brain_id in ^brain_id_bins,
+      # Templates are meta, never knowledge hits (covers chunks embedded
+      # before templates were excluded from chunking). Trashed pages keep
+      # their chunks (soft_delete doesn't rechunk), so filter those too.
+      where: p.kind != "template",
+      where: is_nil(p.deleted_at),
       select: %{
         page_id: c.page_id,
         brain_id: p.brain_id,

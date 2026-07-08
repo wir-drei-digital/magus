@@ -585,10 +585,13 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Reads do
 
     like_pattern = "%" <> escape_like(lowered) <> "%"
 
+    # kind != :template (templates are meta, not findable content) and
+    # is_nil(deleted_at) (the primary :read includes trashed rows).
     Magus.Brain.Page
     |> Ash.Query.filter(
       brain_id == ^brain_id and
-        fragment("LOWER(?) LIKE ?", title, ^like_pattern)
+        fragment("LOWER(?) LIKE ?", title, ^like_pattern) and
+        kind != :template and is_nil(deleted_at)
     )
     |> Ash.Query.limit(50)
     |> Ash.read(actor: user)
@@ -628,7 +631,7 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Reads do
 
       tsquery ->
         Magus.Brain.Page
-        |> Ash.Query.filter(brain_id == ^brain_id)
+        |> Ash.Query.filter(brain_id == ^brain_id and kind != :template and is_nil(deleted_at))
         |> Ash.Query.filter(fragment("search_vector @@ to_tsquery('english', ?)", ^tsquery))
         |> Ash.Query.limit(50)
         |> Ash.read(actor: user)

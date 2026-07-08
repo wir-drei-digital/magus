@@ -135,12 +135,15 @@ defmodule Magus.Brain.Page.Changes.UpdateBodyDerivedState do
   defp resolve_target(brain_id, target_title) do
     brain_id_bin = dump_uuid(brain_id)
 
+    # Templates are excluded: a [[wikilink]] is content-facing and must
+    # never bind to a template that happens to share the title (templates
+    # are addressable by id only, keeping them meta).
     Repo.one(
       from(p in "brain_pages",
         where:
           p.brain_id == ^brain_id_bin and
             fragment("LOWER(?) = LOWER(?)", p.title, ^target_title) and
-            is_nil(p.deleted_at),
+            is_nil(p.deleted_at) and p.kind != "template",
         select: p.id,
         limit: 1
       )
@@ -304,21 +307,16 @@ defmodule Magus.Brain.Page.Changes.UpdateBodyDerivedState do
     from(c in "brain_page_chunks", where: c.page_id == ^page_id_bin)
     |> Repo.delete_all()
 
+    # Templates are meta (reusable skeletons), not knowledge: never embed
+    # them, or their scaffold prose surfaces in semantic search and RAG.
+    # The delete above still runs so a page that somehow carried chunks
+    # is cleaned rather than left stale.
     rows =
-      body
-      |> Chunker.chunk()
-      |> Enum.map(fn %{content: content, index: idx, token_count: tokens} ->
-        %{
-          id: new_uuid_bin(),
-          page_id: page_id_bin,
-          index: idx,
-          content: content,
-          token_count: tokens,
-          embedding: nil,
-          inserted_at: now,
-          updated_at: now
-        }
-      end)
+      if page.kind == :template do
+        []
+      else
+        chunk_rows(body, page_id_bin, now)
+      end
 
     case rows do
       [] ->
@@ -328,6 +326,23 @@ defmodule Magus.Brain.Page.Changes.UpdateBodyDerivedState do
         Repo.insert_all("brain_page_chunks", rows, on_conflict: :nothing)
         :ok
     end
+  end
+
+  defp chunk_rows(body, page_id_bin, now) do
+    body
+    |> Chunker.chunk()
+    |> Enum.map(fn %{content: content, index: idx, token_count: tokens} ->
+      %{
+        id: new_uuid_bin(),
+        page_id: page_id_bin,
+        index: idx,
+        content: content,
+        token_count: tokens,
+        embedding: nil,
+        inserted_at: now,
+        updated_at: now
+      }
+    end)
   end
 
   # --- Helpers -------------------------------------------------------

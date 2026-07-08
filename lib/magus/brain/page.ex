@@ -278,13 +278,17 @@ defmodule Magus.Brain.Page do
       prepare build(sort: [position: :asc])
     end
 
+    # Title lookups are content-facing and exclude templates: a template is
+    # addressable by id (or via :templates_for_brain), never by the title
+    # resolution the write/guide tools use — otherwise `page_title: "Meeting
+    # Note"` could bind content edits or type/guide writes to the template.
     read :by_title_in_brain do
       argument :brain_id, :uuid, allow_nil?: false
       argument :title, :string, allow_nil?: false
 
       filter expr(
                brain_id == ^arg(:brain_id) and title == ^arg(:title) and is_nil(deleted_at) and
-                 ^no_trashed_ancestor()
+                 kind != :template and ^no_trashed_ancestor()
              )
     end
 
@@ -299,7 +303,7 @@ defmodule Magus.Brain.Page do
       filter expr(
                brain_id == ^arg(:brain_id) and
                  fragment("LOWER(?) = LOWER(?)", title, ^arg(:title)) and
-                 is_nil(deleted_at) and ^no_trashed_ancestor()
+                 is_nil(deleted_at) and kind != :template and ^no_trashed_ancestor()
              )
     end
 

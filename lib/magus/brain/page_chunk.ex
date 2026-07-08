@@ -72,7 +72,12 @@ defmodule Magus.Brain.PageChunk do
 
         query
         |> Ash.Query.filter(not is_nil(embedding))
-        |> Ash.Query.filter(exists(page, brain_id == ^brain_id))
+        # kind != :template — templates are meta, never knowledge hits.
+        # is_nil(deleted_at) — trashed pages keep their chunks (soft_delete
+        # doesn't rechunk), so exclude them at query time too.
+        |> Ash.Query.filter(
+          exists(page, brain_id == ^brain_id and kind != :template and is_nil(deleted_at))
+        )
         |> Ash.Query.load([:page, vector_distance: calc_args])
         |> Ash.Query.sort({:vector_distance, {calc_args, :asc}})
         |> Ash.Query.limit(limit_val)
