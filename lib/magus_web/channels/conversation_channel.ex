@@ -249,6 +249,8 @@ defmodule MagusWeb.ConversationChannel do
       push(socket, "presence.state", %{viewers: viewers})
     end
 
+    warm_conversation_agent(socket.assigns.conversation_id)
+
     {:noreply, socket}
   end
 
@@ -265,4 +267,30 @@ defmodule MagusWeb.ConversationChannel do
   end
 
   def handle_info(_message, socket), do: {:noreply, socket}
+
+  # Warm-boot the conversation agent on open. This is what makes interrupted
+  # turns actually retry when the user comes back: thawing an agent whose
+  # checkpoint says was_active triggers Magus.Agents.Recovery, which
+  # re-dispatches the interrupted message (with the recovery-retry note).
+  # It also removes the thaw latency from the user's first message. Strictly
+  # best effort and fully detached: a join must never fail or slow down
+  # because agent infrastructure is unavailable (tests run without the
+  # InstanceManager entirely).
+  defp warm_conversation_agent(conversation_id) do
+    Task.Supervisor.start_child(Magus.AgentLoopTaskSupervisor, fn ->
+      case Magus.Agents.Support.AgentBootstrap.ensure_conversation_agent(conversation_id) do
+        {:ok, _} ->
+          :ok
+
+        {:error, reason} ->
+          Logger.debug(
+            "ConversationChannel: agent warm-boot skipped for #{conversation_id}: #{inspect(reason)}"
+          )
+      end
+    end)
+
+    :ok
+  rescue
+    _ -> :ok
+  end
 end
