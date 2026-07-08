@@ -278,7 +278,7 @@ defmodule Magus.SuperBrain.RetrievalClaimsTest do
     ep
   end
 
-  defp seed_claim(graph, uid, text, opts \\ []) do
+  defp seed_claim(graph, uid, text, opts) do
     ep = seed_episode(graph, uid)
     subject = Keyword.get(opts, :subject, "Aurora")
     object = Keyword.get(opts, :object, "wrapper")
