@@ -31,6 +31,14 @@ defmodule Magus.SuperBrainRetrievalEvalE2ETest do
     assert claim_case.recall_at_k == 1.0,
            "claim_recall graded at #{claim_case.recall_at_k}, expected 1.0 with real embeddings"
 
+    temporal_case = Enum.find(run.per_case, &(&1.id == "temporal_ship_quarter_live"))
+
+    assert temporal_case,
+           "expected the live temporal case in the run (cases.json subjects must include \"live\")"
+
+    assert temporal_case.recall_at_k == 1.0,
+           "temporal graded at #{temporal_case.recall_at_k}: supersedence must return Q4 at k=1"
+
     assert run.aggregate == 1.0
   end
 end

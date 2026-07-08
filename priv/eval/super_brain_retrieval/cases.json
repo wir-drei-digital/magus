@@ -291,5 +291,47 @@
         }
       ]
     }
+  },
+  {
+    "id": "temporal_ship_quarter_live",
+    "category": "temporal",
+    "supported": true,
+    "target": "claims",
+    "subjects": ["live"],
+    "query": "when does project Aurora ship",
+    "query_embedding": [0, 0, 0, 0, 0, 0, 0, 0],
+    "claim_query_embedding": { "hot": 7 },
+    "k": 1,
+    "expected": [
+      { "subject": "Aurora", "predicate": "occurs_at", "object": "Q4" }
+    ],
+    "fixture": {
+      "entities": [
+        {
+          "key": "aurora",
+          "name": "Aurora",
+          "type": "project",
+          "embedding": [1, 0, 0, 0, 0, 0, 0, 0]
+        }
+      ],
+      "edges": [],
+      "sources": [],
+      "claims": [
+        {
+          "subject": "Aurora",
+          "predicate": "occurs_at",
+          "object": "Q3",
+          "claim_text": "Aurora ships in the third quarter.",
+          "asserted_at": "2026-05-01T00:00:00Z"
+        },
+        {
+          "subject": "Aurora",
+          "predicate": "occurs_at",
+          "object": "Q4",
+          "claim_text": "The Aurora ship date moved to Q4.",
+          "asserted_at": "2026-06-01T00:00:00Z"
+        }
+      ]
+    }
   }
 ]

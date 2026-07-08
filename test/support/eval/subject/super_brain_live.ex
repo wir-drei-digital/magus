@@ -159,7 +159,9 @@ defmodule Magus.Eval.Subject.SuperBrainLive do
           claim_text: c.claim_text,
           confidence: c.confidence,
           trust_tier: :evidence,
-          asserted_at: DateTime.utc_now(),
+          asserted_at: c.asserted_at || DateTime.utc_now(),
+          valid_from: c.valid_from,
+          valid_to: c.valid_to,
           embedding: embedding
         })
         |> Ash.create(authorize?: false)
