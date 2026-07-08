@@ -97,7 +97,7 @@ defmodule Magus.Agents.Actions.DistillUserProfile do
 
     query =
       Memory.Memory
-      |> Ash.Query.filter(user_id == ^user_id and scope == :local)
+      |> Ash.Query.filter(user_id == ^user_id and scope == :local and is_active == true)
       |> Ash.Query.sort(updated_at: :desc)
       |> Ash.Query.limit(@max_memories)
 

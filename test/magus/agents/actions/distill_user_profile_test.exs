@@ -50,6 +50,47 @@ defmodule Magus.Agents.Actions.DistillUserProfileTest do
     assert doc =~ "Lisbon"
   end
 
+  test "excludes soft-deleted local memories from distillation" do
+    user = generate(user())
+    conv = generate(conversation(actor: user))
+
+    {:ok, _active_memory} =
+      Magus.Memory.create_memory(
+        conv.id,
+        user.id,
+        "Active project",
+        %{content: %{}, summary: "User is working on a new web app"},
+        actor: user
+      )
+
+    {:ok, inactive_memory} =
+      Magus.Memory.create_memory(
+        conv.id,
+        user.id,
+        "Old project",
+        %{content: %{}, summary: "User completed the old project"},
+        actor: user
+      )
+
+    # Soft-delete the inactive memory by setting is_active to false
+    {:ok, inactive_binary} = Ecto.UUID.dump(inactive_memory.id)
+    Magus.Repo.query!("UPDATE memories SET is_active = false WHERE id = $1", [inactive_binary])
+
+    expect(LLMMock, :generate_object, fn _model, prompt, _schema, _opts ->
+      assert prompt =~ "Active project"
+      refute prompt =~ "Old project"
+
+      MockResponses.generate_object_response(%{
+        "document" => "## Current Focus\nWorking on new web app."
+      })
+    end)
+
+    assert {:ok, %{document: doc}} =
+             DistillUserProfile.run(%{user_id: to_string(user.id), workspace_id: nil}, %{})
+
+    assert doc =~ "web app"
+  end
+
   test "rewrites the profile from memories and pending notes, draining notes" do
     user = generate(user())
     conv = generate(conversation(actor: user))
