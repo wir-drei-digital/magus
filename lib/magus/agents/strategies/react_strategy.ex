@@ -88,9 +88,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
   """
 
   @start :ai_react_start
-  @llm_result :ai_react_llm_result
-  @tool_result :ai_react_tool_result
-  @llm_partial :ai_react_llm_partial
   @cancel :ai_react_cancel
   @steer :ai_react_steer
   @request_error :ai_react_request_error
@@ -98,7 +95,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
   @unregister_tool :ai_react_unregister_tool
   @set_tool_context :ai_react_set_tool_context
   @set_system_prompt :ai_react_set_system_prompt
-  @runtime_event :ai_react_runtime_event
   @worker_event :ai_react_worker_event
   @worker_child_started :ai_react_worker_child_started
   @worker_child_exit :ai_react_worker_child_exit
@@ -107,10 +103,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
   @spec start_action() :: :ai_react_start
   def start_action, do: @start
 
-  @doc "Returns the legacy action atom for handling LLM results (no-op in delegated mode)."
-  @spec llm_result_action() :: :ai_react_llm_result
-  def llm_result_action, do: @llm_result
-
   @doc "Returns the action atom for registering a tool dynamically."
   @spec register_tool_action() :: :ai_react_register_tool
   def register_tool_action, do: @register_tool
@@ -118,14 +110,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
   @doc "Returns the action atom for unregistering a tool."
   @spec unregister_tool_action() :: :ai_react_unregister_tool
   def unregister_tool_action, do: @unregister_tool
-
-  @doc "Returns the legacy action atom for handling tool results (no-op in delegated mode)."
-  @spec tool_result_action() :: :ai_react_tool_result
-  def tool_result_action, do: @tool_result
-
-  @doc "Returns the legacy action atom for handling streaming deltas (no-op in delegated mode)."
-  @spec llm_partial_action() :: :ai_react_llm_partial
-  def llm_partial_action, do: @llm_partial
 
   @doc "Returns the action atom for request cancellation."
   @spec cancel_action() :: :ai_react_cancel
@@ -142,10 +126,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
   @doc "Returns the action atom for updating the base system prompt."
   @spec set_system_prompt_action() :: :ai_react_set_system_prompt
   def set_system_prompt_action, do: @set_system_prompt
-
-  @doc "Returns the legacy action atom for direct runtime stream events (no-op in delegated mode)."
-  @spec runtime_event_action() :: :ai_react_runtime_event
-  def runtime_event_action, do: @runtime_event
 
   @action_specs %{
     @start => %{
@@ -242,32 +222,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
         }),
       doc: "Handle worker child exit lifecycle signal",
       name: "jido.agent.child.exit"
-    },
-    # Legacy compatibility actions kept as no-op adapters.
-    @llm_result => %{
-      schema: Zoi.object(%{call_id: Zoi.string(), result: Zoi.any()}),
-      doc: "Legacy no-op in delegated ReAct mode",
-      name: "ai.react.llm_result"
-    },
-    @tool_result => %{
-      schema: Zoi.object(%{call_id: Zoi.string(), tool_name: Zoi.string(), result: Zoi.any()}),
-      doc: "Legacy no-op in delegated ReAct mode",
-      name: "ai.react.tool_result"
-    },
-    @llm_partial => %{
-      schema:
-        Zoi.object(%{
-          call_id: Zoi.string(),
-          delta: Zoi.string(),
-          chunk_type: Zoi.atom() |> Zoi.default(:content)
-        }),
-      doc: "Legacy no-op in delegated ReAct mode",
-      name: "ai.react.llm_partial"
-    },
-    @runtime_event => %{
-      schema: Zoi.object(%{request_id: Zoi.string(), event: Zoi.map()}),
-      doc: "Legacy no-op in delegated ReAct mode",
-      name: "ai.react.runtime_event"
     }
   }
 
@@ -448,7 +402,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
         end
       end)
 
-    agent = strip_thinking_from_thread(agent)
     {agent, Enum.reverse(directives_rev)}
   end
 
@@ -516,10 +469,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
 
       @worker_child_exit ->
         process_worker_child_exit(agent, params)
-
-      # Legacy compatibility no-ops in delegated mode.
-      legacy when legacy in [@llm_result, @tool_result, @llm_partial, @runtime_event] ->
-        {agent, []}
 
       _ ->
         Helpers.maybe_execute_action_instruction(agent, instruction, ctx)
@@ -1189,6 +1138,7 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
           |> Map.put(:run_thread, nil)
           |> Map.put(:active_request_id, nil)
           |> clear_run_state()
+          |> drop_request_trace(request_id)
 
         signal =
           Signal.RequestCompleted.new!(%{
@@ -1211,6 +1161,7 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
           |> Map.put(:run_thread, nil)
           |> Map.put(:active_request_id, nil)
           |> clear_run_state()
+          |> drop_request_trace(request_id)
 
         signal =
           Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
@@ -1231,6 +1182,7 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
           |> Map.put(:run_thread, nil)
           |> Map.put(:active_request_id, nil)
           |> clear_run_state()
+          |> drop_request_trace(request_id)
 
         signal =
           Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
@@ -1604,24 +1556,20 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
     end
   end
 
-  defp append_assistant_to_run_thread(state, turn_type, text, tool_calls, thinking_content) do
+  # The parent's run_thread exists only for snapshot output; thinking content
+  # is tracked separately in :thinking_trace, so it is never appended here
+  # (the runner's own thread keeps thinking for LLM continuity).
+  defp append_assistant_to_run_thread(state, turn_type, text, tool_calls, _thinking_content) do
     thread = Map.get(state, :run_thread) || Map.get(state, :thread)
 
     case thread do
       %Thread{} = thread ->
         assistant_tool_calls = if turn_type == :tool_calls, do: tool_calls, else: nil
-        assistant_content = text
-
-        thinking_opts =
-          case thinking_content do
-            thinking when is_binary(thinking) and thinking != "" -> [thinking: thinking]
-            _ -> []
-          end
 
         Map.put(
           state,
           :run_thread,
-          Thread.append_assistant(thread, assistant_content, assistant_tool_calls, thinking_opts)
+          Thread.append_assistant(thread, text, assistant_tool_calls, [])
         )
 
       _ ->
@@ -1650,37 +1598,6 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
   # Thread is no longer persisted between requests — each request loads
   # history from DB via initial_messages. The run_thread is cleared on
   # completion/failure/cancellation.
-
-  defp strip_thinking_from_thread(agent) do
-    state = StratState.get(agent, %{})
-
-    cleaned_state =
-      state
-      |> maybe_strip_thread_thinking(:thread)
-      |> maybe_strip_thread_thinking(:run_thread)
-
-    put_strategy_state(agent, cleaned_state)
-  end
-
-  defp maybe_strip_thread_thinking(state, key) do
-    case Map.get(state, key) do
-      %Thread{entries: entries} = thread ->
-        cleaned_entries =
-          Enum.map(entries, fn
-            %Thread.Entry{thinking: thinking} = entry
-            when is_binary(thinking) and thinking != "" ->
-              %{entry | thinking: nil}
-
-            entry ->
-              entry
-          end)
-
-        Map.put(state, key, %{thread | entries: cleaned_entries})
-
-      _ ->
-        state
-    end
-  end
 
   defp ensure_request_trace(state, request_id) when is_binary(request_id) do
     traces = Map.get(state, :request_traces, %{})
@@ -1746,7 +1663,17 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
     |> Map.delete(:run_max_iterations)
     |> Map.delete(:run_system_prompt)
     |> Map.delete(:raw_streaming_text)
+    |> Map.put(:pending_tool_calls, [])
   end
+
+  # Traces exist only for live-run diagnostics (snapshot trace_summary); once
+  # the request is terminal they would otherwise accumulate unboundedly across
+  # turns for a long-lived agent process.
+  defp drop_request_trace(state, request_id) when is_binary(request_id) do
+    Map.update(state, :request_traces, %{}, &Map.delete(&1, request_id))
+  end
+
+  defp drop_request_trace(state, _request_id), do: state
 
   defp apply_content_delta(state, delta) when is_binary(delta) do
     previous_raw = state[:raw_streaming_text] || ""

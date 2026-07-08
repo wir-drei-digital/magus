@@ -472,4 +472,69 @@ defmodule Magus.Agents.Strategies.ReactStrategyTest do
       assert context_signals(iter_directives) == []
     end
   end
+
+  describe "terminal-event state hygiene" do
+    defp run_with_pending_tools(request_id) do
+      {agent, ctx} = init_agent(tools: [TestTool])
+      {agent, _} = ReactStrategy.cmd(agent, [start_instruction(%{request_id: request_id})], ctx)
+
+      llm_completed =
+        worker_event_instruction(request_id, %{
+          kind: :llm_completed,
+          request_id: request_id,
+          iteration: 1,
+          data: %{
+            turn_type: :tool_calls,
+            text: "",
+            tool_calls: [
+              %{id: "call_hygiene_1", name: "react_strategy_test_tool", arguments: %{}}
+            ],
+            usage: %{}
+          }
+        })
+
+      {agent, _} = ReactStrategy.cmd(agent, [llm_completed], ctx)
+      {agent, ctx}
+    end
+
+    test "cancellation clears pending_tool_calls" do
+      request_id = "req-hygiene-1"
+      {agent, ctx} = run_with_pending_tools(request_id)
+
+      state = StratState.get(agent, %{})
+      assert [%{id: "call_hygiene_1"}] = state[:pending_tool_calls]
+
+      cancelled =
+        worker_event_instruction(request_id, %{
+          kind: :request_cancelled,
+          request_id: request_id,
+          data: %{reason: :user_cancelled}
+        })
+
+      {agent, _} = ReactStrategy.cmd(agent, [cancelled], ctx)
+
+      state = StratState.get(agent, %{})
+      assert state[:pending_tool_calls] == []
+    end
+
+    test "request completion prunes the request's trace" do
+      request_id = "req-hygiene-2"
+      {agent, ctx} = run_with_pending_tools(request_id)
+
+      state = StratState.get(agent, %{})
+      assert Map.has_key?(state[:request_traces], request_id)
+
+      completed =
+        worker_event_instruction(request_id, %{
+          kind: :request_completed,
+          request_id: request_id,
+          data: %{result: "done", termination_reason: :final_answer, usage: %{}}
+        })
+
+      {agent, _} = ReactStrategy.cmd(agent, [completed], ctx)
+
+      state = StratState.get(agent, %{})
+      refute Map.has_key?(state[:request_traces] || %{}, request_id)
+    end
+  end
 end

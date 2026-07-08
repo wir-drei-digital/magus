@@ -142,6 +142,45 @@ defmodule Magus.Agents.Strategies.ReactStrategy.RunnerLifecycleTest do
     end
   end
 
+  describe "checkpoint emission" do
+    test "checkpoint events are not emitted by default (nothing consumes them)" do
+      Magus.Test.Mocks.LLMMock
+      |> expect(:stream_text, fn _model, _messages, _opts ->
+        MockResponses.stream_text_response("done")
+      end)
+
+      config =
+        Config.new(%{model: "mock:test-model", tools: [], max_iterations: 5, streaming: true})
+
+      events =
+        Runner.stream("q", config, request_id: "req_chk_off", run_id: "run_chk_off")
+        |> Enum.to_list()
+
+      refute Enum.any?(events, &(&1.kind == :checkpoint))
+      assert Enum.any?(events, &(&1.kind == :request_completed))
+    end
+
+    test "checkpoint events are emitted when :emit_checkpoints is enabled" do
+      original = Application.get_env(:magus, :agents, [])
+      Application.put_env(:magus, :agents, Keyword.put(original, :emit_checkpoints, true))
+      on_exit(fn -> Application.put_env(:magus, :agents, original) end)
+
+      Magus.Test.Mocks.LLMMock
+      |> expect(:stream_text, fn _model, _messages, _opts ->
+        MockResponses.stream_text_response("done")
+      end)
+
+      config =
+        Config.new(%{model: "mock:test-model", tools: [], max_iterations: 5, streaming: true})
+
+      events =
+        Runner.stream("q", config, request_id: "req_chk_on", run_id: "run_chk_on")
+        |> Enum.to_list()
+
+      assert Enum.any?(events, &(&1.kind == :checkpoint))
+    end
+  end
+
   describe "turn keepalive" do
     test "broadcasts turn.keepalive while the turn runs and stops when it ends" do
       conversation_id = Ecto.UUID.generate()

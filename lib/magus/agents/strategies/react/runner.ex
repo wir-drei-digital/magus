@@ -294,10 +294,11 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
       {:final_answer, completed} ->
         completed
 
-      # Unreachable in wrap-up mode (tools are stripped and needs_tools? is
-      # ignored), kept for exhaustiveness.
-      {:tool_calls, state, _tool_calls} ->
-        state
+      # Unreachable: wrap-up strips tools and forces the final-answer branch.
+      # If this ever fires, tools leaked into the wrap-up call — fail loudly.
+      {:tool_calls, _state, _tool_calls} ->
+        raise "ReAct wrap-up returned tool_calls despite stripped tools; " <>
+                "check maybe_strip_tools_for_wrap_up/2"
 
       {:error, state, error_reason, _error_type} ->
         Logger.warning(
@@ -1490,15 +1491,30 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
     state
   end
 
+  # Checkpoint tokens serialize and sign the WHOLE runtime state (thread
+  # included) — O(thread) work per boundary that grows quadratically over a
+  # long turn. Nothing consumes them until the deferred checkpoint-resume
+  # plan (docs/superpowers/plans/2026-07-08-checkpoint-resume.md) is
+  # executed, so emission is off by default and opt-in via config.
   defp emit_checkpoint(%State{} = state, owner, ref, %Config{} = config, reason)
        when reason in [:after_llm, :after_tools, :terminal] do
-    token = Token.issue(state, config)
+    if emit_checkpoints?() do
+      token = Token.issue(state, config)
 
-    emit_event(state, owner, ref, :checkpoint, %{
-      token: token,
-      reason: reason
-    })
-    |> then(fn {updated, _event} -> {updated, token} end)
+      emit_event(state, owner, ref, :checkpoint, %{
+        token: token,
+        reason: reason
+      })
+      |> then(fn {updated, _event} -> {updated, token} end)
+    else
+      {state, nil}
+    end
+  end
+
+  defp emit_checkpoints? do
+    :magus
+    |> Application.get_env(:agents, [])
+    |> Keyword.get(:emit_checkpoints, false)
   end
 
   defp emit_event(%State{} = state, owner, ref, kind, data, extra \\ %{}) do
