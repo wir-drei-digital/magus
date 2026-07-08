@@ -407,15 +407,28 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
       base_tool_context =
         Map.put(base_tool_context, :workspace_id, conversation.workspace_id)
 
-      # Enrich base tool context with brain IDs from signal data
-      brain_id = data[:brain_id] || data["brain_id"]
-      brain_page_id = data[:brain_page_id] || data["brain_page_id"]
+      # Enrich base tool context with brain IDs from signal data (explicit
+      # pane metadata), falling back to the conversation's brain-page
+      # companion link: a companion chat IS the brain pane, so the tools get
+      # the pane hints without the client having to thread metadata. The
+      # fallback feeds ONLY the tool context, not the Builder selections
+      # below — CompanionPreamble already injects the tree/body/Guide for
+      # companions, and selections would make BrainContext inject them twice.
+      explicit_brain_id = data[:brain_id] || data["brain_id"]
+      explicit_brain_page_id = data[:brain_page_id] || data["brain_page_id"]
+
+      {hint_brain_id, hint_brain_page_id} =
+        if explicit_brain_id do
+          {explicit_brain_id, explicit_brain_page_id}
+        else
+          companion_brain_hints(conversation)
+        end
 
       base_tool_context =
-        if brain_id do
+        if hint_brain_id do
           base_tool_context
-          |> Map.put(:brain_id, brain_id)
-          |> Map.put(:brain_page_id, brain_page_id)
+          |> Map.put(:brain_id, hint_brain_id)
+          |> Map.put(:brain_page_id, hint_brain_page_id)
         else
           base_tool_context
         end
@@ -456,8 +469,10 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
             pdf: data[:pdf_selection],
             service: data[:service_selection],
             message_selections: data[:message_selections],
-            brain_id: brain_id,
-            brain_page_id: brain_page_id,
+            # Explicit metadata only (see the tool-context comment above):
+            # companion-derived hints must not re-trigger BrainContext.
+            brain_id: explicit_brain_id,
+            brain_page_id: explicit_brain_page_id,
             source: run_source
           }
         )
@@ -502,6 +517,39 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
         }
     end
   end
+
+  @doc false
+  # Resolves the conversation's brain-page companion link to
+  # `{brain_id, page_id}` tool-context hints (`{nil, nil}` for
+  # non-companions). A companion chat IS the brain pane, so the agent's brain
+  # tools should target that page's brain without the client threading
+  # metadata. System reads (metadata only, no bodies): the link row belongs to
+  # the conversation the agent already operates in, the brain hint is
+  # workspace-validated by `BrainResolver` on use, and every downstream data
+  # access stays actor-gated.
+  def companion_brain_hints(%{id: conversation_id}) do
+    require Ash.Query
+
+    # Direct reads rather than get_companion_by_conversation: that action
+    # filters on actor(:id) (per-user link lookup), and this system context
+    # has no actor. conversation_id is a unique identity on the link.
+    with {:ok, %{resource_type: :brain_page, resource_id: page_id}} <-
+           Magus.Chat.ConversationCompanion
+           |> Ash.Query.filter(conversation_id == ^conversation_id)
+           |> Ash.Query.select([:id, :resource_type, :resource_id])
+           |> Ash.read_one(authorize?: false),
+         {:ok, %{brain_id: brain_id}} <-
+           Magus.Brain.Page
+           |> Ash.Query.filter(id == ^page_id and is_nil(deleted_at))
+           |> Ash.Query.select([:id, :brain_id])
+           |> Ash.read_one(authorize?: false) do
+      {brain_id, page_id}
+    else
+      _ -> {nil, nil}
+    end
+  end
+
+  def companion_brain_hints(_), do: {nil, nil}
 
   defp load_conversation_context(_conversation_id, %{id: _} = conversation_context) do
     {:ok, conversation_context}

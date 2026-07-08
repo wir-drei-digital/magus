@@ -130,10 +130,11 @@ they belong on: a project page, a spec page, a meeting note, anything.
 
 Each brain has its own **Guide**: brain-wide instructions (the constitution) plus,
 for the page you're working on, inherited section guides and its type's template.
-Most of the time this arrives for free as a `### Brain Guide` block already injected
-into your context. If you need it explicitly, or for a different page or location,
-call `brain_guide get_guide`. Check it before creating or restructuring pages so you
-follow that brain's own conventions on top of the defaults above.
+In a brain-page companion chat the Guide is already injected into your context (a
+`### Brain Guide` block inside the companion section). In any other conversation,
+call `brain_guide get_guide` for the brain (and page) you're about to touch. Check
+it before creating or restructuring pages so you follow that brain's own
+conventions on top of the defaults above.
 
 ## Authoring the Guide
 

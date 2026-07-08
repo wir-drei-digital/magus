@@ -207,4 +207,57 @@ defmodule Magus.Agents.Context.CompanionPreambleTest do
 
     refute preamble =~ "references"
   end
+
+  test "embeds the Brain Guide (constitution + section guides + types) in the preamble" do
+    user = generate(user())
+    {:ok, brain} = Magus.Brain.create_brain(%{title: "Guided"}, actor: user)
+
+    {:ok, brain} =
+      Magus.Brain.set_brain_instructions(brain, %{instructions: "One concept per page."},
+        actor: user
+      )
+
+    {:ok, parent} = Magus.Brain.create_page(brain.id, %{title: "Research"}, actor: user)
+
+    {:ok, _parent} =
+      Magus.Brain.update_page_body(
+        parent,
+        %{body: "---\ninstructions: Cite a source.\n---\n# Research", base_version: 0},
+        actor: user
+      )
+
+    {:ok, page} =
+      Magus.Brain.create_page(brain.id, %{title: "Paper Notes", parent_page_id: parent.id},
+        actor: user
+      )
+
+    {:ok, _template} =
+      Magus.Brain.create_page(brain.id, %{title: "Paper", kind: :template}, actor: user)
+
+    {:ok, conv} =
+      Magus.Chat.find_or_create_companion_conversation(:brain_page, page.id, actor: user)
+
+    preamble = CompanionPreamble.build(%{conversation_id: conv.id, user: user})
+
+    # This is the product's always-on Guide injection path: without it the
+    # agent would have to volunteer a brain_guide get_guide call every turn.
+    assert preamble =~ "### Brain Guide"
+    assert preamble =~ "One concept per page."
+    assert preamble =~ "Cite a source."
+    assert preamble =~ "**Types:**"
+    assert preamble =~ "- Paper"
+  end
+
+  test "omits the Brain Guide block when the brain has no guide at all" do
+    user = generate(user())
+    {:ok, brain} = Magus.Brain.create_brain(%{title: "Bare"}, actor: user)
+    {:ok, page} = Magus.Brain.create_page(brain.id, %{title: "Loose"}, actor: user)
+
+    {:ok, conv} =
+      Magus.Chat.find_or_create_companion_conversation(:brain_page, page.id, actor: user)
+
+    preamble = CompanionPreamble.build(%{conversation_id: conv.id, user: user})
+
+    refute preamble =~ "### Brain Guide"
+  end
 end

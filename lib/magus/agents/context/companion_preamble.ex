@@ -55,6 +55,11 @@ defmodule Magus.Agents.Context.CompanionPreamble do
           brain_page_intro(page, title, brain_title),
           BrainContext.available_brains_section(user, workspace_id),
           "### Page tree — " <> brain_title <> "\n\n" <> BrainContext.full_tree(pages, page.id),
+          # The brain's Guide (constitution + inherited section guides +
+          # types) rides along on every companion turn: this is the always-on
+          # injection path, so the agent follows the brain's own conventions
+          # without having to call brain_guide get_guide first.
+          BrainContext.guide_section(page.brain, page, pages, user),
           "### Current page: " <> title <> "\n\n" <> companion_body(page.body),
           companion_file_summary(page, user)
         ]

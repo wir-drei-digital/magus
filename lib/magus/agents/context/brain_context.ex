@@ -130,7 +130,7 @@ defmodule Magus.Agents.Context.BrainContext do
 
     stats_line = build_stats_line(pages, body, effective_frontmatter)
     frontmatter_line = build_frontmatter_line(effective_frontmatter)
-    guide_section = build_guide_section(brain, page, pages, actor)
+    guide_section = guide_section(brain, page, pages, actor)
     body_preview = build_body_preview(body_without_frontmatter)
     sources_section = build_sources_section(body)
     brains_section = wrap_brains_section(available_brains_section(actor, workspace_id))
@@ -214,10 +214,21 @@ defmodule Magus.Agents.Context.BrainContext do
 
   defp format_tags(_), do: nil
 
-  # Renders the `### Brain Guide` block: constitution, inherited section
-  # guides for the active page's location, and the brain's types index.
-  # Omitted entirely when `Guide` has nothing to show (see `Guide.empty?/1`).
-  defp build_guide_section(brain, page, pages, actor) do
+  @doc """
+  Renders the `### Brain Guide` block: constitution, inherited section
+  guides for the active page's location, and the brain's types index.
+  Returns nil when `Guide` has nothing to show (see `Guide.empty?/1`).
+
+  Public because `CompanionPreamble` embeds the same block in brain-page
+  companion chats (the always-on injection path), so both render identically.
+  """
+  @spec guide_section(
+          Ash.Resource.record(),
+          Ash.Resource.record(),
+          [Ash.Resource.record()],
+          term()
+        ) :: String.t() | nil
+  def guide_section(brain, page, pages, actor) do
     guide = Guide.for_page(brain, page, pages, actor)
 
     if Guide.empty?(guide) do

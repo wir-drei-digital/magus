@@ -180,4 +180,65 @@ defmodule Magus.Agents.Plugins.Support.PreflightTest do
   defp get_llm_opt(opts, key) when is_map(opts), do: Map.get(opts, key)
   defp get_llm_opt(opts, key) when is_list(opts), do: Keyword.get(opts, key)
   defp get_llm_opt(_opts, _key), do: nil
+
+  describe "companion_brain_hints/1" do
+    test "resolves a brain-page companion to {brain_id, page_id}" do
+      user = generate(user())
+      {:ok, brain} = Magus.Brain.create_brain(%{title: "Hints"}, actor: user)
+      {:ok, page} = Magus.Brain.create_page(brain.id, %{title: "Page"}, actor: user)
+
+      {:ok, conv} =
+        Magus.Chat.find_or_create_companion_conversation(:brain_page, page.id, actor: user)
+
+      # A companion chat IS the brain pane: the tools get the pane hints
+      # without the client threading brain metadata on every message.
+      assert {brain_id, page_id} = Preflight.companion_brain_hints(conv)
+      assert brain_id == brain.id
+      assert page_id == page.id
+    end
+
+    test "returns {nil, nil} for a plain conversation" do
+      user = generate(user())
+      {:ok, conv} = Magus.Chat.create_conversation(%{title: "Plain"}, actor: user)
+
+      assert {nil, nil} = Preflight.companion_brain_hints(conv)
+    end
+
+    test "returns {nil, nil} for a file companion" do
+      user = generate(user())
+      ensure_workspace_plan(user)
+      ws = generate(workspace(actor: user))
+
+      {:ok, file} =
+        Magus.Files.create_file(
+          %{
+            name: "doc.pdf",
+            type: :document,
+            mime_type: "application/pdf",
+            file_size: 1,
+            file_path: "#{user.id}/#{Ash.UUIDv7.generate()}.pdf",
+            workspace_id: ws.id
+          },
+          actor: user
+        )
+
+      {:ok, conv} =
+        Magus.Chat.find_or_create_companion_conversation(:file, file.id, actor: user)
+
+      assert {nil, nil} = Preflight.companion_brain_hints(conv)
+    end
+
+    test "returns {nil, nil} once the companion page is trashed" do
+      user = generate(user())
+      {:ok, brain} = Magus.Brain.create_brain(%{title: "Hints"}, actor: user)
+      {:ok, page} = Magus.Brain.create_page(brain.id, %{title: "Gone"}, actor: user)
+
+      {:ok, conv} =
+        Magus.Chat.find_or_create_companion_conversation(:brain_page, page.id, actor: user)
+
+      {:ok, _} = Magus.Brain.soft_delete_page(page, actor: user)
+
+      assert {nil, nil} = Preflight.companion_brain_hints(conv)
+    end
+  end
 end

@@ -288,8 +288,12 @@ defmodule Magus.LiveE2E.BrainGuidesTest do
   # LiveE2ECase.send_user_message/3 doesn't thread metadata; brain scope
   # (which makes BrainContext inject "### Brain Guide" and gives the brain
   # tools an auto-resolved brain_id/brain_page_id) rides on the message's
-  # metadata, matching how the SPA's brain pane selection reaches the agent
-  # (see Magus.Agents.Dispatcher.build_signal_data/3).
+  # metadata here. NOTE: this exercises the explicit metadata channel
+  # (Magus.Agents.Dispatcher.build_signal_data/3) directly — no UI sends
+  # this metadata today. The product's always-on injection path is the
+  # brain-page COMPANION conversation (CompanionPreamble embeds the Guide,
+  # and preflight derives the tools' brain hints from the companion link);
+  # that path is covered by non-live tests.
   defp send_brain_scoped_message(conversation, user, brain_id, brain_page_id, text) do
     {:ok, message} =
       Magus.Chat.send_user_message(
