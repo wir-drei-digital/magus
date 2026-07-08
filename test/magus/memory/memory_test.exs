@@ -214,8 +214,14 @@ defmodule Magus.Memory.MemoryTest do
           actor: user
         )
 
-      # Database constraint error for duplicate unique name
-      assert %Ash.Error.Unknown{} = error
+      # Database constraint error for duplicate unique name. The unique index
+      # is Ash-tracked (memories_unique_name_per_conversation_index), so
+      # Ash.Postgres maps the Postgres violation to a typed InvalidAttribute
+      # rather than falling back to Ash.Error.Unknown.
+      assert %Ash.Error.Invalid{
+               errors: [%Ash.Error.Changes.InvalidAttribute{field: :conversation_id}]
+             } =
+               error
     end
 
     test "allows same name in different conversations" do
