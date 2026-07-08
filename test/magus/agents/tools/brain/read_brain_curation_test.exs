@@ -80,6 +80,30 @@ defmodule Magus.Agents.Tools.Brain.ReadBrainCurationTest do
       assert page.id in Enum.map(result.untyped, & &1.page_id)
     end
 
+    test "tolerates limit / day params passed as strings (LLM format drift)" do
+      %{user: user, brain: brain} = setup_brain()
+      page = create_page!(brain.id, "Orphan", user)
+      write_body!(page, "# Orphan\n\nNo type, no links.", user)
+
+      # An LLM may send these as strings ("5") or floats; before coercion this
+      # blew up Enum.take/2 with a FunctionClauseError.
+      assert {:ok, result} =
+               ReadBrain.run(
+                 %{
+                   "action" => "list_curation_candidates",
+                   "brain_id" => brain.id,
+                   "limit" => "5",
+                   "stale_after_days" => "30",
+                   "recent_days" => "7"
+                 },
+                 default_context(user, brain.id)
+               )
+
+      refute Map.has_key?(result, :error)
+      assert is_list(result.untyped)
+      assert page.id in Enum.map(result.untyped, & &1.page_id)
+    end
+
     test "untyped: does NOT flag a page with a frontmatter type set" do
       %{user: user, brain: brain} = setup_brain()
       page = create_page!(brain.id, "Typed Page", user)

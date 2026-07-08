@@ -164,6 +164,35 @@ defmodule Magus.Agents.Tools.Helpers do
   end
 
   @doc """
+  Reads an integer param, tolerating LLM format drift.
+
+  LLMs routinely emit numbers as strings (`"20"`) or floats (`20.0`); those slip
+  past a plain `get_param(...) || default` (a non-empty string is truthy) and
+  then blow up integer-only callees like `Enum.take/2`. Numeric strings and
+  floats are coerced to an integer; `nil`, blanks, and anything unparseable fall
+  back to `default`.
+  """
+  @spec get_int_param(map(), atom(), integer()) :: integer()
+  def get_int_param(params, key, default) when is_atom(key) and is_integer(default) do
+    case get_param(params, key) do
+      n when is_integer(n) ->
+        n
+
+      n when is_float(n) ->
+        trunc(n)
+
+      n when is_binary(n) ->
+        case Integer.parse(String.trim(n)) do
+          {i, _rest} -> i
+          :error -> default
+        end
+
+      _ ->
+        default
+    end
+  end
+
+  @doc """
   Fix double-JSON-encoded content from LLMs.
 
   Some LLM providers double-encode tool call arguments, turning actual newlines

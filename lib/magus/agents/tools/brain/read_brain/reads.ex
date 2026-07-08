@@ -13,7 +13,7 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Reads do
   alias Magus.Brain
   alias Magus.Agents.Tools.Brain.BrainResolver
 
-  import Magus.Agents.Tools.Helpers, only: [get_param: 2, tool_error: 3]
+  import Magus.Agents.Tools.Helpers, only: [get_param: 2, get_int_param: 3, tool_error: 3]
 
   import Magus.Agents.Tools.Brain.ReadBrain.Support,
     only: [
@@ -171,7 +171,7 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Reads do
     if is_nil(query) or query == "" do
       {:ok, %{error: "Missing required parameter: query"}}
     else
-      limit = get_param(params, :limit) || 20
+      limit = get_int_param(params, :limit, 20)
       boost_tags = normalize_tag_list(get_param(params, :tags))
       brain_pairs = resolve_brain_pairs(params, context, ctx)
 

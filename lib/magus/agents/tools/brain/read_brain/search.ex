@@ -13,7 +13,7 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Search do
   alias Magus.Brain
   alias Magus.Files.EmbeddingModel
 
-  import Magus.Agents.Tools.Helpers, only: [get_param: 2]
+  import Magus.Agents.Tools.Helpers, only: [get_param: 2, get_int_param: 3]
   import Magus.Agents.Tools.Brain.ReadBrain.Support, only: [resolve_brain_pairs: 3]
 
   def handle_search(params, ctx, context) do
@@ -24,7 +24,7 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Search do
         {:ok, %{error: "Missing required parameter: query"}}
 
       true ->
-        limit = get_param(params, :limit) || 10
+        limit = get_int_param(params, :limit, 10)
         kind = normalize_kind(get_param(params, :kind))
         brain_pairs = resolve_brain_pairs(params, context, ctx)
 

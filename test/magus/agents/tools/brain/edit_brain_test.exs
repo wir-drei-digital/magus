@@ -789,6 +789,29 @@ defmodule Magus.Agents.Tools.Brain.EditBrainTest do
       assert updated.lock_version == page.lock_version + 1
     end
 
+    test "accepts edits passed as a JSON-encoded string (LLM format drift)" do
+      %{context: ctx, page: page, user: user} = setup_brain_with_page("foo\nbar\nbaz")
+
+      # Some LLMs stringify the array param instead of sending a real list; the
+      # tool must decode it rather than rejecting it (which forced a fallback to
+      # slower one-at-a-time edits).
+      edits_json =
+        Jason.encode!([
+          %{"old_str" => "foo", "new_str" => "FOO"},
+          %{"old_str" => "baz", "new_str" => "BAZ"}
+        ])
+
+      assert {:ok, result} =
+               EditBrain.run(
+                 %{"action" => "multi_edit", "page_id" => page.id, "edits" => edits_json},
+                 ctx
+               )
+
+      assert result.action == "multi_edit"
+      assert result.edits_applied == 2
+      assert read_page_body!(page.id, user) == "FOO\nbar\nBAZ"
+    end
+
     test "later edits operate on the buffer left by earlier edits" do
       %{context: ctx, page: page, user: user} =
         setup_brain_with_page("alpha")

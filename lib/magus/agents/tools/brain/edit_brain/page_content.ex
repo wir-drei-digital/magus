@@ -136,7 +136,7 @@ defmodule Magus.Agents.Tools.Brain.EditBrain.PageContent do
 
   def handle_multi_edit(params, ctx) do
     page_id = get_param(params, :page_id)
-    edits = get_param(params, :edits)
+    edits = coerce_edits(get_param(params, :edits))
 
     cond do
       is_nil(page_id) ->
@@ -163,6 +163,21 @@ defmodule Magus.Agents.Tools.Brain.EditBrain.PageContent do
         end
     end
   end
+
+  # LLMs sometimes send the edits array as a JSON-encoded string instead of a
+  # real list. Decode that so multi_edit isn't rejected (otherwise the model
+  # retries and falls back to slower one-at-a-time edits). A non-decodable
+  # string is left as-is so the "non-empty list" error below stays accurate.
+  defp coerce_edits(edits) when is_list(edits), do: edits
+
+  defp coerce_edits(edits) when is_binary(edits) do
+    case Jason.decode(edits) do
+      {:ok, decoded} when is_list(decoded) -> decoded
+      _ -> edits
+    end
+  end
+
+  defp coerce_edits(other), do: other
 
   # ---------------------------------------------------------------------------
   # clear_page

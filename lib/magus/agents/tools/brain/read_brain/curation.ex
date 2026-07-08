@@ -12,15 +12,15 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Curation do
   alias Magus.Brain
   alias Magus.Agents.Tools.Brain.BrainResolver
 
-  import Magus.Agents.Tools.Helpers, only: [get_param: 2, tool_error: 3]
+  import Magus.Agents.Tools.Helpers, only: [get_int_param: 3, tool_error: 3]
   import Magus.Agents.Tools.Brain.ReadBrain.Support, only: [blank?: 1]
 
   def handle_list_curation_candidates(params, ctx, context) do
     case BrainResolver.resolve_brain_id(context, params) do
       {:ok, brain_id} ->
-        stale_after_days = get_param(params, :stale_after_days) || 30
-        recent_days = get_param(params, :recent_days) || 7
-        limit = get_param(params, :limit) || 20
+        stale_after_days = get_int_param(params, :stale_after_days, 30)
+        recent_days = get_int_param(params, :recent_days, 7)
+        limit = get_int_param(params, :limit, 20)
         curation_candidates(brain_id, stale_after_days, recent_days, limit, ctx.user)
 
       {:error, msg} ->

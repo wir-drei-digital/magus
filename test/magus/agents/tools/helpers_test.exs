@@ -35,6 +35,30 @@ defmodule Magus.Agents.Tools.HelpersTest do
     end
   end
 
+  describe "get_int_param/3" do
+    test "returns an integer value as-is" do
+      assert Helpers.get_int_param(%{limit: 5}, :limit, 20) == 5
+    end
+
+    test "coerces a numeric string (LLMs often send \"10\")" do
+      assert Helpers.get_int_param(%{"limit" => "10"}, :limit, 20) == 10
+      assert Helpers.get_int_param(%{limit: " 7 "}, :limit, 20) == 7
+    end
+
+    test "truncates a float (LLMs sometimes send 10.0)" do
+      assert Helpers.get_int_param(%{limit: 10.9}, :limit, 20) == 10
+    end
+
+    test "falls back to the default for nil / missing" do
+      assert Helpers.get_int_param(%{}, :limit, 20) == 20
+      assert Helpers.get_int_param(%{limit: nil}, :limit, 20) == 20
+    end
+
+    test "falls back to the default for an unparseable string" do
+      assert Helpers.get_int_param(%{limit: "lots"}, :limit, 20) == 20
+    end
+  end
+
   describe "extract_error_message/1" do
     test "extracts messages from Ash.Error.Invalid" do
       error = %Ash.Error.Invalid{
