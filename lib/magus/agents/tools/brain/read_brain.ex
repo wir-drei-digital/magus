@@ -70,10 +70,11 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain do
       (untouched longer than stale_after_days), orphans (no inbound
       wikilinks), recently_changed, untyped (content pages with no
       frontmatter type), off_template (typed pages missing a heading
-      their type's template declares), and unfiled (root pages with no
-      parent and no inbound link). Optional: brain_id, stale_after_days
-      (default 30), recent_days (default 7), limit (per-signal cap,
-      default 20).
+      their type's template declares), dangling_type (typed pages whose
+      type matches no live template, e.g. after a template rename or
+      trash), and unfiled (root pages with no parent and no inbound
+      link). Optional: brain_id, stale_after_days (default 30),
+      recent_days (default 7), limit (per-signal cap, default 20).
     - read_page: Read a page's full body. Required one of: page_id,
       page_title. Optional: start_line, end_line (1-indexed, inclusive)
       to read a slice with line-number prefixes.
@@ -242,7 +243,7 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain do
 
   def summarize_output(%{action: "list_curation_candidates", counts: c}),
     do:
-      "Curation candidates: #{c.drifted} drifted, #{c.stale} stale, #{c.orphans} orphan(s), #{c.recently_changed} recently changed, #{c.untyped} untyped, #{c.off_template} off_template, #{c.unfiled} unfiled"
+      "Curation candidates: #{c.drifted} drifted, #{c.stale} stale, #{c.orphans} orphan(s), #{c.recently_changed} recently changed, #{c.untyped} untyped, #{c.off_template} off_template, #{Map.get(c, :dangling_type, 0)} dangling_type, #{c.unfiled} unfiled"
 
   def summarize_output(%{summary: summary}), do: summary
   def summarize_output(%{hint: hint}) when is_binary(hint), do: hint

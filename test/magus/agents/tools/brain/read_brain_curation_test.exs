@@ -524,4 +524,83 @@ defmodule Magus.Agents.Tools.Brain.ReadBrainCurationTest do
       assert "method" in entry.missing_headings
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # list_curation_candidates: dangling_type (type's template renamed/trashed)
+  # ---------------------------------------------------------------------------
+
+  describe "list_curation_candidates: dangling_type" do
+    test "flags a typed page whose type matches no live template" do
+      %{user: user, brain: brain} = setup_brain()
+
+      # The brain HAS a template system (one live template), but this page's
+      # type points at nothing (e.g. its template was renamed).
+      _live_template = create_page!(brain.id, "Meeting Note", user, kind: :template)
+
+      page = create_page!(brain.id, "Q3 Spec", user)
+      write_body!(page, "---\ntype: spec\n---\n# Q3 Spec\n", user)
+
+      context = default_context(user, brain.id)
+
+      assert {:ok, result} =
+               ReadBrain.run(%{"action" => "list_curation_candidates"}, context)
+
+      assert [entry] = result.dangling_type
+      assert entry.page_id == page.id
+      assert entry.type == "spec"
+      assert result.counts.dangling_type == 1
+    end
+
+    test "does NOT flag typed pages when the brain has no templates at all" do
+      %{user: user, brain: brain} = setup_brain()
+
+      page = create_page!(brain.id, "Early Note", user)
+      write_body!(page, "---\ntype: note\n---\n# Early Note\n", user)
+
+      context = default_context(user, brain.id)
+
+      assert {:ok, result} =
+               ReadBrain.run(%{"action" => "list_curation_candidates"}, context)
+
+      # Types without templates are a legitimate early stage; flagging every
+      # typed page in a template-less brain would be noise.
+      assert result.dangling_type == []
+      assert result.counts.dangling_type == 0
+      refute page.id in Enum.map(result.dangling_type, & &1.page_id)
+    end
+
+    test "a live match is not flagged; trashing the template makes it dangling" do
+      %{user: user, brain: brain} = setup_brain()
+
+      template = create_page!(brain.id, "Decision", user, kind: :template)
+      page = create_page!(brain.id, "Use Postgres", user)
+      write_body!(page, "---\ntype: decision\n---\n# Use Postgres\n", user)
+
+      context = default_context(user, brain.id)
+
+      assert {:ok, before_trash} =
+               ReadBrain.run(%{"action" => "list_curation_candidates"}, context)
+
+      refute page.id in Enum.map(before_trash.dangling_type, & &1.page_id)
+
+      {:ok, _} = Brain.soft_delete_page(template, actor: user)
+
+      assert {:ok, after_trash} =
+               ReadBrain.run(%{"action" => "list_curation_candidates"}, context)
+
+      # The template list is now empty, so the guard suppresses the signal ...
+      # unless another template still exists. Add one to keep the template
+      # system "established" and assert the dangling page is flagged.
+      _other = create_page!(brain.id, "Meeting Note", user, kind: :template)
+
+      assert {:ok, with_other} =
+               ReadBrain.run(%{"action" => "list_curation_candidates"}, context)
+
+      assert page.id in Enum.map(with_other.dangling_type, & &1.page_id)
+
+      # And document the no-templates edge explicitly: with zero live
+      # templates the signal stays quiet even though the type dangles.
+      assert after_trash.dangling_type == []
+    end
+  end
 end

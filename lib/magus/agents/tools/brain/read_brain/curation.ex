@@ -58,6 +58,7 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Curation do
       {:ok, pages} ->
         now = DateTime.utc_now()
         linked_targets = linked_target_ids(pages, user)
+        templates = fetch_templates(brain_id, user)
 
         drifted = drifted_candidates(pages)
         stale = stale_candidates(pages, now, stale_after_days)
@@ -65,13 +66,14 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Curation do
         recent = recent_candidates(pages, now, recent_days)
         untyped = untyped_candidates(pages)
         unfiled = unfiled_candidates(pages, linked_targets)
-        off_template = off_template_candidates(pages, brain_id, limit, user)
+        off_template = off_template_candidates(pages, templates, limit, user)
+        dangling_type = dangling_type_candidates(pages, templates)
 
         # `count` is the deduped UNION of the actionable signals (a page can be
         # both stale and an orphan but counts once). recently_changed is
         # informational, not "needs curation", so it is excluded from count.
         total =
-          [drifted, stale, orphans, untyped, unfiled, off_template]
+          [drifted, stale, orphans, untyped, unfiled, off_template, dangling_type]
           |> Enum.flat_map(fn list -> Enum.map(list, & &1.page_id) end)
           |> Enum.uniq()
           |> length()
@@ -88,6 +90,7 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Curation do
              recently_changed: length(recent),
              untyped: length(untyped),
              off_template: length(off_template),
+             dangling_type: length(dangling_type),
              unfiled: length(unfiled)
            },
            drifted: Enum.take(drifted, limit),
@@ -96,9 +99,10 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Curation do
            recently_changed: Enum.take(recent, limit),
            untyped: Enum.take(untyped, limit),
            off_template: Enum.take(off_template, limit),
+           dangling_type: Enum.take(dangling_type, limit),
            unfiled: Enum.take(unfiled, limit),
            hint:
-             "Metadata only — no page bodies. Read just the pages you intend to act on with read_brain.read_page. 'drifted' = parent/index pages whose children changed after the parent was last edited; 'untyped' = content pages with no frontmatter type; 'off_template' = typed pages missing headings their type's template declares; 'unfiled' = root pages with no parent and no inbound link; what to do about each signal is decided by your instructions."
+             "Metadata only — no page bodies. Read just the pages you intend to act on with read_brain.read_page. 'drifted' = parent/index pages whose children changed after the parent was last edited; 'untyped' = content pages with no frontmatter type; 'off_template' = typed pages missing headings their type's template declares; 'dangling_type' = typed pages whose type no longer matches any template (renamed or trashed) — re-point the type or re-create the template with brain_guide define_type; 'unfiled' = root pages with no parent and no inbound link; what to do about each signal is decided by your instructions."
          }}
 
       {:error, err} ->
@@ -126,6 +130,7 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Curation do
         recently_changed: 0,
         untyped: 0,
         off_template: 0,
+        dangling_type: 0,
         unfiled: 0
       },
       drifted: [],
@@ -134,6 +139,7 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Curation do
       recently_changed: [],
       untyped: [],
       off_template: [],
+      dangling_type: [],
       unfiled: [],
       hint: "This brain has no pages yet."
     }
@@ -259,7 +265,41 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Curation do
   # `resolve_type_template/3`), then flag it if the template declares a
   # heading the page's body doesn't have. Pages whose type has no matching
   # template are skipped (nothing to diff against).
-  defp off_template_candidates(pages, brain_id, limit, user) do
+  defp fetch_templates(brain_id, user) do
+    case Brain.templates_for_brain(brain_id, actor: user) do
+      {:ok, templates} -> templates
+      _ -> []
+    end
+  end
+
+  # Typed pages whose `type:` no longer matches any live template (the
+  # template was renamed or trashed): the binding is title-only, so nothing
+  # else surfaces the break — get_guide just returns type_template: nil and
+  # off_template skips the page. Only fires when the brain HAS templates:
+  # types without templates are a legitimate early stage, and flagging every
+  # typed page in a template-less brain would be pure noise.
+  defp dangling_type_candidates(_pages, []), do: []
+
+  defp dangling_type_candidates(pages, templates) do
+    live_types =
+      templates
+      |> Enum.map(&String.downcase(&1.title || ""))
+      |> MapSet.new()
+
+    pages
+    |> Enum.filter(fn page ->
+      type = page_type(page)
+
+      page.kind == :page and not blank?(type) and
+        not MapSet.member?(live_types, String.downcase(type))
+    end)
+    |> Enum.sort_by(& &1.updated_at, {:desc, DateTime})
+    |> Enum.map(fn page ->
+      %{page_id: page.id, title: page.title || "Untitled", type: page_type(page)}
+    end)
+  end
+
+  defp off_template_candidates(pages, templates, limit, user) do
     typed =
       pages
       |> Enum.filter(&(&1.kind == :page and not blank?(page_type(&1))))
@@ -271,12 +311,6 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Curation do
         []
 
       _ ->
-        templates =
-          case Brain.templates_for_brain(brain_id, actor: user) do
-            {:ok, templates} -> templates
-            _ -> []
-          end
-
         template_headings_by_title =
           Map.new(templates, fn t -> {String.downcase(t.title || ""), heading_set(t.body)} end)
 
