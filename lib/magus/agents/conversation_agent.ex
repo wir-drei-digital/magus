@@ -66,6 +66,7 @@ defmodule Magus.Agents.ConversationAgent do
          },
          tool_timeout_ms: 120_000,
          tool_max_retries: 1,
+         runtime_task_supervisor: Magus.Agents.RunnerTaskSupervisor,
          observability: %{
            emit_signals?: true,
            emit_lifecycle_signals?: true,
@@ -150,16 +151,46 @@ defmodule Magus.Agents.ConversationAgent do
       end
 
     strategy_state = state[:__strategy__] || %{}
+    conversation_id = Persistence.get_value(state, :conversation_id)
+    was_active = strategy_state[:status] in [:awaiting_llm, :awaiting_tool]
+
+    if was_active do
+      settle_interrupted_turn(conversation_id, strategy_state[:active_request_id])
+    end
 
     Persistence.wrap_checkpoint(__MODULE__, agent.id, %{
-      conversation_id: Persistence.get_value(state, :conversation_id),
+      conversation_id: conversation_id,
       user_id: Persistence.get_value(state, :user_id),
       model_keys: model_keys,
       mode: Persistence.get_value(state, :mode) || :chat,
-      was_active: strategy_state[:status] in [:awaiting_llm, :awaiting_tool],
+      was_active: was_active,
       active_message_id: strategy_state[:active_request_id]
     })
   end
+
+  # Checkpointing an ACTIVE turn means the agent is stopping mid-turn (deploy
+  # drain or crash; idle-timeout hibernation is blocked by the run's
+  # attachment). Settle the conversation immediately: broadcast idle so the UI
+  # drops its thinking state and error-mark the stuck streaming rows, instead
+  # of leaving both until the next thaw's recovery pass. Best effort — a
+  # checkpoint must never fail because of these side effects.
+  defp settle_interrupted_turn(conversation_id, active_request_id)
+       when is_binary(conversation_id) do
+    Logger.warning(
+      "ConversationAgent conv:#{conversation_id} checkpointed mid-turn " <>
+        "(request #{inspect(active_request_id)}); settling interrupted turn"
+    )
+
+    Magus.Agents.Signals.state_change(conversation_id, :idle)
+    Magus.Agents.Recovery.sweep_streaming_messages(conversation_id)
+    :ok
+  rescue
+    _ -> :ok
+  catch
+    :exit, _ -> :ok
+  end
+
+  defp settle_interrupted_turn(_conversation_id, _active_request_id), do: :ok
 
   @doc """
   Restore agent state from persistence after hibernation (thaw).

@@ -28,6 +28,7 @@ defmodule Magus.Agents.ConversationAgentTest do
       assert Keyword.get(opts, :streaming) == true
       assert Keyword.get(opts, :tool_timeout_ms) == 120_000
       assert Keyword.get(opts, :tool_max_retries) == 1
+      assert Keyword.get(opts, :runtime_task_supervisor) == Magus.Agents.RunnerTaskSupervisor
     end
 
     test "has all composable plugins registered" do
@@ -588,6 +589,85 @@ defmodule Magus.Agents.ConversationAgentTest do
       assert no_unsafe_structs?(checkpoint),
              "checkpoint contains non-JSON-serializable structs: #{inspect(checkpoint)}"
     end
+  end
+
+  describe "checkpoint/2 mid-turn interruption" do
+    import Magus.Generators
+
+    setup do
+      user = generate(user())
+      conversation = generate(conversation(actor: user))
+      %{user: user, conversation: conversation}
+    end
+
+    test "broadcasts idle and sweeps streaming rows when the turn was active", %{
+      user: user,
+      conversation: conversation
+    } do
+      streaming =
+        generate(message(actor: user, conversation_id: conversation.id))
+        |> force_streaming!()
+
+      MagusWeb.Endpoint.subscribe("agents:#{conversation.id}")
+
+      conversation
+      |> mid_turn_agent(user, :awaiting_llm)
+      |> ConversationAgent.checkpoint(%{})
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "agent_signal",
+        payload: %{type: "state.change", state: :idle}
+      }
+
+      reloaded = Ash.get!(Magus.Chat.Message, streaming.id, authorize?: false)
+      assert reloaded.status == :error
+    end
+
+    test "does not broadcast or sweep when the agent was idle", %{
+      user: user,
+      conversation: conversation
+    } do
+      streaming =
+        generate(message(actor: user, conversation_id: conversation.id))
+        |> force_streaming!()
+
+      MagusWeb.Endpoint.subscribe("agents:#{conversation.id}")
+
+      conversation
+      |> mid_turn_agent(user, :idle)
+      |> ConversationAgent.checkpoint(%{})
+
+      refute_receive %Phoenix.Socket.Broadcast{event: "agent_signal"}, 200
+
+      reloaded = Ash.get!(Magus.Chat.Message, streaming.id, authorize?: false)
+      assert reloaded.status == :streaming
+    end
+  end
+
+  defp mid_turn_agent(conversation, user, strategy_status) do
+    ConversationAgent.new(id: "conv:#{conversation.id}")
+    |> set_state!(%{
+      conversation_id: to_string(conversation.id),
+      user_id: to_string(user.id)
+    })
+    |> then(fn agent ->
+      %{
+        agent
+        | state:
+            Map.put(agent.state, :__strategy__, %{
+              status: strategy_status,
+              active_request_id: "req_checkpoint_test"
+            })
+      }
+    end)
+  end
+
+  defp force_streaming!(message) do
+    message
+    |> Ash.Changeset.for_update(:update, %{})
+    |> Ash.Changeset.force_change_attribute(:status, :streaming)
+    |> Ash.Changeset.force_change_attribute(:complete, false)
+    |> Ash.update!(authorize?: false)
   end
 
   # Check for non-JSON-serializable structs (DateTime, Date, etc. are OK)

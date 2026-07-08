@@ -84,6 +84,9 @@ defmodule Magus.Agents.Tools.Media.GenerateImage do
 
   def display_name, do: "Generating image..."
 
+  # Image generation regularly exceeds the default 2-minute tool timeout.
+  def execution_timeout_ms, do: :timer.minutes(10)
+
   def summarize_output(%{__attachments__: [_ | _] = ids}),
     do: "Generated #{length(ids)} image(s)"
 

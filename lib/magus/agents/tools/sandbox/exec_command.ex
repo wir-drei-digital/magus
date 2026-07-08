@@ -69,6 +69,11 @@ defmodule Magus.Agents.Tools.Sandbox.ExecCommand do
 
   def display_name, do: "Executing command..."
 
+  # The LLM chooses the command timeout (no upper cap documented) and the
+  # sandbox client enforces it; this is only the runner-level backstop for a
+  # hung client call.
+  def execution_timeout_ms, do: :timer.minutes(30)
+
   def summarize_output(%{success: true, exit_code: 0}), do: "Command succeeded"
 
   def summarize_output(%{success: true, exit_code: code}) when is_integer(code),

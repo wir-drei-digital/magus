@@ -67,6 +67,10 @@ defmodule Magus.Agents.Tools.Tasks.AwaitSubAgents do
 
   def display_name, do: "Waiting for sub-agents..."
 
+  # Self-bounded: the tool enforces its own deadline (timeout_seconds param)
+  # and returns status: "timeout" itself, so the runner must not cut it off.
+  def execution_timeout_ms, do: :infinity
+
   def summarize_output(%{status: "completed", satisfied: %{completed: n}}),
     do: "#{n} sub-agent(s) completed"
 

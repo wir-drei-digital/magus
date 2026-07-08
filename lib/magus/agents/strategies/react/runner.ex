@@ -74,7 +74,14 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
            opts
          ) do
       {:ok, pid} ->
+        # Link the coordinator to the consuming process so a hard kill of the
+        # consumer (worker hibernation, node drain) tears the coordinator down
+        # instead of leaving a zombie turn running LLM calls into the void.
+        # In-band coordinator failures never propagate here: coordinator/6
+        # converts them to :request_failed events and exits :normal.
+        Process.link(pid)
         monitor_ref = Process.monitor(pid)
+        halt_ref = monitor_halt_pid(Keyword.get(opts, :halt_on_down))
 
         Stream.resource(
           fn ->
@@ -84,6 +91,7 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
               cancel_sent?: false,
               pid: pid,
               monitor_ref: monitor_ref,
+              halt_ref: halt_ref,
               ref: ref
             }
           end,
@@ -1122,7 +1130,7 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
          attempt
        ) do
     start_ms = System.monotonic_time(:millisecond)
-    timeout_ms = normalize_timeout(config.tool_exec[:timeout_ms])
+    timeout_ms = tool_execution_timeout(module, config)
 
     base_tool_context = tool_context_for(context, pending_call.name)
 
@@ -1157,6 +1165,22 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
 
       _ ->
         {pending_call, result, attempt, duration_ms}
+    end
+  end
+
+  # Per-tool timeout override: a tool that legitimately runs long (e.g.
+  # await_sub_agents polling sub-agent runs) exports execution_timeout_ms/0
+  # returning a pos_integer or :infinity; everything else uses the run-level
+  # tool timeout from config.
+  defp tool_execution_timeout(module, %Config{} = config) do
+    if function_exported?(module, :execution_timeout_ms, 0) do
+      case module.execution_timeout_ms() do
+        :infinity -> :infinity
+        value when is_integer(value) and value > 0 -> value
+        _ -> normalize_timeout(config.tool_exec[:timeout_ms])
+      end
+    else
+      normalize_timeout(config.tool_exec[:timeout_ms])
     end
   end
 
@@ -1238,13 +1262,25 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
 
       {:DOWN, monitor_ref, :process, _pid, _reason} when monitor_ref == state.monitor_ref ->
         next_event(nil, %{state | down?: true})
+
+      # The watched pid (the worker agent) died: the events have no consumer
+      # anymore, so halt. cleanup/2 then shuts the coordinator down.
+      {:DOWN, halt_ref, :process, _pid, _reason} when halt_ref == state.halt_ref ->
+        {:halt, %{state | done?: true}}
     end
   end
 
-  defp cleanup(_owner, %{pid: pid, ref: ref, monitor_ref: monitor_ref}) when is_pid(pid) do
+  defp cleanup(_owner, %{pid: pid, ref: ref, monitor_ref: monitor_ref} = state)
+       when is_pid(pid) do
+    demonitor_halt_ref(state)
+
     case Process.alive?(pid) do
       true ->
         send(pid, {:react_cancel, ref, :stream_halted})
+        # Unlink first: the coordinator is linked to this (consuming) process,
+        # and killing a live linked coordinator would otherwise take the
+        # consumer down with it.
+        Process.unlink(pid)
         Process.exit(pid, :shutdown)
 
         receive do
@@ -1260,10 +1296,13 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
     :ok
   end
 
-  defp cleanup(_owner, %{pid: pid, ref: ref}) when is_pid(pid) do
+  defp cleanup(_owner, %{pid: pid, ref: ref} = state) when is_pid(pid) do
+    demonitor_halt_ref(state)
+
     case Process.alive?(pid) do
       true ->
         send(pid, {:react_cancel, ref, :stream_halted})
+        Process.unlink(pid)
         Process.exit(pid, :shutdown)
 
       _ ->
@@ -1272,6 +1311,15 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
 
     :ok
   end
+
+  defp monitor_halt_pid(pid) when is_pid(pid), do: Process.monitor(pid)
+  defp monitor_halt_pid(_), do: nil
+
+  defp demonitor_halt_ref(%{halt_ref: halt_ref}) when is_reference(halt_ref) do
+    Process.demonitor(halt_ref, [:flush])
+  end
+
+  defp demonitor_halt_ref(_state), do: :ok
 
   defp start_task(fun, opts) do
     case Keyword.get(opts, :task_supervisor) do
@@ -1421,15 +1469,46 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Runner do
 
   defp request_stream_steer(state, _payload), do: state
 
-  defp safe_execute_module(module, params, context, _opts) do
-    module.run(params, context)
-  rescue
-    error ->
-      {:error,
-       %{type: :exception, error: Exception.message(error), exception_type: error.__struct__}}
-  catch
-    kind, reason ->
-      {:error, %{type: :caught, kind: kind, error: inspect(reason)}}
+  # Runs the tool in a task so a hung tool can be cut off at the configured
+  # timeout instead of blocking the turn forever. Exceptions are converted
+  # inside the task, so the link to this process never fires abnormally and
+  # existing error result shapes are preserved.
+  defp safe_execute_module(module, params, context, opts) do
+    timeout = Keyword.get(opts, :timeout, :infinity)
+
+    task =
+      Task.async(fn ->
+        try do
+          module.run(params, context)
+        rescue
+          error ->
+            {:error,
+             %{
+               type: :exception,
+               error: Exception.message(error),
+               exception_type: error.__struct__
+             }}
+        catch
+          kind, reason ->
+            {:error, %{type: :caught, kind: kind, error: inspect(reason)}}
+        end
+      end)
+
+    case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
+      {:ok, result} ->
+        result
+
+      {:exit, reason} ->
+        {:error, %{type: :execution_error, error: inspect(reason)}}
+
+      nil ->
+        {:error,
+         %{
+           type: :timeout,
+           error: "Tool execution exceeded #{timeout}ms and was aborted",
+           timeout_ms: timeout
+         }}
+    end
   end
 
   defp normalize_timeout(value) when is_integer(value) and value > 0, do: value

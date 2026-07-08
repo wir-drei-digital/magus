@@ -110,6 +110,10 @@ defmodule Magus.Application do
         {Task.Supervisor, name: Magus.Integrations.WebhookTaskSupervisor},
         # General-purpose task supervisor for async operations (LiveView, components, changes)
         {Task.Supervisor, name: Magus.AgentLoopTaskSupervisor},
+        # Supervises ReAct runner processes (runtime task + coordinator) so
+        # agentic turns are enumerable and torn down at node shutdown instead
+        # of orphaned as bare tasks.
+        {Task.Supervisor, name: Magus.Agents.RunnerTaskSupervisor},
         # Task supervisor for knowledge sync operations
         {Task.Supervisor, name: Magus.Knowledge.SyncTaskSupervisor},
         # Reset collections stuck in :syncing after restart
@@ -173,12 +177,16 @@ defmodule Magus.Application do
       store = instance_manager_config[:store] || {Magus.Agents.Persistence.PostgresStore, []}
 
       [
-        # ConversationAgent InstanceManager - 5 minute idle timeout
+        # ConversationAgent InstanceManager - 5 minute idle timeout by default.
+        # The legacy top-level :agent_idle_timeout key wins when set (deploy
+        # compatibility); otherwise the documented Magus.Config knob applies.
         {Jido.Agent.InstanceManager,
          [
            name: :conversations,
            agent: Magus.Agents.ConversationAgent,
-           idle_timeout: Application.get_env(:magus, :agent_idle_timeout, :timer.minutes(5)),
+           idle_timeout:
+             Application.get_env(:magus, :agent_idle_timeout) ||
+               Magus.Config.agent_idle_timeout(:conversation),
            storage: store,
            agent_opts: [jido: Magus.Jido, agent_module: Magus.Agents.ConversationAgent]
          ]}

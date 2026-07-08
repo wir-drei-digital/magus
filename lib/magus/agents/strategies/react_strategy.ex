@@ -605,22 +605,35 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
             {thread, Thread.to_messages(thread)}
         end
 
-      worker_start_payload = %{
-        request_id: request_id,
-        run_id: run_id,
-        query: query,
-        config: runtime_config,
-        thread_messages: thread_messages,
-        initial_messages: initial_messages,
-        task_supervisor: config[:runtime_task_supervisor],
-        context:
-          Map.merge(effective_tool_context, %{
-            request_id: request_id,
-            run_id: run_id,
-            agent_id: state[:agent_id] || Map.get(agent, :id),
-            observability: config[:observability] || %{}
-          })
-      }
+      worker_start_payload =
+        %{
+          request_id: request_id,
+          run_id: run_id,
+          query: query,
+          config: runtime_config,
+          thread_messages: thread_messages,
+          task_supervisor: config[:runtime_task_supervisor],
+          # This code runs inside the parent agent server process. The worker's
+          # runtime task attaches itself to this pid for the duration of the run
+          # so the idle-timeout lifecycle cannot hibernate the agent mid-turn.
+          parent_pid: self(),
+          context:
+            Map.merge(effective_tool_context, %{
+              request_id: request_id,
+              run_id: run_id,
+              agent_id: state[:agent_id] || Map.get(agent, :id),
+              observability: config[:observability] || %{}
+            })
+        }
+        # The worker schema validates initial_messages as an (optional) list;
+        # an explicit nil fails validation and kills the worker, so only put
+        # the key when there is a real list (absent on the fallback path).
+        |> then(fn payload ->
+          case initial_messages do
+            msgs when is_list(msgs) -> Map.put(payload, :initial_messages, msgs)
+            _ -> payload
+          end
+        end)
 
       {new_state, directives} = ensure_worker_start(state, worker_start_payload)
 

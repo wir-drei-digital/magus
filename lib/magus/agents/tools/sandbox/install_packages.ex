@@ -46,6 +46,9 @@ defmodule Magus.Agents.Tools.Sandbox.InstallPackages do
   @doc "User-friendly display name shown in the UI"
   def display_name, do: "Installing packages..."
 
+  # Internal client timeout is @timeout_ms (180s); runner backstop sits above it.
+  def execution_timeout_ms, do: :timer.minutes(5)
+
   @doc "Generate a human-readable summary of output"
   def summarize_output(%{success: true, packages: packages}) when is_list(packages) do
     "Installed #{length(packages)} package(s)"

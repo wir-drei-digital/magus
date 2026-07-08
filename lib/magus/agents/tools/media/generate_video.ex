@@ -87,6 +87,9 @@ defmodule Magus.Agents.Tools.Media.GenerateVideo do
 
   def display_name, do: "Generating video..."
 
+  # Video generation can take tens of minutes on some providers.
+  def execution_timeout_ms, do: :timer.minutes(30)
+
   def summarize_output(%{__attachments__: [_ | _] = ids}),
     do: "Generated #{length(ids)} video(s)"
 

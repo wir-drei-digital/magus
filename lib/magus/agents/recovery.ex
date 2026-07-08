@@ -192,6 +192,19 @@ defmodule Magus.Agents.Recovery do
     await_agent_ready(conversation_id, attempts + 1)
   end
 
+  @doc """
+  Marks any messages stuck in `:streaming` for the conversation as errored.
+
+  Used by the thaw-time recovery pass and by `ConversationAgent.checkpoint/2`
+  when an agent is stopped mid-turn, so the UI settles immediately instead of
+  waiting for the next thaw.
+  """
+  @spec sweep_streaming_messages(String.t()) :: :ok
+  def sweep_streaming_messages(conversation_id) do
+    cleanup_interrupted_messages(conversation_id)
+    :ok
+  end
+
   defp cleanup_interrupted_messages(conversation_id) do
     streaming_messages =
       Magus.Chat.Message

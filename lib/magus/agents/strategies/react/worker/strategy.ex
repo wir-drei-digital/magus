@@ -33,7 +33,8 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Worker.Strategy do
           thread_messages: Zoi.list(Zoi.map()) |> Zoi.default([]),
           initial_messages: Zoi.list(Zoi.any()) |> Zoi.optional(),
           context: Zoi.map() |> Zoi.default(%{}),
-          task_supervisor: Zoi.any() |> Zoi.optional()
+          task_supervisor: Zoi.any() |> Zoi.optional(),
+          parent_pid: Zoi.any() |> Zoi.optional()
         }),
       doc: "Start a delegated ReAct runtime run",
       name: "ai.react.worker.start"
@@ -212,22 +213,28 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Worker.Strategy do
         runtime_state_from_messages(query, request_id, run_id, config, thread_messages)
 
       task_supervisor = Map.get(params, :task_supervisor)
+      parent_pid = Map.get(params, :parent_pid)
       worker_pid = self()
 
       # Pass initial_messages (conversation history from Builder with images preserved)
       # via stream_opts rather than injecting into the State struct, which doesn't
       # define this field. The Runner reads them from opts to prepend before LLM calls.
+      # halt_on_down ties the runtime task's stream to this worker: if the worker
+      # dies (parent hibernated or crashed), the stream halts and the coordinator
+      # is torn down instead of running the turn as a zombie.
       stream_opts =
         []
         |> Keyword.put(:request_id, request_id)
         |> Keyword.put(:run_id, run_id)
         |> Keyword.put(:context, context)
+        |> Keyword.put(:halt_on_down, worker_pid)
         |> maybe_put_initial_messages(initial_messages)
         |> maybe_put_task_supervisor(task_supervisor)
 
       case start_task(
              fn ->
                Logger.metadata(request_id: request_id, run_id: run_id)
+               attach_run_to_parent(parent_pid)
                run_stream(worker_pid, request_id, query, runtime_state, config, stream_opts)
              end,
              task_supervisor
@@ -385,6 +392,26 @@ defmodule Magus.Agents.Strategies.ReactStrategy.Worker.Strategy do
   end
 
   defp process_runtime_failed(agent, _params), do: {agent, []}
+
+  # Attach the runtime task (self()) to the parent agent server for the
+  # duration of the run. The Keyed idle lifecycle only hibernates when no
+  # process is attached, so a live run structurally blocks mid-turn
+  # hibernation; when this task exits (any reason), the parent's monitor
+  # drops the attachment and the idle timer re-arms. Best effort: a run
+  # must never fail because attachment did.
+  defp attach_run_to_parent(parent_pid) when is_pid(parent_pid) do
+    if Process.alive?(parent_pid) do
+      Jido.AgentServer.attach(parent_pid, self())
+    end
+
+    :ok
+  rescue
+    _ -> :ok
+  catch
+    :exit, _ -> :ok
+  end
+
+  defp attach_run_to_parent(_parent_pid), do: :ok
 
   defp run_stream(worker_pid, request_id, query, runtime_state, config, stream_opts) do
     Runner.stream_from_state(runtime_state, config, Keyword.put(stream_opts, :query, query))
