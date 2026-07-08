@@ -22,7 +22,7 @@ defmodule Magus.SuperBrain.Tools.GetDossier do
   require Ash.Query
   require Logger
 
-  alias Magus.SuperBrain.{AccessibleGraphs, Claim, Dossier, Naming, Retrieval}
+  alias Magus.SuperBrain.{AccessibleGraphs, Claim, Dossier, Naming, Retrieval, Temporal}
 
   import Magus.Agents.Tools.Helpers, only: [get_param: 2, get_param: 3]
 
@@ -70,16 +70,39 @@ defmodule Magus.SuperBrain.Tools.GetDossier do
         fallback(name, user, context)
       else
         limit = get_param(params, :limit, 20)
-        d = Dossier.build(key, Enum.map(filtered, &to_dossier_claim/1))
 
-        # Cap the returned fact / referenced_by groups to `limit`. Both lists
+        # Temporal resolution runs over the subject-side claims only: the
+        # :for_entity_keys fetch is history-complete for THIS entity's
+        # (subject, predicate) groups, but object-side groups belong to
+        # other subjects whose sibling claims were not fetched, so resolving
+        # them would yield false current verdicts. Object-side claims pass
+        # through untagged (status defaults to :current in Dossier.build).
+        now = DateTime.utc_now()
+        {as_subject, as_object} = Enum.split_with(filtered, &(&1.subject_key == key))
+        resolved = Temporal.resolve(as_subject, now: now)
+
+        tagged =
+          Enum.map(resolved.current, fn %{claim: c} -> {c, :current} end) ++
+            Enum.map(resolved.historic, fn %{claim: c, reason: r} -> {c, r} end) ++
+            Enum.map(as_object, fn c -> {c, :current} end)
+
+        d =
+          Dossier.build(
+            key,
+            Enum.map(tagged, fn {c, status} ->
+              c |> to_dossier_claim() |> Map.put(:status, status)
+            end)
+          )
+
+        # Cap the returned groups to `limit`. facts / referenced_by / history
         # are already ordered newest-first by Dossier.build, so this keeps the
-        # most recent groups. `conflicts` is intentionally left uncapped: it is
-        # the conflict summary and should surface every conflicting triple.
+        # most recent entries. `conflicts` is intentionally left uncapped: it
+        # is the conflict summary and should surface every conflicting triple.
         d = %{
           d
           | facts: Enum.take(d.facts, limit),
-            referenced_by: Enum.take(d.referenced_by, limit)
+            referenced_by: Enum.take(d.referenced_by, limit),
+            history: Enum.take(d.history, limit)
         }
 
         {:ok, Map.put(d, :entity, name)}

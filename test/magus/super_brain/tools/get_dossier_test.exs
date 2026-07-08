@@ -119,6 +119,41 @@ defmodule Magus.SuperBrain.Tools.GetDossierTest do
     assert length(facts) == 1
   end
 
+  test "superseded and expired facts move to the history trail" do
+    user = generate(user())
+    graph = "memories:user:#{user.id}"
+
+    seed_temporal_claim(graph, user.id, "Aurora ships in Q3.",
+      predicate: "occurs_at",
+      object: "Q3",
+      asserted_at: ~U[2026-05-01 00:00:00Z]
+    )
+
+    seed_temporal_claim(graph, user.id, "Aurora now ships in Q4.",
+      predicate: "occurs_at",
+      object: "Q4",
+      asserted_at: ~U[2026-06-01 00:00:00Z]
+    )
+
+    seed_temporal_claim(graph, user.id, "Aurora uses OldVendor.",
+      predicate: "relates_to",
+      object: "OldVendor",
+      asserted_at: ~U[2026-05-01 00:00:00Z],
+      valid_to: ~U[2026-06-01 00:00:00Z]
+    )
+
+    assert {:ok, result} = GetDossier.run(%{entity_name: "Aurora"}, %{user_id: user.id})
+
+    fact_objects = Enum.map(result.facts, & &1.other_name)
+    assert "Q4" in fact_objects
+    refute "Q3" in fact_objects
+    refute "OldVendor" in fact_objects
+
+    statuses = Map.new(result.history, &{&1.object_name, &1.status})
+    assert statuses["Q3"] == :superseded
+    assert statuses["OldVendor"] == :expired
+  end
+
   # Claim.episode_id is a hard DB foreign key (belongs_to :episode,
   # allow_nil? false), so a fabricated UUID violates the constraint on insert.
   # Create a real Episode first and use its id (mirrors
@@ -175,5 +210,30 @@ defmodule Magus.SuperBrain.Tools.GetDossierTest do
       |> Ash.create(authorize?: false)
 
     claim
+  end
+
+  defp seed_temporal_claim(graph, uid, text, opts) do
+    ep = seed_episode(graph, uid)
+    object = Keyword.fetch!(opts, :object)
+
+    Magus.SuperBrain.Claim
+    |> Ash.Changeset.for_create(:create, %{
+      graph_name: graph,
+      episode_id: ep.id,
+      source_user_id: uid,
+      subject_name: "Aurora",
+      subject_key: "aurora",
+      object_name: object,
+      object_key: Magus.SuperBrain.Naming.key(object),
+      predicate: Keyword.fetch!(opts, :predicate),
+      polarity: :affirms,
+      claim_text: text,
+      confidence: 0.8,
+      trust_tier: :evidence,
+      asserted_at: Keyword.fetch!(opts, :asserted_at),
+      valid_to: Keyword.get(opts, :valid_to),
+      embedding: nil
+    })
+    |> Ash.create(authorize?: false)
   end
 end
