@@ -201,6 +201,62 @@ defmodule Magus.Agents.Tools.Brain.BrainResolverTest do
       assert brain_id == workspace_brain.id
     end
 
+    # The open-pane brain (`context[:brain_id]`) is workspace-scoped exactly like
+    # an explicit param. It used to be trusted blindly, so a cross-workspace pane
+    # brain was usable via context but rejected via explicit id — the very
+    # inconsistency that confused the agent. Strict separation on every path.
+    test "rejects a context brain_id from a different workspace" do
+      user = generate(user())
+      ensure_workspace_plan(user)
+
+      {:ok, ws_a} =
+        Workspaces.create_workspace(
+          %{name: "Ctx WS A", slug: "ctx-ws-a-#{System.unique_integer([:positive])}"},
+          actor: user
+        )
+
+      {:ok, ws_b} =
+        Workspaces.create_workspace(
+          %{name: "Ctx WS B", slug: "ctx-ws-b-#{System.unique_integer([:positive])}"},
+          actor: user
+        )
+
+      {:ok, brain_b} =
+        Brain.create_brain(%{title: "Ctx Brain B", workspace_id: ws_b.id}, actor: user)
+
+      # Conversation in workspace A, pane holds a workspace-B brain.
+      context = %{user_id: user.id, user: user, workspace_id: ws_a.id, brain_id: brain_b.id}
+
+      assert {:error, message} = BrainResolver.resolve_brain_id(context, %{})
+      assert message =~ "different workspace"
+    end
+
+    test "rejects a context workspace brain_id from a personal context" do
+      %{user: user, workspace_brain: workspace_brain} = create_workspace_test_data()
+
+      # Personal conversation (no workspace_id), pane holds a workspace brain —
+      # the reported scenario. Must be rejected, not silently used.
+      context = %{user_id: user.id, user: user, brain_id: workspace_brain.id}
+
+      assert {:error, message} = BrainResolver.resolve_brain_id(context, %{})
+      assert message =~ "different workspace"
+    end
+
+    test "allows a context brain_id from the same workspace" do
+      %{user: user, workspace: workspace, workspace_brain: workspace_brain} =
+        create_workspace_test_data()
+
+      context = %{
+        user_id: user.id,
+        user: user,
+        workspace_id: workspace.id,
+        brain_id: workspace_brain.id
+      }
+
+      assert {:ok, brain_id} = BrainResolver.resolve_brain_id(context, %{})
+      assert brain_id == workspace_brain.id
+    end
+
     test "resolves a brain by its slug" do
       user = generate(user())
       {:ok, brain} = Brain.create_brain(%{title: "My Research Notes"}, actor: user)

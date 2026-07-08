@@ -29,12 +29,17 @@ defmodule Magus.Agents.Tools.Brain.BrainResolver do
   Resolution order:
   1. `params["brain_id"]` (explicit param). This may be a UUID id, a slug, or
      a title — users commonly name their brain rather than paste an id, so the
-     model is allowed to pass any of those. Always validated against the
-     conversation's workspace so an agent cannot reach a brain in a different
-     workspace.
+     model is allowed to pass any of those.
   2. `context[:brain_id]` (active pane context — set by the authenticated UI)
   3. Actor's most recently updated non-archived brain (via `Magus.Brain.Resolver`),
      scoped to `context[:workspace_id]` when present
+
+  Workspaces stay strictly separated: EVERY path is validated against the
+  conversation's workspace (`context[:workspace_id]`). The agent can reach any
+  brain in the current workspace but never one in a different workspace —
+  whether the id arrives as an explicit param OR from the open pane. The pane
+  hint is validated exactly like an explicit id (it used to be trusted blindly,
+  which let a cross-workspace brain be used one way and rejected another).
   """
   @spec resolve_brain_id(map(), map()) :: {:ok, String.t()} | {:error, String.t()}
   def resolve_brain_id(context, params) do
@@ -45,7 +50,7 @@ defmodule Magus.Agents.Tools.Brain.BrainResolver do
 
     cond do
       explicit -> resolve_explicit_brain(explicit, actor, workspace_id)
-      from_context -> {:ok, from_context}
+      from_context -> resolve_explicit_brain(from_context, actor, workspace_id)
       actor -> Resolver.resolve_brain_id(actor, nil, workspace_id: workspace_id)
       true -> {:error, "Missing user context. Cannot resolve brain."}
     end
