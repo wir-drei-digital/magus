@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
-	import { Brain, ChevronRight, FileText, Plus, Settings } from '@lucide/svelte';
+	import { Brain, ChevronRight, FileText, Folder, Plus, Settings } from '@lucide/svelte';
 	import { createBrainPage, type BrainSummary, type PageTreeNode } from '$lib/ash/api';
 	import { brainNav } from '$lib/stores/brain-nav.svelte';
 	import { session } from '$lib/stores/session.svelte';
@@ -13,6 +13,12 @@
 
 	let settingsBrainId = $state<string | null>(null);
 	let settingsOpen = $state(false);
+	// Synthetic "Templates" folder expand state, per brain: template pages are
+	// real pages but grouped so they don't clutter the content tree.
+	let templatesExpanded = $state<Record<string, boolean>>({});
+	function toggleTemplates(brainId: string) {
+		templatesExpanded = { ...templatesExpanded, [brainId]: !templatesExpanded[brainId] };
+	}
 	// Derive from the store so a share toggle (which doesn't close the dialog)
 	// reflects the updated brain immediately.
 	const settingsBrain = $derived(
@@ -116,6 +122,62 @@
 	</Sidebar.MenuItem>
 {/snippet}
 
+{#snippet templateRow(node: PageTreeNode)}
+	<Sidebar.MenuItem>
+		<a
+			href="{base}/brain/page/{node.id}"
+			data-testid="brain-template-page"
+			class="flex items-center gap-1.5 rounded-md p-2 py-1.5 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground {page.url.pathname.endsWith(
+				`/brain/page/${node.id}`
+			)
+				? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
+				: ''}"
+		>
+			<span class="flex size-5 shrink-0 items-center justify-center text-muted-foreground">
+				{#if node.icon}
+					<span class="text-xs leading-none">{node.icon}</span>
+				{:else}
+					<FileText class="size-3.5" />
+				{/if}
+			</span>
+			<span class="min-w-0 flex-1 truncate">{node.title ?? 'Untitled'}</span>
+		</a>
+	</Sidebar.MenuItem>
+{/snippet}
+
+<!-- Templates are real pages but authored as reusable skeletons; grouping them
+     under one synthetic, collapsible folder keeps the content tree readable. -->
+{#snippet templateFolder(brainId: string, templates: PageTreeNode[])}
+	{@const tExpanded = templatesExpanded[brainId] ?? false}
+	<Sidebar.MenuItem>
+		<button
+			type="button"
+			class="group/label flex w-full items-center gap-1 rounded-md p-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+			data-testid="brain-templates-folder"
+			aria-expanded={tExpanded}
+			onclick={() => toggleTemplates(brainId)}
+		>
+			<span class="flex size-5 shrink-0 items-center justify-center">
+				<Folder class="size-3.5 group-hover/label:hidden" />
+				<ChevronRight
+					class="hidden size-3 transition-transform group-hover/label:block {tExpanded
+						? 'rotate-90'
+						: ''}"
+				/>
+			</span>
+			<span class="min-w-0 flex-1 truncate text-left">Templates</span>
+			<span class="shrink-0 text-xs tabular-nums">{templates.length}</span>
+		</button>
+		{#if tExpanded}
+			<Sidebar.MenuSub class="mr-0 pr-0">
+				{#each templates as t (t.id)}
+					{@render templateRow(t)}
+				{/each}
+			</Sidebar.MenuSub>
+		{/if}
+	</Sidebar.MenuItem>
+{/snippet}
+
 {#snippet brainRow(brain: BrainSummary)}
 	{@const expanded = brainNav.isBrainExpanded(brain.id)}
 	<Sidebar.MenuItem data-testid="brain-root">
@@ -161,11 +223,17 @@
 			<span class="sr-only">New page</span>
 		</Sidebar.MenuAction>
 		{#if expanded}
+			{@const rootNodes = brainNav.roots[brain.id] ?? []}
+			{@const contentPages = rootNodes.filter((n) => n.kind !== 'template')}
+			{@const templates = rootNodes.filter((n) => n.kind === 'template')}
 			<Sidebar.MenuSub class="mr-0 pr-0">
-				{#each brainNav.roots[brain.id] ?? [] as node (node.id)}
+				{#each contentPages as node (node.id)}
 					{@render pageRow(node, brain.id)}
 				{/each}
-				{#if (brainNav.roots[brain.id] ?? []).length === 0}
+				{#if templates.length > 0}
+					{@render templateFolder(brain.id, templates)}
+				{/if}
+				{#if rootNodes.length === 0}
 					<li class="py-1 pl-2 text-xs text-muted-foreground">No pages yet</li>
 				{/if}
 			</Sidebar.MenuSub>

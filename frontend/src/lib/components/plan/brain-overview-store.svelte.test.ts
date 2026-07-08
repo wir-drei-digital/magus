@@ -116,6 +116,7 @@ function pageNode(overrides: Partial<PageTreeNode> & { id: string }): PageTreeNo
 		title: 'Plan',
 		icon: null,
 		parentPageId: null,
+		kind: 'page',
 		...overrides
 	};
 }

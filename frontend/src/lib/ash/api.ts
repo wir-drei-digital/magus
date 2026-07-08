@@ -3968,9 +3968,11 @@ export type PageTreeNode = {
 	title: string | null;
 	icon: string | null;
 	parentPageId: string | null;
+	/** `'template'` pages are grouped under a synthetic Templates folder in the tree. */
+	kind: 'page' | 'template';
 };
 
-const PAGE_NODE_FIELDS: rpc.RootBrainPagesFields = ['id', 'title', 'icon', 'parentPageId'];
+const PAGE_NODE_FIELDS: rpc.RootBrainPagesFields = ['id', 'title', 'icon', 'parentPageId', 'kind'];
 
 export function rootBrainPages(brainId: string): Promise<RpcResult<PageTreeNode[]>> {
 	return run((opts) =>
