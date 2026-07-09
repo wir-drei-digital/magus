@@ -156,6 +156,8 @@ defmodule Magus.Knowledge.KnowledgeSource do
                     :google_drive,
                     :onedrive,
                     :dropbox,
+                    :kdrive,
+                    :webdav,
                     :nextcloud,
                     :notion,
                     :confluence,
