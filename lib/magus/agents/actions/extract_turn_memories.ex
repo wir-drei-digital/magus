@@ -105,8 +105,7 @@ defmodule Magus.Agents.Actions.ExtractTurnMemories do
   @impl true
   def run(params, _context) do
     # Normalize once at the boundary so the rest of the function reads a single
-    # key shape instead of checking atom-or-string per field (magus-t1dx). This
-    # also fixes allow_global_memories below, which previously only read the atom.
+    # key shape instead of checking atom-or-string per field (magus-t1dx).
     params = normalize_keys(params)
     user_id = params["user_id"]
     conversation_id = params["conversation_id"]

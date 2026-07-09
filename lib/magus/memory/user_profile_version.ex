@@ -1,7 +1,7 @@
 defmodule Magus.Memory.UserProfileVersion do
   @moduledoc """
   Immutable snapshot of a UserProfile document, captured on every
-  set_document. Mirrors MemoryVersion.
+  set_document, as a record of how the profile evolves over time.
   """
 
   use Ash.Resource,
