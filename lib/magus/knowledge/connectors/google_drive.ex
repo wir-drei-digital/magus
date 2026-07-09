@@ -135,6 +135,9 @@ defmodule Magus.Knowledge.Connectors.GoogleDrive do
   end
 
   @impl true
+  def deletes_in_delta?, do: true
+
+  @impl true
   def register_webhook(_conn, _collection, _callback_url) do
     {:error, :not_supported}
   end

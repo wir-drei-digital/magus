@@ -22,9 +22,11 @@ defmodule Magus.Knowledge.Connectors.Notion do
 
   require Logger
 
-  @base_url "https://api.notion.com/v1"
+  @default_base_url "https://api.notion.com/v1"
   @notion_version "2022-06-28"
   @max_block_depth 10
+
+  defp base_url, do: Application.get_env(:magus, :notion_base_url, @default_base_url)
 
   # token holds the Bearer token regardless of whether it came from OAuth or an API key
   defstruct [:token]
@@ -370,7 +372,7 @@ defmodule Magus.Knowledge.Connectors.Notion do
   # --- Private helpers ---
 
   defp post(conn, path, body, retries \\ 0) do
-    url = @base_url <> path
+    url = base_url() <> path
 
     case Req.post(url,
            json: body,
@@ -393,7 +395,7 @@ defmodule Magus.Knowledge.Connectors.Notion do
   end
 
   defp get(conn, path, params, retries \\ 0) do
-    url = @base_url <> path
+    url = base_url() <> path
 
     case Req.get(url,
            params: params,

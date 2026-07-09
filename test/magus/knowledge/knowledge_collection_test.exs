@@ -764,4 +764,83 @@ defmodule Magus.Knowledge.KnowledgeCollectionTest do
       refute Map.has_key?(by_ext, "file-gone")
     end
   end
+
+  describe "notion delta reconciles deletions" do
+    setup do
+      notion = Bypass.open()
+      prev = Application.get_env(:magus, :notion_base_url)
+      Application.put_env(:magus, :notion_base_url, "http://localhost:#{notion.port}/v1")
+      on_exit(fn -> Application.put_env(:magus, :notion_base_url, prev) end)
+      {:ok, notion: notion}
+    end
+
+    test "a page missing from the full listing is hard-deleted", %{notion: notion} do
+      user = generate(user())
+      Magus.Generators.ensure_workspace_plan(user)
+
+      {:ok, source} =
+        Magus.Knowledge.create_source(
+          %{name: "N", provider: :notion, auth_config: %{"access_token" => "secret"}},
+          actor: user
+        )
+
+      {:ok, _} = Magus.Knowledge.update_source_status(source, %{status: :active}, actor: user)
+
+      # notion.ex page_collection?/1 keys purely on external_path starting
+      # with "/page/"; a database collection is any path that does not, so
+      # "/db-1" (no settings flag needed) takes the database path.
+      {:ok, collection} =
+        Magus.Knowledge.create_collection(
+          source.id,
+          %{name: "DB", external_id: "db-1", external_path: "/db-1"},
+          actor: user
+        )
+
+      {:ok, collection} =
+        Magus.Knowledge.update_sync_status(
+          collection,
+          %{
+            sync_status: :synced,
+            last_synced_at: DateTime.add(DateTime.utc_now(), -7200, :second)
+          },
+          authorize?: false
+        )
+
+      # Local file whose Notion page no longer exists.
+      path = "test/#{Ash.UUIDv7.generate()}.md"
+      {:ok, _} = Magus.Files.Storage.store(path, "old page")
+
+      {:ok, gone_file} =
+        Magus.Files.create_file_from_connector(
+          %{
+            name: "gone.md",
+            type: :text,
+            mime_type: "text/markdown",
+            file_size: 8,
+            file_path: path,
+            knowledge_collection_id: collection.id,
+            external_id: "page-gone",
+            external_etag: "t1",
+            external_updated_at: DateTime.utc_now()
+          },
+          actor: user
+        )
+
+      # Delta: no edits since last sync. Full listing: empty database.
+      # Both detect_changes and list_items (database path) POST the same
+      # query endpoint, so one stub serves both requests.
+      Bypass.stub(notion, "POST", "/v1/databases/db-1/query", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(
+          200,
+          Jason.encode!(%{"results" => [], "has_more" => false, "next_cursor" => nil})
+        )
+      end)
+
+      Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync.do_incremental_sync(collection)
+
+      assert {:error, _} = Magus.Files.get_file(gone_file.id, authorize?: false)
+    end
+  end
 end

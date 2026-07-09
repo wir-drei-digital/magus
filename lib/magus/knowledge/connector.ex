@@ -102,6 +102,18 @@ defmodule Magus.Knowledge.Connector do
             ) :: {:ok, item()} | {:error, :not_supported} | {:error, term()}
 
   @doc """
+  Whether `detect_changes/3` emits `:deleted` changes.
+
+  Connectors whose delta feed has no deletion signal (for example Notion
+  database queries filtered by last_edited_time) return false or omit the
+  callback; the sync framework then reconciles deletions with a full-listing
+  diff after applying delta changes.
+  """
+  @callback deletes_in_delta?() :: boolean()
+
+  @optional_callbacks deletes_in_delta?: 0
+
+  @doc """
   Return the connector module for the given provider atom.
 
   ## Examples

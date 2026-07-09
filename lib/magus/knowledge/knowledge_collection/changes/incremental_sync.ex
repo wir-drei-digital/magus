@@ -157,6 +157,15 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
         end
       end)
 
+    reconciliation_errors =
+      if deletes_in_delta?(connector) do
+        0
+      else
+        reconcile_remote_deletions(conn, connector, collection, existing_by_external_id)
+      end
+
+    error_count = error_count + reconciliation_errors
+
     now = DateTime.utc_now()
 
     {:ok, actual_count} =
@@ -270,6 +279,39 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
           :ok -> {:ok, "Deleted: #{item.name || item.id}"}
           :error -> {:error, "Failed to delete: #{item.name || item.id}"}
         end
+    end
+  end
+
+  defp deletes_in_delta?(connector) do
+    Code.ensure_loaded?(connector) and
+      function_exported?(connector, :deletes_in_delta?, 0) and
+      connector.deletes_in_delta?()
+  end
+
+  # Full-listing diff for connectors whose delta cannot see deletions.
+  # Returns the number of failures (0 on clean run or on listing failure,
+  # which is logged and skipped rather than failing the whole sync).
+  defp reconcile_remote_deletions(conn, connector, collection, existing_by_external_id) do
+    case list_all_remote_items(conn, connector, collection) do
+      {:ok, remote_items} ->
+        remote_ids = MapSet.new(remote_items, & &1.id)
+
+        existing_by_external_id
+        |> Enum.reject(fn {ext_id, _f} -> MapSet.member?(remote_ids, ext_id) end)
+        |> Enum.reduce(0, fn {_ext_id, file}, failures ->
+          case SyncHelpers.delete_remote_gone_file(file) do
+            :ok -> failures
+            :error -> failures + 1
+          end
+        end)
+
+      {:error, reason} ->
+        SyncLogger.warn(
+          collection.id,
+          "Deletion reconciliation skipped (listing failed): #{inspect(reason)}"
+        )
+
+        0
     end
   end
 
