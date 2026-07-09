@@ -64,7 +64,20 @@ defmodule Magus.Eval.Harness do
     model = Magus.LiveE2ECase.create_live_model()
     user = Magus.LiveE2ECase.create_live_user()
     Magus.LiveE2ECase.setup_live_subscription(user)
-    workspace = Magus.Generators.generate(Magus.Generators.workspace(actor: user))
+
+    # The generator's default slug uses System.unique_integer, which restarts
+    # with every VM: two eval runs against the same (persistent) eval DB
+    # would collide on the workspace slug. Stamp a cross-VM-unique one.
+    unique = System.system_time(:millisecond)
+
+    workspace =
+      Magus.Generators.generate(
+        Magus.Generators.workspace(
+          actor: user,
+          name: "Eval Workspace #{unique}",
+          slug: "eval-#{unique}"
+        )
+      )
 
     {:ok, %{user: user, model: model, workspace: workspace}}
   end
