@@ -61,7 +61,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="sm:max-w-md" data-testid="brain-settings-dialog">
+	<Dialog.Content class="sm:max-w-xl" data-testid="brain-settings-dialog">
 		<Dialog.Header>
 			<Dialog.Title>Brain settings</Dialog.Title>
 		</Dialog.Header>

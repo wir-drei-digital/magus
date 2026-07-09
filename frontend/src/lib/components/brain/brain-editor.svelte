@@ -27,7 +27,7 @@
 		FileBlock,
 		ImageBlock,
 		MessageBlock,
-		PageRef,
+		createPageRef,
 		SourceBlock,
 		Tag
 	} from '$lib/brain/blocks';
@@ -280,7 +280,7 @@
 						MessageBlock,
 						CalloutBlock,
 						ImageBlock,
-						PageRef,
+						createPageRef({ onPageRefClick }),
 						Tag
 					],
 					onUpdate: () => onChange()

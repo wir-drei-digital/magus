@@ -483,55 +483,60 @@ export const ImageBlock = Node.create({
 // `Magus.Brain.ProseMirrorProfile`.
 // ---------------------------------------------------------------------------
 
-export const PageRef = Node.create({
-	name: 'pageRef',
-	group: 'inline',
-	inline: true,
-	atom: true,
-	selectable: true,
+export function createPageRef({ onPageRefClick } = {}) {
+	return Node.create({
+		name: 'pageRef',
+		group: 'inline',
+		inline: true,
+		atom: true,
+		selectable: true,
 
-	addAttributes() {
-		return { title: { default: '' } };
-	},
+		addAttributes() {
+			return { title: { default: '' } };
+		},
 
-	parseHTML() {
-		return [{ tag: 'a[data-type="pageRef"]' }];
-	},
+		parseHTML() {
+			return [{ tag: 'a[data-type="pageRef"]' }];
+		},
 
-	renderHTML({ HTMLAttributes, node }) {
-		return [
-			'a',
-			mergeAttributes(HTMLAttributes, {
-				'data-type': 'pageRef',
-				class: 'brain-page-ref',
-				href: '#'
-			}),
-			`[[${node.attrs.title || ''}]]`
-		];
-	},
+		renderHTML({ HTMLAttributes, node }) {
+			return [
+				'a',
+				mergeAttributes(HTMLAttributes, {
+					'data-type': 'pageRef',
+					class: 'brain-page-ref',
+					href: '#'
+				}),
+				`[[${node.attrs.title || ''}]]`
+			];
+		},
 
-	addNodeView() {
-		return ({ node, HTMLAttributes }) => {
-			const dom = document.createElement('a');
-			dom.className = 'brain-page-ref';
-			dom.setAttribute('data-type', 'pageRef');
-			dom.setAttribute('href', '#');
-			dom.textContent = `[[${node.attrs.title || ''}]]`;
-			// Click handling lives at the editor host level; firing a window
-			// event keeps NodeView wiring decoupled from the LiveView hook.
-			dom.addEventListener('mousedown', (e) => {
-				e.preventDefault();
-				e.stopPropagation();
-				window.dispatchEvent(
-					new CustomEvent('phx:brain-page-ref-click', {
-						detail: { title: node.attrs.title }
-					})
-				);
-			});
-			return { dom };
-		};
-	}
-});
+		addNodeView() {
+			return ({ node }) => {
+				const dom = document.createElement('a');
+				dom.className = 'brain-page-ref';
+				dom.setAttribute('data-type', 'pageRef');
+				dom.setAttribute('href', '#');
+				dom.textContent = `[[${node.attrs.title || ''}]]`;
+				// mousedown keeps the caret out of the atom; navigation is bound to
+				// click because a mousedown preventDefault does NOT suppress the
+				// `href="#"` anchor default. Only a click preventDefault does. The
+				// callback is passed in per-editor (not a global window event), so a
+				// click never leaks into another mounted editor's host.
+				dom.addEventListener('mousedown', (e) => {
+					e.preventDefault();
+					e.stopPropagation();
+				});
+				dom.addEventListener('click', (e) => {
+					e.preventDefault();
+					e.stopPropagation();
+					onPageRefClick?.(node.attrs.title);
+				});
+				return { dom };
+			};
+		}
+	});
+}
 
 export const Tag = Node.create({
 	name: 'tag',

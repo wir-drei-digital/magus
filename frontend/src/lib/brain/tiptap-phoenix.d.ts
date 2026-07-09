@@ -15,7 +15,9 @@ declare module '$lib/brain/blocks' {
 	export const MessageBlock: AnyExtension;
 	export const CalloutBlock: AnyExtension;
 	export const ImageBlock: AnyExtension;
-	export const PageRef: AnyExtension;
+	export function createPageRef(options?: {
+		onPageRefClick?: (title: string) => void;
+	}): AnyExtension;
 	export const Tag: AnyExtension;
 }
 
