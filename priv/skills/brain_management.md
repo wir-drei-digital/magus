@@ -125,8 +125,9 @@ automatically; you don't create them by hand.
 CURRENT CONVERSATION by default. Any brain page also carries its own task board
 (what the user sees on the page): pass `brain_page_id` (a page id, or an exact
 page title; add `brain_id` when the title is ambiguous across brains) to
-`create_task` or `list_tasks` to work that board instead. `update_task` works
-on any task by task_id. `clear_tasks` clears conversation tasks only, never a
+`create_task` or `list_tasks` to work that board instead. `update_task` changes
+any task by task_id, or several at once via an `updates` array of
+`{task_id, ...fields}`. `clear_tasks` clears conversation tasks only, never a
 page's board. Use page tasks for durable, user-visible work items on a topic;
 use conversation tasks for your own in-flight plan.
 

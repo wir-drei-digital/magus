@@ -158,5 +158,98 @@ defmodule Magus.Agents.Tools.Plan.UpdateTaskTest do
 
       assert result.error =~ "Missing required context"
     end
+
+    test "asks for a task_id when neither task_id nor updates is given" do
+      %{context: context} = create_test_context()
+
+      assert {:ok, result} = UpdateTask.run(%{"status" => "done"}, context)
+      assert result.error =~ "task_id is required"
+    end
+
+    test "blank task_id is treated as missing, not passed to the query" do
+      %{context: context} = create_test_context()
+
+      assert {:ok, result} = UpdateTask.run(%{"task_id" => "", "status" => "done"}, context)
+      assert result.error =~ "task_id is required"
+    end
+  end
+
+  describe "run/2 - batch updates" do
+    test "updates several tasks in one call" do
+      %{context: context} = create_test_context()
+      a = create_task(context, %{"title" => "A"})
+      b = create_task(context, %{"title" => "B"})
+
+      assert {:ok, result} =
+               UpdateTask.run(
+                 %{
+                   "updates" => [
+                     %{"task_id" => a.task_id, "status" => "done"},
+                     %{"task_id" => b.task_id, "status" => "in_progress"}
+                   ]
+                 },
+                 context
+               )
+
+      assert length(result.updated) == 2
+      refute Map.has_key?(result, :errors)
+
+      by_id = Map.new(result.updated, &{&1.task_id, &1.status})
+      assert by_id[a.task_id] == :done
+      assert by_id[b.task_id] == :in_progress
+    end
+
+    test "tolerates the `tasks` key as an alias for `updates`" do
+      %{context: context} = create_test_context()
+      task = create_task(context)
+
+      assert {:ok, result} =
+               UpdateTask.run(
+                 %{"tasks" => [%{"task_id" => task.task_id, "status" => "done"}]},
+                 context
+               )
+
+      assert [%{status: :done}] = result.updated
+    end
+
+    test "reports per-item errors without aborting the good updates" do
+      %{context: context} = create_test_context()
+      task = create_task(context)
+      fake_id = Ash.UUIDv7.generate()
+
+      assert {:ok, result} =
+               UpdateTask.run(
+                 %{
+                   "updates" => [
+                     %{"task_id" => task.task_id, "status" => "done"},
+                     %{"task_id" => fake_id, "status" => "done"},
+                     %{"status" => "done"}
+                   ]
+                 },
+                 context
+               )
+
+      assert [%{task_id: updated_id, status: :done}] = result.updated
+      assert updated_id == task.task_id
+      assert length(result.errors) == 2
+      assert Enum.any?(result.errors, &(&1[:error] =~ "not found"))
+      assert Enum.any?(result.errors, &(&1[:error] =~ "needs a task_id"))
+    end
+
+    test "a cross-conversation task in a batch is rejected as not found" do
+      %{context: context1} = create_test_context()
+      %{context: context2} = create_test_context()
+      foreign = create_task(context1)
+
+      assert {:ok, result} =
+               UpdateTask.run(
+                 %{"updates" => [%{"task_id" => foreign.task_id, "status" => "done"}]},
+                 context2
+               )
+
+      assert result.updated == []
+      assert [%{error: message}] = result.errors
+      assert message =~ "not found"
+    end
   end
 end
