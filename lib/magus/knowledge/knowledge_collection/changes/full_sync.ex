@@ -2,9 +2,12 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
   @moduledoc """
   Ash change that performs a full sync of a KnowledgeCollection.
 
-  Paginates through all items from the remote connector, deduplicates by
-  `external_id`, fetches content for new items, and creates File records
-  via the `create_from_connector` action.
+  Paginates through all items from the remote connector, matching against
+  existing files by `external_id`: new items are created, changed items
+  (list-time etag differs or is nil) are re-fetched and updated, and local
+  files absent from the complete remote listing are hard-deleted. The
+  deletion pass only runs after pagination completes without error, so a
+  mid-listing failure never mass-deletes based on a partial inventory.
   """
 
   use Ash.Resource.Change
@@ -116,33 +119,43 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
 
   defp sync_all_items(conn, connector, collection, source) do
     actor = Ash.get!(Magus.Accounts.User, source.user_id, authorize?: false)
-    existing_external_ids = get_existing_external_ids(collection)
-    SyncLogger.info(collection.id, "Found #{MapSet.size(existing_external_ids)} existing files")
+    existing = get_existing_files(collection)
+    existing_by_external_id = Map.new(existing, &{&1.external_id, &1})
 
-    do_paginate(conn, connector, collection, source, actor, existing_external_ids, nil, 0, 0, nil)
+    SyncLogger.info(collection.id, "Found #{map_size(existing_by_external_id)} existing files")
+
+    state = %{
+      conn: conn,
+      connector: connector,
+      collection: collection,
+      source: source,
+      actor: actor,
+      existing_by_external_id: existing_by_external_id
+    }
+
+    case do_paginate(state, nil, 0, 0, nil, MapSet.new()) do
+      {:ok, total_items, total_errors, updated_max, remote_ids} ->
+        delete_remote_gone_files(state, remote_ids)
+        {:ok, total_items, total_errors, updated_max}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
-  defp do_paginate(
-         conn,
-         connector,
-         collection,
-         source,
-         actor,
-         existing_ids,
-         cursor,
-         item_count,
-         error_count,
-         max_updated_at
-       ) do
+  defp do_paginate(state, cursor, item_count, error_count, max_updated_at, remote_ids) do
+    %{conn: conn, connector: connector, collection: collection} = state
+
     case apply(connector, :list_items, [conn, collection, cursor]) do
       {:ok, items, new_cursor} ->
         SyncLogger.info(collection.id, "Listed #{length(items)} items from provider")
 
         {new_item_count, new_error_count, new_max_updated_at} =
-          process_items(conn, connector, items, collection, source, actor, existing_ids)
+          process_items(state, items)
 
         total_items = item_count + new_item_count
         total_errors = error_count + new_error_count
+        new_remote_ids = MapSet.union(remote_ids, MapSet.new(items, & &1.id))
 
         updated_max =
           case {max_updated_at, new_max_updated_at} do
@@ -152,20 +165,9 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
           end
 
         if new_cursor do
-          do_paginate(
-            conn,
-            connector,
-            collection,
-            source,
-            actor,
-            existing_ids,
-            new_cursor,
-            total_items,
-            total_errors,
-            updated_max
-          )
+          do_paginate(state, new_cursor, total_items, total_errors, updated_max, new_remote_ids)
         else
-          {:ok, total_items, total_errors, updated_max}
+          {:ok, total_items, total_errors, updated_max, new_remote_ids}
         end
 
       {:error, reason} ->
@@ -174,7 +176,16 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
     end
   end
 
-  defp process_items(conn, connector, items, collection, source, actor, existing_ids) do
+  defp process_items(state, items) do
+    %{
+      conn: conn,
+      connector: connector,
+      collection: collection,
+      source: source,
+      actor: actor,
+      existing_by_external_id: existing_by_external_id
+    } = state
+
     cid = collection.id
 
     Enum.reduce(items, {0, 0, nil}, fn item, {item_count, error_count, max_updated_at} ->
@@ -185,24 +196,63 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
           {old, new} -> if DateTime.compare(new, old) == :gt, do: new, else: old
         end
 
-      if MapSet.member?(existing_ids, item.id) do
-        {item_count + 1, error_count, updated_max}
-      else
-        case create_file_from_item(conn, connector, item, collection, source, actor) do
-          {:ok, _file} ->
-            SyncLogger.info(cid, "Synced: #{item.name}")
+      case Map.get(existing_by_external_id, item.id) do
+        nil ->
+          case create_file_from_item(conn, connector, item, collection, source, actor) do
+            {:ok, _file} ->
+              SyncLogger.info(cid, "Synced: #{item.name}")
+              {item_count + 1, error_count, updated_max}
+
+            {:error, reason} ->
+              Logger.warning(
+                "FullSync: failed to create file for item #{item.id}: #{inspect(reason)}"
+              )
+
+              SyncLogger.error(cid, "Failed to sync #{item.name}: #{inspect(reason)}")
+              {item_count, error_count + 1, updated_max}
+          end
+
+        file ->
+          needs_check? = is_nil(item.etag) or file.external_etag != item.etag
+
+          if needs_check? do
+            case SyncHelpers.update_existing_file(conn, connector, file, item, actor) do
+              {:ok, :updated} ->
+                SyncLogger.info(cid, "Updated: #{item.name}")
+                {item_count + 1, error_count, updated_max}
+
+              {:ok, :unchanged} ->
+                {item_count + 1, error_count, updated_max}
+
+              {:error, reason} ->
+                SyncLogger.error(cid, "Failed to update #{item.name}: #{inspect(reason)}")
+                {item_count, error_count + 1, updated_max}
+            end
+          else
             {item_count + 1, error_count, updated_max}
-
-          {:error, reason} ->
-            Logger.warning(
-              "FullSync: failed to create file for item #{item.id}: #{inspect(reason)}"
-            )
-
-            SyncLogger.error(cid, "Failed to sync #{item.name}: #{inspect(reason)}")
-            {item_count, error_count + 1, updated_max}
-        end
+          end
       end
     end)
+  end
+
+  # Hard-deletes local files absent from the complete remote listing. Only
+  # called from the success path of `do_paginate/6` (a complete pagination),
+  # never after a mid-pagination error: a partial listing would otherwise be
+  # mistaken for a full remote inventory and mass-delete files that are
+  # simply on a page we never reached.
+  defp delete_remote_gone_files(state, remote_ids) do
+    %{collection: collection, existing_by_external_id: existing_by_external_id} = state
+    cid = collection.id
+
+    gone =
+      existing_by_external_id
+      |> Enum.reject(fn {ext_id, _file} -> MapSet.member?(remote_ids, ext_id) end)
+
+    Enum.each(gone, fn {_ext_id, file} -> SyncHelpers.delete_remote_gone_file(file) end)
+
+    if gone != [] do
+      SyncLogger.info(cid, "Hard-deleted #{length(gone)} remotely removed files")
+    end
   end
 
   @doc """
@@ -257,17 +307,14 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
     end
   end
 
-  defp get_existing_external_ids(collection) do
+  defp get_existing_files(collection) do
     Magus.Files.File
     |> Ash.Query.filter(
       knowledge_collection_id == ^collection.id and
         not is_nil(external_id) and
         is_nil(deleted_at)
     )
-    |> Ash.Query.select([:external_id])
     |> Ash.read!(authorize?: false)
-    |> Enum.map(& &1.external_id)
-    |> MapSet.new()
   end
 
   @doc false

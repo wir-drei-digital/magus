@@ -660,4 +660,108 @@ defmodule Magus.Knowledge.KnowledgeCollectionTest do
       assert chunk_rows == 0
     end
   end
+
+  describe "full sync updates and deletes" do
+    setup do
+      drive = Bypass.open()
+      prev = Application.get_env(:magus, :google_drive_base_url)
+      Application.put_env(:magus, :google_drive_base_url, "http://localhost:#{drive.port}")
+      on_exit(fn -> Application.put_env(:magus, :google_drive_base_url, prev) end)
+      {:ok, drive: drive}
+    end
+
+    test "changed etag re-fetches; remote-gone file is removed", %{drive: drive} do
+      user = generate(user())
+      Magus.Generators.ensure_workspace_plan(user)
+
+      {:ok, source} =
+        Magus.Knowledge.create_source(
+          %{
+            name: "GD",
+            provider: :google_drive,
+            auth_config: %{"access_token" => "tok", "refresh_token" => "rt"}
+          },
+          actor: user
+        )
+
+      {:ok, source} =
+        Magus.Knowledge.update_source_status(source, %{status: :active}, actor: user)
+
+      {:ok, collection} =
+        Magus.Knowledge.create_collection(
+          source.id,
+          %{name: "F", external_id: "root-folder", external_path: "/r"},
+          actor: user
+        )
+
+      # Pre-existing local files: one whose remote etag changed, one gone remotely.
+      for {ext_id, name} <- [{"file-changed", "changed.txt"}, {"file-gone", "gone.txt"}] do
+        path = "test/#{Ash.UUIDv7.generate()}.txt"
+        {:ok, _} = Magus.Files.Storage.store(path, "old #{name}")
+
+        {:ok, _} =
+          Magus.Files.create_file_from_connector(
+            %{
+              name: name,
+              type: :text,
+              mime_type: "text/plain",
+              file_size: 10,
+              file_path: path,
+              knowledge_collection_id: collection.id,
+              external_id: ext_id,
+              external_etag: "etag-old",
+              external_updated_at: DateTime.utc_now(),
+              metadata: %{"content_hash" => "stale-hash"}
+            },
+            actor: user
+          )
+      end
+
+      Bypass.stub(drive, "GET", "/files", fn conn ->
+        conn = Plug.Conn.fetch_query_params(conn)
+        q = conn.query_params["q"] || ""
+
+        body =
+          if String.contains?(q, "mimeType='application/vnd.google-apps.folder'") do
+            %{"files" => []}
+          else
+            %{
+              "files" => [
+                %{
+                  "id" => "file-changed",
+                  "name" => "changed.txt",
+                  "mimeType" => "text/plain",
+                  "modifiedTime" => "2026-07-09T12:00:00Z",
+                  "md5Checksum" => "etag-NEW"
+                }
+              ]
+            }
+          end
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(body))
+      end)
+
+      Bypass.stub(drive, "GET", "/files/file-changed", fn conn ->
+        Plug.Conn.resp(conn, 200, "fresh content")
+      end)
+
+      Magus.Knowledge.KnowledgeCollection.Changes.FullSync.do_full_sync(collection)
+
+      require Ash.Query
+
+      files =
+        Magus.Files.File
+        |> Ash.Query.filter(knowledge_collection_id == ^collection.id)
+        |> Ash.read!(authorize?: false)
+
+      by_ext = Map.new(files, &{&1.external_id, &1})
+
+      assert Map.has_key?(by_ext, "file-changed")
+      assert by_ext["file-changed"].external_etag == "etag-NEW"
+      assert by_ext["file-changed"].status == :pending
+      refute Map.has_key?(by_ext, "file-gone")
+    end
+  end
 end
