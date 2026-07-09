@@ -225,8 +225,8 @@
 					<p class="text-xs text-muted-foreground">Loading…</p>
 				{:else if !guide.constitution && guide.sectionGuides.length === 0 && !guide.pageType}
 					<p class="text-xs text-muted-foreground">
-						No guide yet. The agent writes one as this brain takes shape; you can also ask it to
-						set instructions for the brain or this section.
+						No guide yet. The agent writes one as this brain takes shape; you can also ask it to set
+						instructions for the brain or this section.
 					</p>
 				{:else}
 					<!-- Mirrors the agent's Brain Guide context block: constitution, then
