@@ -561,7 +561,8 @@ defmodule Magus.Files.File do
         :status,
         :file_path,
         :file_size,
-        :mime_type
+        :mime_type,
+        :metadata
       ]
 
       require_atomic? false

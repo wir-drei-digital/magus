@@ -14,7 +14,6 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
   require Ash.Query
   require Logger
 
-  alias Magus.Files.Storage
   alias Magus.Knowledge.Connector
   alias Magus.Knowledge.KnowledgeCollection.Changes.FullSync
   alias Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers
@@ -229,8 +228,8 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
         :ok
 
       file ->
-        case update_existing_file(conn, connector, file, item, actor) do
-          {:ok, _file} ->
+        case SyncHelpers.update_existing_file(conn, connector, file, item, actor) do
+          {:ok, _outcome} ->
             {:ok, "Updated: #{item.name}"}
 
           {:error, reason} ->
@@ -302,10 +301,15 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
                 end
 
               file ->
-                if file.external_etag != item.etag do
-                  case update_existing_file(conn, connector, file, item, actor) do
-                    {:ok, _} ->
+                needs_check? = is_nil(item.etag) or file.external_etag != item.etag
+
+                if needs_check? do
+                  case SyncHelpers.update_existing_file(conn, connector, file, item, actor) do
+                    {:ok, :updated} ->
                       SyncLogger.info(cid, "Updated: #{item.name}")
+                      {items + 1, errors}
+
+                    {:ok, :unchanged} ->
                       {items + 1, errors}
 
                     {:error, reason} ->
@@ -380,38 +384,6 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
 
   # --- Shared helpers ---
 
-  defp update_existing_file(conn, connector, file, item, _actor) do
-    case apply(connector, :fetch_content, [conn, item]) do
-      {:ok, content, metadata} ->
-        effective_mime = Map.get(metadata || %{}, "export_mime", item.mime_type)
-        file_size = byte_size(content)
-        storage_path = file.file_path || Storage.generate_path(file.user_id, file.id, item.name)
-
-        case Storage.store(storage_path, content) do
-          {:ok, _} ->
-            Magus.Files.update_file_from_connector(
-              file,
-              %{
-                external_etag: item.etag,
-                external_updated_at: item.updated_at,
-                last_synced_at: DateTime.utc_now(),
-                status: :pending,
-                file_path: storage_path,
-                file_size: file_size,
-                mime_type: effective_mime
-              },
-              authorize?: false
-            )
-
-          {:error, reason} ->
-            {:error, {:storage_failed, reason}}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
   defp soft_delete_file(file) do
     case Magus.Files.soft_delete_file(file, authorize?: false) do
       {:ok, _} ->
@@ -433,7 +405,6 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
         not is_nil(external_id) and
         is_nil(deleted_at)
     )
-    |> Ash.Query.select([:id, :external_id, :external_etag])
     |> Ash.read!(authorize?: false)
   end
 

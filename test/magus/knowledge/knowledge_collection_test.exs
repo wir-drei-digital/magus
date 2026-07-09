@@ -313,4 +313,193 @@ defmodule Magus.Knowledge.KnowledgeCollectionTest do
       assert reloaded.auth_config["some_other_key"] == "keep-me"
     end
   end
+
+  describe "update path: hash guard + quota" do
+    setup do
+      drive = Bypass.open()
+      prev = Application.get_env(:magus, :google_drive_base_url)
+      Application.put_env(:magus, :google_drive_base_url, "http://localhost:#{drive.port}")
+      on_exit(fn -> Application.put_env(:magus, :google_drive_base_url, prev) end)
+      {:ok, drive: drive}
+    end
+
+    defp gdrive_fixture(_ctx) do
+      user = generate(user())
+      Magus.Generators.ensure_workspace_plan(user)
+
+      {:ok, source} =
+        Magus.Knowledge.create_source(
+          %{
+            name: "GD",
+            provider: :google_drive,
+            auth_config: %{"access_token" => "tok", "refresh_token" => "rt"}
+          },
+          actor: user
+        )
+
+      {:ok, source} =
+        Magus.Knowledge.update_source_status(source, %{status: :active}, actor: user)
+
+      {:ok, collection} =
+        Magus.Knowledge.create_collection(
+          source.id,
+          %{name: "Folder", external_id: "root", external_path: "/root"},
+          actor: user
+        )
+
+      %{user: user, source: source, collection: collection}
+    end
+
+    defp existing_file(user, collection, body) do
+      hash = Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers.content_hash(body)
+
+      {:ok, file} =
+        Magus.Files.create_file_from_connector(
+          %{
+            name: "doc.txt",
+            type: :text,
+            mime_type: "text/plain",
+            file_size: byte_size(body),
+            file_path: "test/#{Ash.UUIDv7.generate()}.txt",
+            knowledge_collection_id: collection.id,
+            external_id: "file-1",
+            external_etag: "etag-old",
+            external_updated_at: DateTime.utc_now(),
+            metadata: %{"content_hash" => hash}
+          },
+          actor: user
+        )
+
+      file
+    end
+
+    test "unchanged content skips re-store and does not flip status to :pending", ctx do
+      %{user: user, collection: collection} = gdrive_fixture(ctx)
+      body = "same content"
+      file = existing_file(user, collection, body)
+      {:ok, _} = Magus.Files.update_file_status(file, %{status: :ready}, authorize?: false)
+
+      Bypass.expect(ctx.drive, "GET", "/files/file-1", fn conn ->
+        Plug.Conn.resp(conn, 200, body)
+      end)
+
+      {:ok, conn} =
+        Magus.Knowledge.Connectors.GoogleDrive.connect(%{"access_token" => "tok"})
+
+      item = %{
+        id: "file-1",
+        name: "doc.txt",
+        etag: "etag-new",
+        updated_at: DateTime.utc_now(),
+        mime_type: "text/plain"
+      }
+
+      assert {:ok, :unchanged} =
+               Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers.update_existing_file(
+                 conn,
+                 Magus.Knowledge.Connectors.GoogleDrive,
+                 Magus.Files.get_file!(file.id, authorize?: false),
+                 item,
+                 user
+               )
+
+      reloaded = Magus.Files.get_file!(file.id, authorize?: false)
+      assert reloaded.status == :ready
+      assert reloaded.external_etag == "etag-new"
+    end
+
+    test "changed content re-stores, flips to :pending, and refreshes the stored hash", ctx do
+      %{user: user, collection: collection} = gdrive_fixture(ctx)
+      file = existing_file(user, collection, "old content")
+
+      Bypass.expect(ctx.drive, "GET", "/files/file-1", fn conn ->
+        Plug.Conn.resp(conn, 200, "new content")
+      end)
+
+      {:ok, conn} =
+        Magus.Knowledge.Connectors.GoogleDrive.connect(%{"access_token" => "tok"})
+
+      item = %{
+        id: "file-1",
+        name: "doc.txt",
+        etag: "etag-new",
+        updated_at: DateTime.utc_now(),
+        mime_type: "text/plain"
+      }
+
+      assert {:ok, :updated} =
+               Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers.update_existing_file(
+                 conn,
+                 Magus.Knowledge.Connectors.GoogleDrive,
+                 Magus.Files.get_file!(file.id, authorize?: false),
+                 item,
+                 user
+               )
+
+      reloaded = Magus.Files.get_file!(file.id, authorize?: false)
+      assert reloaded.status == :pending
+
+      assert reloaded.metadata["content_hash"] ==
+               Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers.content_hash("new content")
+    end
+
+    test "an update that exceeds max_upload_bytes keeps the old content", ctx do
+      %{user: user, collection: collection} = gdrive_fixture(ctx)
+      file = existing_file(user, collection, "old content")
+
+      # The Google Drive connector itself hard-caps downloads at 100 MiB
+      # (same as the default "pro" plan's max_upload_bytes), so exceeding
+      # both at once would trip the connector's own guard instead of the
+      # quota check under test here. Give this user a much smaller plan so
+      # the fetched content clears the connector's cap but still exceeds
+      # the plan's upload quota.
+      {:ok, tiny_plan} =
+        Magus.Usage.create_usage_plan(
+          %{
+            key: "wt-sync-tiny-#{Ash.UUIDv7.generate()}",
+            name: "Tiny",
+            price_monthly_cents: 0,
+            storage_bytes: 1_000_000,
+            max_upload_bytes: 100,
+            is_active: true,
+            sort_order: 99
+          },
+          authorize?: false
+        )
+
+      {:ok, sub} = Magus.Usage.get_user_subscription(user.id, authorize?: false)
+
+      {:ok, _} =
+        Magus.Usage.upgrade_subscription(sub, %{usage_plan_id: tiny_plan.id}, authorize?: false)
+
+      huge = String.duplicate("x", 1_000)
+
+      Bypass.expect(ctx.drive, "GET", "/files/file-1", fn conn ->
+        Plug.Conn.resp(conn, 200, huge)
+      end)
+
+      {:ok, conn} =
+        Magus.Knowledge.Connectors.GoogleDrive.connect(%{"access_token" => "tok"})
+
+      item = %{
+        id: "file-1",
+        name: "doc.txt",
+        etag: "etag-new",
+        updated_at: DateTime.utc_now(),
+        mime_type: "text/plain"
+      }
+
+      assert {:error, {:quota_exceeded, _msg}} =
+               Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers.update_existing_file(
+                 conn,
+                 Magus.Knowledge.Connectors.GoogleDrive,
+                 Magus.Files.get_file!(file.id, authorize?: false),
+                 item,
+                 user
+               )
+
+      reloaded = Magus.Files.get_file!(file.id, authorize?: false)
+      assert reloaded.external_etag == "etag-old"
+    end
+  end
 end

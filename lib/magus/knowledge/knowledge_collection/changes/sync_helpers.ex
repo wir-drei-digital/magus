@@ -5,6 +5,7 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers do
 
   require Logger
 
+  alias Magus.Files.Storage
   alias Magus.Knowledge.Connectors.GoogleDrive
 
   @doc """
@@ -54,6 +55,94 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers do
               )
           end
       end
+    end
+  end
+
+  @doc "SHA-256 hex digest used as the stored content fingerprint."
+  def content_hash(content) when is_binary(content) do
+    :crypto.hash(:sha256, content) |> Base.encode16(case: :lower)
+  end
+
+  @doc """
+  Fetch remote content for `item` and update the local `file`.
+
+  Layers, in order:
+    1. Content-hash guard: when the fetched bytes hash to the stored
+       `metadata["content_hash"]`, only `external_etag`/`last_synced_at` are
+       bumped. No re-store, no `:pending`, no new chunks.
+    2. Quota: same limits as create. An oversized update keeps the old
+       content and surfaces `{:error, {:quota_exceeded, msg}}` as an item error.
+
+  Returns `{:ok, :updated}`, `{:ok, :unchanged}`, or `{:error, reason}`.
+  """
+  def update_existing_file(conn, connector, file, item, actor) do
+    case apply(connector, :fetch_content, [conn, item]) do
+      {:ok, content, metadata} ->
+        hash = content_hash(content)
+
+        if hash == (file.metadata || %{})["content_hash"] do
+          touch_unchanged_file(file, item)
+        else
+          store_updated_file(file, item, content, metadata, hash, actor)
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp touch_unchanged_file(file, item) do
+    case Magus.Files.update_file_from_connector(
+           file,
+           %{external_etag: item.etag, last_synced_at: DateTime.utc_now()},
+           authorize?: false
+         ) do
+      {:ok, _} -> {:ok, :unchanged}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp store_updated_file(file, item, content, metadata, hash, actor) do
+    effective_mime = Map.get(metadata || %{}, "export_mime", item.mime_type)
+    file_size = byte_size(content)
+
+    with :ok <- check_update_quota(actor, file_size),
+         storage_path =
+           file.file_path || Storage.generate_path(file.user_id, file.id, item.name),
+         {:ok, _} <- store_content(storage_path, content),
+         {:ok, _updated} <-
+           Magus.Files.update_file_from_connector(
+             file,
+             %{
+               external_etag: item.etag,
+               external_updated_at: item.updated_at,
+               last_synced_at: DateTime.utc_now(),
+               status: :pending,
+               file_path: storage_path,
+               file_size: file_size,
+               mime_type: effective_mime,
+               metadata: Map.put(file.metadata || %{}, "content_hash", hash)
+             },
+             authorize?: false
+           ) do
+      {:ok, :updated}
+    end
+  end
+
+  defp check_update_quota(actor, file_size) do
+    case Magus.Usage.PolicyEnforcer.check_file_upload(actor, file_size) do
+      {:ok, :allowed} ->
+        :ok
+
+      {:error, error} ->
+        {:error, {:quota_exceeded, Magus.Usage.PolicyErrorMessage.message(error)}}
+    end
+  end
+
+  defp store_content(path, content) do
+    case Storage.store(path, content) do
+      {:ok, _} = ok -> ok
+      {:error, reason} -> {:error, {:storage_failed, reason}}
     end
   end
 end

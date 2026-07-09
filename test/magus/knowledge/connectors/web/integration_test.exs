@@ -318,11 +318,12 @@ defmodule Magus.Knowledge.Connectors.Web.IntegrationTest do
   # ---------------------------------------------------------------------------
 
   describe "FullSync etag fix" do
-    test "create_file_from_item uses metadata etag when present over item etag" do
-      # Read the source to verify the etag fix is in place:
-      # Map.get(metadata || %{}, "etag", item.etag)
-      # This confirms that metadata["etag"] (the content hash) takes precedence
-      # over item.etag (which is nil for web items).
+    test "create_file_from_item stores the list-time etag and the content hash separately" do
+      # Since Task 1 (shared update path hardening), external_etag always stores
+      # the LIST-TIME etag (item.etag), never a fetch-time metadata override.
+      # The content fingerprint used by the update path's hash guard lives in
+      # metadata["content_hash"] instead. Verify both are present in the source
+      # and that the old metadata-etag-override no longer is.
       full_sync_path =
         Path.join([
           File.cwd!(),
@@ -331,8 +332,9 @@ defmodule Magus.Knowledge.Connectors.Web.IntegrationTest do
 
       source = File.read!(full_sync_path)
 
-      # Verify the fix is present in the source
-      assert String.contains?(source, "Map.get(metadata || %{}, \"etag\", item.etag)")
+      assert String.contains?(source, "external_etag: item.etag")
+      assert String.contains?(source, "\"content_hash\" => SyncHelpers.content_hash(content)")
+      refute String.contains?(source, "Map.get(metadata || %{}, \"etag\", item.etag)")
     end
 
     test "detect_file_type correctly classifies text/markdown" do

@@ -223,6 +223,10 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
         file_size = byte_size(content)
         storage_path = Storage.generate_path(source.user_id, file_id, item.name)
 
+        # external_etag is the LIST-TIME etag (item.etag): it is what future
+        # list_items/detect_changes results are compared against. The
+        # fetch-time content fingerprint lives in metadata["content_hash"]
+        # and powers the update path's hash guard.
         case Storage.store(storage_path, content) do
           {:ok, _} ->
             Magus.Files.create_file_from_connector(
@@ -234,9 +238,12 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
                 file_path: storage_path,
                 knowledge_collection_id: collection.id,
                 external_id: item.id,
-                external_etag: Map.get(metadata || %{}, "etag", item.etag),
+                external_etag: item.etag,
                 external_updated_at: item.updated_at,
-                metadata: %{source_provider: source.provider}
+                metadata: %{
+                  "source_provider" => source.provider,
+                  "content_hash" => SyncHelpers.content_hash(content)
+                }
               },
               actor: actor
             )
