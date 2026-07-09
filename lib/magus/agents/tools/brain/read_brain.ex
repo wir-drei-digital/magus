@@ -181,7 +181,7 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain do
   alias Magus.Agents.Tools.Brain.ReadBrain.Curation
 
   import Magus.Agents.Tools.Helpers,
-    only: [validate_context: 2, get_param: 2]
+    only: [validate_context: 2, get_param: 2, nilify_blank_params: 2]
 
   def display_name, do: "Reading brain..."
 
@@ -256,6 +256,10 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain do
   def run(params, context) do
     case validate_context(context, [:user_id, :user]) do
       {:ok, ctx} ->
+        # LLMs send "" for reference params they mean to omit; a blank id
+        # reaching an Ash filter raises InvalidFilterValue. Blank = absent,
+        # so resolution falls back (pane context / title lookup) instead.
+        params = nilify_blank_params(params, [:brain_id, :page_id, :parent_page_id, :page_title])
         action = get_param(params, :action)
         dispatch(action, params, ctx, context)
 

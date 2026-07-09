@@ -92,6 +92,13 @@ defmodule Magus.Agents.Tools.Helpers do
     "#{inspect(resource)} not found"
   end
 
+  # Its default Exception.message embeds the entire inspected Ecto query
+  # (`Invalid filter value ... supplied in #Ecto.Query<...>`), which is
+  # useless noise for the LLM. Render just the offending value.
+  defp extract_single_error(%Ash.Error.Query.InvalidFilterValue{value: value}) do
+    "invalid filter value #{inspect(value)} (expected a valid id)"
+  end
+
   defp extract_single_error(%Ash.Error.Changes.InvalidAttribute{field: field, message: message})
        when is_binary(message) do
     "#{field}: #{message}"
@@ -190,6 +197,35 @@ defmodule Magus.Agents.Tools.Helpers do
       _ ->
         default
     end
+  end
+
+  @doc """
+  Drops blank string values for the given keys (atom AND string forms).
+
+  LLMs routinely send `""` for id/reference params they mean to omit
+  (`page_id: ""`). A blank id slips past `is_nil`/truthiness guards and ends
+  up in an Ash filter (`id == ^""`), which raises InvalidFilterValue and
+  dumps a raw Ecto query into the tool error. Deleting the key restores the
+  intended "absent" semantics, so resolution falls back (pane context,
+  title lookup) or fails with the tool's own actionable message.
+
+  Only pass REFERENCE keys (ids, lookup titles): blank is meaningful for
+  content params like `new_str` (deletion) or `body`.
+  """
+  @spec nilify_blank_params(map(), [atom()]) :: map()
+  def nilify_blank_params(params, keys) when is_map(params) and is_list(keys) do
+    Enum.reduce(keys, params, fn key, acc ->
+      [key, to_string(key)]
+      |> Enum.reduce(acc, fn k, inner ->
+        case Map.get(inner, k) do
+          value when is_binary(value) ->
+            if String.trim(value) == "", do: Map.delete(inner, k), else: inner
+
+          _ ->
+            inner
+        end
+      end)
+    end)
   end
 
   @doc """

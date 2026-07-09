@@ -1050,6 +1050,18 @@ defmodule Magus.Agents.Tools.Brain.ReadBrainTest do
       refute Map.has_key?(result, :guide)
     end
 
+    test "a blank page_id is treated as absent and falls back to the pane page" do
+      %{context: ctx, page: page} = setup_brain_with_page("# Title\n\nSome body content.")
+
+      # LLMs send page_id: "" for "no page id"; it used to reach
+      # Brain.get_page("") and raise InvalidFilterValue with a query dump.
+      assert {:ok, result} =
+               ReadBrain.run(%{"action" => "read_page", "page_id" => ""}, ctx)
+
+      refute Map.has_key?(result, :error)
+      assert result.page_id == page.id
+    end
+
     test "supports start_line / end_line slicing with line-number prefixes" do
       body = Enum.map_join(1..6, "\n", fn i -> "line #{i}" end)
       %{context: ctx, page: page} = setup_brain_with_page(body)

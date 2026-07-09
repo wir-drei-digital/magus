@@ -111,7 +111,7 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
   alias Magus.Agents.Tools.Brain.BrainResolver
 
   import Magus.Agents.Tools.Helpers,
-    only: [validate_context: 2, get_param: 2, tool_error: 3]
+    only: [validate_context: 2, get_param: 2, nilify_blank_params: 2, tool_error: 3]
 
   @valid_actions ~w(get_guide set_brain_guide set_page_guide define_type set_page_type)
 
@@ -153,6 +153,10 @@ defmodule Magus.Agents.Tools.Brain.BrainGuide do
   def run(params, context) do
     case validate_context(context, [:user_id, :user]) do
       {:ok, ctx} ->
+        # LLMs send "" for reference params they mean to omit; a blank id
+        # reaching an Ash filter raises InvalidFilterValue. Blank = absent,
+        # so resolution falls back (pane context / title lookup) instead.
+        params = nilify_blank_params(params, [:brain_id, :page_id, :parent_page_id, :page_title])
         action = get_param(params, :action)
         dispatch(action, params, ctx, context)
 

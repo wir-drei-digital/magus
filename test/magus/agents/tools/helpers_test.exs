@@ -59,6 +59,32 @@ defmodule Magus.Agents.Tools.HelpersTest do
     end
   end
 
+  describe "nilify_blank_params/2" do
+    test "drops blank values for the given keys, atom and string forms" do
+      params = %{"page_id" => "", :brain_id => "   ", "title" => "Keep"}
+
+      cleaned = Helpers.nilify_blank_params(params, [:page_id, :brain_id])
+
+      refute Map.has_key?(cleaned, "page_id")
+      refute Map.has_key?(cleaned, :brain_id)
+      assert cleaned["title"] == "Keep"
+    end
+
+    test "keeps non-blank values and non-string values untouched" do
+      params = %{"page_id" => "abc-123", "limit" => 5}
+
+      assert Helpers.nilify_blank_params(params, [:page_id, :limit]) == params
+    end
+
+    test "only touches the listed keys (blank content params stay meaningful)" do
+      params = %{"new_str" => "", "page_id" => ""}
+
+      cleaned = Helpers.nilify_blank_params(params, [:page_id])
+
+      assert cleaned == %{"new_str" => ""}
+    end
+  end
+
   describe "extract_error_message/1" do
     test "extracts messages from Ash.Error.Invalid" do
       error = %Ash.Error.Invalid{
@@ -69,6 +95,25 @@ defmodule Magus.Agents.Tools.HelpersTest do
       }
 
       assert Helpers.extract_error_message(error) == "is required; must be unique"
+    end
+
+    test "renders InvalidFilterValue short, without the inspected Ecto query" do
+      # An invalid id in a filter (e.g. `id == ^""`) raises this with the
+      # WHOLE query in `context`; the default message dumps it at the LLM.
+      error = %Ash.Error.Invalid{
+        errors: [
+          Ash.Error.Query.InvalidFilterValue.exception(
+            value: "",
+            context: %{pretend: "this is a giant Ecto.Query dump"}
+          )
+        ]
+      }
+
+      message = Helpers.extract_error_message(error)
+
+      assert message =~ ~s(invalid filter value "")
+      refute message =~ "Ecto.Query"
+      refute message =~ "giant"
     end
 
     test "handles single error" do

@@ -228,6 +228,48 @@ defmodule Magus.Agents.Tools.Brain.EditBrainTest do
       refute Map.has_key?(result, :guide)
     end
 
+    test "a blank page_id is treated as absent and falls back to the title path" do
+      %{user: user, brain: brain} = setup_brain()
+      ctx = %{user_id: user.id, user: user, brain_id: brain.id}
+
+      # LLMs send page_id: "" for "no page id" (observed in prod); it used to
+      # reach Brain.get_page("") and blow up with InvalidFilterValue + a raw
+      # Ecto query dump. Blank must mean absent: create by title instead.
+      assert {:ok, result} =
+               EditBrain.run(
+                 %{
+                   "action" => "write_page",
+                   "page_id" => "",
+                   "title" => "Blank Id Page",
+                   "body" => "Content."
+                 },
+                 ctx
+               )
+
+      refute Map.has_key?(result, :error)
+      assert result.action == "write_page"
+      assert result.page_title == "Blank Id Page"
+    end
+
+    test "a garbage page_id yields a short actionable error, not a query dump" do
+      %{user: user, brain: brain} = setup_brain()
+      ctx = %{user_id: user.id, user: user, brain_id: brain.id}
+
+      assert {:ok, %{error: error}} =
+               EditBrain.run(
+                 %{
+                   "action" => "write_page",
+                   "page_id" => "not-a-real-uuid",
+                   "body" => "Content."
+                 },
+                 ctx
+               )
+
+      assert error =~ "read_brain list_pages"
+      refute error =~ "Ecto.Query"
+      refute error =~ "Bread Crumbs"
+    end
+
     test "a write carries the brain's Guide with the result (just-in-time steering)" do
       %{user: user, brain: brain} = setup_brain()
 
