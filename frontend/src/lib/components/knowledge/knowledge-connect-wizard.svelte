@@ -70,6 +70,43 @@
 			fields: [
 				{ name: 'seed_url', label: 'URL', type: 'url', placeholder: 'https://example.com/docs' }
 			]
+		},
+		{
+			key: 'onedrive',
+			label: 'OneDrive',
+			kind: 'oauth',
+			oauthKey: 'onedrive_knowledge',
+			hint: 'Sign in with Microsoft to browse your OneDrive folders.'
+		},
+		{
+			key: 'dropbox',
+			label: 'Dropbox',
+			kind: 'oauth',
+			oauthKey: 'dropbox_knowledge',
+			hint: 'Authorize Dropbox to sync selected folders.'
+		},
+		{
+			key: 'kdrive',
+			label: 'Infomaniak kDrive',
+			kind: 'form',
+			hint: 'Paste an API token created in the Infomaniak Manager (Drive scope).',
+			fields: [{ name: 'api_token', label: 'API token', type: 'password' }]
+		},
+		{
+			key: 'webdav',
+			label: 'WebDAV',
+			kind: 'form',
+			hint: 'Any WebDAV server: ownCloud, Koofr, Hetzner Storage Share, Fastmail.',
+			fields: [
+				{
+					name: 'base_url',
+					label: 'WebDAV URL',
+					type: 'url',
+					placeholder: 'https://dav.example.com/files/user'
+				},
+				{ name: 'username', label: 'Username', type: 'text' },
+				{ name: 'password', label: 'Password or app password', type: 'password' }
+			]
 		}
 	];
 
