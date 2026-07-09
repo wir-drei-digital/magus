@@ -155,7 +155,7 @@ The application is organized into Ash domains, each managing a specific business
 | **Chat** | Conversations and messaging | Conversation, Message, Model, RoutingSlot |
 | **Library** | Reusable prompts and personas | Prompt, Tag, Favorite |
 | **Files** | File storage and semantic search | File, Chunk |
-| **Memory** | Agent memory with scopes | Memory (local/agent/global), MemoryVersion |
+| **Memory** | Agent memory with scopes | Memory (local/agent/user), UserProfileVersion |
 | **CustomAgents** | User-defined agent configurations | CustomAgent, AgentSecret |
 | **Agents** | Agent execution and control plane | AgentRun, AgentInboxEvent, AgentActivityLog, AgentState |
 | **Plan** | Collaborative task management | Task, TaskPaneState |

@@ -77,7 +77,7 @@ The system prompt string includes (in order):
 3. Time context in user's timezone
 4. Workspace/draft/jobs/tasks context
 5. Skill listings (when tools are available)
-6. Memory context (semantic search results, pinned memories)
+6. Memory context (key recency + semantic layers per scope, or the distilled user profile when enabled)
 7. RAG context (file knowledge retrieval results)
 
 ### BuildMessageHistory (`lib/magus/chat/conversation/actions/build_message_history.ex`)
