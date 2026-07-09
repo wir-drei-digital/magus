@@ -34,6 +34,28 @@ defmodule Magus.Files.File do
         worker_module_name Magus.Files.File.Workers.RetryTransientProcessing
         scheduler_module_name Magus.Files.File.Schedulers.RetryTransientProcessing
       end
+
+      # Mirrors the KnowledgeCollection stuck-:syncing watchdog: a crash
+      # between the chunk-destroy and chunk-insert steps of ProcessFile
+      # (non-transactional by design, see process_file.ex) can leave a file
+      # stuck in :processing forever, since neither the :process trigger
+      # (wants :pending) nor the retry trigger (wants :error) would pick it
+      # up again. This trigger reclaims it back to :pending so processing
+      # retries. Bounded by processing_attempts < 4, same budget as the
+      # transient-retry trigger, so a crash-looping file cannot retry forever.
+      trigger :recover_stuck_processing do
+        action :recover_stuck_processing
+        queue :file_processing
+        scheduler_cron "*/30 * * * *"
+
+        where expr(
+                status == :processing and updated_at < ago(30, :minute) and
+                  processing_attempts < 4
+              )
+
+        worker_module_name Magus.Files.File.Workers.RecoverStuckProcessing
+        scheduler_module_name Magus.Files.File.Schedulers.RecoverStuckProcessing
+      end
     end
   end
 
@@ -571,7 +593,8 @@ defmodule Magus.Files.File do
         :file_path,
         :file_size,
         :mime_type,
-        :metadata
+        :metadata,
+        :processing_attempts
       ]
 
       require_atomic? false
@@ -623,6 +646,27 @@ defmodule Magus.Files.File do
       require_atomic? false
       change set_attribute(:status, :pending)
       change set_attribute(:transient_error, false)
+      change set_attribute(:processing_attempts, 0)
+      change run_oban_trigger(:process_file)
+    end
+
+    update :recover_stuck_processing do
+      description """
+      Resets a file stuck in :processing (e.g. crashed between the chunk
+      destroy and insert steps of ProcessFile, see process_file.ex) back to
+      :pending so the :process_file trigger picks it up again. Run by the
+      recover_stuck_processing Oban trigger; bounded by processing_attempts < 4.
+      """
+
+      require_atomic? false
+      change set_attribute(:status, :pending)
+      change set_attribute(:transient_error, false)
+
+      change fn changeset, _context ->
+        attempts = changeset.data.processing_attempts || 0
+        Ash.Changeset.force_change_attribute(changeset, :processing_attempts, attempts + 1)
+      end
+
       change run_oban_trigger(:process_file)
     end
   end

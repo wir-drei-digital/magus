@@ -763,6 +763,79 @@ defmodule Magus.Knowledge.KnowledgeCollectionTest do
       assert by_ext["file-changed"].status == :pending
       refute Map.has_key?(by_ext, "file-gone")
     end
+
+    # Forcing a real destroy failure inside the sync's deletion pass would
+    # require the file to still be present in the pre-sync "existing files"
+    # snapshot yet fail when re-destroyed moments later; DeleteFile's storage
+    # errors are logged, not surfaced as changeset errors, and every other
+    # avenue we found to make `Ash.destroy(authorize?: false)` return
+    # `{:error, _}` (stale/missing row) also removes the row from that
+    # snapshot before the sync runs, so it never reaches the deletion pass.
+    # We therefore assert the success-path accounting directly: a clean full
+    # sync with a remote-gone file reports error_count 0 (no failures
+    # incorrectly counted) and correctly excludes the deleted file, which
+    # exercises the same `delete_remote_gone_files/2` return-value plumbing
+    # the fix added (deletion_errors folded into total_errors).
+    test "a clean full sync reports error_count 0 after a successful hard-delete", %{
+      drive: drive
+    } do
+      user = generate(user())
+      Magus.Generators.ensure_workspace_plan(user)
+
+      {:ok, source} =
+        Magus.Knowledge.create_source(
+          %{
+            name: "GD",
+            provider: :google_drive,
+            auth_config: %{"access_token" => "tok", "refresh_token" => "rt"}
+          },
+          actor: user
+        )
+
+      {:ok, source} =
+        Magus.Knowledge.update_source_status(source, %{status: :active}, actor: user)
+
+      {:ok, collection} =
+        Magus.Knowledge.create_collection(
+          source.id,
+          %{name: "F", external_id: "root-folder", external_path: "/r"},
+          actor: user
+        )
+
+      path = "test/#{Ash.UUIDv7.generate()}.txt"
+      {:ok, _} = Magus.Files.Storage.store(path, "old gone.txt")
+
+      {:ok, gone_file} =
+        Magus.Files.create_file_from_connector(
+          %{
+            name: "gone.txt",
+            type: :text,
+            mime_type: "text/plain",
+            file_size: 10,
+            file_path: path,
+            knowledge_collection_id: collection.id,
+            external_id: "file-gone",
+            external_etag: "etag-old",
+            external_updated_at: DateTime.utc_now(),
+            metadata: %{"content_hash" => "stale-hash"}
+          },
+          actor: user
+        )
+
+      Bypass.stub(drive, "GET", "/files", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{"files" => []}))
+      end)
+
+      Magus.Knowledge.KnowledgeCollection.Changes.FullSync.do_full_sync(collection)
+
+      reloaded = Magus.Knowledge.get_collection!(collection.id, authorize?: false)
+
+      assert reloaded.error_count == 0
+      assert reloaded.sync_status == :synced
+      assert {:error, _} = Magus.Files.get_file(gone_file.id, authorize?: false)
+    end
   end
 
   describe "notion delta reconciles deletions" do

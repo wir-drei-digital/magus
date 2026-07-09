@@ -138,8 +138,8 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
 
     case do_paginate(state, nil, 0, 0, nil, MapSet.new()) do
       {:ok, total_items, total_errors, updated_max, remote_ids} ->
-        delete_remote_gone_files(state, remote_ids)
-        {:ok, total_items, total_errors, updated_max}
+        deletion_errors = delete_remote_gone_files(state, remote_ids)
+        {:ok, total_items, total_errors + deletion_errors, updated_max}
 
       {:error, reason} ->
         {:error, reason}
@@ -148,6 +148,13 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
 
   defp do_paginate(state, cursor, item_count, error_count, max_updated_at, remote_ids) do
     %{conn: conn, connector: connector, collection: collection} = state
+
+    # Watchdog heartbeat: touches updated_at with the same sync_status value
+    # so the recover_stuck_sync trigger (sync_status == :syncing and
+    # updated_at < ago(2h)) never trips on a full sync that is still actively
+    # paginating. A dead sync (crashed node) stops calling this and the
+    # watchdog still recovers it after 2h of silence.
+    Magus.Knowledge.update_sync_status(collection, %{sync_status: :syncing}, authorize?: false)
 
     case apply(connector, :list_items, [conn, collection, cursor]) do
       {:ok, items, new_cursor} ->
@@ -243,6 +250,10 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
   # never after a mid-pagination error: a partial listing would otherwise be
   # mistaken for a full remote inventory and mass-delete files that are
   # simply on a page we never reached.
+  #
+  # Returns the number of deletion failures, which the caller folds into the
+  # run's error_count so it flows into the completion attrs (last_error,
+  # error_count) instead of being silently swallowed.
   defp delete_remote_gone_files(state, remote_ids) do
     %{collection: collection, existing_by_external_id: existing_by_external_id} = state
     cid = collection.id
@@ -251,11 +262,22 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
       existing_by_external_id
       |> Enum.reject(fn {ext_id, _file} -> MapSet.member?(remote_ids, ext_id) end)
 
-    Enum.each(gone, fn {_ext_id, file} -> SyncHelpers.delete_remote_gone_file(file) end)
+    results = Enum.map(gone, fn {_ext_id, file} -> SyncHelpers.delete_remote_gone_file(file) end)
+    failures = Enum.count(results, &(&1 == :error))
+    successes = length(results) - failures
 
     if gone != [] do
-      SyncLogger.info(cid, "Hard-deleted #{length(gone)} remotely removed files")
+      if failures > 0 do
+        SyncLogger.info(
+          cid,
+          "Hard-deleted #{successes} of #{length(gone)} remotely removed files"
+        )
+      else
+        SyncLogger.info(cid, "Hard-deleted #{successes} remotely removed files")
+      end
     end
+
+    failures
   end
 
   @doc """

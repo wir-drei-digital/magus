@@ -154,7 +154,10 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers do
                file_path: storage_path,
                file_size: file_size,
                mime_type: effective_mime,
-               metadata: Map.put(file.metadata || %{}, "content_hash", hash)
+               metadata: Map.put(file.metadata || %{}, "content_hash", hash),
+               # Fresh content generation: give it a fresh processing retry
+               # budget rather than inheriting a lifetime-cumulative count.
+               processing_attempts: 0
              },
              authorize?: false
            ) do
@@ -162,6 +165,15 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers do
     end
   end
 
+  # Deliberately conservative: checks the new content's full size against the
+  # quota without first subtracting the size of the content it is replacing,
+  # so an update to an existing file is charged as if it were a net-new
+  # upload of that size. This can reject in-place updates that would not
+  # actually grow total usage (old and new are similar sizes, quota is nearly
+  # full). Fail-closed was chosen over the more precise
+  # "new_size - old_size vs remaining quota" check to keep the quota path
+  # simple and avoid under-counting storage during the brief window between
+  # the check and the actual store.
   defp check_update_quota(actor, file_size) do
     case Magus.Usage.PolicyEnforcer.check_file_upload(actor, file_size) do
       {:ok, :allowed} ->

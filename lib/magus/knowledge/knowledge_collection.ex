@@ -145,7 +145,11 @@ defmodule Magus.Knowledge.KnowledgeCollection do
       it is picked up by the next scheduled run. Run by the recover_stuck_sync
       Oban trigger. A legitimately long full sync (over 2h) may be flapped to
       :error here and then overwritten by its own completion write shortly
-      after; this is acceptable and by design.
+      after; this is acceptable and by design. FullSync's do_paginate loop
+      heartbeats the collection (re-stamps sync_status: :syncing, bumping
+      updated_at) on every page, so a LIVE full sync should never actually
+      trip this watchdog in practice; only a truly stuck/dead sync (crashed
+      node, no more heartbeats) reaches this action.
       """
 
       require_atomic? false

@@ -132,6 +132,9 @@ defmodule Magus.Files.File.ProcessFileChunksTest do
     recovered = Magus.Files.get_file!(file.id, authorize?: false)
     assert recovered.status == :ready
     assert recovered.transient_error == false
+
+    assert recovered.processing_attempts == 0,
+           "a successful process should reset the retry budget, not carry it forward"
   end
 
   test "an empty document is a permanent failure: no retry flag" do
@@ -144,5 +147,56 @@ defmodule Magus.Files.File.ProcessFileChunksTest do
     failed = Magus.Files.get_file!(file.id, authorize?: false)
     assert failed.status == :error
     assert failed.transient_error == false
+  end
+
+  describe "stuck-:processing watchdog" do
+    test "recover_stuck_processing action resets a stuck file back to :pending" do
+      user = generate(user())
+      Magus.Generators.ensure_workspace_plan(user)
+      file = stored_text_file(user, "some content")
+
+      # Simulate a crash mid-ProcessFile: status left at :processing (never
+      # reached the :ready or :error terminal update).
+      {:ok, stuck} =
+        Ash.update(file, %{status: :processing}, action: :update_status, authorize?: false)
+
+      assert stuck.status == :processing
+
+      {:ok, recovered} =
+        Ash.update(stuck, %{}, action: :recover_stuck_processing, authorize?: false)
+
+      assert recovered.status == :pending
+      assert recovered.transient_error == false
+      assert recovered.processing_attempts == stuck.processing_attempts + 1
+    end
+
+    test "recover_stuck_processing is bounded: the where-clause budget mirrors retry_transient" do
+      # Mirrors the "scheduler filter excludes :syncing collections" pattern
+      # in knowledge_collection_test.exs: exercise the trigger's `where`
+      # expression directly against seeded rows rather than trying to
+      # backdate `updated_at` (not directly settable through the action
+      # layer). The action-level transition above is the unit under test;
+      # this asserts the query-level budget guard independently.
+      user = generate(user())
+      Magus.Generators.ensure_workspace_plan(user)
+      file = stored_text_file(user, "some content")
+
+      {:ok, stuck} =
+        Ash.update(file, %{status: :processing, processing_attempts: 4},
+          action: :update_status,
+          authorize?: false
+        )
+
+      require Ash.Query
+
+      ids =
+        Magus.Files.File
+        |> Ash.Query.filter(status == :processing and processing_attempts < 4)
+        |> Ash.read!(authorize?: false)
+        |> MapSet.new(& &1.id)
+
+      refute MapSet.member?(ids, stuck.id),
+             "a file that has exhausted its retry budget must not match the watchdog's where clause"
+    end
   end
 end

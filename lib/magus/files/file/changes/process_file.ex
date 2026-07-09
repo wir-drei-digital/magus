@@ -25,8 +25,14 @@ defmodule Magus.Files.File.Changes.ProcessFile do
              {:ok, text} <- classify(:permanent, extract_text(file, content)),
              {:ok, chunks} <- classify(:permanent, chunk_text(text)),
              {:ok, _} <- classify(:transient, create_chunks_with_embeddings(file, chunks)) do
-          # Update file to ready
-          update_status(file, :ready, %{chunk_count: length(chunks), transient_error: false})
+          # Update file to ready; reset processing_attempts so a fresh content
+          # generation (reprocess, connector update) gets a fresh retry budget
+          # instead of inheriting a lifetime-cumulative count from past failures.
+          update_status(file, :ready, %{
+            chunk_count: length(chunks),
+            transient_error: false,
+            processing_attempts: 0
+          })
 
           Logger.info("Successfully processed file #{file.id} with #{length(chunks)} chunks")
 

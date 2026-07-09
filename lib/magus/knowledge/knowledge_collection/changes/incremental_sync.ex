@@ -385,20 +385,39 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
             end
           end)
 
-        # Hard-delete files that no longer exist remotely
+        # Hard-delete files that no longer exist remotely. Failures fold into
+        # error_count (below) instead of being silently swallowed.
         deleted =
           existing_by_external_id
           |> Enum.reject(fn {ext_id, _file} -> Map.has_key?(remote_by_id, ext_id) end)
 
         deleted_count = length(deleted)
 
-        if deleted_count > 0 do
-          Enum.each(deleted, fn {_ext_id, file} ->
-            SyncHelpers.delete_remote_gone_file(file)
-          end)
+        deletion_failures =
+          if deleted_count > 0 do
+            results =
+              Enum.map(deleted, fn {_ext_id, file} ->
+                SyncHelpers.delete_remote_gone_file(file)
+              end)
 
-          SyncLogger.info(cid, "Hard-deleted #{deleted_count} remotely removed files")
-        end
+            failures = Enum.count(results, &(&1 == :error))
+            successes = deleted_count - failures
+
+            if failures > 0 do
+              SyncLogger.info(
+                cid,
+                "Hard-deleted #{successes} of #{deleted_count} remotely removed files"
+              )
+            else
+              SyncLogger.info(cid, "Hard-deleted #{successes} remotely removed files")
+            end
+
+            failures
+          else
+            0
+          end
+
+        error_count = error_count + deletion_failures
 
         now = DateTime.utc_now()
 
