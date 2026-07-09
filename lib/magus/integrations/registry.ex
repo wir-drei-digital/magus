@@ -21,6 +21,8 @@ defmodule Magus.Integrations.Registry do
     rss_source: Magus.Integrations.Providers.RssSource,
     notion_knowledge: Magus.Integrations.Providers.Notion,
     google_drive_knowledge: Magus.Integrations.Providers.GoogleDriveKnowledge,
+    onedrive_knowledge: Magus.Integrations.Providers.OneDriveKnowledge,
+    dropbox_knowledge: Magus.Integrations.Providers.DropboxKnowledge,
     nextcloud_knowledge: Magus.Integrations.Providers.Nextcloud,
     affine_knowledge: Magus.Integrations.Providers.Affine,
     custom_api: Magus.Integrations.Providers.CustomApi.Provider,

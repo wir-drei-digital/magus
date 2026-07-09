@@ -13,7 +13,7 @@ defmodule Magus.Knowledge.Connect do
 
   # The providers the connect wizard supports (a subset of the source provider
   # enum: the others have no Connector implementation).
-  @providers ~w(google_drive notion nextcloud web)
+  @providers ~w(google_drive onedrive dropbox notion nextcloud kdrive webdav web)
 
   @doc "Provider keys the connect wizard supports."
   def providers, do: @providers
@@ -30,7 +30,7 @@ defmodule Magus.Knowledge.Connect do
     actor = Keyword.fetch!(opts, :actor)
 
     with {:ok, provider_atom} <- parse_provider(provider),
-         module <- Connector.connector_for(provider_atom),
+         {:ok, module} <- connector_module(provider_atom),
          {:ok, _conn} <- module.connect(auth_config),
          attrs = %{
            name: presence(opts[:name]) || default_name(provider_atom),
@@ -43,6 +43,7 @@ defmodule Magus.Knowledge.Connect do
       {:ok, source}
     else
       :error -> {:error, "Unknown provider"}
+      :no_connector -> {:error, "Provider not available"}
       {:error, reason} -> {:error, friendly_error(reason)}
     end
   end
@@ -60,7 +61,7 @@ defmodule Magus.Knowledge.Connect do
     actor = Keyword.fetch!(opts, :actor)
 
     with {:ok, provider_atom} <- parse_provider(provider),
-         module <- Connector.connector_for(provider_atom),
+         {:ok, module} <- connector_module(provider_atom),
          {:ok, _conn} <- module.connect(auth_config) do
       case existing_source(provider_atom, actor) do
         nil ->
@@ -71,6 +72,7 @@ defmodule Magus.Knowledge.Connect do
       end
     else
       :error -> {:error, "Unknown provider"}
+      :no_connector -> {:error, "Provider not available"}
       {:error, reason} -> {:error, friendly_error(reason)}
     end
   end
@@ -112,12 +114,12 @@ defmodule Magus.Knowledge.Connect do
   """
   def list_folders(%{provider: provider} = source, parent_id) do
     if provider in supported_atoms() do
-      module = Connector.connector_for(provider)
-
-      with {:ok, conn} <- module.connect(source.auth_config),
+      with {:ok, module} <- connector_module(provider),
+           {:ok, conn} <- module.connect(source.auth_config),
            {:ok, folders} <- module.list_folders(conn, parent_id) do
         {:ok, folders}
       else
+        :no_connector -> {:error, "Provider not available"}
         {:error, reason} -> {:error, friendly_error(reason)}
       end
     else
@@ -129,6 +131,18 @@ defmodule Magus.Knowledge.Connect do
     do: {:ok, String.to_existing_atom(provider)}
 
   defp parse_provider(_), do: :error
+
+  # `Connector.connector_for/1` returns the connector module for providers whose
+  # connector ships, and an `{:error, {:unsupported_provider, _}}` tuple otherwise.
+  # A provider can be in `@providers` (so the wizard offers it) before its
+  # connector lands (Tasks 3-6). Normalize the tuple to a `:no_connector`
+  # sentinel so callers fail cleanly instead of calling `connect/1` on a tuple.
+  defp connector_module(provider_atom) do
+    case Connector.connector_for(provider_atom) do
+      module when is_atom(module) -> {:ok, module}
+      {:error, _} -> :no_connector
+    end
+  end
 
   defp supported_atoms, do: Enum.map(@providers, &String.to_existing_atom/1)
 
@@ -142,6 +156,10 @@ defmodule Magus.Knowledge.Connect do
   end
 
   defp default_name(:google_drive), do: "Google Drive"
+  defp default_name(:onedrive), do: "OneDrive"
+  defp default_name(:dropbox), do: "Dropbox"
+  defp default_name(:kdrive), do: "kDrive"
+  defp default_name(:webdav), do: "WebDAV"
   defp default_name(:notion), do: "Notion"
   defp default_name(:nextcloud), do: "Nextcloud"
   defp default_name(:web), do: "Web"

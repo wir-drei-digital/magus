@@ -1,6 +1,7 @@
 defmodule Magus.Knowledge.ConnectTest do
   use Magus.ResourceCase, async: true
 
+  alias Magus.Integrations.Registry
   alias Magus.Knowledge
   alias Magus.Knowledge.Connect
   alias Magus.Knowledge.KnowledgeSource
@@ -40,7 +41,7 @@ defmodule Magus.Knowledge.ConnectTest do
       user = generate(user())
 
       assert {:error, "Unknown provider"} =
-               Connect.connect_and_create("dropbox", %{}, actor: user)
+               Connect.connect_and_create("bogus", %{}, actor: user)
     end
 
     test "affine is no longer a connectable provider" do
@@ -60,6 +61,48 @@ defmodule Magus.Knowledge.ConnectTest do
                )
 
       assert {:ok, []} = Knowledge.list_sources_for_user(actor: user)
+    end
+  end
+
+  describe "providers/0 and provider parsing" do
+    test "providers/0 lists the drive/oauth wizard providers" do
+      assert Connect.providers() ==
+               ~w(google_drive onedrive dropbox notion nextcloud kdrive webdav web)
+    end
+
+    for provider <- ~w(onedrive dropbox kdrive webdav) do
+      test "#{provider} parses but fails cleanly while its connector is missing" do
+        user = generate(user())
+
+        result = Connect.connect_and_create(unquote(provider), %{}, actor: user)
+
+        # parse_provider accepts it (not "Unknown provider"); with no connector
+        # clause yet it returns the defensive "Provider not available" guard.
+        assert result == {:error, "Provider not available"}
+      end
+    end
+  end
+
+  describe "knowledge provider registry entries" do
+    test "onedrive_knowledge is a knowledge provider with the Microsoft authorize URL" do
+      module = Registry.get(:onedrive_knowledge)
+      assert module != nil
+      assert module.source_type() == :knowledge
+      assert module.requires_admin?() == true
+
+      assert module.oauth_config().authorize_url ==
+               "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
+    end
+
+    test "dropbox_knowledge is a knowledge provider carrying token_access_type=offline" do
+      module = Registry.get(:dropbox_knowledge)
+      assert module != nil
+      assert module.source_type() == :knowledge
+      assert module.requires_admin?() == true
+
+      config = module.oauth_config()
+      assert config.authorize_url == "https://www.dropbox.com/oauth2/authorize"
+      assert config.extra_authorize_params == %{token_access_type: "offline"}
     end
   end
 
