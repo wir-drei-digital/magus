@@ -1,6 +1,6 @@
 defmodule Magus.Knowledge.Connectors.WebdavTest do
-  # async: false — the round-trip tests spin up a Bypass server and assert on
-  # request headers/paths; no shared global state, but Bypass servers are per-test.
+  # async: true is safe: the round-trip tests spin up a per-test Bypass server
+  # and assert on request headers/paths; there is no shared global state.
   use ExUnit.Case, async: true
 
   alias Magus.Knowledge.Connectors.Webdav
