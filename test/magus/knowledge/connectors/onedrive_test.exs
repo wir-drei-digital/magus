@@ -257,6 +257,25 @@ defmodule Magus.Knowledge.Connectors.OnedriveTest do
       assert {:error, :cursor_reset} =
                Onedrive.detect_changes(conn, collection, ~U[1970-01-01 00:00:00Z])
     end
+
+    test "a terminal page with neither nextLink nor deltaLink self-heals via cursor_reset", %{
+      graph: graph,
+      base: base
+    } do
+      {:ok, conn} = Onedrive.connect(%{"access_token" => "tok"})
+
+      stored = base <> "/me/drive/items/coll/delta?token=CUR"
+
+      # Malformed terminal page: no @odata.nextLink and no @odata.deltaLink.
+      Bypass.expect_once(graph, "GET", "/me/drive/items/coll/delta", fn conn ->
+        json(conn, 200, %{"value" => []})
+      end)
+
+      collection = %{external_id: "coll", sync_cursor: %{"sync_cursor" => stored}}
+
+      assert {:error, :cursor_reset} =
+               Onedrive.detect_changes(conn, collection, ~U[1970-01-01 00:00:00Z])
+    end
   end
 
   describe "deletes_in_delta?/0" do

@@ -198,7 +198,22 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
 
     cid = collection.id
 
-    Enum.reduce(items, {0, 0, nil}, fn item, {item_count, error_count, max_updated_at} ->
+    items
+    |> Enum.with_index()
+    |> Enum.reduce({0, 0, nil}, fn {item, index}, {item_count, error_count, max_updated_at} ->
+      # Item-granular watchdog heartbeat. do_paginate/6 heartbeats once per
+      # framework page, but the cloud-drive connectors (OneDrive, Dropbox,
+      # kDrive, WebDAV) drain their entire recursive listing into a single
+      # framework page, so a large initial sync would otherwise run all its
+      # downloads under one heartbeat and could trip the 2h recover_stuck_sync
+      # watchdog mid-sync. Touching the collection every 25 processed items
+      # keeps updated_at fresh without changing this reduce's return shape.
+      if rem(index, 25) == 0 and index > 0 do
+        Magus.Knowledge.update_sync_status(collection, %{sync_status: :syncing},
+          authorize?: false
+        )
+      end
+
       updated_max =
         case {max_updated_at, Map.get(item, :updated_at)} do
           {_, nil} -> max_updated_at

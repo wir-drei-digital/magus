@@ -63,6 +63,7 @@ defmodule Magus.Knowledge.Connectors.Kdrive do
   @root_file_id 1
 
   @max_depth 10
+  @max_pages 1000
   @page_size 500
   @max_download_size 100 * 1024 * 1024
   @content_download_timeout 300_000
@@ -213,6 +214,14 @@ defmodule Magus.Knowledge.Connectors.Kdrive do
   end
 
   # --- Private: pagination (page/per_page) ---
+
+  defp drain_pages(_conn, url, page, acc) when page > @max_pages do
+    Logger.warning(
+      "kDrive pagination hit @max_pages (#{@max_pages}) for #{url}; returning accumulated entries"
+    )
+
+    {:ok, acc |> Enum.reverse() |> List.flatten()}
+  end
 
   defp drain_pages(conn, url, page, acc) do
     paged_url = append_query(url, "per_page=#{@page_size}&page=#{page}")
