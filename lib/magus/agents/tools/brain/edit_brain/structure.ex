@@ -10,11 +10,13 @@ defmodule Magus.Agents.Tools.Brain.EditBrain.Structure do
   """
 
   alias Magus.Brain
+  alias Magus.Agents.Tools.Brain.BrainResolver
   alias Magus.Agents.Tools.Brain.EditBrain.Support
 
   import Magus.Agents.Tools.Helpers, only: [get_param: 2, tool_error: 3]
 
-  import Support, only: [build_current: 2, load_brain: 2, blank?: 1]
+  import Support,
+    only: [build_current: 2, load_brain: 2, blank?: 1, resolve_page_for_read: 4]
 
   # ---------------------------------------------------------------------------
   # create_brain (unchanged behavior)
@@ -70,101 +72,99 @@ defmodule Magus.Agents.Tools.Brain.EditBrain.Structure do
   # rename_page / move_page / delete_page (preserved)
   # ---------------------------------------------------------------------------
 
-  def handle_rename_page(params, ctx) do
-    page_id = get_param(params, :page_id)
+  # Page resolution mirrors edit_page: explicit page_id, page_title lookup,
+  # or the open pane page — so structural actions accept the same page refs
+  # as the body-editing actions instead of demanding a bare page_id.
+  def handle_rename_page(params, ctx, context) do
     title = get_param(params, :title)
 
-    cond do
-      is_nil(page_id) ->
-        {:ok, %{error: "Missing required parameter: page_id"}}
-
-      blank?(title) ->
-        {:ok, %{error: "Missing required parameter: title"}}
-
-      true ->
-        with {:ok, page} <- Brain.get_page(page_id, actor: ctx.user),
-             {:ok, updated} <- Brain.update_page_title(page, %{title: title}, actor: ctx.user) do
-          brain = load_brain(updated, ctx)
-
-          {:ok,
-           %{
-             action: "rename_page",
-             page_id: updated.id,
-             page_title: updated.title,
-             current: build_current(brain, updated),
-             hint: "Renamed to '#{updated.title}'."
-           }}
-        else
-          {:error, err} ->
-            {:ok,
-             %{
-               error: tool_error("rename page", err, "Verify page_id with read_brain list_pages.")
-             }}
-        end
-    end
-  end
-
-  def handle_delete_page(params, ctx) do
-    page_id = get_param(params, :page_id)
-
-    if is_nil(page_id) do
-      {:ok, %{error: "Missing required parameter: page_id"}}
+    if blank?(title) do
+      {:ok, %{error: "Missing required parameter: title"}}
     else
-      with {:ok, page} <- Brain.get_page(page_id, actor: ctx.user),
-           descendant_count = count_descendants(page_id, ctx),
-           {:ok, _trashed} <- Brain.soft_delete_page(page, actor: ctx.user) do
-        hint =
-          if descendant_count > 0 do
-            "Moved page and #{descendant_count} sub-page(s) to trash. The user can restore within 30 days."
-          else
-            "Moved page to trash. The user can restore within 30 days."
-          end
-
-        {:ok, %{action: "delete_page", page_id: page_id, hint: hint}}
-      else
-        {:error, err} ->
-          {:ok,
-           %{
-             error: tool_error("delete page", err, "Verify page_id with read_brain list_pages.")
-           }}
-      end
-    end
-  end
-
-  def handle_move_page(params, ctx) do
-    page_id = get_param(params, :page_id)
-    parent_page_id = get_param(params, :parent_page_id)
-
-    if is_nil(page_id) do
-      {:ok, %{error: "Missing required parameter: page_id"}}
-    else
-      with {:ok, page} <- Brain.get_page(page_id, actor: ctx.user),
-           {:ok, moved} <-
-             Brain.move_page_to_parent(page, %{parent_page_id: parent_page_id}, actor: ctx.user) do
-        {:ok, reloaded} = Brain.get_page(moved.id, actor: ctx.user)
-        brain = load_brain(reloaded, ctx)
+      with {:ok, brain_id} <- BrainResolver.resolve_brain_id(context, params),
+           {:ok, page} <- resolve_page_for_read(context, params, brain_id, ctx),
+           {:ok, updated} <- Brain.update_page_title(page, %{title: title}, actor: ctx.user) do
+        brain = load_brain(updated, ctx)
 
         {:ok,
          %{
-           action: "move_page",
-           page_id: reloaded.id,
-           parent_page_id: reloaded.parent_page_id,
-           depth: reloaded.depth,
-           current: build_current(brain, reloaded),
-           hint: "Page moved."
+           action: "rename_page",
+           page_id: updated.id,
+           page_title: updated.title,
+           current: build_current(brain, updated),
+           hint: "Renamed to '#{updated.title}'."
          }}
       else
+        {:error, msg} when is_binary(msg) ->
+          {:ok, %{error: msg}}
+
         {:error, err} ->
           {:ok,
            %{
-             error:
-               tool_error(
-                 "move page",
-                 err,
-                 "Verify page_id and parent_page_id (pass null for root)."
-               )
+             error: tool_error("rename page", err, "Verify page_id with read_brain list_pages.")
            }}
       end
+    end
+  end
+
+  def handle_delete_page(params, ctx, context) do
+    with {:ok, brain_id} <- BrainResolver.resolve_brain_id(context, params),
+         {:ok, page} <- resolve_page_for_read(context, params, brain_id, ctx),
+         descendant_count = count_descendants(page.id, ctx),
+         {:ok, _trashed} <- Brain.soft_delete_page(page, actor: ctx.user) do
+      hint =
+        if descendant_count > 0 do
+          "Moved page and #{descendant_count} sub-page(s) to trash. The user can restore within 30 days."
+        else
+          "Moved page to trash. The user can restore within 30 days."
+        end
+
+      {:ok, %{action: "delete_page", page_id: page.id, hint: hint}}
+    else
+      {:error, msg} when is_binary(msg) ->
+        {:ok, %{error: msg}}
+
+      {:error, err} ->
+        {:ok,
+         %{
+           error: tool_error("delete page", err, "Verify page_id with read_brain list_pages.")
+         }}
+    end
+  end
+
+  def handle_move_page(params, ctx, context) do
+    parent_page_id = get_param(params, :parent_page_id)
+
+    with {:ok, brain_id} <- BrainResolver.resolve_brain_id(context, params),
+         {:ok, page} <- resolve_page_for_read(context, params, brain_id, ctx),
+         {:ok, moved} <-
+           Brain.move_page_to_parent(page, %{parent_page_id: parent_page_id}, actor: ctx.user) do
+      {:ok, reloaded} = Brain.get_page(moved.id, actor: ctx.user)
+      brain = load_brain(reloaded, ctx)
+
+      {:ok,
+       %{
+         action: "move_page",
+         page_id: reloaded.id,
+         parent_page_id: reloaded.parent_page_id,
+         depth: reloaded.depth,
+         current: build_current(brain, reloaded),
+         hint: "Page moved."
+       }}
+    else
+      {:error, msg} when is_binary(msg) ->
+        {:ok, %{error: msg}}
+
+      {:error, err} ->
+        {:ok,
+         %{
+           error:
+             tool_error(
+               "move page",
+               err,
+               "Verify page_id and parent_page_id (pass null for root)."
+             )
+         }}
     end
   end
 

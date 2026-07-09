@@ -948,8 +948,26 @@ defmodule Magus.Agents.Tools.Brain.EditBrainTest do
       assert refreshed.lock_version == page.lock_version
     end
 
-    test "errors when page_id is missing" do
-      %{context: ctx} = setup_brain_with_page("body")
+    test "falls back to the pane page when page_id is missing" do
+      %{context: ctx, page: page, user: user} = setup_brain_with_page("body")
+
+      assert {:ok, result} =
+               EditBrain.run(
+                 %{
+                   "action" => "multi_edit",
+                   "edits" => [%{"old_str" => "body", "new_str" => "BODY"}]
+                 },
+                 ctx
+               )
+
+      refute Map.has_key?(result, :error)
+      assert result.page_id == page.id
+      assert read_page_body!(page.id, user) == "BODY"
+    end
+
+    test "errors actionably when no page ref exists anywhere" do
+      %{user: user, brain: brain} = setup_brain()
+      ctx = %{user_id: user.id, user: user, brain_id: brain.id}
 
       assert {:ok, %{error: error}} =
                EditBrain.run(
@@ -957,7 +975,7 @@ defmodule Magus.Agents.Tools.Brain.EditBrainTest do
                  ctx
                )
 
-      assert error =~ "page_id"
+      assert error =~ "No page specified"
     end
 
     test "errors when edits is empty or missing" do
@@ -1053,11 +1071,25 @@ defmodule Magus.Agents.Tools.Brain.EditBrainTest do
       assert read_page_body!(page.id, user) == ""
     end
 
-    test "errors when page_id is missing" do
-      %{context: ctx} = setup_brain_with_page("body")
+    test "falls back to the pane page when page_id is missing" do
+      %{context: ctx, page: page, user: user} = setup_brain_with_page("body")
 
-      assert {:ok, %{error: error}} = EditBrain.run(%{"action" => "clear_page"}, ctx)
-      assert error =~ "page_id"
+      assert {:ok, result} = EditBrain.run(%{"action" => "clear_page"}, ctx)
+
+      refute Map.has_key?(result, :error)
+      assert result.cleared == true
+      assert result.page_id == page.id
+      assert read_page_body!(page.id, user) == ""
+    end
+
+    test "targets a page by page_title" do
+      %{context: ctx, page: page, user: user} = setup_brain_with_page("body")
+
+      assert {:ok, result} =
+               EditBrain.run(%{"action" => "clear_page", "page_title" => page.title}, ctx)
+
+      assert result.cleared == true
+      assert read_page_body!(page.id, user) == ""
     end
   end
 
@@ -1103,11 +1135,16 @@ defmodule Magus.Agents.Tools.Brain.EditBrainTest do
       assert read_page_body!(page.id, user) == "v2 content"
     end
 
-    test "errors when page_id is missing" do
-      %{context: ctx} = setup_brain_with_page("body")
+    test "falls back to the pane page, and refuses to blank a single-version page" do
+      %{context: ctx, page: page, user: user} = setup_brain_with_page("body")
 
+      # One saved version: undo used to restore "" (silently wiping a
+      # just-written page). It must refuse instead.
       assert {:ok, %{error: error}} = EditBrain.run(%{"action" => "undo_last_edit"}, ctx)
-      assert error =~ "page_id"
+
+      assert error =~ "Only one saved version"
+      assert error =~ "clear_page"
+      assert read_page_body!(page.id, user) == "body"
     end
   end
 
@@ -1143,16 +1180,18 @@ defmodule Magus.Agents.Tools.Brain.EditBrainTest do
       assert error =~ "title"
     end
 
-    test "errors when page_id is missing" do
-      %{context: ctx} = setup_brain_with_page("")
+    test "falls back to the pane page when page_id is missing" do
+      %{context: ctx, page: page} = setup_brain_with_page("")
 
-      assert {:ok, %{error: error}} =
+      assert {:ok, result} =
                EditBrain.run(
                  %{"action" => "rename_page", "title" => "X"},
                  ctx
                )
 
-      assert error =~ "page_id"
+      refute Map.has_key?(result, :error)
+      assert result.page_id == page.id
+      assert result.page_title == "X"
     end
   end
 
@@ -1206,11 +1245,28 @@ defmodule Magus.Agents.Tools.Brain.EditBrainTest do
       assert result.depth == 0
     end
 
-    test "errors when page_id is missing" do
-      %{context: ctx} = setup_brain_with_page("")
+    test "falls back to the pane page; literal \"null\" parent means root" do
+      %{context: ctx, page: page, user: user} = setup_brain_with_page("")
+      {:ok, parent} = Brain.create_page(page.brain_id, %{title: "Parent"}, actor: user)
 
-      assert {:ok, %{error: error}} = EditBrain.run(%{"action" => "move_page"}, ctx)
-      assert error =~ "page_id"
+      # Nest the pane page first so moving to root is observable.
+      assert {:ok, _} =
+               EditBrain.run(
+                 %{"action" => "move_page", "parent_page_id" => parent.id},
+                 ctx
+               )
+
+      # Weaker models emit the literal string "null" for JSON null; it must
+      # mean "move to root", not a failing parent lookup.
+      assert {:ok, result} =
+               EditBrain.run(
+                 %{"action" => "move_page", "parent_page_id" => "null"},
+                 ctx
+               )
+
+      refute Map.has_key?(result, :error)
+      assert result.page_id == page.id
+      assert result.parent_page_id == nil
     end
   end
 
@@ -1232,11 +1288,79 @@ defmodule Magus.Agents.Tools.Brain.EditBrainTest do
       assert {:error, _} = Brain.get_page(temp.id, actor: user)
     end
 
-    test "errors when page_id is missing" do
-      %{context: ctx} = setup_brain_with_page("")
+    test "falls back to the pane page when page_id is missing" do
+      %{context: ctx, page: page, user: user} = setup_brain_with_page("")
 
-      assert {:ok, %{error: error}} = EditBrain.run(%{"action" => "delete_page"}, ctx)
-      assert error =~ "page_id"
+      assert {:ok, result} = EditBrain.run(%{"action" => "delete_page"}, ctx)
+
+      refute Map.has_key?(result, :error)
+      assert result.page_id == page.id
+      assert result.hint =~ "trash"
+      # Trashed: no longer readable through the default read.
+      assert {:error, _} = Brain.get_page(page.id, actor: user)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # LLM param drift (strings for numbers/booleans, trailing spaces)
+  # ---------------------------------------------------------------------------
+
+  describe "param drift tolerance" do
+    test "edit_page line-range accepts string line numbers (no ArithmeticError)" do
+      %{context: ctx, page: page, user: user} = setup_brain_with_page("one\ntwo\nthree")
+
+      assert {:ok, result} =
+               EditBrain.run(
+                 %{
+                   "action" => "edit_page",
+                   "page_id" => page.id,
+                   "start_line" => "2",
+                   "end_line" => "2",
+                   "new_content" => "TWO"
+                 },
+                 ctx
+               )
+
+      refute Map.has_key?(result, :error)
+      assert read_page_body!(page.id, user) == "one\nTWO\nthree"
+    end
+
+    test "edit_page replace_all accepts the string \"true\"" do
+      %{context: ctx, page: page, user: user} = setup_brain_with_page("foo bar foo")
+
+      assert {:ok, result} =
+               EditBrain.run(
+                 %{
+                   "action" => "edit_page",
+                   "page_id" => page.id,
+                   "old_str" => "foo",
+                   "new_str" => "baz",
+                   "replace_all" => "true"
+                 },
+                 ctx
+               )
+
+      refute Map.has_key?(result, :error)
+      assert read_page_body!(page.id, user) == "baz bar baz"
+    end
+
+    test "write_page mode tolerates surrounding whitespace" do
+      %{context: ctx, page: page, user: user} = setup_brain_with_page("start")
+
+      assert {:ok, result} =
+               EditBrain.run(
+                 %{
+                   "action" => "write_page",
+                   "page_id" => page.id,
+                   "mode" => "append ",
+                   "body" => "more"
+                 },
+                 ctx
+               )
+
+      refute Map.has_key?(result, :error)
+      assert result.mode == "append"
+      assert read_page_body!(page.id, user) =~ "more"
     end
   end
 end

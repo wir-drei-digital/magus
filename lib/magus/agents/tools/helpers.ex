@@ -200,14 +200,17 @@ defmodule Magus.Agents.Tools.Helpers do
   end
 
   @doc """
-  Drops blank string values for the given keys (atom AND string forms).
+  Drops blank or null-ish string values for the given keys (atom AND string
+  forms).
 
   LLMs routinely send `""` for id/reference params they mean to omit
-  (`page_id: ""`). A blank id slips past `is_nil`/truthiness guards and ends
-  up in an Ash filter (`id == ^""`), which raises InvalidFilterValue and
-  dumps a raw Ecto query into the tool error. Deleting the key restores the
-  intended "absent" semantics, so resolution falls back (pane context,
-  title lookup) or fails with the tool's own actionable message.
+  (`page_id: ""`), and weaker models emit the literal strings `"null"` /
+  `"nil"` for JSON null (`parent_page_id: "null"` meaning "move to root").
+  A blank id slips past `is_nil`/truthiness guards and ends up in an Ash
+  filter (`id == ^""`), which raises InvalidFilterValue; a literal "null"
+  becomes a failing id lookup. Deleting the key restores the intended
+  "absent" semantics, so resolution falls back (pane context, title lookup,
+  root) or fails with the tool's own actionable message.
 
   Only pass REFERENCE keys (ids, lookup titles): blank is meaningful for
   content params like `new_str` (deletion) or `body`.
@@ -219,13 +222,54 @@ defmodule Magus.Agents.Tools.Helpers do
       |> Enum.reduce(acc, fn k, inner ->
         case Map.get(inner, k) do
           value when is_binary(value) ->
-            if String.trim(value) == "", do: Map.delete(inner, k), else: inner
+            if String.trim(value) == "" or String.downcase(String.trim(value)) in ~w(null nil),
+              do: Map.delete(inner, k),
+              else: inner
 
           _ ->
             inner
         end
       end)
     end)
+  end
+
+  @doc """
+  Reads an OPTIONAL integer param: coerces LLM format drift (numeric
+  strings, floats) like `get_int_param/3`, but preserves absence — returns
+  nil when the param is missing, nil, or unparseable.
+
+  Use for params where nil is meaningful (e.g. `start_line`/`end_line`
+  select line-range mode only when present); `get_int_param/3` is for
+  params with a numeric default.
+  """
+  @spec get_optional_int_param(map(), atom()) :: integer() | nil
+  def get_optional_int_param(params, key) when is_atom(key) do
+    case get_param(params, key) do
+      n when is_integer(n) ->
+        n
+
+      n when is_float(n) ->
+        trunc(n)
+
+      n when is_binary(n) ->
+        case Integer.parse(String.trim(n)) do
+          {i, _rest} -> i
+          :error -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  @doc """
+  Reads a boolean flag param, tolerating LLM format drift: `true` and the
+  string `"true"` count as set; everything else (false, "false", nil,
+  garbage) is false.
+  """
+  @spec flag_param?(map(), atom()) :: boolean()
+  def flag_param?(params, key) when is_atom(key) do
+    get_param(params, key) in [true, "true"]
   end
 
   @doc """

@@ -83,6 +83,38 @@ defmodule Magus.Agents.Tools.HelpersTest do
 
       assert cleaned == %{"new_str" => ""}
     end
+
+    test "drops the literal strings \"null\" and \"nil\" (LLMs emit them for JSON null)" do
+      params = %{"parent_page_id" => "null", "page_id" => "NIL", "brain_id" => " null "}
+
+      cleaned = Helpers.nilify_blank_params(params, [:parent_page_id, :page_id, :brain_id])
+
+      assert cleaned == %{}
+    end
+  end
+
+  describe "get_optional_int_param/2" do
+    test "coerces strings and floats, preserves integers" do
+      assert Helpers.get_optional_int_param(%{"n" => "3"}, :n) == 3
+      assert Helpers.get_optional_int_param(%{n: 3.9}, :n) == 3
+      assert Helpers.get_optional_int_param(%{n: 7}, :n) == 7
+    end
+
+    test "missing or unparseable values are nil (absence is meaningful)" do
+      assert Helpers.get_optional_int_param(%{}, :n) == nil
+      assert Helpers.get_optional_int_param(%{n: "lots"}, :n) == nil
+      assert Helpers.get_optional_int_param(%{n: nil}, :n) == nil
+    end
+  end
+
+  describe "flag_param?/2" do
+    test "true and \"true\" count as set; everything else is false" do
+      assert Helpers.flag_param?(%{"f" => true}, :f)
+      assert Helpers.flag_param?(%{f: "true"}, :f)
+      refute Helpers.flag_param?(%{f: false}, :f)
+      refute Helpers.flag_param?(%{f: "false"}, :f)
+      refute Helpers.flag_param?(%{}, :f)
+    end
   end
 
   describe "extract_error_message/1" do

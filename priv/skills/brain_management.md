@@ -79,7 +79,7 @@ changes use `edit_brain edit_page` (find-and-replace).
 ## Sub-pages
 
 - Slash path: `title: "Meeting Notes/Sprint 42"` creates/uses the parent automatically
-  (nesting up to 3 levels).
+  (any nesting depth).
 - Or pass `parent_page_id` (from `find_page` / `read_brain list_pages`). If a title is
   duplicated across the brain, pass `parent_page_id` to say which one you mean.
 - Reorganize with `edit_brain move_page` (`parent_page_id: null` moves to the root).
@@ -119,12 +119,14 @@ There is no separate "add block" or "link" step; author everything in the page
 markdown. Typed relationships (supports / contradicts / derived_from) are derived
 automatically; you don't create them by hand.
 
-## Tasks live on any page
+## Tasks
 
-Any page can carry tasks (`create_task` / `update_task` / `list_tasks` / `clear_tasks`
-from the Plan domain, keyed by the page). A page with tasks is what used to be called a
-"plan": there's no separate plan or spec kind anymore. Add tasks to whatever page
-they belong on: a project page, a spec page, a meeting note, anything.
+`create_task` / `update_task` / `list_tasks` / `clear_tasks` track work in the
+CURRENT CONVERSATION, not on brain pages. Brain pages have their own task board
+in the UI (any page can carry user-managed tasks), but your task tools cannot
+attach tasks to a page yet — do not try to pass a page to them. To record
+page-related work durably, write it into the page body (a checklist or a
+"Next steps" section).
 
 ## Read the Guide before you write
 

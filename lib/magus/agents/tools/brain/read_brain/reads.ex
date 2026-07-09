@@ -13,7 +13,14 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Reads do
   alias Magus.Brain
   alias Magus.Agents.Tools.Brain.BrainResolver
 
-  import Magus.Agents.Tools.Helpers, only: [get_param: 2, get_int_param: 3, tool_error: 3]
+  import Magus.Agents.Tools.Helpers,
+    only: [
+      get_param: 2,
+      get_int_param: 3,
+      get_optional_int_param: 2,
+      flag_param?: 2,
+      tool_error: 3
+    ]
 
   import Magus.Agents.Tools.Brain.ReadBrain.Support,
     only: [
@@ -92,7 +99,8 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Reads do
 
   def handle_list_pages(params, ctx, context) do
     parent_page_id = get_param(params, :parent_page_id)
-    root_only = get_param(params, :root_only)
+    # flag_param?: accepts boolean true or the string "true" (LLM drift).
+    root_only = flag_param?(params, :root_only)
     tags = normalize_tag_filter(get_param(params, :tag))
 
     pages_result =
@@ -100,7 +108,7 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Reads do
         parent_page_id ->
           Brain.list_children_pages(parent_page_id, actor: ctx.user)
 
-        root_only == true ->
+        root_only ->
           case BrainResolver.resolve_brain_id(context, params) do
             {:ok, brain_id} -> Brain.list_root_pages(brain_id, actor: ctx.user)
             {:error, msg} -> {:error, msg}
@@ -218,58 +226,60 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Reads do
   # get_backlinks
   # ---------------------------------------------------------------------------
 
-  def handle_get_backlinks(params, ctx) do
-    page_id = get_param(params, :page_id)
+  # Accepts the same page refs as read_page (page_id, page_title, or the
+  # open pane page) so a model holding only a title doesn't dead-end.
+  def handle_get_backlinks(params, ctx, context) do
+    with {:ok, brain_id} <- BrainResolver.resolve_brain_id(context, params),
+         {:ok, page} <- resolve_page_for_read(context, params, brain_id, ctx) do
+      page_id = page.id
 
-    cond do
-      is_nil(page_id) ->
-        {:ok, %{error: "Missing required parameter: page_id for get_backlinks"}}
+      case Brain.list_backlinks(page_id, load: [:source_page], actor: ctx.user) do
+        {:ok, links} ->
+          formatted =
+            links
+            |> Enum.map(fn link ->
+              source_page = link.source_page
 
-      true ->
-        case Brain.list_backlinks(page_id, load: [:source_page], actor: ctx.user) do
-          {:ok, links} ->
-            formatted =
-              links
-              |> Enum.map(fn link ->
-                source_page = link.source_page
+              %{
+                source_page_id: link.source_page_id,
+                source_page_title: source_page && (source_page.title || "Untitled"),
+                brain_id: source_page && source_page.brain_id,
+                target_title_at_link_time: link.target_title_at_link_time
+              }
+            end)
 
-                %{
-                  source_page_id: link.source_page_id,
-                  source_page_title: source_page && (source_page.title || "Untitled"),
-                  brain_id: source_page && source_page.brain_id,
-                  target_title_at_link_time: link.target_title_at_link_time
-                }
-              end)
+          count = length(formatted)
 
-            count = length(formatted)
+          hint =
+            if count == 0 do
+              "No pages link to this one. Hint: add `[[Page Name]]` in another page's body to create a backlink."
+            else
+              "#{count} backlink(s). Hint: target_title_at_link_time reveals rename drift between the original wikilink text and the current page title."
+            end
 
-            hint =
-              if count == 0 do
-                "No pages link to this one. Hint: add `[[Page Name]]` in another page's body to create a backlink."
-              else
-                "#{count} backlink(s). Hint: target_title_at_link_time reveals rename drift between the original wikilink text and the current page title."
-              end
+          {:ok,
+           %{
+             action: "get_backlinks",
+             page_id: page_id,
+             count: count,
+             backlinks: formatted,
+             hint: hint
+           }}
 
-            {:ok,
-             %{
-               action: "get_backlinks",
-               page_id: page_id,
-               count: count,
-               backlinks: formatted,
-               hint: hint
-             }}
-
-          {:error, err} ->
-            {:ok,
-             %{
-               error:
-                 tool_error(
-                   "get backlinks",
-                   err,
-                   "Verify page_id with read_brain list_pages."
-                 )
-             }}
-        end
+        {:error, err} ->
+          {:ok,
+           %{
+             error:
+               tool_error(
+                 "get backlinks",
+                 err,
+                 "Verify page_id with read_brain list_pages."
+               )
+           }}
+      end
+    else
+      {:error, msg} when is_binary(msg) -> {:ok, %{error: msg}}
+      {:error, err} -> {:ok, %{error: tool_error("get backlinks", err, nil)}}
     end
   end
 
@@ -322,8 +332,10 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Reads do
   def handle_read_page(params, ctx, context) do
     with {:ok, brain_id} <- BrainResolver.resolve_brain_id(context, params),
          {:ok, page} <- resolve_page_for_read(context, params, brain_id, ctx) do
-      start_line = get_param(params, :start_line)
-      end_line = get_param(params, :end_line)
+      # Coerced: a string "50" used to fail slice_body's integer guard and
+      # silently return the WHOLE body, ignoring the requested slice.
+      start_line = get_optional_int_param(params, :start_line)
+      end_line = get_optional_int_param(params, :end_line)
       body = page.body || ""
       line_count = line_count(body)
       breadcrumb = build_breadcrumb(page, ctx)
@@ -510,8 +522,10 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Reads do
     end
   end
 
+  # A single binary may be a comma-joined list ("ml,research") — natural for
+  # a model and previously parsed as ONE literal tag that matched nothing.
   defp normalize_tag_filter(tag) when is_binary(tag) do
-    normalize_tag_filter([tag])
+    normalize_tag_filter(split_tag_string(tag))
   end
 
   defp normalize_tag_list(nil), do: []
@@ -523,7 +537,17 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain.Reads do
     |> Enum.uniq()
   end
 
-  defp normalize_tag_list(tag) when is_binary(tag), do: normalize_tag_list([tag])
+  defp normalize_tag_list(tag) when is_binary(tag), do: normalize_tag_list(split_tag_string(tag))
+
+  # "ml,research" -> ["ml", "research"]; a plain tag passes through as [tag].
+  # Split on commas only: spaces inside a tag are meaningful (normalize_tag
+  # turns "machine learning" into "machine-learning").
+  defp split_tag_string(tag) do
+    tag
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+  end
 
   defp apply_tag_filter(pages, nil, _user), do: pages
 

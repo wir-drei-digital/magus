@@ -294,8 +294,8 @@ defmodule Magus.Agents.Tools.Brain.ReadBrain do
     Reads.handle_find_page(params, ctx, context)
   end
 
-  defp dispatch("get_backlinks", params, ctx, _context) do
-    Reads.handle_get_backlinks(params, ctx)
+  defp dispatch("get_backlinks", params, ctx, context) do
+    Reads.handle_get_backlinks(params, ctx, context)
   end
 
   defp dispatch("list_tags", params, ctx, context) do

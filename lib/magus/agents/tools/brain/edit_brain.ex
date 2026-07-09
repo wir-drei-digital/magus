@@ -271,16 +271,16 @@ defmodule Magus.Agents.Tools.Brain.EditBrain do
     Structure.handle_create_brain(params, ctx, context)
   end
 
-  defp dispatch("rename_page", params, ctx, _context) do
-    Structure.handle_rename_page(params, ctx)
+  defp dispatch("rename_page", params, ctx, context) do
+    Structure.handle_rename_page(params, ctx, context)
   end
 
-  defp dispatch("delete_page", params, ctx, _context) do
-    Structure.handle_delete_page(params, ctx)
+  defp dispatch("delete_page", params, ctx, context) do
+    Structure.handle_delete_page(params, ctx, context)
   end
 
-  defp dispatch("move_page", params, ctx, _context) do
-    Structure.handle_move_page(params, ctx)
+  defp dispatch("move_page", params, ctx, context) do
+    Structure.handle_move_page(params, ctx, context)
   end
 
   # ---------------------------------------------------------------------------
@@ -295,16 +295,16 @@ defmodule Magus.Agents.Tools.Brain.EditBrain do
     PageContent.handle_edit_page(params, ctx, context)
   end
 
-  defp dispatch("multi_edit", params, ctx, _context) do
-    PageContent.handle_multi_edit(params, ctx)
+  defp dispatch("multi_edit", params, ctx, context) do
+    PageContent.handle_multi_edit(params, ctx, context)
   end
 
-  defp dispatch("clear_page", params, ctx, _context) do
-    PageContent.handle_clear_page(params, ctx)
+  defp dispatch("clear_page", params, ctx, context) do
+    PageContent.handle_clear_page(params, ctx, context)
   end
 
-  defp dispatch("undo_last_edit", params, ctx, _context) do
-    PageContent.handle_undo_last_edit(params, ctx)
+  defp dispatch("undo_last_edit", params, ctx, context) do
+    PageContent.handle_undo_last_edit(params, ctx, context)
   end
 
   defp removed_actions, do: ~w(add_block edit_block delete_block move_block link)

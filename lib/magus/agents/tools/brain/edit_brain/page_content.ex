@@ -18,7 +18,8 @@ defmodule Magus.Agents.Tools.Brain.EditBrain.PageContent do
   alias Magus.Agents.Tools.Brain.BrainResolver
   alias Magus.Agents.Signals
 
-  import Magus.Agents.Tools.Helpers, only: [get_param: 2, tool_error: 3]
+  import Magus.Agents.Tools.Helpers,
+    only: [get_param: 2, get_optional_int_param: 2, flag_param?: 2, tool_error: 3]
 
   import Support,
     only: [
@@ -72,7 +73,12 @@ defmodule Magus.Agents.Tools.Brain.EditBrain.PageContent do
         end
 
       blank?(title) ->
-        {:ok, %{error: "Missing required parameter: title (or page_id)"}}
+        {:ok,
+         %{
+           error:
+             "Missing required parameter: title (or page_id). To write the page open in " <>
+               "the pane/companion, pass its page_id explicitly (it is shown in your context)."
+         }}
 
       true ->
         case BrainResolver.resolve_brain_id(context, params) do
@@ -104,14 +110,16 @@ defmodule Magus.Agents.Tools.Brain.EditBrain.PageContent do
          {:ok, page} <- resolve_page_for_read(context, params, brain_id, ctx) do
       old_str = get_param(params, :old_str)
       new_str = get_param(params, :new_str)
-      start_line = get_param(params, :start_line)
-      end_line = get_param(params, :end_line)
+      # Coerced: LLMs send line numbers as strings ("3"), which used to reach
+      # the arithmetic below and crash with a bare ArithmeticError.
+      start_line = get_optional_int_param(params, :start_line)
+      end_line = get_optional_int_param(params, :end_line)
       new_content = get_param(params, :new_content)
 
       cond do
         not is_nil(old_str) ->
-          replace_all = get_param(params, :replace_all) == true
-          hint_line = get_param(params, :hint_line)
+          replace_all = flag_param?(params, :replace_all)
+          hint_line = get_optional_int_param(params, :hint_line)
           do_edit_string(page, old_str, new_str || "", replace_all, hint_line, ctx)
 
         not is_nil(start_line) and not is_nil(end_line) ->
@@ -134,33 +142,22 @@ defmodule Magus.Agents.Tools.Brain.EditBrain.PageContent do
   # multi_edit
   # ---------------------------------------------------------------------------
 
-  def handle_multi_edit(params, ctx) do
-    page_id = get_param(params, :page_id)
+  # Page resolution mirrors edit_page: explicit page_id, page_title lookup,
+  # or the open pane page — so the model can target the page the same way
+  # across every body-editing action.
+  def handle_multi_edit(params, ctx, context) do
     edits = coerce_edits(get_param(params, :edits))
 
-    cond do
-      is_nil(page_id) ->
-        {:ok, %{error: "Missing required parameter: page_id"}}
-
-      not is_list(edits) or edits == [] ->
-        {:ok, %{error: "Missing or empty required parameter: edits (non-empty list)"}}
-
-      true ->
-        case Brain.get_page(page_id, actor: ctx.user) do
-          {:ok, page} ->
-            do_multi_edit(page, edits, ctx)
-
-          {:error, err} ->
-            {:ok,
-             %{
-               error:
-                 tool_error(
-                   "multi_edit",
-                   err,
-                   "Verify page_id with read_brain list_pages."
-                 )
-             }}
-        end
+    if not is_list(edits) or edits == [] do
+      {:ok, %{error: "Missing or empty required parameter: edits (non-empty list)"}}
+    else
+      with {:ok, brain_id} <- BrainResolver.resolve_brain_id(context, params),
+           {:ok, page} <- resolve_page_for_read(context, params, brain_id, ctx) do
+        do_multi_edit(page, edits, ctx)
+      else
+        {:error, msg} when is_binary(msg) -> {:ok, %{error: msg}}
+        {:error, err} -> {:ok, %{error: tool_error("multi_edit", err, nil)}}
+      end
     end
   end
 
@@ -183,34 +180,32 @@ defmodule Magus.Agents.Tools.Brain.EditBrain.PageContent do
   # clear_page
   # ---------------------------------------------------------------------------
 
-  def handle_clear_page(params, ctx) do
-    page_id = get_param(params, :page_id)
+  def handle_clear_page(params, ctx, context) do
+    with {:ok, brain_id} <- BrainResolver.resolve_brain_id(context, params),
+         {:ok, page} <- resolve_page_for_read(context, params, brain_id, ctx),
+         {:ok, updated} <- save_body_with_retry(page, "", :clear, ctx) do
+      brain = load_brain(updated, ctx)
 
-    if is_nil(page_id) do
-      {:ok, %{error: "Missing required parameter: page_id"}}
+      {:ok,
+       %{
+         action: "clear_page",
+         cleared: true,
+         page_id: updated.id,
+         page_title: updated.title,
+         current: build_current(brain, updated)
+       }}
     else
-      with {:ok, page} <- Brain.get_page(page_id, actor: ctx.user),
-           {:ok, updated} <- save_body_with_retry(page, "", :clear, ctx) do
-        brain = load_brain(updated, ctx)
+      {:error, %VersionConflict{} = conflict} ->
+        {:ok, conflict_payload("clear page", conflict, get_param(params, :page_id), ctx)}
 
+      {:error, msg} when is_binary(msg) ->
+        {:ok, %{error: msg}}
+
+      {:error, err} ->
         {:ok,
          %{
-           action: "clear_page",
-           cleared: true,
-           page_id: updated.id,
-           page_title: updated.title,
-           current: build_current(brain, updated)
+           error: tool_error("clear page", err, "Verify page_id with read_brain list_pages.")
          }}
-      else
-        {:error, %VersionConflict{} = conflict} ->
-          {:ok, conflict_payload("clear page", conflict, page_id, ctx)}
-
-        {:error, err} ->
-          {:ok,
-           %{
-             error: tool_error("clear page", err, "Verify page_id with read_brain list_pages.")
-           }}
-      end
     end
   end
 
@@ -218,13 +213,13 @@ defmodule Magus.Agents.Tools.Brain.EditBrain.PageContent do
   # undo_last_edit
   # ---------------------------------------------------------------------------
 
-  def handle_undo_last_edit(params, ctx) do
-    page_id = get_param(params, :page_id)
-
-    if is_nil(page_id) do
-      {:ok, %{error: "Missing required parameter: page_id"}}
+  def handle_undo_last_edit(params, ctx, context) do
+    with {:ok, brain_id} <- BrainResolver.resolve_brain_id(context, params),
+         {:ok, page} <- resolve_page_for_read(context, params, brain_id, ctx) do
+      do_undo_last_edit(page.id, ctx)
     else
-      do_undo_last_edit(page_id, ctx)
+      {:error, msg} when is_binary(msg) -> {:ok, %{error: msg}}
+      {:error, err} -> {:ok, %{error: tool_error("undo last edit", err, nil)}}
     end
   end
 
@@ -556,7 +551,7 @@ defmodule Magus.Agents.Tools.Brain.EditBrain.PageContent do
   defp normalize_mode(nil), do: nil
 
   defp normalize_mode(mode) when is_binary(mode) do
-    case String.downcase(mode) do
+    case mode |> String.trim() |> String.downcase() do
       m when m in @write_modes -> String.to_existing_atom(m)
       _ -> :invalid
     end
@@ -1022,23 +1017,18 @@ defmodule Magus.Agents.Tools.Brain.EditBrain.PageContent do
            }}
 
         [_only_one] ->
-          # Restore to "" — the state before the first update_body save.
-          case save_body_with_retry(page, "", :undo, ctx) do
-            {:ok, updated} ->
-              brain = load_brain(updated, ctx)
-
-              {:ok,
-               %{
-                 action: "undo_last_edit",
-                 page_id: updated.id,
-                 page_title: updated.title,
-                 current: build_current(brain, updated),
-                 hint: "Restored to empty (no prior version existed)."
-               }}
-
-            {:error, err} ->
-              {:ok, %{error: tool_error("undo last edit", err, nil)}}
-          end
+          # Refuse rather than restore to "": with a single version, "undo"
+          # would silently blank a just-written page — an agent reverting
+          # "my last change" destroys the content instead. The model can
+          # still clear deliberately via clear_page.
+          {:ok,
+           %{
+             error:
+               "Only one saved version exists; there is no earlier content to restore. " <>
+                 "Use edit_page/write_page to change the content, or clear_page to empty it deliberately.",
+             page_id: page.id,
+             current: build_current(load_brain(page, ctx), page)
+           }}
 
         [_latest, prior | _] ->
           prior_body = prior.changes["body"] || prior.changes[:body] || ""

@@ -325,6 +325,19 @@ defmodule Magus.Agents.Tools.Brain.ReadBrainTest do
       assert hd(result.pages).page_id == tagged.id
     end
 
+    test "a comma-joined tag string is split, not treated as one literal tag", %{
+      context: context,
+      tagged: tagged
+    } do
+      # "ml,research" used to normalize to the single tag "ml,research" and
+      # silently match nothing.
+      assert {:ok, result} =
+               ReadBrain.run(%{"action" => "list_pages", "tag" => "ml, research"}, context)
+
+      assert result.count == 1
+      assert hd(result.pages).page_id == tagged.id
+    end
+
     test "list of tags requires every tag (AND, not OR)", %{
       context: context,
       tagged: tagged
@@ -694,9 +707,24 @@ defmodule Magus.Agents.Tools.Brain.ReadBrainTest do
       assert bl.target_title_at_link_time == "Target"
     end
 
-    test "missing page_id returns an error", %{context: context} do
+    test "resolves the page by page_title (no page_id needed)", %{
+      context: context,
+      target: target
+    } do
+      assert {:ok, result} =
+               ReadBrain.run(
+                 %{"action" => "get_backlinks", "page_title" => "Target"},
+                 context
+               )
+
+      refute Map.has_key?(result, :error)
+      assert result.page_id == target.id
+      assert result.count == 2
+    end
+
+    test "errors actionably when no page ref exists anywhere", %{context: context} do
       assert {:ok, %{error: error}} = ReadBrain.run(%{"action" => "get_backlinks"}, context)
-      assert error =~ "page_id"
+      assert error =~ "No page specified"
     end
 
     test "returns empty list with a helpful hint when no pages link", %{
@@ -1060,6 +1088,28 @@ defmodule Magus.Agents.Tools.Brain.ReadBrainTest do
 
       refute Map.has_key?(result, :error)
       assert result.page_id == page.id
+    end
+
+    test "line-range slicing accepts string line numbers" do
+      body = Enum.map_join(1..6, "\n", fn i -> "line #{i}" end)
+      %{context: ctx, page: page} = setup_brain_with_page(body)
+
+      # A string "2" used to fail slice_body's integer guard and silently
+      # return the WHOLE body, ignoring the requested slice.
+      assert {:ok, result} =
+               ReadBrain.run(
+                 %{
+                   "action" => "read_page",
+                   "page_id" => page.id,
+                   "start_line" => "2",
+                   "end_line" => "3"
+                 },
+                 ctx
+               )
+
+      assert result.body =~ "line 2"
+      assert result.body =~ "line 3"
+      refute result.body =~ "line 5"
     end
 
     test "supports start_line / end_line slicing with line-number prefixes" do
