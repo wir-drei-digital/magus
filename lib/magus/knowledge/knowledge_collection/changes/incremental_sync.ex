@@ -113,6 +113,14 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
         SyncLogger.info(cid, "Delta not supported, using fallback etag sync")
         fallback_sync(conn, connector, collection, source, actor)
 
+      {:error, :cursor_reset} ->
+        SyncLogger.warn(cid, "Delta cursor expired: running full fallback sync")
+
+        {:ok, _} =
+          Magus.Knowledge.update_sync_status(collection, %{sync_cursor: %{}}, authorize?: false)
+
+        fallback_sync(conn, connector, collection, source, actor)
+
       {:error, :reauth_required} ->
         update_sync_error(collection, :reauth_required)
         {:error, :reauth_required}

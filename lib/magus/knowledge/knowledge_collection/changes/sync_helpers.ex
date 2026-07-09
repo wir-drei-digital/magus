@@ -16,8 +16,12 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers do
     provider_key =
       case source.provider do
         :google_drive -> :google_drive_knowledge
+        :onedrive -> :onedrive_knowledge
+        :dropbox -> :dropbox_knowledge
         :notion -> :notion_knowledge
         :nextcloud -> :nextcloud_knowledge
+        :kdrive -> :kdrive_knowledge
+        :webdav -> :webdav_knowledge
         :affine -> :affine_knowledge
         other -> other
       end

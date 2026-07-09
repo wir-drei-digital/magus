@@ -126,8 +126,12 @@ defmodule Magus.Knowledge.Connector do
 
   """
   def connector_for(:google_drive), do: Magus.Knowledge.Connectors.GoogleDrive
+  def connector_for(:onedrive), do: Magus.Knowledge.Connectors.Onedrive
+  def connector_for(:dropbox), do: Magus.Knowledge.Connectors.Dropbox
   def connector_for(:notion), do: Magus.Knowledge.Connectors.Notion
   def connector_for(:nextcloud), do: Magus.Knowledge.Connectors.Nextcloud
+  def connector_for(:kdrive), do: Magus.Knowledge.Connectors.Kdrive
+  def connector_for(:webdav), do: Magus.Knowledge.Connectors.Webdav
   def connector_for(:affine), do: Magus.Knowledge.Connectors.Affine
   def connector_for(:web), do: Magus.Knowledge.Connectors.Web
   def connector_for(provider), do: {:error, {:unsupported_provider, provider}}

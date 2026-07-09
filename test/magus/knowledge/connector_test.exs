@@ -128,8 +128,11 @@ defmodule Magus.Knowledge.ConnectorTest do
       assert Connector.connector_for(:affine) == Magus.Knowledge.Connectors.Affine
     end
 
+    test "returns the Dropbox module for :dropbox" do
+      assert Connector.connector_for(:dropbox) == Magus.Knowledge.Connectors.Dropbox
+    end
+
     test "returns an error tuple for unknown providers" do
-      assert Connector.connector_for(:dropbox) == {:error, {:unsupported_provider, :dropbox}}
       assert Connector.connector_for(:unknown) == {:error, {:unsupported_provider, :unknown}}
     end
   end

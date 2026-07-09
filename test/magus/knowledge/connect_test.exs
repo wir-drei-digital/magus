@@ -1,6 +1,7 @@
 defmodule Magus.Knowledge.ConnectTest do
   use Magus.ResourceCase, async: true
 
+  alias Magus.Integrations.Registry
   alias Magus.Knowledge
   alias Magus.Knowledge.Connect
   alias Magus.Knowledge.KnowledgeSource
@@ -40,7 +41,7 @@ defmodule Magus.Knowledge.ConnectTest do
       user = generate(user())
 
       assert {:error, "Unknown provider"} =
-               Connect.connect_and_create("dropbox", %{}, actor: user)
+               Connect.connect_and_create("bogus", %{}, actor: user)
     end
 
     test "affine is no longer a connectable provider" do
@@ -63,6 +64,84 @@ defmodule Magus.Knowledge.ConnectTest do
     end
   end
 
+  describe "providers/0 and provider parsing" do
+    test "providers/0 lists the drive/oauth wizard providers" do
+      assert Connect.providers() ==
+               ~w(google_drive onedrive dropbox notion nextcloud kdrive webdav web)
+    end
+
+    test "webdav parses and reaches its connector, failing credential validation" do
+      user = generate(user())
+
+      # With the generic WebDAV connector wired in, an empty auth_config no longer
+      # hits the "Provider not available" guard: it reaches connect/1 and fails on
+      # the missing base_url/credentials, surfaced through friendly_error.
+      result = Connect.connect_and_create("webdav", %{}, actor: user)
+
+      assert {:error, message} = result
+      refute message == "Provider not available"
+    end
+
+    test "kdrive parses and reaches its connector, failing credential validation" do
+      user = generate(user())
+
+      # With the kDrive connector wired in, an empty auth_config no longer hits
+      # the "Provider not available" guard: it reaches connect/1 and fails on the
+      # missing api_token, surfaced through friendly_error.
+      result = Connect.connect_and_create("kdrive", %{}, actor: user)
+
+      assert {:error, message} = result
+      refute message == "Provider not available"
+    end
+
+    test "onedrive parses and reaches its connector, failing credential validation" do
+      user = generate(user())
+
+      # With the OneDrive connector wired in, an empty auth_config no longer hits
+      # the "Provider not available" guard: it reaches connect/1 and fails on the
+      # missing access token, surfaced through friendly_error.
+      result = Connect.connect_and_create("onedrive", %{}, actor: user)
+
+      assert {:error, message} = result
+      refute message == "Provider not available"
+    end
+
+    test "dropbox parses and reaches its connector, failing credential validation" do
+      user = generate(user())
+
+      # With the Dropbox connector wired in, an empty auth_config no longer hits
+      # the "Provider not available" guard: it reaches connect/1 and fails on the
+      # missing access token, surfaced through friendly_error.
+      result = Connect.connect_and_create("dropbox", %{}, actor: user)
+
+      assert {:error, message} = result
+      refute message == "Provider not available"
+    end
+  end
+
+  describe "knowledge provider registry entries" do
+    test "onedrive_knowledge is a knowledge provider with the Microsoft authorize URL" do
+      module = Registry.get(:onedrive_knowledge)
+      assert module != nil
+      assert module.source_type() == :knowledge
+      assert module.requires_admin?() == true
+
+      assert module.oauth_config().authorize_url ==
+               "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
+    end
+
+    test "dropbox_knowledge is a knowledge provider carrying token_access_type=offline" do
+      module = Registry.get(:dropbox_knowledge)
+      assert module != nil
+      assert module.source_type() == :knowledge
+      assert module.requires_admin?() == true
+
+      config = module.oauth_config()
+      assert config.authorize_url == "https://www.dropbox.com/oauth2/authorize"
+      assert config.extra_authorize_params == %{token_access_type: "offline"}
+    end
+  end
+
   describe "connect_source action (SPA RPC surface)" do
     test "returns a source summary map" do
       user = generate(user())
@@ -79,6 +158,127 @@ defmodule Magus.Knowledge.ConnectTest do
       assert summary.provider == "nextcloud"
       assert summary.status == "active"
       assert is_binary(summary.id)
+    end
+  end
+
+  describe "connect_source action: form providers end-to-end (Bypass)" do
+    # These mirror the SPA wizard's exact server calls: the form provider posts
+    # its fields through `connect_source` (creating an ACTIVE source), then the
+    # wizard browses folders through `source_folders`. The Bypass server stands
+    # in for the real WebDAV / kDrive endpoint so the round-trip is exercised
+    # without touching the network.
+
+    test "webdav: connect_source creates an active source, then folders browse against the DAV root" do
+      user = generate(user())
+      dav = Bypass.open()
+      base = "http://localhost:#{dav.port}"
+
+      auth_config = %{
+        "base_url" => base,
+        "username" => "alice",
+        "password" => "app-token"
+      }
+
+      assert {:ok, summary} =
+               KnowledgeSource
+               |> Ash.ActionInput.for_action(
+                 :connect_source,
+                 %{provider: "webdav", auth_config: auth_config},
+                 actor: user
+               )
+               |> Ash.run_action()
+
+      assert summary.provider == "webdav"
+      assert summary.status == "active"
+      assert is_binary(summary.id)
+
+      expected_auth = "Basic " <> Base.encode64("alice:app-token")
+
+      Bypass.expect_once(dav, fn conn ->
+        assert conn.method == "PROPFIND"
+        assert Plug.Conn.get_req_header(conn, "authorization") == [expected_auth]
+
+        multistatus = """
+        <?xml version="1.0"?>
+        <d:multistatus xmlns:d="DAV:">
+          <d:response>
+            <d:href>/</d:href>
+            <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat>
+          </d:response>
+          <d:response>
+            <d:href>/Reports/</d:href>
+            <d:propstat>
+              <d:prop>
+                <d:displayname>Reports</d:displayname>
+                <d:resourcetype><d:collection/></d:resourcetype>
+              </d:prop>
+            </d:propstat>
+          </d:response>
+        </d:multistatus>
+        """
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/xml")
+        |> Plug.Conn.resp(207, multistatus)
+      end)
+
+      assert {:ok, folders} =
+               KnowledgeSource
+               |> Ash.ActionInput.for_action(
+                 :source_folders,
+                 %{source_id: summary.id},
+                 actor: user
+               )
+               |> Ash.run_action()
+
+      assert Enum.any?(folders, &(&1.name == "Reports"))
+    end
+
+    test "kdrive: connect_source creates an active source, then folders browse the drives endpoint" do
+      user = generate(user())
+      api = Bypass.open()
+      base = "http://localhost:#{api.port}"
+
+      prev = Application.get_env(:magus, :kdrive_api_base_url)
+      Application.put_env(:magus, :kdrive_api_base_url, base)
+      on_exit(fn -> Application.put_env(:magus, :kdrive_api_base_url, prev) end)
+
+      auth_config = %{"api_token" => "kd-secret"}
+
+      assert {:ok, summary} =
+               KnowledgeSource
+               |> Ash.ActionInput.for_action(
+                 :connect_source,
+                 %{provider: "kdrive", auth_config: auth_config},
+                 actor: user
+               )
+               |> Ash.run_action()
+
+      assert summary.provider == "kdrive"
+      assert summary.status == "active"
+      assert is_binary(summary.id)
+
+      Bypass.expect_once(api, "GET", "/2/drive", fn conn ->
+        assert Plug.Conn.get_req_header(conn, "authorization") == ["Bearer kd-secret"]
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(
+          200,
+          Jason.encode!(%{"data" => [%{"id" => 111, "name" => "Team Drive"}]})
+        )
+      end)
+
+      assert {:ok, folders} =
+               KnowledgeSource
+               |> Ash.ActionInput.for_action(
+                 :source_folders,
+                 %{source_id: summary.id},
+                 actor: user
+               )
+               |> Ash.run_action()
+
+      assert [%{id: "111:root", name: "Team Drive"}] = folders
     end
   end
 

@@ -7,10 +7,19 @@ defmodule Magus.Knowledge.TokenManagerTest do
   setup do
     bypass = Bypass.open()
     prev = Application.get_env(:magus, :google_token_url)
+    prev_dbx = Application.get_env(:magus, :dropbox_token_url)
     Application.put_env(:magus, :google_token_url, "http://localhost:#{bypass.port}/token")
+    Application.put_env(:magus, :dropbox_token_url, "http://localhost:#{bypass.port}/token")
     System.put_env("GOOGLE_CLIENT_ID", "id")
     System.put_env("GOOGLE_CLIENT_SECRET", "secret")
-    on_exit(fn -> Application.put_env(:magus, :google_token_url, prev) end)
+    System.put_env("DROPBOX_APP_KEY", "key")
+    System.put_env("DROPBOX_APP_SECRET", "secret")
+
+    on_exit(fn ->
+      Application.put_env(:magus, :google_token_url, prev)
+      Application.put_env(:magus, :dropbox_token_url, prev_dbx)
+    end)
+
     {:ok, bypass: bypass}
   end
 
@@ -18,6 +27,17 @@ defmodule Magus.Knowledge.TokenManagerTest do
     {:ok, source} =
       Knowledge.create_source(
         %{name: "GD", provider: :google_drive, auth_config: auth_config},
+        actor: user
+      )
+
+    {:ok, source} = Knowledge.update_source_status(source, %{status: :active}, actor: user)
+    source
+  end
+
+  defp dropbox_source(user, auth_config) do
+    {:ok, source} =
+      Knowledge.create_source(
+        %{name: "DBX", provider: :dropbox, auth_config: auth_config},
         actor: user
       )
 
@@ -49,6 +69,34 @@ defmodule Magus.Knowledge.TokenManagerTest do
 
     {:ok, reloaded} = Knowledge.get_source(source.id, actor: user)
     assert reloaded.auth_config["access_token"] == "fresh"
+  end
+
+  test "refreshes and persists a dropbox source when the access token is expired", %{
+    bypass: bypass
+  } do
+    user = generate(user())
+
+    source =
+      dropbox_source(user, %{
+        "access_token" => "old",
+        "refresh_token" => "r",
+        "expires_at" => expired_iso()
+      })
+
+    Bypass.expect_once(bypass, "POST", "/token", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.resp(
+        200,
+        Jason.encode!(%{"access_token" => "dbx-fresh", "expires_in" => 14_400})
+      )
+    end)
+
+    assert {:ok, refreshed} = TokenManager.ensure_fresh(source)
+    assert refreshed.auth_config["access_token"] == "dbx-fresh"
+
+    {:ok, reloaded} = Knowledge.get_source(source.id, actor: user)
+    assert reloaded.auth_config["access_token"] == "dbx-fresh"
   end
 
   test "does not call the token endpoint when the token is still valid" do

@@ -1,24 +1,32 @@
-defmodule Magus.Knowledge.Connectors.Nextcloud do
+defmodule Magus.Knowledge.Connectors.Webdav do
   @moduledoc """
-  Knowledge connector for Nextcloud via WebDAV.
+  Generic WebDAV knowledge connector.
 
-  Thin adapter over `Magus.Knowledge.Connectors.Webdav.Client`. Keeps only the
-  Nextcloud-specific pieces: the auth-config shape, the
-  `/remote.php/dav/files/{username}` DAV path prefix, and `relative_path/2`.
-  All generic WebDAV mechanics (PROPFIND/GET, retry, XML/date parsing) live in
-  the shared client.
+  A thin adapter over `Magus.Knowledge.Connectors.Webdav.Client` for any
+  standards-compliant WebDAV server where the configured `base_url` is already
+  the DAV collection root. Unlike the Nextcloud connector there is no
+  path-prefix magic: PROPFIND/GET requests hit `base_url <> path` directly and
+  hrefs are used verbatim.
+
+  Suitable for providers that expose a plain WebDAV endpoint, including:
+
+    * ownCloud
+    * Koofr
+    * Hetzner Storage Share
+    * Fastmail Files
+    * kDrive paid tiers
 
   Uses recursive `Depth: 1` PROPFIND requests instead of `Depth: infinity`
-  for compatibility — many Nextcloud instances disable infinite depth.
-
-  Handles 429/503 rate limiting with automatic retry using the `Retry-After`
-  header.
+  for compatibility. Handles 429/503 rate limiting with automatic retry using
+  the `Retry-After` header.
 
   ## Auth Config
 
-      %{"base_url" => "https://cloud.example.com", "username" => "user", "password" => "pass"}
+      %{"base_url" => "https://dav.example.com/remote/dav", "username" => "user", "password" => "pass"}
 
-  The password can be an app-specific password generated in Nextcloud settings.
+  `base_url` IS the DAV collection root. `username`/`password` are sent as HTTP
+  Basic auth; the password can be an app-specific password where the provider
+  supports one.
   """
 
   @behaviour Magus.Knowledge.Connector
@@ -38,7 +46,7 @@ defmodule Magus.Knowledge.Connectors.Nextcloud do
       when is_binary(base_url) and base_url != "" and
              is_binary(username) and username != "" and
              is_binary(password) and password != "" do
-    # Normalize base_url — strip trailing slash
+    # Normalize base_url — strip trailing slash so it is a clean DAV root.
     base_url = String.trim_trailing(base_url, "/")
 
     {:ok,
@@ -55,7 +63,7 @@ defmodule Magus.Knowledge.Connectors.Nextcloud do
 
   @impl true
   def list_folders(%__MODULE__{} = conn, path) do
-    webdav_path = build_webdav_path(conn, path || "/")
+    webdav_path = build_path(path || "/")
 
     case propfind(conn, webdav_path, 1) do
       {:ok, body} ->
@@ -70,7 +78,7 @@ defmodule Magus.Knowledge.Connectors.Nextcloud do
             %{
               id: entry.href,
               name: entry.display_name || Path.basename(URI.decode(entry.href)),
-              path: relative_path(conn, entry.href)
+              path: relative_path(entry.href)
             }
           end)
 
@@ -83,7 +91,7 @@ defmodule Magus.Knowledge.Connectors.Nextcloud do
 
   @impl true
   def list_items(%__MODULE__{} = conn, collection, _cursor) do
-    webdav_path = collection_path(conn, collection)
+    webdav_path = collection_path(collection)
 
     case list_items_recursive(conn, webdav_path, 0) do
       {:ok, entries} ->
@@ -153,7 +161,7 @@ defmodule Magus.Knowledge.Connectors.Nextcloud do
         {:ok, body, metadata}
 
       {:ok, %Req.Response{status: status, body: body}} ->
-        Logger.warning("Nextcloud GET error: status=#{status} path=#{path}")
+        Logger.warning("WebDAV GET error: status=#{status} path=#{path}")
         {:error, {:webdav_error, status, body}}
 
       {:error, reason} ->
@@ -192,18 +200,19 @@ defmodule Magus.Knowledge.Connectors.Nextcloud do
     Client.basic_auth_headers(username, password)
   end
 
-  defp build_webdav_path(%__MODULE__{username: username}, path) do
-    base = "/remote.php/dav/files/" <> Client.encode_component(username)
+  # base_url IS the DAV root, so there is no prefix: paths map straight onto it.
+  # Encode each segment and normalize to a trailing-slash collection path.
+  defp build_path(path) do
     path = String.trim_leading(path, "/")
 
     if path == "" do
-      base <> "/"
+      "/"
     else
-      base <> "/" <> Client.encode_path(path) <> "/"
+      "/" <> Client.encode_path(path) <> "/"
     end
   end
 
-  defp collection_path(conn, collection) do
+  defp collection_path(collection) do
     path =
       case collection do
         %{path: p} when is_binary(p) -> p
@@ -213,18 +222,23 @@ defmodule Magus.Knowledge.Connectors.Nextcloud do
         _ -> "/"
       end
 
-    # If path already contains /remote.php/dav/files, use it directly
-    if String.starts_with?(path, "/remote.php/") do
-      path
-    else
-      build_webdav_path(conn, path)
+    # An href captured from a prior PROPFIND is already an absolute, encoded DAV
+    # path (starts with "/"); use it verbatim, only ensuring a trailing slash so
+    # the server treats it as a collection. A user-supplied logical path gets
+    # encoded onto the root.
+    cond do
+      String.starts_with?(path, "/") -> ensure_trailing_slash(path)
+      true -> build_path(path)
     end
   end
 
-  defp relative_path(%__MODULE__{username: username}, href) do
-    prefix = "/remote.php/dav/files/" <> Client.encode_component(username)
-    String.trim_leading(href, prefix)
+  defp ensure_trailing_slash(path) do
+    if String.ends_with?(path, "/"), do: path, else: path <> "/"
   end
+
+  # base_url is the DAV root and hrefs are absolute paths under it, so the
+  # relative path is the href itself (prefix "").
+  defp relative_path(href), do: href
 
   defp item_path(%{id: id}), do: id
   defp item_path(%{"id" => id}), do: id
