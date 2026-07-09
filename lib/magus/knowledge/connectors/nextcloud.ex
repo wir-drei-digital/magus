@@ -234,7 +234,10 @@ defmodule Magus.Knowledge.Connectors.Nextcloud do
 
     case Req.request(opts) do
       {:ok, %Req.Response{status: status} = response} when status in [429, 503] and retries < 3 ->
-        retry_after = retry_after_seconds(response)
+        # Capped at 15s: this sleep occupies one of only 5 global knowledge_sync
+        # queue slots, so a large provider-supplied Retry-After should not stall
+        # the whole queue.
+        retry_after = min(retry_after_seconds(response), 15)
 
         Logger.warning(
           "Nextcloud rate limited (#{status}), retrying in #{retry_after}s (attempt #{retries + 1}/3)"

@@ -843,4 +843,78 @@ defmodule Magus.Knowledge.KnowledgeCollectionTest do
       assert {:error, _} = Magus.Files.get_file(gone_file.id, authorize?: false)
     end
   end
+
+  describe "sync hygiene" do
+    test "watchdog action resets a stuck syncing collection" do
+      user = generate(user())
+
+      {:ok, source} =
+        Magus.Knowledge.create_source(
+          %{
+            name: "NC",
+            provider: :nextcloud,
+            auth_config: %{"base_url" => "https://x", "username" => "u", "password" => "p"}
+          },
+          actor: user
+        )
+
+      {:ok, collection} =
+        Magus.Knowledge.create_collection(
+          source.id,
+          %{name: "F", external_id: "/f", external_path: "/f"},
+          actor: user
+        )
+
+      {:ok, collection} =
+        Magus.Knowledge.update_sync_status(collection, %{sync_status: :syncing},
+          authorize?: false
+        )
+
+      {:ok, reset} =
+        Ash.update(collection, %{}, action: :mark_sync_interrupted, authorize?: false)
+
+      assert reset.sync_status == :error
+      assert reset.last_error =~ "stuck"
+    end
+
+    test "scheduler filter excludes :syncing collections" do
+      # mirror of the trigger where clause; keep in sync with knowledge_collection.ex
+      user = generate(user())
+
+      {:ok, source} =
+        Magus.Knowledge.create_source(
+          %{
+            name: "NC",
+            provider: :nextcloud,
+            auth_config: %{"base_url" => "https://x", "username" => "u", "password" => "p"}
+          },
+          actor: user
+        )
+
+      {:ok, _} = Magus.Knowledge.update_source_status(source, %{status: :active}, actor: user)
+
+      {:ok, syncing} =
+        Magus.Knowledge.create_collection(
+          source.id,
+          %{name: "A", external_id: "/a", external_path: "/a"},
+          actor: user
+        )
+
+      {:ok, syncing} =
+        Magus.Knowledge.update_sync_status(syncing, %{sync_status: :syncing}, authorize?: false)
+
+      require Ash.Query
+
+      ids =
+        Magus.Knowledge.KnowledgeCollection
+        |> Ash.Query.filter(
+          sync_status != :pending and sync_status != :syncing and
+            sync_strategy != :manual and knowledge_source.needs_reauth == false
+        )
+        |> Ash.read!(authorize?: false)
+        |> MapSet.new(& &1.id)
+
+      refute MapSet.member?(ids, syncing.id)
+    end
+  end
 end

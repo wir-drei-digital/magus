@@ -25,9 +25,19 @@ defmodule Magus.Knowledge.KnowledgeCollection do
         scheduler_module_name __MODULE__.Schedulers.IncrementalSync
 
         where expr(
-                sync_status != :pending and sync_strategy != :manual and
+                sync_status != :pending and sync_status != :syncing and
+                  sync_strategy != :manual and
                   knowledge_source.needs_reauth == false
               )
+      end
+
+      trigger :recover_stuck_sync do
+        action :mark_sync_interrupted
+        queue :knowledge_sync
+        scheduler_cron "*/30 * * * *"
+        where expr(sync_status == :syncing and updated_at < ago(2, :hour))
+        worker_module_name __MODULE__.Workers.RecoverStuckSync
+        scheduler_module_name __MODULE__.Schedulers.RecoverStuckSync
       end
     end
   end
@@ -127,6 +137,24 @@ defmodule Magus.Knowledge.KnowledgeCollection do
     update :incremental_sync do
       require_atomic? false
       change Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync
+    end
+
+    update :mark_sync_interrupted do
+      description """
+      Resets a collection stuck in :syncing for over 2 hours back to :error so
+      it is picked up by the next scheduled run. Run by the recover_stuck_sync
+      Oban trigger. A legitimately long full sync (over 2h) may be flapped to
+      :error here and then overwritten by its own completion write shortly
+      after; this is acceptable and by design.
+      """
+
+      require_atomic? false
+      change set_attribute(:sync_status, :error)
+
+      change set_attribute(
+               :last_error,
+               "Sync appeared stuck for over 2 hours and was reset. It will be retried on the next scheduled run."
+             )
     end
 
     read :for_source do

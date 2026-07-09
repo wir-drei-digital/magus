@@ -183,11 +183,18 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
       last_synced_at: now,
       item_count: actual_count,
       error_count: error_count,
-      last_error: nil
+      last_error:
+        if(error_count > 0,
+          do: "#{error_count} item(s) failed during the last sync. See the sync log.",
+          else: nil
+        )
     }
 
     sync_attrs =
       if cursor, do: Map.put(sync_attrs, :sync_cursor, cursor), else: sync_attrs
+
+    sync_attrs =
+      if changes != [], do: Map.put(sync_attrs, :content_updated_at, now), else: sync_attrs
 
     Magus.Knowledge.update_sync_status(collection, sync_attrs, authorize?: false)
   end
@@ -327,8 +334,8 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
         SyncLogger.info(cid, "Fallback: #{length(remote_items)} remote items found")
         remote_by_id = Map.new(remote_items, &{&1.id, &1})
 
-        {_item_count, error_count} =
-          Enum.reduce(remote_items, {0, 0}, fn item, {items, errors} ->
+        {created_count, updated_count, error_count} =
+          Enum.reduce(remote_items, {0, 0, 0}, fn item, {created, updated, errors} ->
             case Map.get(existing_by_external_id, item.id) do
               nil ->
                 case FullSync.create_file_from_item(
@@ -341,7 +348,7 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
                      ) do
                   {:ok, _} ->
                     SyncLogger.info(cid, "Created: #{item.name}")
-                    {items + 1, errors}
+                    {created + 1, updated, errors}
 
                   {:error, reason} ->
                     Logger.warning(
@@ -349,7 +356,7 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
                     )
 
                     SyncLogger.error(cid, "Failed to create #{item.name}: #{inspect(reason)}")
-                    {items, errors + 1}
+                    {created, updated, errors + 1}
                 end
 
               file ->
@@ -359,10 +366,10 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
                   case SyncHelpers.update_existing_file(conn, connector, file, item, actor) do
                     {:ok, :updated} ->
                       SyncLogger.info(cid, "Updated: #{item.name}")
-                      {items + 1, errors}
+                      {created, updated + 1, errors}
 
                     {:ok, :unchanged} ->
-                      {items + 1, errors}
+                      {created, updated, errors}
 
                     {:error, reason} ->
                       Logger.warning(
@@ -370,10 +377,10 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
                       )
 
                       SyncLogger.error(cid, "Failed to update #{item.name}: #{inspect(reason)}")
-                      {items, errors + 1}
+                      {created, updated, errors + 1}
                   end
                 else
-                  {items + 1, errors}
+                  {created, updated, errors}
                 end
             end
           end)
@@ -383,12 +390,14 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
           existing_by_external_id
           |> Enum.reject(fn {ext_id, _file} -> Map.has_key?(remote_by_id, ext_id) end)
 
-        if length(deleted) > 0 do
+        deleted_count = length(deleted)
+
+        if deleted_count > 0 do
           Enum.each(deleted, fn {_ext_id, file} ->
             SyncHelpers.delete_remote_gone_file(file)
           end)
 
-          SyncLogger.info(cid, "Hard-deleted #{length(deleted)} remotely removed files")
+          SyncLogger.info(cid, "Hard-deleted #{deleted_count} remotely removed files")
         end
 
         now = DateTime.utc_now()
@@ -403,15 +412,26 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
           "Incremental sync complete: #{actual_count} files, #{error_count} errors"
         )
 
+        sync_attrs = %{
+          sync_status: :synced,
+          last_synced_at: now,
+          item_count: actual_count,
+          error_count: error_count,
+          last_error:
+            if(error_count > 0,
+              do: "#{error_count} item(s) failed during the last sync. See the sync log.",
+              else: nil
+            )
+        }
+
+        sync_attrs =
+          if created_count + updated_count + deleted_count > 0,
+            do: Map.put(sync_attrs, :content_updated_at, now),
+            else: sync_attrs
+
         Magus.Knowledge.update_sync_status(
           collection,
-          %{
-            sync_status: :synced,
-            last_synced_at: now,
-            item_count: actual_count,
-            error_count: error_count,
-            last_error: nil
-          },
+          sync_attrs,
           authorize?: false
         )
 
@@ -457,8 +477,7 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
       collection,
       %{
         sync_status: :error,
-        last_error: inspect(reason),
-        error_count: (collection.error_count || 0) + 1
+        last_error: SyncHelpers.format_sync_error(reason)
       },
       authorize?: false
     )

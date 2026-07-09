@@ -80,6 +80,17 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers do
     end
   end
 
+  @doc """
+  Renders a sync failure `reason` as a user-facing `last_error` string.
+  """
+  def format_sync_error(:reauth_required),
+    do: "Authorization expired. Reconnect this source to resume syncing."
+
+  def format_sync_error(:rate_limited),
+    do: "Rate limited by the provider. The next scheduled sync will retry automatically."
+
+  def format_sync_error(reason), do: inspect(reason)
+
   @doc "SHA-256 hex digest used as the stored content fingerprint."
   def content_hash(content) when is_binary(content) do
     :crypto.hash(:sha256, content) |> Base.encode16(case: :lower)

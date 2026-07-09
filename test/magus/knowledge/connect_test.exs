@@ -43,6 +43,12 @@ defmodule Magus.Knowledge.ConnectTest do
                Connect.connect_and_create("dropbox", %{}, actor: user)
     end
 
+    test "affine is no longer a connectable provider" do
+      user = generate(user())
+      refute "affine" in Magus.Knowledge.Connect.providers()
+      assert {:error, "Unknown provider"} = Connect.connect_and_create("affine", %{}, actor: user)
+    end
+
     test "surfaces a connector failure without creating a source" do
       user = generate(user())
 

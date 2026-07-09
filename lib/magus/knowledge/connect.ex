@@ -13,7 +13,7 @@ defmodule Magus.Knowledge.Connect do
 
   # The providers the connect wizard supports (a subset of the source provider
   # enum — the others have no Connector implementation).
-  @providers ~w(google_drive notion nextcloud affine web)
+  @providers ~w(google_drive notion nextcloud web)
 
   @doc "Provider keys the connect wizard supports."
   def providers, do: @providers
@@ -144,7 +144,6 @@ defmodule Magus.Knowledge.Connect do
   defp default_name(:google_drive), do: "Google Drive"
   defp default_name(:notion), do: "Notion"
   defp default_name(:nextcloud), do: "Nextcloud"
-  defp default_name(:affine), do: "AFFiNE"
   defp default_name(:web), do: "Web"
   defp default_name(other), do: other |> to_string() |> String.capitalize()
 

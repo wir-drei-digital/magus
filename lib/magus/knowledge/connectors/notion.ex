@@ -418,7 +418,10 @@ defmodule Magus.Knowledge.Connectors.Notion do
   end
 
   defp maybe_retry(method, conn, path, body_or_params, retries, response) when retries < 3 do
-    retry_after = retry_after_seconds(response)
+    # Capped at 15s: this sleep occupies one of only 5 global knowledge_sync
+    # queue slots, so a large provider-supplied Retry-After should not stall
+    # the whole queue.
+    retry_after = min(retry_after_seconds(response), 15)
 
     Logger.warning(
       "Notion API rate limited (429), retrying in #{retry_after}s (attempt #{retries + 1}/3)"

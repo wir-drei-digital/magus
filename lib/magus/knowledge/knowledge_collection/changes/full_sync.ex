@@ -54,7 +54,11 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
             content_updated_at: content_updated_at,
             item_count: actual_count,
             error_count: error_count,
-            last_error: nil
+            last_error:
+              if(error_count > 0,
+                do: "#{error_count} item(s) failed during the last sync. See the sync log.",
+                else: nil
+              )
           },
           authorize?: false
         )
@@ -71,8 +75,7 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.FullSync do
           collection,
           %{
             sync_status: :error,
-            last_error: inspect(reason),
-            error_count: (collection.error_count || 0) + 1
+            last_error: SyncHelpers.format_sync_error(reason)
           },
           authorize?: false
         )
