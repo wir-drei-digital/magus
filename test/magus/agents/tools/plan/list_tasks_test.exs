@@ -155,4 +155,49 @@ defmodule Magus.Agents.Tools.Plan.ListTasksTest do
       assert hd(result2.tasks).title == "Conv2 task"
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Brain page boards
+  # ---------------------------------------------------------------------------
+
+  describe "run/2 - brain page board" do
+    test "lists the page board, not the conversation list" do
+      %{user: user, context: context} = create_test_context()
+      {:ok, brain} = Magus.Brain.create_brain(%{title: "Board Brain"}, actor: user)
+      {:ok, page} = Magus.Brain.create_page(brain.id, %{title: "Roadmap"}, actor: user)
+      context = Map.put(context, :user, user)
+
+      assert {:ok, _} = CreateTask.run(%{"title" => "Conversation only"}, context)
+      {:ok, _} = Magus.Plan.create_plan_task(page.id, %{title: "On the board"}, actor: user)
+
+      assert {:ok, result} = ListTasks.run(%{"brain_page_id" => page.id}, context)
+
+      assert result.brain_page_id == page.id
+      assert result.page_title == "Roadmap"
+      titles = Enum.map(result.tasks, & &1.title)
+      assert "On the board" in titles
+      refute "Conversation only" in titles
+    end
+
+    test "resolves the page by exact title" do
+      %{user: user, context: context} = create_test_context()
+      {:ok, brain} = Magus.Brain.create_brain(%{title: "Board Brain"}, actor: user)
+      {:ok, page} = Magus.Brain.create_page(brain.id, %{title: "Roadmap"}, actor: user)
+      {:ok, _} = Magus.Plan.create_plan_task(page.id, %{title: "Titled"}, actor: user)
+      context = Map.put(context, :user, user)
+
+      assert {:ok, result} = ListTasks.run(%{"brain_page_id" => "Roadmap"}, context)
+      assert result.brain_page_id == page.id
+      assert Enum.map(result.tasks, & &1.title) == ["Titled"]
+    end
+
+    test "errors actionably without a user struct in context" do
+      %{context: context} = create_test_context()
+
+      assert {:ok, %{error: error}} =
+               ListTasks.run(%{"brain_page_id" => Ash.UUIDv7.generate()}, context)
+
+      assert error =~ "user context"
+    end
+  end
 end

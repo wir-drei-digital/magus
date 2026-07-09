@@ -5,11 +5,35 @@ defmodule Magus.Agents.Tools.Plan.ListTasks do
 
   use Jido.Action,
     name: "list_tasks",
-    description:
-      "List all tasks for the current conversation. Returns tasks grouped with their subtasks, including status, assignment, and completion info.",
-    schema: []
+    description: """
+    List all tasks for the current conversation. Returns tasks grouped with their subtasks, including status, assignment, and completion info.
 
-  import Magus.Agents.Tools.Helpers, only: [validate_context: 2]
+    Pass `brain_page_id` (a page id, or an exact page title; add `brain_id` if the title is ambiguous) to list a brain page's task board instead.
+    """,
+    schema: [
+      brain_page_id: [
+        type: {:or, [:string, nil]},
+        default: nil,
+        doc:
+          "List this brain page's task board instead of the conversation. Accepts a page id or an exact page title."
+      ],
+      brain_id: [
+        type: {:or, [:string, nil]},
+        default: nil,
+        doc: "Brain to resolve a brain_page_id TITLE in (id, slug, or brain title)"
+      ]
+    ]
+
+  alias Magus.Agents.Tools.Brain.BrainResolver
+
+  import Magus.Agents.Tools.Helpers,
+    only: [
+      get_param: 2,
+      get_context_value: 2,
+      validate_context: 2,
+      nilify_blank_params: 2,
+      extract_error_message: 1
+    ]
 
   def display_name, do: "Listing tasks..."
 
@@ -18,17 +42,22 @@ defmodule Magus.Agents.Tools.Plan.ListTasks do
   def summarize_output(_), do: "Listed tasks"
 
   @impl true
-  def run(_params, context) do
+  def run(params, context) do
     case validate_context(context, [:conversation_id]) do
       {:ok, ctx} ->
-        list_tasks(ctx.conversation_id)
+        params = nilify_blank_params(params, [:brain_page_id, :brain_id])
+
+        case get_param(params, :brain_page_id) do
+          nil -> list_conversation_tasks(ctx.conversation_id)
+          ref -> list_page_tasks(ref, params, context)
+        end
 
       {:error, message} ->
         {:ok, %{error: message}}
     end
   end
 
-  defp list_tasks(conversation_id) do
+  defp list_conversation_tasks(conversation_id) do
     case Magus.Plan.tasks_for_conversation(
            conversation_id,
            actor: Magus.Agents.Tools.Helpers.ai_actor()
@@ -39,7 +68,38 @@ defmodule Magus.Agents.Tools.Plan.ListTasks do
         {:ok, %{tasks: grouped, summary: summary}}
 
       {:error, error} ->
-        {:ok, %{error: inspect(error)}}
+        {:ok, %{error: extract_error_message(error)}}
+    end
+  end
+
+  # Page boards are read AS THE USER (viewer-gated ActorCanAccessTaskPage);
+  # page refs resolve like the brain tools (id or exact title).
+  defp list_page_tasks(ref, params, context) do
+    user = get_context_value(context, :user)
+
+    if is_nil(user) do
+      {:ok, %{error: "brain_page_id requires user context. List without brain_page_id instead."}}
+    else
+      page_params =
+        case Ecto.UUID.cast(ref) do
+          {:ok, _} -> %{"page_id" => ref}
+          :error -> %{"page_title" => ref}
+        end
+
+      with {:ok, brain_id} <- BrainResolver.resolve_brain_id(context, params),
+           {:ok, page} <- BrainResolver.resolve_page(context, page_params, brain_id),
+           {:ok, tasks} <- Magus.Plan.tasks_for_plan(page.id, actor: user) do
+        {:ok,
+         %{
+           tasks: group_tasks(tasks),
+           summary: build_summary(tasks),
+           brain_page_id: page.id,
+           page_title: page.title
+         }}
+      else
+        {:error, msg} when is_binary(msg) -> {:ok, %{error: msg}}
+        {:error, error} -> {:ok, %{error: extract_error_message(error)}}
+      end
     end
   end
 

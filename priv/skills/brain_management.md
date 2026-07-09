@@ -122,11 +122,13 @@ automatically; you don't create them by hand.
 ## Tasks
 
 `create_task` / `update_task` / `list_tasks` / `clear_tasks` track work in the
-CURRENT CONVERSATION, not on brain pages. Brain pages have their own task board
-in the UI (any page can carry user-managed tasks), but your task tools cannot
-attach tasks to a page yet — do not try to pass a page to them. To record
-page-related work durably, write it into the page body (a checklist or a
-"Next steps" section).
+CURRENT CONVERSATION by default. Any brain page also carries its own task board
+(what the user sees on the page): pass `brain_page_id` (a page id, or an exact
+page title; add `brain_id` when the title is ambiguous across brains) to
+`create_task` or `list_tasks` to work that board instead. `update_task` works
+on any task by task_id. `clear_tasks` clears conversation tasks only, never a
+page's board. Use page tasks for durable, user-visible work items on a topic;
+use conversation tasks for your own in-flight plan.
 
 ## Read the Guide before you write
 

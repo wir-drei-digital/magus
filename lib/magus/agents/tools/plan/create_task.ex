@@ -20,12 +20,27 @@ defmodule Magus.Agents.Tools.Plan.CreateTask do
 
     Pass `clear_previous: true` to archive all existing tasks in the conversation before creating new ones.
     Use this to start a fresh batch when the old tasks are no longer relevant or the previous plan is complete.
+
+    **Brain page tasks:** pass `brain_page_id` (a page id, or an exact page title; add `brain_id`
+    if the title is ambiguous across brains) to put the task(s) on that page's task board instead
+    of the conversation. The board is what the user sees on the brain page.
     """,
     schema: [
       title: [
         type: {:or, [:string, nil]},
         default: nil,
         doc: "Task title (for single task creation)"
+      ],
+      brain_page_id: [
+        type: {:or, [:string, nil]},
+        default: nil,
+        doc:
+          "Create the task(s) on this brain page's task board instead of the conversation. Accepts a page id or an exact page title."
+      ],
+      brain_id: [
+        type: {:or, [:string, nil]},
+        default: nil,
+        doc: "Brain to resolve a brain_page_id TITLE in (id, slug, or brain title)"
       ],
       tasks: [
         type: {:or, [{:list, :map}, nil]},
@@ -74,9 +89,17 @@ defmodule Magus.Agents.Tools.Plan.CreateTask do
   require Logger
 
   alias Magus.Agents.Signals
+  alias Magus.Agents.Tools.Brain.BrainResolver
 
   import Magus.Agents.Tools.Helpers,
-    only: [get_param: 2, validate_context: 2, ai_actor: 0, extract_error_message: 1]
+    only: [
+      get_param: 2,
+      get_context_value: 2,
+      validate_context: 2,
+      nilify_blank_params: 2,
+      ai_actor: 0,
+      extract_error_message: 1
+    ]
 
   def display_name, do: "Creating task..."
 
@@ -91,16 +114,32 @@ defmodule Magus.Agents.Tools.Plan.CreateTask do
   def run(params, context) do
     case validate_context(context, [:conversation_id, :user_id]) do
       {:ok, ctx} ->
-        maybe_clear_previous(params, ctx, context)
+        params = nilify_blank_params(params, [:brain_page_id, :brain_id, :parent_id])
 
-        case parse_tasks_param(get_param(params, :tasks)) do
-          tasks when is_list(tasks) and tasks != [] ->
-            Signals.emit_tool_progress(context, :creating, %{count: length(tasks)})
-            create_batch(tasks, ctx)
+        case resolve_target(params, ctx, context) do
+          {:ok, target} ->
+            note = maybe_clear_previous(params, ctx, context, target)
 
-          _ ->
-            Signals.emit_tool_progress(context, :creating, %{title: get_param(params, :title)})
-            create_single(params, ctx)
+            result =
+              case parse_tasks_param(get_param(params, :tasks)) do
+                tasks when is_list(tasks) and tasks != [] ->
+                  Signals.emit_tool_progress(context, :creating, %{count: length(tasks)})
+                  create_batch(tasks, ctx, context, target)
+
+                _ ->
+                  Signals.emit_tool_progress(context, :creating, %{
+                    title: get_param(params, :title)
+                  })
+
+                  create_single(params, ctx, context, target)
+              end
+
+            with {:ok, payload} <- result do
+              {:ok, if(note, do: Map.put(payload, :note, note), else: payload)}
+            end
+
+          {:error, message} ->
+            {:ok, %{error: message}}
         end
 
       {:error, message} ->
@@ -108,20 +147,63 @@ defmodule Magus.Agents.Tools.Plan.CreateTask do
     end
   end
 
-  defp maybe_clear_previous(params, ctx, context) do
-    if get_param(params, :clear_previous) == true do
-      Signals.emit_tool_progress(context, :clearing_previous, %{})
+  # Where the task(s) live: the conversation list (default) or a brain page's
+  # task board. Page refs resolve through the brain tools' resolver with the
+  # REAL user as actor (access-gated); the create itself is then policy-gated
+  # too (ActorCanAccessTaskPage, editor) — the ai_actor bypass must never be
+  # the thing granting page access.
+  defp resolve_target(params, _ctx, context) do
+    case get_param(params, :brain_page_id) do
+      nil ->
+        {:ok, :conversation}
 
-      Magus.Plan.archive_all_tasks(
-        ctx.conversation_id,
-        actor: Magus.Agents.Tools.Helpers.ai_actor()
-      )
+      ref ->
+        user = get_context_value(context, :user)
+
+        if is_nil(user) do
+          {:error,
+           "brain_page_id requires user context. Create the task without brain_page_id instead."}
+        else
+          page_params =
+            case Ecto.UUID.cast(ref) do
+              {:ok, _} -> %{"page_id" => ref}
+              :error -> %{"page_title" => ref}
+            end
+
+          with {:ok, brain_id} <- BrainResolver.resolve_brain_id(context, params),
+               {:ok, page} <- BrainResolver.resolve_page(context, page_params, brain_id) do
+            {:ok, {:page, page, user}}
+          else
+            {:error, msg} when is_binary(msg) -> {:error, msg}
+            {:error, err} -> {:error, extract_error_message(err)}
+          end
+        end
     end
-
-    :ok
   end
 
-  defp create_batch(tasks, ctx) do
+  defp maybe_clear_previous(params, ctx, context, target) do
+    cond do
+      get_param(params, :clear_previous) != true ->
+        nil
+
+      target != :conversation ->
+        # archive_all_tasks is conversation-keyed; silently archiving a page
+        # board the user curates would be destructive. Say so instead.
+        "clear_previous was ignored: it archives conversation tasks only, not the page's task board."
+
+      true ->
+        Signals.emit_tool_progress(context, :clearing_previous, %{})
+
+        Magus.Plan.archive_all_tasks(
+          ctx.conversation_id,
+          actor: Magus.Agents.Tools.Helpers.ai_actor()
+        )
+
+        nil
+    end
+  end
+
+  defp create_batch(tasks, ctx, _context, target) do
     # Normalize: ensure each item is a string-keyed map with at least "title"
     tasks =
       Enum.map(tasks, fn item ->
@@ -144,7 +226,7 @@ defmodule Magus.Agents.Tools.Plan.CreateTask do
         Enum.reduce_while(tasks, [], fn task_params, acc ->
           attrs = build_attrs(task_params, ctx)
 
-          case Magus.Plan.create_task(ctx.conversation_id, attrs, actor: ai_actor()) do
+          case create_on_target(target, attrs, ctx) do
             {:ok, task} ->
               {:cont, [%{task_id: task.id, title: task.title, position: task.position} | acc]}
 
@@ -159,15 +241,18 @@ defmodule Magus.Agents.Tools.Plan.CreateTask do
 
         created ->
           created = Enum.reverse(created)
-          {:ok, %{created: created, message: "Created #{length(created)} tasks in order"}}
+
+          {:ok,
+           %{created: created, message: "Created #{length(created)} tasks in order"}
+           |> put_target_info(target)}
       end
     end
   end
 
-  defp create_single(params, ctx) do
+  defp create_single(params, ctx, _context, target) do
     attrs = build_attrs(params, ctx)
 
-    case Magus.Plan.create_task(ctx.conversation_id, attrs, actor: ai_actor()) do
+    case create_on_target(target, attrs, ctx) do
       {:ok, task} ->
         Logger.debug("CreateTask: created", id: task.id, title: task.title)
 
@@ -179,13 +264,34 @@ defmodule Magus.Agents.Tools.Plan.CreateTask do
            parent_id: task.parent_id,
            position: task.position,
            assigned_to: assigned_to_label(task)
-         }}
+         }
+         |> put_target_info(target)}
 
       {:error, error} ->
         message = extract_error_message(error)
         Logger.warning("CreateTask: failed - #{message}")
         {:ok, %{error: message}}
     end
+  end
+
+  # Conversation tasks keep the ai_actor (the agent's own plan list, policies
+  # bypass for AI). Page tasks are created AS THE USER so the editor-level
+  # ActorCanAccessTaskPage policy actually gates them. create_plan does not
+  # accept :recurrence — drop it rather than erroring the whole create.
+  defp create_on_target(:conversation, attrs, ctx) do
+    Magus.Plan.create_task(ctx.conversation_id, attrs, actor: ai_actor())
+  end
+
+  defp create_on_target({:page, page, user}, attrs, _ctx) do
+    Magus.Plan.create_plan_task(page.id, Map.drop(attrs, [:recurrence]), actor: user)
+  end
+
+  defp put_target_info(payload, :conversation), do: payload
+
+  defp put_target_info(payload, {:page, page, _user}) do
+    payload
+    |> Map.put(:brain_page_id, page.id)
+    |> Map.put(:page_title, page.title)
   end
 
   # LLMs sometimes JSON-encode the tasks array as a string instead of passing a native array
