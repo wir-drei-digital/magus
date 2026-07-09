@@ -65,10 +65,15 @@ defmodule Magus.SuperBrain.LLMClient.ReqLLM do
 
   # Structured-output schema for `generate_object/4`. ReqLLM converts this to
   # the provider's tool / JSON-schema, so the model returns a validated object
-  # instead of free-form text. `subtype` is optional: the model omits it when
-  # no finer granularity applies. Business rules (confidence floor, ontology
-  # coercion, name clipping, edge-endpoint filtering) are still applied
-  # downstream by `Magus.SuperBrain.Extraction.Sanitizer`.
+  # instead of free-form text. The shape MUST match what
+  # `Magus.SuperBrain.Extraction.parse_and_sanitize/1` expects: Claims v1
+  # made `claims` the extraction unit (edges are derived downstream via
+  # `claims_to_edges/1`); a schema still requesting `edges` makes every real
+  # extraction fail with :unexpected_schema while the mock-based tests pass.
+  # `subtype` is optional: the model omits it when no finer granularity
+  # applies. Business rules (confidence floor, ontology coercion, name
+  # clipping, claim-endpoint filtering) are still applied downstream by
+  # `Magus.SuperBrain.Extraction.Sanitizer`.
   defp extraction_schema do
     entity =
       Zoi.object(%{
@@ -78,17 +83,21 @@ defmodule Magus.SuperBrain.LLMClient.ReqLLM do
         confidence: Zoi.number()
       })
 
-    edge =
+    claim =
       Zoi.object(%{
         subject_name: Zoi.string(),
-        object_name: Zoi.string(),
         predicate: Zoi.string(),
-        confidence: Zoi.number()
+        object_name: Zoi.string(),
+        polarity: Zoi.string(),
+        claim_text: Zoi.string(),
+        confidence: Zoi.number(),
+        valid_from: Zoi.union([Zoi.string(), Zoi.null()]) |> Zoi.optional(),
+        valid_to: Zoi.union([Zoi.string(), Zoi.null()]) |> Zoi.optional()
       })
 
     Zoi.object(%{
       entities: Zoi.array(entity),
-      edges: Zoi.array(edge)
+      claims: Zoi.array(claim)
     })
   end
 
