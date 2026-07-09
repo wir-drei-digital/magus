@@ -70,16 +70,16 @@ defmodule Magus.Knowledge.ConnectTest do
                ~w(google_drive onedrive dropbox notion nextcloud kdrive webdav web)
     end
 
-    for provider <- ~w(webdav) do
-      test "#{provider} parses but fails cleanly while its connector is missing" do
-        user = generate(user())
+    test "webdav parses and reaches its connector, failing credential validation" do
+      user = generate(user())
 
-        result = Connect.connect_and_create(unquote(provider), %{}, actor: user)
+      # With the generic WebDAV connector wired in, an empty auth_config no longer
+      # hits the "Provider not available" guard: it reaches connect/1 and fails on
+      # the missing base_url/credentials, surfaced through friendly_error.
+      result = Connect.connect_and_create("webdav", %{}, actor: user)
 
-        # parse_provider accepts it (not "Unknown provider"); with no connector
-        # clause yet it returns the defensive "Provider not available" guard.
-        assert result == {:error, "Provider not available"}
-      end
+      assert {:error, message} = result
+      refute message == "Provider not available"
     end
 
     test "kdrive parses and reaches its connector, failing credential validation" do
