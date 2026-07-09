@@ -109,6 +109,12 @@ config :magus, :onedrive_api_base_url, "https://graph.microsoft.com/v1.0"
 config :magus, :dropbox_token_url, "https://api.dropboxapi.com/oauth2/token"
 
 # Overridden per-test to a Bypass endpoint; unset in prod so the real URL is used.
+config :magus, :dropbox_api_base_url, "https://api.dropboxapi.com"
+
+# Overridden per-test to a Bypass endpoint; unset in prod so the real URL is used.
+config :magus, :dropbox_content_base_url, "https://content.dropboxapi.com"
+
+# Overridden per-test to a Bypass endpoint; unset in prod so the real URL is used.
 config :magus, :notion_base_url, "https://api.notion.com/v1"
 
 # Overridden per-test to a Bypass endpoint; unset in prod so the real URL is used.
