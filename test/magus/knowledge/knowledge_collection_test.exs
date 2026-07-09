@@ -917,6 +917,119 @@ defmodule Magus.Knowledge.KnowledgeCollectionTest do
     end
   end
 
+  describe "onedrive delta cursor reset falls back to a full listing" do
+    setup do
+      graph = Bypass.open()
+      prev = Application.get_env(:magus, :onedrive_api_base_url)
+      Application.put_env(:magus, :onedrive_api_base_url, "http://localhost:#{graph.port}")
+      on_exit(fn -> Application.put_env(:magus, :onedrive_api_base_url, prev) end)
+      {:ok, graph: graph}
+    end
+
+    test "410 clears the cursor and the fallback diff hard-deletes a vanished file", %{
+      graph: graph
+    } do
+      user = generate(user())
+      Magus.Generators.ensure_workspace_plan(user)
+
+      {:ok, source} =
+        Magus.Knowledge.create_source(
+          %{
+            name: "OD",
+            provider: :onedrive,
+            auth_config: %{"access_token" => "tok", "refresh_token" => "rt"}
+          },
+          actor: user
+        )
+
+      {:ok, _} = Magus.Knowledge.update_source_status(source, %{status: :active}, actor: user)
+
+      {:ok, collection} =
+        Magus.Knowledge.create_collection(
+          source.id,
+          %{name: "Folder", external_id: "coll", external_path: "/coll"},
+          actor: user
+        )
+
+      # A previously-bootstrapped cursor; backdate so should_sync? passes.
+      {:ok, collection} =
+        Magus.Knowledge.update_sync_status(
+          collection,
+          %{
+            sync_status: :synced,
+            sync_cursor: %{
+              "sync_cursor" =>
+                "http://localhost:#{graph.port}/me/drive/items/coll/delta?token=STALE"
+            },
+            last_synced_at: DateTime.add(DateTime.utc_now(), -7200, :second)
+          },
+          authorize?: false
+        )
+
+      # Local file present now but absent from the remote listing below: the
+      # fallback full-listing diff must hard-delete it (the deletion the delta
+      # gap missed).
+      path = "test/#{Ash.UUIDv7.generate()}.txt"
+      {:ok, _} = Magus.Files.Storage.store(path, "stale bytes")
+
+      {:ok, gone_file} =
+        Magus.Files.create_file_from_connector(
+          %{
+            name: "gone.txt",
+            type: :text,
+            mime_type: "text/plain",
+            file_size: 11,
+            file_path: path,
+            knowledge_collection_id: collection.id,
+            external_id: "vanished",
+            external_etag: "e1",
+            external_updated_at: DateTime.utc_now()
+          },
+          actor: user
+        )
+
+      # Delta endpoint: 410 Gone -> {:error, :cursor_reset}.
+      Bypass.stub(graph, "GET", "/me/drive/items/coll/delta", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(410, Jason.encode!(%{"error" => %{"code" => "resyncRequired"}}))
+      end)
+
+      # Fallback listing: one remote item, "vanished" is NOT in it.
+      Bypass.stub(graph, "GET", "/me/drive/items/coll/children", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(
+          200,
+          Jason.encode!(%{
+            "value" => [
+              %{
+                "id" => "kept",
+                "name" => "kept.txt",
+                "cTag" => "c-kept",
+                "lastModifiedDateTime" => "2026-07-09T10:00:00Z",
+                "file" => %{"mimeType" => "text/plain"}
+              }
+            ]
+          })
+        )
+      end)
+
+      Bypass.stub(graph, "GET", "/me/drive/items/kept/content", fn conn ->
+        Plug.Conn.resp(conn, 200, "kept bytes")
+      end)
+
+      Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync.do_incremental_sync(collection)
+
+      reloaded = Ash.get!(Magus.Knowledge.KnowledgeCollection, collection.id, authorize?: false)
+      assert reloaded.sync_status == :synced
+      assert reloaded.sync_cursor == %{}
+
+      # The vanished file was hard-deleted by the fallback diff.
+      assert {:error, _} = Magus.Files.get_file(gone_file.id, authorize?: false)
+    end
+  end
+
   describe "sync hygiene" do
     test "watchdog action resets a stuck syncing collection" do
       user = generate(user())
