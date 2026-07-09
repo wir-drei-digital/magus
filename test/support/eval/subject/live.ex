@@ -22,6 +22,12 @@ defmodule Magus.Eval.Subject.Live do
 
   @impl true
   def reset(ctx) do
+    # Per-case isolation. LongMemEval assumes each question's haystack stands
+    # alone, but user-scoped memories (and the Super Brain state derived from
+    # them) live on the shared eval user and would otherwise accumulate
+    # across cases. Wipe memories, claims, episodes, and the user's graphs.
+    wipe_user_state(ctx.user)
+
     conversation =
       Magus.Generators.generate(
         Magus.Generators.conversation(
@@ -42,6 +48,7 @@ defmodule Magus.Eval.Subject.Live do
       force_extract(ctx, user_text, agent_text)
     end)
 
+    promote_memories_to_user_scope(ctx)
     settle_extraction()
     {:ok, ctx}
   end
@@ -85,6 +92,71 @@ defmodule Magus.Eval.Subject.Live do
 
   defp pair_turns([_other | rest], acc), do: pair_turns(rest, acc)
 
+  # LongMemEval haystacks are PAST sessions: their knowledge belongs in the
+  # durable user tier (what production distills across conversations), not in
+  # the query conversation's local working memory. User scope is also the
+  # only tier the Super Brain ingests (enqueue_super_brain_extraction is a
+  # no-op for :local), so this is what lets an eval run exercise the graph.
+  # The local originals are destroyed so the conversation-local channel does
+  # not double-inject the same content.
+  defp promote_memories_to_user_scope(ctx) do
+    case Magus.Memory.list_memories_for_conversation(ctx.conversation.id, actor: ctx.user) do
+      {:ok, locals} ->
+        Enum.each(locals, fn m ->
+          case Magus.Memory.create_user_memory(
+                 ctx.user.id,
+                 nil,
+                 m.name,
+                 %{summary: m.summary, content: m.content, kind: m.kind},
+                 actor: ctx.user
+               ) do
+            {:ok, _} -> Magus.Memory.destroy_memory(m, actor: ctx.user)
+            {:error, e} -> Logger.warning("promote_memories: create_user failed: #{inspect(e)}")
+          end
+        end)
+
+      other ->
+        Logger.warning("promote_memories: list failed: #{inspect(other)}")
+    end
+  end
+
+  # Wipes the eval user's durable state between cases: user-scoped memories
+  # (destroyed WITHOUT the resource action to avoid enqueueing retraction
+  # jobs against graphs we drop wholesale below), claims, episodes, super
+  # graph rows, and the FalkorDB graphs themselves.
+  defp wipe_user_state(user) do
+    require Ash.Query
+
+    Magus.Memory.Memory
+    |> Ash.Query.filter(user_id == ^user.id and scope in [:user, :agent])
+    |> Ash.bulk_destroy!(:destroy, %{},
+      authorize?: false,
+      return_errors?: false,
+      strategy: [:stream],
+      notify?: false
+    )
+
+    Magus.SuperBrain.Claim
+    |> Ash.Query.filter(source_user_id == ^user.id)
+    |> Ash.bulk_destroy(:destroy, %{}, authorize?: false, return_errors?: false)
+
+    Magus.SuperBrain.Episode
+    |> Ash.Query.filter(source_user_id == ^user.id)
+    |> Ash.bulk_destroy(:destroy, %{}, authorize?: false, return_errors?: false)
+
+    Magus.SuperBrain.SuperGraph
+    |> Ash.Query.filter(user_id == ^user.id)
+    |> Ash.bulk_destroy(:destroy, %{}, authorize?: false, return_errors?: false)
+
+    Magus.Graph.drop("memories:user:#{user.id}")
+    Magus.Graph.drop("super:user:#{user.id}")
+    :ok
+  rescue
+    e ->
+      Logger.warning("Subject.Live wipe_user_state failed: #{Exception.message(e)}")
+      :ok
+  end
+
   # ExtractTurnMemories exposes run/2 (params, context); context is unused, so
   # we pass an empty map. It runs synchronously inline (no Task spawn) and
   # persists memories before returning. Wrap so one failure does not abort ingest.
@@ -109,7 +181,9 @@ defmodule Magus.Eval.Subject.Live do
   # Brain graph build (and its embeddings) are enqueued, so drain them too.
   defp settle_extraction do
     Oban.drain_queue(queue: :memory_extraction)
-    Oban.drain_queue(queue: :super_brain_extraction)
+    # Recursive: ExtractMemory jobs enqueue follow-up graph builds into the
+    # same queue; a plain drain would leave those sitting as available.
+    Oban.drain_queue(queue: :super_brain_extraction, with_recursion: true)
     :ok
   rescue
     e ->
