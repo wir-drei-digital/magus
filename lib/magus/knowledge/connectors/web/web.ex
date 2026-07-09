@@ -222,7 +222,8 @@ defmodule Magus.Knowledge.Connectors.Web do
   The item ID is the normalized URL. The name is taken from
   `metadata["title"]` if present, otherwise derived from the URL path.
   Datetime strings in `metadata["last_modified"]` are parsed to
-  `DateTime.t()` when possible.
+  `DateTime.t()` when possible and also serve as the list-time etag,
+  allowing unchanged pages to be skipped without fetching.
   """
   @spec translate_item(%{url: String.t(), metadata: map()}) :: Magus.Knowledge.Connector.item()
   def translate_item(%{url: url, metadata: metadata}) do
@@ -232,7 +233,7 @@ defmodule Magus.Knowledge.Connectors.Web do
     %{
       id: url,
       name: name,
-      etag: nil,
+      etag: Map.get(metadata, "last_modified"),
       updated_at: updated_at,
       mime_type: "text/markdown",
       metadata: metadata

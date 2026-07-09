@@ -137,6 +137,28 @@ defmodule Magus.Knowledge.Connectors.WebTest do
     end
   end
 
+  describe "translate_item/1 etag" do
+    test "uses last_modified metadata as the list-time etag" do
+      item =
+        Magus.Knowledge.Connectors.Web.translate_item(%{
+          url: "https://example.com/docs/a",
+          metadata: %{"last_modified" => "2026-07-01T00:00:00Z"}
+        })
+
+      assert item.etag == "2026-07-01T00:00:00Z"
+    end
+
+    test "etag stays nil without last_modified" do
+      item =
+        Magus.Knowledge.Connectors.Web.translate_item(%{
+          url: "https://example.com/b",
+          metadata: %{}
+        })
+
+      assert item.etag == nil
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Unsupported callbacks
   # ---------------------------------------------------------------------------

@@ -134,7 +134,8 @@ defmodule Magus.Knowledge.Connectors.Web.IntegrationTest do
       for item <- items do
         assert is_binary(item.id)
         assert is_binary(item.name)
-        assert is_nil(item.etag)
+        # etag is either nil (no last_modified) or a string (with last_modified)
+        assert is_nil(item.etag) or is_binary(item.etag)
         assert item.mime_type == "text/markdown"
       end
     end
@@ -205,7 +206,7 @@ defmodule Magus.Knowledge.Connectors.Web.IntegrationTest do
       assert item.id == "https://example.com/docs/api-reference"
       assert item.name == "API Reference"
       assert item.mime_type == "text/markdown"
-      assert is_nil(item.etag)
+      assert item.etag == "2025-01-20T12:00:00Z"
       assert %DateTime{year: 2025, month: 1, day: 20} = item.updated_at
       assert item.metadata["title"] == "API Reference"
     end
