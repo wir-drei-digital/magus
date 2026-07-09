@@ -70,7 +70,7 @@ defmodule Magus.Knowledge.ConnectTest do
                ~w(google_drive onedrive dropbox notion nextcloud kdrive webdav web)
     end
 
-    for provider <- ~w(dropbox kdrive webdav) do
+    for provider <- ~w(kdrive webdav) do
       test "#{provider} parses but fails cleanly while its connector is missing" do
         user = generate(user())
 
@@ -89,6 +89,18 @@ defmodule Magus.Knowledge.ConnectTest do
       # the "Provider not available" guard: it reaches connect/1 and fails on the
       # missing access token, surfaced through friendly_error.
       result = Connect.connect_and_create("onedrive", %{}, actor: user)
+
+      assert {:error, message} = result
+      refute message == "Provider not available"
+    end
+
+    test "dropbox parses and reaches its connector, failing credential validation" do
+      user = generate(user())
+
+      # With the Dropbox connector wired in, an empty auth_config no longer hits
+      # the "Provider not available" guard: it reaches connect/1 and fails on the
+      # missing access token, surfaced through friendly_error.
+      result = Connect.connect_and_create("dropbox", %{}, actor: user)
 
       assert {:error, message} = result
       refute message == "Provider not available"
