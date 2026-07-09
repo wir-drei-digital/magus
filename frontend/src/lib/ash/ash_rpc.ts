@@ -12976,6 +12976,47 @@ export async function setBillingPreferences(
 }
 
 
+export type UsageLogInput = {
+  range?: string | null;
+  modelName?: string | null;
+  workspace?: string | null;
+  page?: number | null;
+};
+
+export type InferUsageLogResult = Record<string, any>;
+
+export type UsageLogResult = | { success: true; data: InferUsageLogResult; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Execute generic action on MessageUsage
+ *
+ * @ashActionType :action
+ */
+export async function usageLog(
+  config: {
+  tenant?: string;
+  input?: UsageLogInput;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<UsageLogResult> {
+  const payload = {
+    action: "usage_log",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    input: config.input
+  };
+
+  return executeActionRpcRequest<UsageLogResult>(
+    payload,
+    config
+  );
+}
+
+
 export type ActivateWorkbenchTabInput = {
   tabId: string;
 };

@@ -11,6 +11,93 @@ defmodule Magus.Chat.MessageUsageLog do
   require Ash.Query
 
   @period_lookback_days 30
+  @per_page 25
+
+  @doc """
+  Full payload for the SPA settings "Usage" page, built for the
+  `Magus.Usage.MessageUsage.usage_log` generic action. `params` carries the
+  RPC arguments (`:range`, `:model_name`, `:workspace`, `:page`); everything
+  is serialized to JSON-safe values (ISO datetimes, stringified decimals).
+  """
+  def rpc_payload(user, params) do
+    {from, to, label} = resolve_range(params[:range], user)
+
+    filters = %{
+      from: from,
+      to: to,
+      model_name: blank_to_nil(params[:model_name]),
+      workspace: parse_workspace(params[:workspace])
+    }
+
+    page_num = max(params[:page] || 1, 1)
+
+    %{rows: rows, total_count: total_count, total_pages: total_pages} =
+      page(user, filters, page: page_num, per_page: @per_page)
+
+    summary = summary(user, filters)
+
+    %{
+      period_label: to_string(label),
+      page: page_num,
+      per_page: @per_page,
+      total_count: total_count,
+      total_pages: total_pages,
+      summary: %{
+        count: summary.count,
+        total_tokens: summary.total_tokens,
+        total_cost_chf: chf_string(summary.total_cost_chf)
+      },
+      model_options: used_model_names(user),
+      rows: Enum.map(rows, &serialize_row/1)
+    }
+  end
+
+  defp serialize_row(row) do
+    %{
+      id: row.id,
+      inserted_at: DateTime.to_iso8601(row.inserted_at),
+      model_name: row.model_name,
+      usage_type: to_string(row.usage_type),
+      prompt_tokens: row.prompt_tokens,
+      completion_tokens: row.completion_tokens,
+      total_tokens: row.total_tokens,
+      cost_chf: row.total_cost |> usd_to_chf() |> chf_string(),
+      reconciliation_status: to_string(row.reconciliation_status),
+      conversation_id: row.conversation_id,
+      message_id: row.message_id
+    }
+  end
+
+  defp chf_string(%Decimal{} = chf),
+    do: chf |> Decimal.round(4) |> Decimal.to_string(:normal)
+
+  defp blank_to_nil(nil), do: nil
+  defp blank_to_nil(""), do: nil
+  defp blank_to_nil(v), do: v
+
+  defp parse_workspace("personal"), do: :personal
+
+  defp parse_workspace(ws_id) when is_binary(ws_id) and ws_id not in ["", "all"],
+    do: {:workspace, ws_id}
+
+  defp parse_workspace(_), do: :all
+
+  defp resolve_range("7d", _user), do: last_days(7)
+  defp resolve_range("30d", _user), do: last_days(30)
+  defp resolve_range("90d", _user), do: last_days(90)
+  defp resolve_range("all", _user), do: {~U[2000-01-01 00:00:00Z], DateTime.utc_now(), :all_time}
+
+  defp resolve_range("month", _user) do
+    now = DateTime.utc_now()
+    start = %{now | day: 1, hour: 0, minute: 0, second: 0, microsecond: {0, 6}}
+    {start, now, :this_month}
+  end
+
+  # "current_period" and anything unrecognized fall back to the default window.
+  defp resolve_range(_other, user), do: default_period(user)
+
+  defp last_days(n),
+    do: {DateTime.add(DateTime.utc_now(), -n, :day), DateTime.utc_now(), :"last_#{n}_days"}
 
   @doc """
   The default time window for a user: their Stripe billing cycle when present,

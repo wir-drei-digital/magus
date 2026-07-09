@@ -129,4 +129,73 @@ defmodule Magus.Chat.MessageUsageLogTest do
       assert MessageUsageLog.used_model_names(user) == ["Zeta"]
     end
   end
+
+  describe "usage_log action (SPA settings Usage page)" do
+    defp run_usage_log(actor, args) do
+      Magus.Usage.MessageUsage
+      |> Ash.ActionInput.for_action(:usage_log, args, actor: actor)
+      |> Ash.run_action!()
+    end
+
+    test "returns a JSON-safe payload scoped to the caller" do
+      user = generate(user())
+      other = generate(user())
+      model = generate(model(name: "Alpha"))
+      conv = generate(conversation(actor: user))
+      other_conv = generate(conversation(actor: other))
+
+      create_usage_record(user, model,
+        conversation_id: conv.id,
+        billable: true,
+        total_tokens: 200,
+        total_cost: Decimal.new("0.10")
+      )
+
+      create_usage_record(other, model, conversation_id: other_conv.id, billable: true)
+
+      payload = run_usage_log(user, %{range: "30d"})
+
+      assert payload.total_count == 1
+      assert payload.total_pages == 1
+      assert payload.period_label == "last_30_days"
+      assert payload.model_options == ["Alpha"]
+      assert payload.summary.count == 1
+      assert payload.summary.total_tokens == 200
+      # FX defaults to 1.0 in test, and the payload stringifies decimals.
+      assert payload.summary.total_cost_chf == "0.1000"
+
+      assert [row] = payload.rows
+      assert row.model_name == "Alpha"
+      assert row.conversation_id == conv.id
+      assert row.cost_chf == "0.1000"
+      assert {:ok, _, _} = DateTime.from_iso8601(row.inserted_at)
+      assert row.usage_type == "response"
+    end
+
+    test "applies model and workspace filters from RPC-style string args" do
+      user = generate(user())
+      model_a = generate(model(name: "Model A"))
+      model_b = generate(model(name: "Model B"))
+      ws = generate(workspace(actor: user))
+      conv_personal = generate(conversation(actor: user))
+      conv_ws = generate(conversation(actor: user, workspace_id: ws.id))
+
+      create_usage_record(user, model_a, conversation_id: conv_personal.id, billable: true)
+      create_usage_record(user, model_b, conversation_id: conv_ws.id, billable: true)
+
+      assert run_usage_log(user, %{range: "7d"}).total_count == 2
+      assert run_usage_log(user, %{range: "7d", model_name: "Model A"}).total_count == 1
+      assert run_usage_log(user, %{range: "7d", workspace: "personal"}).total_count == 1
+      assert run_usage_log(user, %{range: "7d", workspace: ws.id}).total_count == 1
+      assert run_usage_log(user, %{range: "7d", workspace: "all"}).total_count == 2
+    end
+
+    test "is forbidden without an actor" do
+      assert_raise Ash.Error.Forbidden, fn ->
+        Magus.Usage.MessageUsage
+        |> Ash.ActionInput.for_action(:usage_log, %{})
+        |> Ash.run_action!()
+      end
+    end
+  end
 end

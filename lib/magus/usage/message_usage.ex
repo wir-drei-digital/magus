@@ -11,7 +11,8 @@ defmodule Magus.Usage.MessageUsage do
     otp_app: :magus,
     domain: Magus.Usage,
     data_layer: AshPostgres.DataLayer,
-    authorizers: [Ash.Policy.Authorizer]
+    authorizers: [Ash.Policy.Authorizer],
+    extensions: [AshTypescript.Resource]
 
   postgres do
     table "message_usages"
@@ -23,6 +24,10 @@ defmodule Magus.Usage.MessageUsage do
       reference :conversation, on_delete: :nilify
       reference :model, on_delete: :nilify
     end
+  end
+
+  typescript do
+    type_name "MessageUsage"
   end
 
   actions do
@@ -145,12 +150,31 @@ defmodule Magus.Usage.MessageUsage do
       accept []
       change set_attribute(:reconciliation_status, :unavailable)
     end
+
+    action :usage_log, :map do
+      description "Paged, filterable log of the caller's billable usage rows (settings Usage page)."
+
+      argument :range, :string, default: "current_period"
+      argument :model_name, :string, allow_nil?: true
+      argument :workspace, :string, allow_nil?: true
+      argument :page, :integer, default: 1
+
+      run fn input, context ->
+        {:ok, Magus.Chat.MessageUsageLog.rpc_payload(context.actor, input.arguments)}
+      end
+    end
   end
 
   policies do
     policy action_type(:read) do
       authorize_if expr(user_id == ^actor(:id))
       authorize_if Magus.Checks.IsAdmin
+    end
+
+    # The log payload re-reads MessageUsage with `actor:`, so the read policy
+    # above scopes the rows; the action itself only needs a signed-in caller.
+    policy action(:usage_log) do
+      authorize_if actor_present()
     end
 
     # Usage rows are written exclusively by server-side recorders via

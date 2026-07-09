@@ -28,6 +28,11 @@ defmodule Magus.Usage do
       rpc_action :billing_overview, :billing_overview
       rpc_action :set_billing_preferences, :set_billing_preferences
     end
+
+    # Settings → Usage: paged log of the caller's billable usage rows.
+    resource Magus.Usage.MessageUsage do
+      rpc_action :usage_log, :usage_log
+    end
   end
 
   resources do

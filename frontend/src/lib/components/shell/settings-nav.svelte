@@ -11,6 +11,7 @@
 		KeyRound,
 		Key,
 		Plug,
+		ReceiptText,
 		Server,
 		Shield,
 		SlidersHorizontal,
@@ -26,7 +27,8 @@
 			items: [
 				{ id: 'profile', label: 'Profile', icon: User },
 				{ id: 'preferences', label: 'Preferences', icon: SlidersHorizontal },
-				{ id: 'subscription', label: 'Subscription', icon: CreditCard }
+				{ id: 'subscription', label: 'Subscription', icon: CreditCard },
+				{ id: 'usage', label: 'Usage', icon: ReceiptText }
 			]
 		},
 		{

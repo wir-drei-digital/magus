@@ -1895,6 +1895,84 @@ export type UserSubscriptionAttributesOnlySchema = {
 };
 
 
+// MessageUsage Schema
+export type MessageUsageResourceSchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "modelName" | "provider" | "usageType" | "promptTokens" | "completionTokens" | "totalTokens" | "reasoningTokens" | "audioTokens" | "acceptedPredictionTokens" | "rejectedPredictionTokens" | "cachedTokens" | "cacheWriteTokens" | "promptAudioTokens" | "videoTokens" | "videoDuration" | "inputCost" | "outputCost" | "totalCost" | "providerCost" | "finishReason" | "billable" | "actionName" | "providerGenerationId" | "reconciledAt" | "reconciliationStatus" | "userId" | "messageId" | "conversationId" | "modelId";
+  id: UUIDv7;
+  modelName: string;
+  provider: string | null;
+  usageType: "embedding" | "image_generation" | "response" | "search" | "super_brain_extraction" | "tool_call" | "video_generation" | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  reasoningTokens: number | null;
+  audioTokens: number | null;
+  acceptedPredictionTokens: number | null;
+  rejectedPredictionTokens: number | null;
+  cachedTokens: number | null;
+  cacheWriteTokens: number | null;
+  promptAudioTokens: number | null;
+  videoTokens: number | null;
+  videoDuration: Decimal | null;
+  inputCost: Decimal | null;
+  outputCost: Decimal | null;
+  totalCost: Decimal | null;
+  providerCost: Decimal | null;
+  finishReason: string | null;
+  billable: boolean | null;
+  actionName: string | null;
+  providerGenerationId: string | null;
+  reconciledAt: UtcDateTimeUsec | null;
+  reconciliationStatus: "not_required" | "pending" | "reconciled" | "unavailable";
+  userId: UUID | null;
+  messageId: UUID | null;
+  conversationId: UUID | null;
+  modelId: UUID | null;
+  user: { __type: "Relationship"; __resource: UserResourceSchema | null; };
+  message: { __type: "Relationship"; __resource: MessageResourceSchema | null; };
+  conversation: { __type: "Relationship"; __resource: ConversationResourceSchema | null; };
+  model: { __type: "Relationship"; __resource: ModelResourceSchema | null; };
+};
+
+
+
+export type MessageUsageAttributesOnlySchema = {
+  __type: "Resource";
+  __primitiveFields: "id" | "modelName" | "provider" | "usageType" | "promptTokens" | "completionTokens" | "totalTokens" | "reasoningTokens" | "audioTokens" | "acceptedPredictionTokens" | "rejectedPredictionTokens" | "cachedTokens" | "cacheWriteTokens" | "promptAudioTokens" | "videoTokens" | "videoDuration" | "inputCost" | "outputCost" | "totalCost" | "providerCost" | "finishReason" | "billable" | "actionName" | "providerGenerationId" | "reconciledAt" | "reconciliationStatus" | "userId" | "messageId" | "conversationId" | "modelId";
+  id: UUIDv7;
+  modelName: string;
+  provider: string | null;
+  usageType: "embedding" | "image_generation" | "response" | "search" | "super_brain_extraction" | "tool_call" | "video_generation" | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  reasoningTokens: number | null;
+  audioTokens: number | null;
+  acceptedPredictionTokens: number | null;
+  rejectedPredictionTokens: number | null;
+  cachedTokens: number | null;
+  cacheWriteTokens: number | null;
+  promptAudioTokens: number | null;
+  videoTokens: number | null;
+  videoDuration: Decimal | null;
+  inputCost: Decimal | null;
+  outputCost: Decimal | null;
+  totalCost: Decimal | null;
+  providerCost: Decimal | null;
+  finishReason: string | null;
+  billable: boolean | null;
+  actionName: string | null;
+  providerGenerationId: string | null;
+  reconciledAt: UtcDateTimeUsec | null;
+  reconciliationStatus: "not_required" | "pending" | "reconciled" | "unavailable";
+  userId: UUID | null;
+  messageId: UUID | null;
+  conversationId: UUID | null;
+  modelId: UUID | null;
+};
+
+
 // TabSession Schema
 export type TabSessionResourceSchema = {
   __type: "Resource";
@@ -6578,6 +6656,295 @@ export type UserSubscriptionFilterInput = {
 
 
 };
+export type MessageUsageFilterInput = {
+  and?: Array<MessageUsageFilterInput>;
+  or?: Array<MessageUsageFilterInput>;
+  not?: Array<MessageUsageFilterInput>;
+
+  id?: {
+    eq?: UUIDv7;
+    notEq?: UUIDv7;
+    in?: Array<UUIDv7>;
+  };
+
+  modelName?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+  };
+
+  provider?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  usageType?: {
+    eq?: "embedding" | "image_generation" | "response" | "search" | "super_brain_extraction" | "tool_call" | "video_generation";
+    notEq?: "embedding" | "image_generation" | "response" | "search" | "super_brain_extraction" | "tool_call" | "video_generation";
+    in?: Array<"embedding" | "image_generation" | "response" | "search" | "super_brain_extraction" | "tool_call" | "video_generation">;
+    isNil?: boolean;
+  };
+
+  promptTokens?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  completionTokens?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  totalTokens?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  reasoningTokens?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  audioTokens?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  acceptedPredictionTokens?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  rejectedPredictionTokens?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  cachedTokens?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  cacheWriteTokens?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  promptAudioTokens?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  videoTokens?: {
+    eq?: number;
+    notEq?: number;
+    greaterThan?: number;
+    greaterThanOrEqual?: number;
+    lessThan?: number;
+    lessThanOrEqual?: number;
+    in?: Array<number>;
+    isNil?: boolean;
+  };
+
+  videoDuration?: {
+    eq?: Decimal;
+    notEq?: Decimal;
+    greaterThan?: Decimal;
+    greaterThanOrEqual?: Decimal;
+    lessThan?: Decimal;
+    lessThanOrEqual?: Decimal;
+    in?: Array<Decimal>;
+    isNil?: boolean;
+  };
+
+  inputCost?: {
+    eq?: Decimal;
+    notEq?: Decimal;
+    greaterThan?: Decimal;
+    greaterThanOrEqual?: Decimal;
+    lessThan?: Decimal;
+    lessThanOrEqual?: Decimal;
+    in?: Array<Decimal>;
+    isNil?: boolean;
+  };
+
+  outputCost?: {
+    eq?: Decimal;
+    notEq?: Decimal;
+    greaterThan?: Decimal;
+    greaterThanOrEqual?: Decimal;
+    lessThan?: Decimal;
+    lessThanOrEqual?: Decimal;
+    in?: Array<Decimal>;
+    isNil?: boolean;
+  };
+
+  totalCost?: {
+    eq?: Decimal;
+    notEq?: Decimal;
+    greaterThan?: Decimal;
+    greaterThanOrEqual?: Decimal;
+    lessThan?: Decimal;
+    lessThanOrEqual?: Decimal;
+    in?: Array<Decimal>;
+    isNil?: boolean;
+  };
+
+  providerCost?: {
+    eq?: Decimal;
+    notEq?: Decimal;
+    greaterThan?: Decimal;
+    greaterThanOrEqual?: Decimal;
+    lessThan?: Decimal;
+    lessThanOrEqual?: Decimal;
+    in?: Array<Decimal>;
+    isNil?: boolean;
+  };
+
+  finishReason?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  billable?: {
+    eq?: boolean;
+    notEq?: boolean;
+    isNil?: boolean;
+  };
+
+  actionName?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  providerGenerationId?: {
+    eq?: string;
+    notEq?: string;
+    in?: Array<string>;
+    isNil?: boolean;
+  };
+
+  reconciledAt?: {
+    eq?: UtcDateTimeUsec;
+    notEq?: UtcDateTimeUsec;
+    greaterThan?: UtcDateTimeUsec;
+    greaterThanOrEqual?: UtcDateTimeUsec;
+    lessThan?: UtcDateTimeUsec;
+    lessThanOrEqual?: UtcDateTimeUsec;
+    in?: Array<UtcDateTimeUsec>;
+    isNil?: boolean;
+  };
+
+  reconciliationStatus?: {
+    eq?: "not_required" | "pending" | "reconciled" | "unavailable";
+    notEq?: "not_required" | "pending" | "reconciled" | "unavailable";
+    in?: Array<"not_required" | "pending" | "reconciled" | "unavailable">;
+  };
+
+  userId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+  messageId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+  conversationId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+  modelId?: {
+    eq?: UUID;
+    notEq?: UUID;
+    in?: Array<UUID>;
+    isNil?: boolean;
+  };
+
+
+  user?: UserFilterInput;
+
+  message?: MessageFilterInput;
+
+  conversation?: ConversationFilterInput;
+
+  model?: ModelFilterInput;
+
+};
 export type TabSessionFilterInput = {
   and?: Array<TabSessionFilterInput>;
   or?: Array<TabSessionFilterInput>;
@@ -7124,6 +7491,9 @@ export type SkillTrustFilterField = (typeof skillTrustFilterFields)[number];
 export const userSubscriptionFilterFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
 export type UserSubscriptionFilterField = (typeof userSubscriptionFilterFields)[number];
 
+export const messageUsageFilterFields = ["id", "modelName", "provider", "usageType", "promptTokens", "completionTokens", "totalTokens", "reasoningTokens", "audioTokens", "acceptedPredictionTokens", "rejectedPredictionTokens", "cachedTokens", "cacheWriteTokens", "promptAudioTokens", "videoTokens", "videoDuration", "inputCost", "outputCost", "totalCost", "providerCost", "finishReason", "billable", "actionName", "providerGenerationId", "reconciledAt", "reconciliationStatus", "userId", "messageId", "conversationId", "modelId", "user", "message", "conversation", "model"] as const;
+export type MessageUsageFilterField = (typeof messageUsageFilterFields)[number];
+
 export const tabSessionFilterFields = ["id", "mode", "navFilter", "tabs", "activeTabId"] as const;
 export type TabSessionFilterField = (typeof tabSessionFilterFields)[number];
 
@@ -7289,6 +7659,9 @@ export type SkillTrustSortField = (typeof skillTrustSortFields)[number];
 
 export const userSubscriptionSortFields = ["id", "status", "lastPaymentStatus", "storageUsageBytes", "billingInterval", "periodUsageCents", "monthlySpendCapCents", "noSpendCap"] as const;
 export type UserSubscriptionSortField = (typeof userSubscriptionSortFields)[number];
+
+export const messageUsageSortFields = ["id", "modelName", "provider", "usageType", "promptTokens", "completionTokens", "totalTokens", "reasoningTokens", "audioTokens", "acceptedPredictionTokens", "rejectedPredictionTokens", "cachedTokens", "cacheWriteTokens", "promptAudioTokens", "videoTokens", "videoDuration", "inputCost", "outputCost", "totalCost", "providerCost", "finishReason", "billable", "actionName", "providerGenerationId", "reconciledAt", "reconciliationStatus", "userId", "messageId", "conversationId", "modelId"] as const;
+export type MessageUsageSortField = (typeof messageUsageSortFields)[number];
 
 export const tabSessionSortFields = ["id", "mode", "navFilter", "tabs", "activeTabId"] as const;
 export type TabSessionSortField = (typeof tabSessionSortFields)[number];

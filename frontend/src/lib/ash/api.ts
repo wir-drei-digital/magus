@@ -4550,6 +4550,100 @@ export async function setBillingPreferences(input: {
 	return { success: true, data: toBillingOverview(result.data ?? {}) };
 }
 
+// ─── Usage log (settings → Usage) ────────────────────────────────────────────
+
+export type UsageLogRange = 'current_period' | '7d' | '30d' | '90d' | 'month' | 'all';
+
+/** One billable MessageUsage row for the settings Usage table. */
+export type UsageLogRow = {
+	id: string;
+	insertedAt: string;
+	modelName: string;
+	usageType: string;
+	promptTokens: number;
+	completionTokens: number;
+	totalTokens: number;
+	/** Row cost converted to CHF server-side, as a decimal string (4 dp). */
+	costChf: string;
+	/** 'pending' rows are provisional, awaiting provider reconciliation. */
+	reconciliationStatus: string;
+	conversationId: string | null;
+	messageId: string | null;
+};
+
+export type UsageLog = {
+	/** Server-resolved window label, e.g. 'billing_period' | 'last_30_days'. */
+	periodLabel: string;
+	page: number;
+	perPage: number;
+	totalCount: number;
+	totalPages: number;
+	summary: { count: number; totalTokens: number; totalCostChf: string };
+	/** Distinct model names in the caller's billable usage, for the filter. */
+	modelOptions: string[];
+	rows: UsageLogRow[];
+};
+
+export type UsageLogFilters = {
+	range: UsageLogRange;
+	modelName: string | null;
+	/** 'all' | 'personal' | workspace id */
+	workspace: string;
+	page: number;
+};
+
+/**
+ * Paged, filterable log of the caller's billable usage rows. Generic map
+ * action → untyped snake_case keys; map them to a typed shape as
+ * `billingOverview` does.
+ */
+export async function usageLog(filters: UsageLogFilters): Promise<RpcResult<UsageLog>> {
+	const result = await run<Record<string, unknown> | null>((opts) =>
+		rpc.usageLog({
+			input: {
+				range: filters.range,
+				modelName: filters.modelName,
+				workspace: filters.workspace,
+				page: filters.page
+			},
+			...opts
+		})
+	);
+	if (!result.success) return result;
+	const data = result.data ?? {};
+	const summary = (data.summary ?? {}) as Record<string, unknown>;
+	const rows = Array.isArray(data.rows) ? (data.rows as Record<string, unknown>[]) : [];
+	return {
+		success: true,
+		data: {
+			periodLabel: String(data.period_label ?? ''),
+			page: Number(data.page ?? 1),
+			perPage: Number(data.per_page ?? 25),
+			totalCount: Number(data.total_count ?? 0),
+			totalPages: Number(data.total_pages ?? 1),
+			summary: {
+				count: Number(summary.count ?? 0),
+				totalTokens: Number(summary.total_tokens ?? 0),
+				totalCostChf: String(summary.total_cost_chf ?? '0')
+			},
+			modelOptions: Array.isArray(data.model_options) ? data.model_options.map(String) : [],
+			rows: rows.map((row) => ({
+				id: String(row.id ?? ''),
+				insertedAt: String(row.inserted_at ?? ''),
+				modelName: String(row.model_name ?? ''),
+				usageType: String(row.usage_type ?? ''),
+				promptTokens: Number(row.prompt_tokens ?? 0),
+				completionTokens: Number(row.completion_tokens ?? 0),
+				totalTokens: Number(row.total_tokens ?? 0),
+				costChf: String(row.cost_chf ?? '0'),
+				reconciliationStatus: String(row.reconciliation_status ?? 'not_required'),
+				conversationId: typeof row.conversation_id === 'string' ? row.conversation_id : null,
+				messageId: typeof row.message_id === 'string' ? row.message_id : null
+			}))
+		}
+	};
+}
+
 /** POST to a Stripe controller endpoint (session-cookie auth, no CSRF) and
  *  redirect to the returned Stripe URL. Returns false if it couldn't start. */
 async function stripeRedirect(path: string, body: Record<string, unknown>): Promise<boolean> {

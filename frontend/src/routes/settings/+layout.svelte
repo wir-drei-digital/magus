@@ -14,6 +14,7 @@
 		memory: 'Memory',
 		providers: 'Providers',
 		subscription: 'Subscription',
+		usage: 'Usage',
 		integrations: 'Integrations',
 		knowledge: 'Knowledge',
 		storage: 'Storage',
