@@ -29,6 +29,20 @@ defmodule Magus.Eval.Harness do
   def setup(_opts \\ []) do
     Application.put_env(:magus, :llm_client, Magus.Agents.Clients.LLM)
 
+    # The test env mocks the Super Brain extraction LLM and embedder so unit
+    # tests stay offline; an eval run must exercise the real pipeline or the
+    # graphs and claims built during ingest are mock artifacts and the
+    # super_brain context block injects noise. Swap both to the production
+    # modules, mirroring the chat-client swap above.
+    Application.put_env(:magus, :super_brain_llm_client, Magus.SuperBrain.LLMClient.ReqLLM)
+    Application.put_env(:magus, :super_brain_embedder, Magus.Embeddings.OpenAIEmbedder)
+
+    Application.put_env(
+      :magus,
+      :super_brain_extraction_embedder,
+      Magus.Embeddings.OpenAIBatchEmbedder
+    )
+
     store = {Magus.Agents.Persistence.PostgresStore, []}
 
     case Process.whereis(:conversations) do

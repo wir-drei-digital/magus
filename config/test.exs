@@ -77,8 +77,12 @@ config :magus, :provider_usage_fetcher, Magus.Test.StubProviderUsage
 
 # Super Brain stays enabled in tests so the feature suite exercises the real
 # code paths (the kill switch itself is covered by dedicated tests that flip
-# this per-test).
-config :magus, :super_brain_enabled, true
+# this per-test). The env override exists for eval A/B runs:
+# SUPER_BRAIN_ENABLED=false gives `mix magus.eval` a baseline arm without
+# code changes.
+config :magus,
+       :super_brain_enabled,
+       System.get_env("SUPER_BRAIN_ENABLED", "true") in ~w(true 1 yes)
 
 # Use mock SuperBrain LLM client in tests
 config :magus, :super_brain_llm_client, Magus.SuperBrain.LLMMock
