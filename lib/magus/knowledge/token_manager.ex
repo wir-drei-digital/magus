@@ -23,8 +23,11 @@ defmodule Magus.Knowledge.TokenManager do
   # Refresh when the access token expires within this window.
   @refresh_skew_seconds 300
 
+  # Providers with an OAuth refresh-token flow handled by `Magus.Knowledge.OAuth`.
+  @refreshable [:google_drive, :onedrive, :dropbox]
+
   @doc "Returns the source with a valid access token, or `{:error, :reauth_required}`."
-  def ensure_fresh(%{provider: :google_drive} = source) do
+  def ensure_fresh(%{provider: provider} = source) when provider in @refreshable do
     auth = source.auth_config || %{}
     refresh_token = auth["refresh_token"]
 
@@ -64,7 +67,7 @@ defmodule Magus.Knowledge.TokenManager do
   end
 
   defp do_refresh(source, refresh_token) do
-    case OAuth.refresh_google_token(refresh_token) do
+    case OAuth.refresh_token(source.provider, refresh_token) do
       {:ok, new_auth} ->
         persist(source, new_auth)
 

@@ -100,6 +100,12 @@ config :magus, Magus.Sandbox, provider: :test
 config :magus, :google_token_url, "https://oauth2.googleapis.com/token"
 
 # Overridden per-test to a Bypass endpoint; unset in prod so the real URL is used.
+config :magus, :onedrive_token_url, "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+
+# Overridden per-test to a Bypass endpoint; unset in prod so the real URL is used.
+config :magus, :dropbox_token_url, "https://api.dropboxapi.com/oauth2/token"
+
+# Overridden per-test to a Bypass endpoint; unset in prod so the real URL is used.
 config :magus, :notion_base_url, "https://api.notion.com/v1"
 
 # Overridden per-test to a Bypass endpoint; unset in prod so the real URL is used.

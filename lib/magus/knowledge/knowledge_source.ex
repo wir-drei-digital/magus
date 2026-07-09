@@ -155,6 +155,7 @@ defmodule Magus.Knowledge.KnowledgeSource do
       constraints one_of: [
                     :google_drive,
                     :onedrive,
+                    :dropbox,
                     :nextcloud,
                     :notion,
                     :confluence,
