@@ -12,7 +12,7 @@ defmodule Magus.Knowledge.Connect do
   alias Magus.Knowledge.Connector
 
   # The providers the connect wizard supports (a subset of the source provider
-  # enum — the others have no Connector implementation).
+  # enum: the others have no Connector implementation).
   @providers ~w(google_drive notion nextcloud web)
 
   @doc "Provider keys the connect wizard supports."
