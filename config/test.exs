@@ -103,6 +103,9 @@ config :magus, :google_token_url, "https://oauth2.googleapis.com/token"
 config :magus, :onedrive_token_url, "https://login.microsoftonline.com/common/oauth2/v2.0/token"
 
 # Overridden per-test to a Bypass endpoint; unset in prod so the real URL is used.
+config :magus, :onedrive_api_base_url, "https://graph.microsoft.com/v1.0"
+
+# Overridden per-test to a Bypass endpoint; unset in prod so the real URL is used.
 config :magus, :dropbox_token_url, "https://api.dropboxapi.com/oauth2/token"
 
 # Overridden per-test to a Bypass endpoint; unset in prod so the real URL is used.
