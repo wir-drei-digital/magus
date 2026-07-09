@@ -67,7 +67,7 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers do
   deletion still goes through `:soft_delete` and the trash.
   """
   def delete_remote_gone_file(file) do
-    case Magus.Files.destroy_file(file, authorize?: false) do
+    case Magus.Files.delete_file(file, authorize?: false) do
       :ok ->
         :ok
 
