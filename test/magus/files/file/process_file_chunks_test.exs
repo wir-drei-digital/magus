@@ -98,4 +98,51 @@ defmodule Magus.Files.File.ProcessFileChunksTest do
     assert chunk_count(file.id) == first,
            "expected reprocess to replace chunks, not duplicate them"
   end
+
+  test "an embedding API failure is transient: flagged for retry, then succeeds" do
+    user = generate(user())
+    Magus.Generators.ensure_workspace_plan(user)
+    file = stored_text_file(user, "text that will fail to embed the first time")
+
+    # Route embeddings to a dead port for the first attempt.
+    dead = Bypass.open()
+    Bypass.down(dead)
+    prev = Application.get_env(:magus, :openrouter_embeddings_url)
+
+    Application.put_env(
+      :magus,
+      :openrouter_embeddings_url,
+      "http://localhost:#{dead.port}/embeddings"
+    )
+
+    {:ok, _} = Ash.update(file, %{}, action: :process, authorize?: false)
+
+    failed = Magus.Files.get_file!(file.id, authorize?: false)
+    assert failed.status == :error
+    assert failed.transient_error == true
+    assert failed.processing_attempts == 1
+
+    # Restore the working fake and reprocess manually (what the cron trigger does).
+    Application.put_env(:magus, :openrouter_embeddings_url, prev)
+    {:ok, _} = Magus.Files.reprocess_file(failed, authorize?: false)
+    # reprocess sets :pending and enqueues; in tests run the action inline:
+    pending = Magus.Files.get_file!(file.id, authorize?: false)
+    {:ok, _} = Ash.update(pending, %{}, action: :process, authorize?: false)
+
+    recovered = Magus.Files.get_file!(file.id, authorize?: false)
+    assert recovered.status == :ready
+    assert recovered.transient_error == false
+  end
+
+  test "an empty document is a permanent failure: no retry flag" do
+    user = generate(user())
+    Magus.Generators.ensure_workspace_plan(user)
+    file = stored_text_file(user, "   ")
+
+    {:ok, _} = Ash.update(file, %{}, action: :process, authorize?: false)
+
+    failed = Magus.Files.get_file!(file.id, authorize?: false)
+    assert failed.status == :error
+    assert failed.transient_error == false
+  end
 end

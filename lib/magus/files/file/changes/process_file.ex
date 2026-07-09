@@ -21,12 +21,12 @@ defmodule Magus.Files.File.Changes.ProcessFile do
       update_status(file, :processing)
 
       result =
-        with {:ok, content} <- get_file_content(file),
-             {:ok, text} <- extract_text(file, content),
-             {:ok, chunks} <- chunk_text(text),
-             {:ok, _} <- create_chunks_with_embeddings(file, chunks) do
+        with {:ok, content} <- classify(:transient, get_file_content(file)),
+             {:ok, text} <- classify(:permanent, extract_text(file, content)),
+             {:ok, chunks} <- classify(:permanent, chunk_text(text)),
+             {:ok, _} <- classify(:transient, create_chunks_with_embeddings(file, chunks)) do
           # Update file to ready
-          update_status(file, :ready, %{chunk_count: length(chunks)})
+          update_status(file, :ready, %{chunk_count: length(chunks), transient_error: false})
 
           Logger.info("Successfully processed file #{file.id} with #{length(chunks)} chunks")
 
@@ -37,16 +37,35 @@ defmodule Magus.Files.File.Changes.ProcessFile do
         {:ok, changeset} ->
           changeset
 
-        {:error, reason} ->
+        {:error, {class, reason}} ->
           error_message = format_error(reason)
-          Logger.error("File processing failed for #{file.id}: #{error_message}")
-          update_status(file, :error, %{error_message: error_message})
-          # Return the changeset without adding an error so the Oban job
-          # succeeds and doesn't retry. The file status is already set to :error.
+          Logger.error("File processing failed for #{file.id} (#{class}): #{error_message}")
+
+          extra =
+            case class do
+              :transient ->
+                %{
+                  error_message: error_message,
+                  transient_error: true,
+                  processing_attempts: (file.processing_attempts || 0) + 1
+                }
+
+              :permanent ->
+                %{error_message: error_message, transient_error: false}
+            end
+
+          update_status(file, :error, extra)
+          # No changeset error on purpose: the Oban job must succeed. Retries
+          # happen via the retry_transient_processing cron, bounded by
+          # processing_attempts.
           changeset
       end
     end)
   end
+
+  defp classify(_class, {:ok, _} = ok), do: ok
+  defp classify(_class, {:ok, _, _} = ok), do: ok
+  defp classify(class, {:error, reason}), do: {:error, {class, reason}}
 
   defp get_file_content(file) do
     Storage.get(file.file_path)

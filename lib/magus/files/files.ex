@@ -72,6 +72,7 @@ defmodule Magus.Files do
       define :my_files, action: :my_files
       define :update_file, action: :update
       define :update_file_status, action: :update_status
+      define :reprocess_file, action: :reprocess
       define :move_file_to_context, action: :move_to_context
       define :replace_file_content, action: :replace_content, args: [:binary]
       define :delete_file, action: :destroy

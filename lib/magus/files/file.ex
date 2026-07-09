@@ -25,6 +25,15 @@ defmodule Magus.Files.File do
         scheduler_module_name Magus.Files.File.Schedulers.ProcessFile
         where expr(status == :pending)
       end
+
+      trigger :retry_transient_processing do
+        action :reprocess
+        queue :file_processing
+        scheduler_cron "*/30 * * * *"
+        where expr(status == :error and transient_error == true and processing_attempts < 4)
+        worker_module_name Magus.Files.File.Workers.RetryTransientProcessing
+        scheduler_module_name Magus.Files.File.Schedulers.RetryTransientProcessing
+      end
     end
   end
 
@@ -335,7 +344,7 @@ defmodule Magus.Files.File do
     end
 
     update :update_status do
-      accept [:status, :error_message, :chunk_count]
+      accept [:status, :error_message, :chunk_count, :transient_error, :processing_attempts]
       require_atomic? false
       change Magus.Files.File.Changes.BroadcastWorkspaceEvent
     end
@@ -608,6 +617,14 @@ defmodule Magus.Files.File do
       change Magus.Files.File.Changes.ProcessFile
       change Magus.Files.File.Changes.BroadcastWorkspaceEvent
     end
+
+    update :reprocess do
+      description "Manually or automatically re-run processing for a failed file."
+      require_atomic? false
+      change set_attribute(:status, :pending)
+      change set_attribute(:transient_error, false)
+      change run_oban_trigger(:process_file)
+    end
   end
 
   policies do
@@ -786,6 +803,21 @@ defmodule Magus.Files.File do
     attribute :chunk_count, :integer do
       default 0
       public? true
+    end
+
+    attribute :processing_attempts, :integer do
+      allow_nil? false
+      default 0
+      public? false
+      description "Transient processing failures so far; bounds the automatic retry cron."
+    end
+
+    attribute :transient_error, :boolean do
+      allow_nil? false
+      default false
+      public? false
+
+      description "Last processing failure was transient (storage/embedding); eligible for auto-retry."
     end
 
     attribute :external_id, :string do
