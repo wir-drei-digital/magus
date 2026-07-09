@@ -10,7 +10,7 @@ defmodule Magus.Knowledge.Connectors.Onedrive do
       %{"access_token" => "EwB…", "refresh_token" => "M.C5…"}
 
   Obtain tokens via OAuth2 against the Microsoft identity platform with the
-  `Files.Read.All offline_access` scopes. Token refresh (including Microsoft's
+  `Files.Read offline_access` scopes. Token refresh (including Microsoft's
   refresh-token rotation) is handled proactively by `Magus.Knowledge.TokenManager`
   through `Magus.Knowledge.OAuth.refresh_token/2` before each sync job, so this
   connector only carries a short-lived `Bearer` access token.
@@ -215,7 +215,11 @@ defmodule Magus.Knowledge.Connectors.Onedrive do
             {:ok, new_acc |> Enum.reverse() |> List.flatten(), body["@odata.deltaLink"]}
 
           true ->
-            {:ok, new_acc |> Enum.reverse() |> List.flatten(), url}
+            # Malformed terminal page: a well-formed Graph delta feed always
+            # ends with a deltaLink, so neither link present means we cannot
+            # trust `url` as a cursor. Self-heal via the reset contract rather
+            # than persisting a bad cursor.
+            {:error, :cursor_reset}
         end
 
       {:error, {:graph_api_error, 410, _body}} ->
