@@ -5,6 +5,7 @@ defmodule Magus.Files.File.Changes.ProcessFile do
   """
 
   use Ash.Resource.Change
+  require Ash.Query
   require Logger
 
   alias Magus.Files.{Storage, Extractor, Chunker, EmbeddingModel, FileAnalyzer}
@@ -92,6 +93,14 @@ defmodule Magus.Files.File.Changes.ProcessFile do
 
     case EmbeddingModel.embed(texts) do
       {:ok, embeddings} ->
+        # Replace prior chunks: reprocessing (connector updates set the file
+        # back to :pending) must not leave stale rows behind. Old chunks stay
+        # searchable until this point so a failed embed keeps the previous
+        # generation intact.
+        Magus.Files.Chunk
+        |> Ash.Query.filter(file_id == ^file.id)
+        |> Ash.bulk_destroy!(:destroy, %{}, authorize?: false, strategy: :atomic)
+
         # Create chunks with embeddings
         chunks
         |> Enum.zip(embeddings)

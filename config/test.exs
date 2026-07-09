@@ -99,6 +99,9 @@ config :magus, Magus.Sandbox, provider: :test
 # Overridden per-test to a Bypass endpoint; unset in prod so the real URL is used.
 config :magus, :google_token_url, "https://oauth2.googleapis.com/token"
 
+# Overridden per-test to a Bypass endpoint; unset in prod so the real URL is used.
+config :magus, :openrouter_embeddings_url, "https://openrouter.ai/api/v1/embeddings"
+
 # Req.Test plug so the Daytona control-plane client can be HTTP-stubbed in its
 # own unit test (all other tests dispatch to the :test provider above).
 config :magus, Magus.Sandbox.Clients.Daytona,

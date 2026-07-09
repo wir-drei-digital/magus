@@ -69,7 +69,13 @@ defmodule Magus.Files.EmbeddingModel do
 
   defp do_embed_request(texts, api_key, opts) do
     receive_timeout = Keyword.get(opts, :receive_timeout, @default_receive_timeout)
-    url = "https://openrouter.ai/api/v1/embeddings"
+
+    url =
+      Application.get_env(
+        :magus,
+        :openrouter_embeddings_url,
+        "https://openrouter.ai/api/v1/embeddings"
+      )
 
     headers = [
       {"authorization", "Bearer #{api_key}"},
