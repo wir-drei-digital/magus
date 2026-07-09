@@ -1,15 +1,15 @@
 defmodule Magus.Agents.Tools.Memory.ForgetMemory do
   @moduledoc """
-  Tool for deactivating (soft-deleting) a memory by exact name.
+  Tool for permanently deleting a memory by exact name.
 
   When a user explicitly asks the model to forget something, this tool
-  allows the model to immediately deactivate that memory.
+  allows the model to immediately and permanently delete that memory.
   """
 
   use Jido.Action,
     name: "forget_memory",
     description: """
-    Forget (deactivate) a memory by its exact name. Use this when the user explicitly asks you to forget something.
+    Permanently delete a memory by its exact name. This cannot be undone. Use this when the user explicitly asks you to forget something.
 
     SCOPE determines where to look, mirroring where you would have saved it:
     - "local" (default): Anything about this conversation or project.

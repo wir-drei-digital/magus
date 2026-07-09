@@ -455,7 +455,7 @@ defmodule Magus.Agents.Actions.BuildMemoryContext do
     if has_global do
       ""
     else
-      "*Tip: Create global memories with scope=\"global\" to persist preferences across all conversations.*"
+      "*Tip: Create user-level memories with scope=\"user\" for facts the user explicitly wants remembered everywhere.*"
     end
   end
 end

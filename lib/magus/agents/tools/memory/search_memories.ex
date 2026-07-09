@@ -47,7 +47,7 @@ defmodule Magus.Agents.Tools.Memory.SearchMemories do
         type: :string,
         required: false,
         default: "local",
-        doc: "Memory scope: 'local', 'global', 'agent', or 'all'"
+        doc: "Memory scope: 'local', 'user', 'agent', or 'all'"
       ],
       kind: [
         type: {:or, [:string, nil]},

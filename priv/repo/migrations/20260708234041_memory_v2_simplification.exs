@@ -38,6 +38,8 @@ defmodule Magus.Repo.Migrations.MemoryV2Simplification do
                      name: "memories_unique_user_name_per_user_index"
                    )
 
+    # Deploy note: each index rebuild below takes a brief ACCESS EXCLUSIVE lock
+    # on memories, blocking writes to the table for the duration of that build.
     create unique_index(:memories, [:custom_agent_id, :name],
              name: "memories_unique_name_per_agent_index",
              where: "(scope = 'agent')"

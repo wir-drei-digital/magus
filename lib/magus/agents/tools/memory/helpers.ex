@@ -94,7 +94,7 @@ defmodule Magus.Agents.Tools.Memory.Helpers do
       {:ok, "agent"}
 
       iex> validate_scope("invalid")
-      {:error, "Invalid scope 'invalid'. Use 'local', 'global', or 'agent'."}
+      {:error, "Invalid scope 'invalid'. Use 'local', 'user', or 'agent'."}
   """
   @spec validate_scope(String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def validate_scope(scope) when scope in @valid_scopes, do: {:ok, scope}
