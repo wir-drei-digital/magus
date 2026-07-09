@@ -266,7 +266,7 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
         :ok
 
       file ->
-        case soft_delete_file(file) do
+        case SyncHelpers.delete_remote_gone_file(file) do
           :ok -> {:ok, "Deleted: #{item.name || item.id}"}
           :error -> {:error, "Failed to delete: #{item.name || item.id}"}
         end
@@ -336,14 +336,17 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
             end
           end)
 
-        # Soft-delete files that no longer exist remotely
+        # Hard-delete files that no longer exist remotely
         deleted =
           existing_by_external_id
           |> Enum.reject(fn {ext_id, _file} -> Map.has_key?(remote_by_id, ext_id) end)
 
         if length(deleted) > 0 do
-          Enum.each(deleted, fn {_ext_id, file} -> soft_delete_file(file) end)
-          SyncLogger.info(cid, "Removed #{length(deleted)} deleted files")
+          Enum.each(deleted, fn {_ext_id, file} ->
+            SyncHelpers.delete_remote_gone_file(file)
+          end)
+
+          SyncLogger.info(cid, "Hard-deleted #{length(deleted)} remotely removed files")
         end
 
         now = DateTime.utc_now()
@@ -393,20 +396,6 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
   end
 
   # --- Shared helpers ---
-
-  defp soft_delete_file(file) do
-    case Magus.Files.soft_delete_file(file, authorize?: false) do
-      {:ok, _} ->
-        :ok
-
-      {:error, reason} ->
-        Logger.warning(
-          "IncrementalSync: failed to soft-delete file #{file.id}: #{inspect(reason)}"
-        )
-
-        :error
-    end
-  end
 
   defp get_existing_files(collection) do
     Magus.Files.File

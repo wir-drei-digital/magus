@@ -596,4 +596,68 @@ defmodule Magus.Knowledge.KnowledgeCollectionTest do
              "expected the delta-reported new file to be created, got: #{inspect(Enum.map(files, & &1.external_id))}"
     end
   end
+
+  describe "remote deletion hard-deletes local file, chunks, and storage" do
+    test "fallback diff removes the row entirely and reclaims storage" do
+      user = generate(user())
+      Magus.Generators.ensure_workspace_plan(user)
+
+      {:ok, source} =
+        Magus.Knowledge.create_source(
+          %{
+            name: "NC",
+            provider: :nextcloud,
+            auth_config: %{"base_url" => "https://x", "username" => "u", "password" => "p"}
+          },
+          actor: user
+        )
+
+      {:ok, _} = Magus.Knowledge.update_source_status(source, %{status: :active}, actor: user)
+
+      {:ok, collection} =
+        Magus.Knowledge.create_collection(
+          source.id,
+          %{name: "F", external_id: "/f", external_path: "/f"},
+          actor: user
+        )
+
+      body = "bytes to reclaim"
+      path = "test/#{Ash.UUIDv7.generate()}.txt"
+      {:ok, _} = Magus.Files.Storage.store(path, body)
+
+      {:ok, file} =
+        Magus.Files.create_file_from_connector(
+          %{
+            name: "gone.txt",
+            type: :text,
+            mime_type: "text/plain",
+            file_size: byte_size(body),
+            file_path: path,
+            knowledge_collection_id: collection.id,
+            external_id: "remote-1",
+            external_etag: "e1",
+            external_updated_at: DateTime.utc_now()
+          },
+          actor: user
+        )
+
+      assert :ok =
+               Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers.delete_remote_gone_file(
+                 file
+               )
+
+      require Ash.Query
+
+      # Hard gone: not even the trash (IncludeTrashed-style) sees it.
+      assert {:error, _} = Magus.Files.get_file(file.id, authorize?: false)
+      assert {:error, _} = Magus.Files.Storage.get(path)
+
+      chunk_rows =
+        Magus.Files.Chunk
+        |> Ash.Query.filter(file_id == ^file.id)
+        |> Ash.count!(authorize?: false)
+
+      assert chunk_rows == 0
+    end
+  end
 end

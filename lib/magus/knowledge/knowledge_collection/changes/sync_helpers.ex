@@ -58,6 +58,28 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers do
     end
   end
 
+  @doc """
+  Hard-delete a file whose remote counterpart disappeared.
+
+  Sync deletions bypass the user trash on purpose (user decision 2026-07-09):
+  the remote is the source of truth for connector files, and soft-deleted
+  copies would hold chunks, storage bytes, and quota forever. User-initiated
+  deletion still goes through `:soft_delete` and the trash.
+  """
+  def delete_remote_gone_file(file) do
+    case Magus.Files.destroy_file(file, authorize?: false) do
+      :ok ->
+        :ok
+
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning("Sync: failed to hard-delete file #{file.id}: #{inspect(reason)}")
+        :error
+    end
+  end
+
   @doc "SHA-256 hex digest used as the stored content fingerprint."
   def content_hash(content) when is_binary(content) do
     :crypto.hash(:sha256, content) |> Base.encode16(case: :lower)

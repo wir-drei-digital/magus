@@ -76,6 +76,7 @@ defmodule Magus.Files do
       define :move_file_to_context, action: :move_to_context
       define :replace_file_content, action: :replace_content, args: [:binary]
       define :delete_file, action: :destroy
+      define :destroy_file, action: :destroy
       define :create_file_from_connector, action: :create_from_connector
       define :soft_delete_file, action: :soft_delete
       define :update_file_from_connector, action: :update_from_connector
