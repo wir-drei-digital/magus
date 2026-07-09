@@ -471,6 +471,59 @@ defmodule Magus.Agents.Strategies.ReactStrategyTest do
       {_agent, iter_directives} = ReactStrategy.cmd(agent, [llm_started], ctx)
       assert context_signals(iter_directives) == []
     end
+
+    test "stashes the turn-start estimate in strategy state" do
+      {agent, ctx} = init_agent(tools: [TestTool], model: "openrouter:base-model")
+
+      {agent, _directives} = ReactStrategy.cmd(agent, [start_instruction(%{})], ctx)
+
+      assert %{breakdown: %{total_tokens: total}} =
+               StratState.get(agent, %{})[:context_estimate]
+
+      assert total > 0
+    end
+
+    test "re-emits ai.context at turn completion, grown by the reply tokens" do
+      {agent, ctx} = init_agent(tools: [TestTool], model: "openrouter:base-model")
+
+      {agent, start_directives} = ReactStrategy.cmd(agent, [start_instruction(%{})], ctx)
+      assert [start_signal] = context_signals(start_directives)
+      start_total = start_signal.data.breakdown.total_tokens
+
+      reply = "Here is a reasonably detailed final answer for the user to read."
+
+      request_completed =
+        worker_event_instruction("req-test-1", %{
+          kind: :request_completed,
+          request_id: "req-test-1",
+          data: %{result: reply, termination_reason: :final_answer, usage: %{}}
+        })
+
+      {_agent, directives} = ReactStrategy.cmd(agent, [request_completed], ctx)
+
+      assert [completion_signal] = context_signals(directives)
+      # Intermediate tool calls are not resent; only the reply's estimated
+      # tokens (chars/4) grow the turn-start estimate.
+      assert completion_signal.data.breakdown.total_tokens ==
+               start_total + div(String.length(reply), 4)
+    end
+
+    test "turn completion with an empty reply emits no additional ai.context" do
+      {agent, ctx} = init_agent(tools: [TestTool], model: "openrouter:base-model")
+
+      {agent, _} = ReactStrategy.cmd(agent, [start_instruction(%{})], ctx)
+
+      request_completed =
+        worker_event_instruction("req-test-1", %{
+          kind: :request_completed,
+          request_id: "req-test-1",
+          data: %{result: "", termination_reason: :final_answer, usage: %{}}
+        })
+
+      {_agent, directives} = ReactStrategy.cmd(agent, [request_completed], ctx)
+
+      assert context_signals(directives) == []
+    end
   end
 
   describe "terminal-event state hygiene" do

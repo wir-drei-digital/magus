@@ -587,16 +587,19 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
         |> Map.put(:run_thread, run_thread)
         |> ensure_request_trace(request_id)
 
-      context_signal =
-        maybe_context_signal(
+      context_estimate =
+        build_context_estimate(
           run_system_prompt || config[:system_prompt],
           effective_tools,
           initial_messages || thread_messages,
           run_model || config[:model]
         )
 
+      # Stash the estimate so turn completion can re-emit it grown by the reply.
+      new_state = Map.put(new_state, :context_estimate, context_estimate)
+
       directives =
-        case context_signal do
+        case context_signal(context_estimate) do
           nil -> directives
           signal -> [AgentDirective.emit(signal) | directives]
         end
@@ -1113,7 +1116,11 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
             run_id: request_id
           })
 
-        {updated, [signal]}
+        # Refresh the context estimate now the reply is in, so the donut updates
+        # at turn end instead of sitting stale until the next turn starts.
+        post_turn = post_turn_context_signal(base_state[:context_estimate], result)
+
+        {updated, Enum.reject([signal, post_turn], &is_nil/1)}
 
       :request_failed ->
         error = event_field(data, :error, :unknown_error)
@@ -1240,12 +1247,11 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
       details["cached_tokens"] || details[:cached_tokens] || 0
   end
 
-  # Emit a one-shot `ai.context` signal at the start of a turn carrying the
-  # assembled-context breakdown (resting context: system prompt + tools +
-  # message history for this turn). The `ContextPlugin` upserts the snapshot and
-  # broadcasts `context.updated`. Best-effort: any failure to assemble the
-  # report (e.g. tool schema serialization) is swallowed so the turn proceeds.
-  defp maybe_context_signal(system_prompt, tools, messages, model_key) do
+  # Build the resting-context estimate for a turn (system prompt + tools +
+  # message history). Returned as a plain map so the turn can emit it now AND
+  # grow it at completion. Best-effort: any assembly failure (e.g. tool schema
+  # serialization) yields nil so the turn proceeds.
+  defp build_context_estimate(system_prompt, tools, messages, model_key) do
     max_context = resolve_max_context(model_key)
 
     breakdown =
@@ -1257,15 +1263,65 @@ defmodule Magus.Agents.Strategies.ReactStrategy do
         max_context: max_context
       })
 
+    %{breakdown: breakdown, model_key: model_key, max_context: max_context}
+  rescue
+    e ->
+      Logger.warning("ReactStrategy ai.context assembly failed: #{Exception.message(e)}")
+      nil
+  end
+
+  # One-shot `ai.context` signal from an estimate. The `ContextPlugin` upserts
+  # the snapshot and broadcasts `context.updated`.
+  defp context_signal(nil), do: nil
+
+  defp context_signal(%{breakdown: breakdown, model_key: model_key, max_context: max_context}) do
     CoreSignal.new!(
       "ai.context",
       %{breakdown: breakdown, model_key: model_key, max_context: max_context},
       source: @source
     )
+  end
+
+  # When a turn completes, the resting context for the NEXT turn grows by the
+  # agent's reply. Intermediate tool-call messages are NOT resent, so they are
+  # intentionally excluded; only the final reply's estimated tokens are added.
+  # Re-emitting `ai.context` here refreshes the donut at turn end instead of it
+  # sitting stale until the next turn starts. Best-effort: skips a stashed
+  # estimate that did not survive as atom keys (e.g. after mid-turn hibernation).
+  defp post_turn_context_signal(%{breakdown: breakdown} = estimate, result)
+       when is_map(breakdown) and is_binary(result) do
+    added = ContextReport.approx_tokens(result)
+
+    if added > 0 and Map.has_key?(breakdown, :categories) do
+      context_signal(%{estimate | breakdown: grow_messages_category(breakdown, added)})
+    end
   rescue
     e ->
-      Logger.warning("ReactStrategy ai.context assembly failed: #{Exception.message(e)}")
+      Logger.warning("ReactStrategy post-turn ai.context failed: #{Exception.message(e)}")
       nil
+  end
+
+  defp post_turn_context_signal(_estimate, _result), do: nil
+
+  # Bump the Messages category (and the total) by `added` estimated tokens,
+  # adding the category when a prior turn had no messages yet.
+  defp grow_messages_category(breakdown, added) do
+    categories = Map.get(breakdown, :categories, [])
+
+    {categories, found?} =
+      Enum.map_reduce(categories, false, fn
+        %{key: :messages, tokens: t} = cat, _acc -> {%{cat | tokens: t + added}, true}
+        cat, acc -> {cat, acc}
+      end)
+
+    categories =
+      if found?,
+        do: categories,
+        else: categories ++ [%{key: :messages, label: "Messages", tokens: added}]
+
+    breakdown
+    |> Map.put(:categories, categories)
+    |> Map.update(:total_tokens, added, &(&1 + added))
   end
 
   # Resolve the resolved model's context window. For an auto-routed conversation

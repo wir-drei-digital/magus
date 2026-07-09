@@ -119,6 +119,36 @@ defmodule Magus.Agents.Plugins.ContextPluginTest do
     assert {:ok, :continue} = ContextPlugin.handle_signal(signal, %{agent: agent})
   end
 
+  test "a later ai.context turn-start upsert preserves the ai.usage token reconciliation",
+       %{conv: conv, agent: agent} do
+    {:ok, _} = Magus.Chat.get_or_create_context_window(conv.id, actor: %AiAgent{})
+
+    # Turn N usage lands the real input/cached counts.
+    usage = make_signal("ai.usage", %{input_tokens: 999, metadata: %{cached_tokens: 100}})
+    assert {:ok, :continue} = ContextPlugin.handle_signal(usage, %{agent: agent})
+
+    {:ok, after_usage} = Magus.Chat.get_context_window(conv.id, actor: %AiAgent{})
+    assert after_usage.last_actual_input_tokens == 999
+    assert after_usage.last_cached_tokens == 100
+
+    # Turn N+1 starts: ai.context upserts the resting-context estimate. It must
+    # NOT clobber the reconciled actual/cached counts (they are not part of the
+    # estimate payload).
+    context =
+      make_signal("ai.context", %{
+        breakdown: %{categories: [], total_tokens: 1234},
+        model_key: "openrouter:test",
+        max_context: 200_000
+      })
+
+    assert {:ok, :continue} = ContextPlugin.handle_signal(context, %{agent: agent})
+
+    {:ok, after_context} = Magus.Chat.get_context_window(conv.id, actor: %AiAgent{})
+    assert after_context.last_total_tokens == 1234
+    assert after_context.last_actual_input_tokens == 999
+    assert after_context.last_cached_tokens == 100
+  end
+
   # ============================================================================
   # Auto-compact valve
   # ============================================================================
