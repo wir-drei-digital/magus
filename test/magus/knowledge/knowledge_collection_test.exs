@@ -502,4 +502,98 @@ defmodule Magus.Knowledge.KnowledgeCollectionTest do
       assert reloaded.external_etag == "etag-old"
     end
   end
+
+  describe "delta sync picks up files added after the initial sync" do
+    setup do
+      drive = Bypass.open()
+      prev = Application.get_env(:magus, :google_drive_base_url)
+      Application.put_env(:magus, :google_drive_base_url, "http://localhost:#{drive.port}")
+      on_exit(fn -> Application.put_env(:magus, :google_drive_base_url, prev) end)
+      {:ok, drive: drive}
+    end
+
+    test "an :updated change for an unknown external_id creates the file", %{drive: drive} do
+      user = generate(user())
+      Magus.Generators.ensure_workspace_plan(user)
+
+      {:ok, source} =
+        Magus.Knowledge.create_source(
+          %{
+            name: "GD",
+            provider: :google_drive,
+            auth_config: %{"access_token" => "tok", "refresh_token" => "rt"}
+          },
+          actor: user
+        )
+
+      {:ok, source} =
+        Magus.Knowledge.update_source_status(source, %{status: :active}, actor: user)
+
+      {:ok, collection} =
+        Magus.Knowledge.create_collection(
+          source.id,
+          %{name: "Folder", external_id: "root-folder", external_path: "/root"},
+          actor: user
+        )
+
+      # Cursor already bootstrapped; backdate so should_sync? passes.
+      {:ok, collection} =
+        Magus.Knowledge.update_sync_status(
+          collection,
+          %{
+            sync_status: :synced,
+            sync_cursor: %{"sync_cursor" => "cur-1"},
+            last_synced_at: DateTime.add(DateTime.utc_now(), -7200, :second)
+          },
+          authorize?: false
+        )
+
+      Bypass.stub(drive, "GET", "/changes", fn conn ->
+        body = %{
+          "newStartPageToken" => "cur-2",
+          "changes" => [
+            %{
+              "fileId" => "file-new",
+              "removed" => false,
+              "file" => %{
+                "id" => "file-new",
+                "name" => "brand-new.txt",
+                "mimeType" => "text/plain",
+                "modifiedTime" => "2026-07-09T11:00:00Z",
+                "md5Checksum" => "abc",
+                "parents" => ["root-folder"]
+              }
+            }
+          ]
+        }
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(body))
+      end)
+
+      # Subfolder discovery for the tracked-folder filter: no subfolders.
+      Bypass.stub(drive, "GET", "/files", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{"files" => []}))
+      end)
+
+      Bypass.stub(drive, "GET", "/files/file-new", fn conn ->
+        Plug.Conn.resp(conn, 200, "hello new file")
+      end)
+
+      Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync.do_incremental_sync(collection)
+
+      require Ash.Query
+
+      files =
+        Magus.Files.File
+        |> Ash.Query.filter(knowledge_collection_id == ^collection.id)
+        |> Ash.read!(authorize?: false)
+
+      assert Enum.any?(files, &(&1.external_id == "file-new")),
+             "expected the delta-reported new file to be created, got: #{inspect(Enum.map(files, & &1.external_id))}"
+    end
+  end
 end

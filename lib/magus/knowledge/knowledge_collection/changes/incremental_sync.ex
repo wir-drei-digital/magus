@@ -219,13 +219,23 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
          connector,
          %{type: :updated, item: item},
          existing,
-         _collection,
-         _source,
+         collection,
+         source,
          actor
        ) do
     case Map.get(existing, item.id) do
       nil ->
-        :ok
+        # Google Drive's Changes API reports newly added files as :updated.
+        # An update for an item we have never synced is a create, not a no-op.
+        process_change(
+          conn,
+          connector,
+          %{type: :created, item: item},
+          existing,
+          collection,
+          source,
+          actor
+        )
 
       file ->
         case SyncHelpers.update_existing_file(conn, connector, file, item, actor) do
