@@ -1232,7 +1232,7 @@ export type KnowledgeSourceResourceSchema = {
   __primitiveFields: "id" | "name" | "provider" | "status" | "settings" | "lastError" | "needsReauth" | "connectedAt" | "workspaceId";
   id: UUIDv7;
   name: string;
-  provider: "affine" | "confluence" | "github" | "gitlab" | "google_drive" | "nextcloud" | "notion" | "obsidian" | "onedrive" | "web";
+  provider: "affine" | "confluence" | "dropbox" | "github" | "gitlab" | "google_drive" | "nextcloud" | "notion" | "obsidian" | "onedrive" | "web";
   status: "active" | "disabled" | "error" | "pending";
   settings: Record<string, any> | null;
   lastError: string | null;
@@ -1249,7 +1249,7 @@ export type KnowledgeSourceAttributesOnlySchema = {
   __primitiveFields: "id" | "name" | "provider" | "status" | "settings" | "lastError" | "needsReauth" | "connectedAt" | "workspaceId";
   id: UUIDv7;
   name: string;
-  provider: "affine" | "confluence" | "github" | "gitlab" | "google_drive" | "nextcloud" | "notion" | "obsidian" | "onedrive" | "web";
+  provider: "affine" | "confluence" | "dropbox" | "github" | "gitlab" | "google_drive" | "nextcloud" | "notion" | "obsidian" | "onedrive" | "web";
   status: "active" | "disabled" | "error" | "pending";
   settings: Record<string, any> | null;
   lastError: string | null;
@@ -5151,9 +5151,9 @@ export type KnowledgeSourceFilterInput = {
   };
 
   provider?: {
-    eq?: "affine" | "confluence" | "github" | "gitlab" | "google_drive" | "nextcloud" | "notion" | "obsidian" | "onedrive" | "web";
-    notEq?: "affine" | "confluence" | "github" | "gitlab" | "google_drive" | "nextcloud" | "notion" | "obsidian" | "onedrive" | "web";
-    in?: Array<"affine" | "confluence" | "github" | "gitlab" | "google_drive" | "nextcloud" | "notion" | "obsidian" | "onedrive" | "web">;
+    eq?: "affine" | "confluence" | "dropbox" | "github" | "gitlab" | "google_drive" | "nextcloud" | "notion" | "obsidian" | "onedrive" | "web";
+    notEq?: "affine" | "confluence" | "dropbox" | "github" | "gitlab" | "google_drive" | "nextcloud" | "notion" | "obsidian" | "onedrive" | "web";
+    in?: Array<"affine" | "confluence" | "dropbox" | "github" | "gitlab" | "google_drive" | "nextcloud" | "notion" | "obsidian" | "onedrive" | "web">;
   };
 
   status?: {
