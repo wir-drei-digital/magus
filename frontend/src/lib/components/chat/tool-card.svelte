@@ -47,10 +47,12 @@
 	);
 	const hasDetails = $derived(isRich || hasInputs || view.steps.length > 0 || hasOutput);
 
-	// Default open while running; a failed sandbox auto-opens too (classic
-	// open={!success}). Sticky once the user toggles.
+	// Rich, long-running tools (sub-agents, sandbox) open while running so their
+	// streaming detail is visible; a failed sandbox auto-opens too. Generic tools
+	// stay collapsed by default, since their expand-then-collapse churn while
+	// running flickered during tool bursts. Sticky once the user toggles.
 	const defaultOpen = $derived(
-		view.status === 'running' || (type === 'sandbox' && view.status === 'error')
+		(isRich && view.status === 'running') || (type === 'sandbox' && view.status === 'error')
 	);
 	let userOpen = $state<boolean | null>(null);
 	const open = $derived(userOpen ?? defaultOpen);
