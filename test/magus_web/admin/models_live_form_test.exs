@@ -82,6 +82,28 @@ defmodule MagusWeb.Admin.ModelsLiveFormTest do
       assert model.short_description_translations["en"] == "English blurb"
       assert model.short_description_translations["de"] == "Deutscher Text"
     end
+
+    test "the English translation mirrors into the raw description fields", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/models/new")
+
+      view
+      |> element("form[phx-submit=save]")
+      |> render_submit(%{
+        "form" => %{
+          "name" => "Mirror Model",
+          "key" => "openrouter:test/mirror-model",
+          "short_description_translations" => %{"en" => "Short EN", "de" => "Kurz DE"},
+          "detailed_description_translations" => %{"en" => "Long EN", "de" => ""}
+        }
+      })
+
+      # The SPA reads the raw (untranslated) description attributes, so the
+      # English text must land there too or admin-entered descriptions never
+      # reach the model picker.
+      model = created_model!("openrouter:test/mirror-model")
+      assert model.short_description == "Short EN"
+      assert model.detailed_description == "Long EN"
+    end
   end
 
   describe "pricing" do

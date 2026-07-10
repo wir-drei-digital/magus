@@ -1691,11 +1691,26 @@ defmodule MagusWeb.Admin.ModelsLive do
   #     form's models are called through OpenRouter unless prefixed otherwise)
   #   * the legacy display cost strings mirror the entered numeric values so
   #     existing consumers (admin table, model picker) keep rendering a price
+  #   * the English descriptions mirror into the raw (untranslated) columns:
+  #     the SPA model picker reads those, so without the mirror admin-entered
+  #     descriptions never reach it
   defp prepare_save_params(params) do
     params
     |> normalize_key_prefix()
     |> mirror_cost_string("input_cost_value", "input_cost")
     |> mirror_cost_string("output_cost_value", "output_cost")
+    |> mirror_english_description("short_description_translations", "short_description")
+    |> mirror_english_description("detailed_description_translations", "detailed_description")
+  end
+
+  defp mirror_english_description(params, translations_key, raw_key) do
+    case params[translations_key] do
+      %{"en" => english} when is_binary(english) and english != "" ->
+        Map.put(params, raw_key, english)
+
+      _ ->
+        params
+    end
   end
 
   defp normalize_key_prefix(params) do
