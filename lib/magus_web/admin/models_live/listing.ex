@@ -11,8 +11,10 @@ defmodule MagusWeb.Admin.ModelsLive.Listing do
   @page_size 50
 
   @caps ~w(tools search reasoning image video)
-  @sort_fields ~w(name provider status input_cost output_cost usage spend)
+  @sort_fields ~w(name provider status input_cost output_cost usage spend added)
   @statuses ~w(all active disabled)
+  # Allowed "added within the last N days" filter windows (URL param values).
+  @added_windows ~w(7 30 90)
 
   @type model :: map()
   @type result :: %{
@@ -24,6 +26,7 @@ defmodule MagusWeb.Admin.ModelsLive.Listing do
           status: String.t(),
           provider: String.t(),
           caps: [String.t()],
+          added: String.t(),
           sort: String.t(),
           dir: String.t(),
           provider_options: [String.t()]
@@ -37,15 +40,46 @@ defmodule MagusWeb.Admin.ModelsLive.Listing do
 
   @doc """
   The provider label shown for a model: linked provider name, then the
-  free-text brand, then "-". Mirrors the Provider column exactly so the filter
-  dropdown options line up with what the table displays.
+  free-text brand, then the vendor derived from the model key
+  ("openrouter:anthropic/claude-…" → "anthropic"), then "-". Mirrors the
+  Provider column exactly so the filter dropdown options line up with what
+  the table displays.
   """
   def provider_label(model) do
     case model.model_provider do
-      %{name: name} when is_binary(name) and name != "" -> name
-      _ -> blank_to_dash(Map.get(model, :provider))
+      %{name: name} when is_binary(name) and name != "" ->
+        name
+
+      _ ->
+        case blank_to_dash(Map.get(model, :provider)) do
+          "-" -> key_vendor(Map.get(model, :key))
+          brand -> brand
+        end
     end
   end
+
+  # Vendor from a "api:vendor/model" key. Keys without a vendor path segment
+  # ("xai:grok-4") fall back to the api prefix; keys without any prefix carry
+  # no provider information.
+  defp key_vendor(key) when is_binary(key) do
+    case String.split(key, ":", parts: 2) do
+      [api_prefix, rest] ->
+        case String.split(rest, "/", parts: 2) do
+          [vendor, _model] when vendor != "" -> vendor
+          _ -> normalize_api_prefix(api_prefix)
+        end
+
+      _ ->
+        "-"
+    end
+  end
+
+  defp key_vendor(_key), do: "-"
+
+  # "openrouter_citations" is an internal transport variant, not a vendor.
+  defp normalize_api_prefix("openrouter_citations"), do: "openrouter"
+  defp normalize_api_prefix(prefix) when prefix != "", do: prefix
+  defp normalize_api_prefix(_), do: "-"
 
   @doc "Usage request count from the loaded aggregate (0 when unloaded/absent)."
   def usage_count(model) do
@@ -74,6 +108,7 @@ defmodule MagusWeb.Admin.ModelsLive.Listing do
     status = normalize(params["status"], @statuses, "all")
     provider = to_string(params["provider"] || "")
     caps = parse_caps(params["caps"])
+    added = normalize(params["added"], @added_windows, "")
     sort = normalize(params["sort"], @sort_fields, "name")
     dir = normalize(params["dir"], ~w(asc desc), "asc")
 
@@ -82,6 +117,7 @@ defmodule MagusWeb.Admin.ModelsLive.Listing do
       |> filter_status(status)
       |> filter_provider(provider)
       |> filter_caps(caps)
+      |> filter_added(added)
       |> sort_models(String.to_existing_atom(sort), dir)
 
     total = length(filtered)
@@ -99,11 +135,15 @@ defmodule MagusWeb.Admin.ModelsLive.Listing do
       status: status,
       provider: provider,
       caps: caps,
+      added: added,
       sort: sort,
       dir: dir,
       provider_options: provider_options(models)
     }
   end
+
+  @doc "Allowed added-within windows (days, as URL param strings)."
+  def added_windows, do: @added_windows
 
   @doc "Toggle direction for a column: same column flips, a new column starts asc."
   def toggle_dir(current_sort, current_dir, column) do
@@ -120,6 +160,19 @@ defmodule MagusWeb.Admin.ModelsLive.Listing do
 
   defp filter_provider(models, provider),
     do: Enum.filter(models, &(provider_label(&1) == provider))
+
+  defp filter_added(models, ""), do: models
+
+  defp filter_added(models, days) do
+    cutoff = DateTime.add(DateTime.utc_now(), -String.to_integer(days) * 24 * 3600, :second)
+
+    Enum.filter(models, fn model ->
+      case Map.get(model, :inserted_at) do
+        %DateTime{} = at -> DateTime.compare(at, cutoff) != :lt
+        _ -> false
+      end
+    end)
+  end
 
   defp filter_caps(models, []), do: models
 
@@ -149,6 +202,14 @@ defmodule MagusWeb.Admin.ModelsLive.Listing do
   defp sort_key(model, :name), do: model.name |> to_string() |> String.downcase()
   defp sort_key(model, :provider), do: model |> provider_label() |> String.downcase()
   defp sort_key(model, :status), do: if(model.active?, do: 0, else: 1)
+
+  defp sort_key(model, :added) do
+    case Map.get(model, :inserted_at) do
+      %DateTime{} = at -> DateTime.to_unix(at, :microsecond)
+      _ -> nil
+    end
+  end
+
   defp sort_key(model, :input_cost), do: parse_cost(Map.get(model, :input_cost))
   defp sort_key(model, :output_cost), do: parse_cost(Map.get(model, :output_cost))
   defp sort_key(model, :usage), do: usage_count(model)

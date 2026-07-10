@@ -1978,9 +1978,12 @@ export type ModelSummary = {
 	supportsSearch: boolean;
 	supportsReasoning: boolean;
 	supportsTools: boolean;
-	/** Pre-formatted per-million-token cost display strings (e.g. "$3"). */
+	/** Legacy per-million cost display strings (mixed formats: "$3", "3.43"). */
 	inputCost: string | null;
 	outputCost: string | null;
+	/** Structured USD-per-million values (Decimal serialized as string); preferred for display. */
+	inputCostValue: string | null;
+	outputCostValue: string | null;
 	/** Approximate CHF cents for a reference request (composer cost gauge); null for image/video models. */
 	requestCostCents: number | null;
 };
@@ -1998,6 +2001,8 @@ const MODEL_SUMMARY_FIELDS: rpc.ListActiveModelsFields = [
 	'supportsTools',
 	'inputCost',
 	'outputCost',
+	'inputCostValue',
+	'outputCostValue',
 	'requestCostCents'
 ];
 

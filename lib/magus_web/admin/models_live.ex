@@ -75,7 +75,7 @@ defmodule MagusWeb.Admin.ModelsLive do
     assign(socket, :listing, Listing.apply(socket.assigns.all_models, socket.assigns.list_params))
   end
 
-  @list_param_keys ~w(status provider caps sort dir page)
+  @list_param_keys ~w(status provider caps added sort dir page)
 
   defp take_list_params(params), do: Map.take(params, @list_param_keys)
 
@@ -278,6 +278,8 @@ defmodule MagusWeb.Admin.ModelsLive do
   @impl true
   def handle_event("save", %{"form" => params}, socket) do
     if admin?(socket) do
+      params = prepare_save_params(params)
+
       case AshPhoenix.Form.submit(socket.assigns.form.source, params: params) do
         {:ok, _model} ->
           action = if socket.assigns.live_action == :new, do: "created", else: "updated"
@@ -396,6 +398,7 @@ defmodule MagusWeb.Admin.ModelsLive do
       socket.assigns.list_params
       |> Map.put("status", params["status"] || "all")
       |> Map.put("provider", params["provider"] || "")
+      |> Map.put("added", params["added"] || "")
       |> Map.put("caps", caps)
       # Any filter change returns to the first page.
       |> Map.delete("page")
@@ -754,6 +757,25 @@ defmodule MagusWeb.Admin.ModelsLive do
             </div>
 
             <div>
+              <label class="label label-text text-xs pb-1" for="filter-added">Added</label>
+              <select
+                id="filter-added"
+                name="added"
+                class="select select-bordered select-sm"
+                data-test-filter-added
+              >
+                <option value="" selected={@listing.added == ""}>Any time</option>
+                <option
+                  :for={days <- Listing.added_windows()}
+                  value={days}
+                  selected={@listing.added == days}
+                >
+                  Last {days} days
+                </option>
+              </select>
+            </div>
+
+            <div>
               <span class="label label-text text-xs pb-1">Capabilities</span>
               <div class="flex flex-wrap items-center gap-3 h-8" data-test-filter-caps>
                 <label :for={cap <- Listing.caps()} class="label cursor-pointer gap-1 py-0">
@@ -804,13 +826,14 @@ defmodule MagusWeb.Admin.ModelsLive do
                     class="text-right"
                   />
                   <.sort_header label="Usage" col="usage" listing={@listing} class="text-right" />
+                  <.sort_header label="Added" col="added" listing={@listing} class="text-right" />
                   <th class="text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 <%= if @listing.models == [] do %>
                   <tr>
-                    <td colspan="9" class="text-center py-8 text-base-content/50">
+                    <td colspan="10" class="text-center py-8 text-base-content/50">
                       <%= if @all_models == [] do %>
                         No models configured
                       <% else %>
@@ -887,6 +910,9 @@ defmodule MagusWeb.Admin.ModelsLive do
                         <div class="text-xs text-base-content/50">
                           {Formatters.format_cost(Listing.spend(model), 2)}
                         </div>
+                      </td>
+                      <td class="text-right text-sm text-base-content/70" data-test-added>
+                        {format_added(model.inserted_at)}
                       </td>
                       <td>
                         <div class="flex items-center justify-center gap-1">
@@ -1220,10 +1246,13 @@ defmodule MagusWeb.Admin.ModelsLive do
                     <.input
                       field={@form[:key]}
                       label="Model ID / Key"
-                      placeholder="e.g., gpt-4o or openai/gpt-4o"
+                      placeholder="e.g., openrouter:anthropic/claude-sonnet-4.5"
                     />
                     <p class="text-xs text-base-content/50 -mt-1">
-                      The API model identifier used when calling the provider
+                      Format: <code>&lt;api&gt;:&lt;vendor&gt;/&lt;model&gt;</code>
+                      (e.g. <code>openrouter:openai/gpt-5.2</code>, <code>xai:grok-4.3</code>).
+                      Without a prefix, <code>openrouter:</code>
+                      is assumed on save.
                     </p>
                   </div>
                 </div>
@@ -1236,14 +1265,22 @@ defmodule MagusWeb.Admin.ModelsLive do
                 <h3 class="text-lg font-semibold text-base-content mb-4">Pricing</h3>
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 [&_.fieldset]:mb-0">
                   <.input
-                    field={@form[:input_cost]}
-                    label="Input Cost (per 1M tokens)"
+                    type="number"
+                    name="form[input_cost_value]"
+                    value={cost_value_for_form(@form, :input_cost_value, :input_cost)}
+                    label="Input Cost ($ per 1M tokens)"
                     placeholder="e.g., 2.50"
+                    step="any"
+                    min="0"
                   />
                   <.input
-                    field={@form[:output_cost]}
-                    label="Output Cost (per 1M tokens)"
+                    type="number"
+                    name="form[output_cost_value]"
+                    value={cost_value_for_form(@form, :output_cost_value, :output_cost)}
+                    label="Output Cost ($ per 1M tokens)"
                     placeholder="e.g., 10.00"
+                    step="any"
+                    min="0"
                   />
                   <.input
                     field={@form[:context_window]}
@@ -1252,6 +1289,10 @@ defmodule MagusWeb.Admin.ModelsLive do
                     placeholder="e.g., 128000"
                   />
                 </div>
+                <p class="text-xs text-base-content/50 mt-1">
+                  Plain numbers in USD per million tokens; shown as $/M in the model picker
+                  and used for billing.
+                </p>
               </div>
 
               <div class="divider"></div>
@@ -1299,13 +1340,19 @@ defmodule MagusWeb.Admin.ModelsLive do
                   </button>
                 </div>
 
-                <div class="space-y-4 [&_.fieldset]:mb-0">
+                <%!-- BOTH locales stay in the DOM (inactive one hidden) so every
+                submit carries every language; rendering only the active tab
+                used to wipe the other locale's text on save. --%>
+                <div
+                  :for={locale <- ["en", "de"]}
+                  class={"space-y-4 [&_.fieldset]:mb-0 #{if @desc_tab != locale, do: "hidden"}"}
+                >
                   <div>
                     <.input
-                      name={"form[short_description_translations][#{@desc_tab}]"}
-                      value={get_translation_value(@form, :short_description_translations, @desc_tab)}
+                      name={"form[short_description_translations][#{locale}]"}
+                      value={get_translation_value(@form, :short_description_translations, locale)}
                       label={
-                        "Short Description (#{if @desc_tab == "en", do: "English", else: "German"})"
+                        "Short Description (#{if locale == "en", do: "English", else: "German"})"
                       }
                       placeholder="Brief description (1-2 sentences)"
                     />
@@ -1317,16 +1364,16 @@ defmodule MagusWeb.Admin.ModelsLive do
                   <div>
                     <.input
                       type="textarea"
-                      name={"form[detailed_description_translations][#{@desc_tab}]"}
+                      name={"form[detailed_description_translations][#{locale}]"}
                       value={
                         get_translation_value(
                           @form,
                           :detailed_description_translations,
-                          @desc_tab
+                          locale
                         )
                       }
                       label={
-                        "Detailed Description (#{if @desc_tab == "en", do: "English", else: "German"})"
+                        "Detailed Description (#{if locale == "en", do: "English", else: "German"})"
                       }
                       placeholder="Full description for model detail view"
                       class="textarea h-32"
@@ -1485,8 +1532,11 @@ defmodule MagusWeb.Admin.ModelsLive do
 
   defp filters_active?(listing) do
     listing.status != "all" or listing.provider != "" or listing.caps != [] or
-      listing.sort != "name" or listing.dir != "asc"
+      listing.added != "" or listing.sort != "name" or listing.dir != "asc"
   end
+
+  defp format_added(%DateTime{} = at), do: Calendar.strftime(at, "%Y-%m-%d")
+  defp format_added(_), do: "-"
 
   defp admin?(socket), do: socket.assigns.current_user.is_admin == true
 
@@ -1594,6 +1644,8 @@ defmodule MagusWeb.Admin.ModelsLive do
     |> put_present("context_window", to_string_or_nil(Map.get(limits, :context)))
     |> put_present("input_cost", to_string_or_nil(Map.get(cost, :input)))
     |> put_present("output_cost", to_string_or_nil(Map.get(cost, :output)))
+    |> put_present("input_cost_value", to_string_or_nil(Map.get(cost, :input)))
+    |> put_present("output_cost_value", to_string_or_nil(Map.get(cost, :output)))
     |> Map.put("input_modalities", registry_modalities(Map.get(modalities, :input)))
     |> Map.put("output_modalities", registry_modalities(Map.get(modalities, :output)))
     |> Map.put("supports_reasoning?", to_string(Map.get(reasoning, :enabled) == true))
@@ -1633,6 +1685,59 @@ defmodule MagusWeb.Admin.ModelsLive do
       Map.put(params, "llm_metadata", %{"output_limit" => output_limit})
     end
   end
+
+  # Form-level conveniences applied at save time:
+  #   * a model key without an api prefix gets "openrouter:" prepended (this
+  #     form's models are called through OpenRouter unless prefixed otherwise)
+  #   * the legacy display cost strings mirror the entered numeric values so
+  #     existing consumers (admin table, model picker) keep rendering a price
+  defp prepare_save_params(params) do
+    params
+    |> normalize_key_prefix()
+    |> mirror_cost_string("input_cost_value", "input_cost")
+    |> mirror_cost_string("output_cost_value", "output_cost")
+  end
+
+  defp normalize_key_prefix(params) do
+    case params["key"] do
+      key when is_binary(key) and key != "" ->
+        if String.contains?(key, ":") do
+          params
+        else
+          Map.put(params, "key", "openrouter:" <> String.trim(key))
+        end
+
+      _ ->
+        params
+    end
+  end
+
+  defp mirror_cost_string(params, value_key, legacy_key) do
+    case params[value_key] do
+      value when is_binary(value) and value != "" -> Map.put(params, legacy_key, value)
+      _ -> params
+    end
+  end
+
+  # The numeric cost inputs show the structured value; legacy rows that only
+  # carry a display string get its number extracted so editing them does not
+  # present an empty field.
+  defp cost_value_for_form(form, value_field, legacy_field) do
+    case form[value_field].value do
+      %Decimal{} = decimal -> Decimal.to_string(decimal, :normal)
+      value when is_binary(value) and value != "" -> value
+      _ -> parse_legacy_cost_number(form[legacy_field].value)
+    end
+  end
+
+  defp parse_legacy_cost_number(value) when is_binary(value) do
+    case Regex.run(~r/\d+(?:\.\d+)?/, value) do
+      [number] -> number
+      _ -> nil
+    end
+  end
+
+  defp parse_legacy_cost_number(_value), do: nil
 
   defp get_translation_value(form, field, locale) do
     translations = form[field].value || %{}

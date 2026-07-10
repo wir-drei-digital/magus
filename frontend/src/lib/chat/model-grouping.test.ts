@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { FAVORITES_GROUP, groupModels, prefsById, type ModelFilters } from './model-grouping';
+import {
+	FAVORITES_GROUP,
+	costPerMillionLabel,
+	groupModels,
+	prefsById,
+	type ModelFilters
+} from './model-grouping';
 import type { ModelPreference, ModelSummary } from '$lib/ash/api';
 
 function model(id: string, over: Partial<ModelSummary> = {}): ModelSummary {
@@ -16,6 +22,8 @@ function model(id: string, over: Partial<ModelSummary> = {}): ModelSummary {
 		supportsTools: true,
 		inputCost: null,
 		outputCost: null,
+		inputCostValue: null,
+		outputCostValue: null,
 		requestCostCents: null,
 		...over
 	};
@@ -96,5 +104,27 @@ describe('groupModels', () => {
 		]);
 		const favorites = groupModels(models, prefs, NO_FILTERS)[0];
 		expect(favorites.models.map((m) => m.id)).toEqual(['b', 'a', 'c']);
+	});
+});
+
+describe('costPerMillionLabel', () => {
+	it('formats numeric values as $X/M and trims trailing zeros', () => {
+		const m = model('m', { inputCostValue: '2.50', outputCostValue: '10.00' });
+		expect(costPerMillionLabel(m)).toBe('$2.5/M / $10/M');
+	});
+
+	it('falls back to digits inside legacy display strings', () => {
+		const m = model('m', { inputCost: '$3.43/M', outputCost: '12' });
+		expect(costPerMillionLabel(m)).toBe('$3.43/M / $12/M');
+	});
+
+	it('prefers the structured value over the legacy string', () => {
+		const m = model('m', { inputCostValue: '2', inputCost: '$9/M' });
+		expect(costPerMillionLabel(m)).toBe('$2/M / —');
+	});
+
+	it('returns null when no cost information exists', () => {
+		expect(costPerMillionLabel(model('m'))).toBeNull();
+		expect(costPerMillionLabel(model('m', { inputCost: 'free-form text' }))).toBeNull();
 	});
 });

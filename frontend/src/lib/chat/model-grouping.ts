@@ -68,3 +68,29 @@ export function groupModels(
 
 	return groups;
 }
+
+/**
+ * Per-million cost label for the picker footer: "$2/M / $10/M".
+ *
+ * Prefers the structured numeric values (admin-entered plain numbers) and
+ * falls back to digits inside the legacy display strings ("$3.43/M", "12").
+ * Returns null when neither side carries a parseable cost.
+ */
+export function costPerMillionLabel(
+	model: Pick<ModelSummary, 'inputCost' | 'outputCost' | 'inputCostValue' | 'outputCostValue'>
+): string | null {
+	const input = formatPerMillion(model.inputCostValue ?? model.inputCost);
+	const output = formatPerMillion(model.outputCostValue ?? model.outputCost);
+	if (!input && !output) return null;
+	return `${input ?? '—'} / ${output ?? '—'}`;
+}
+
+function formatPerMillion(raw: string | null): string | null {
+	if (raw == null || raw === '') return null;
+	const match = String(raw).match(/\d+(?:\.\d+)?/);
+	if (!match) return null;
+	const value = Number(match[0]);
+	if (!Number.isFinite(value)) return null;
+	// Number#toString trims trailing zeros: "2.50" → "$2.5/M", "10.00" → "$10/M".
+	return `$${value.toString()}/M`;
+}

@@ -74,6 +74,33 @@ defmodule MagusWeb.Admin.ModelsLiveIndexTest do
     end
   end
 
+  describe "added filter" do
+    test "narrows to recently added models via the URL param", %{conn: conn} do
+      old = create_model(%{})
+      recent = create_model(%{})
+      backdate!(old, 40)
+
+      {:ok, _view, html} = live(conn, ~p"/admin/models?added=7")
+      assert on_page?(html, recent)
+      refute on_page?(html, old)
+
+      {:ok, _view, html} = live(conn, ~p"/admin/models")
+      assert on_page?(html, recent)
+      assert on_page?(html, old)
+    end
+  end
+
+  defp backdate!(model, days) do
+    import Ecto.Query
+
+    backdated = DateTime.add(DateTime.utc_now(), -days * 24 * 3600, :second)
+
+    Magus.Repo.update_all(
+      from(m in "models", where: m.id == type(^model.id, :binary_id)),
+      set: [inserted_at: backdated]
+    )
+  end
+
   describe "provider filter" do
     test "keeps only the matching displayed provider", %{conn: conn} do
       anthropic = create_model(%{provider: "Anthropic"})

@@ -12,6 +12,8 @@ defmodule MagusWeb.Admin.ModelsLive.ListingTest do
         active?: true,
         provider: nil,
         model_provider: nil,
+        key: nil,
+        inserted_at: nil,
         supports_tools?: false,
         supports_search?: false,
         supports_reasoning?: false,
@@ -25,6 +27,8 @@ defmodule MagusWeb.Admin.ModelsLive.ListingTest do
       Map.new(attrs)
     )
   end
+
+  defp days_ago(days), do: DateTime.add(DateTime.utc_now(), -days * 24 * 3600, :second)
 
   defp names(result), do: Enum.map(result.models, & &1.name)
 
@@ -44,6 +48,52 @@ defmodule MagusWeb.Admin.ModelsLive.ListingTest do
 
     test "ignores an unloaded (Ash.NotLoaded) relationship" do
       assert Listing.provider_label(model(model_provider: %Ash.NotLoaded{}, provider: "X")) == "X"
+    end
+
+    test "falls back to the vendor derived from the model key" do
+      assert Listing.provider_label(model(key: "openrouter:anthropic/claude-sonnet-4.5")) ==
+               "anthropic"
+
+      assert Listing.provider_label(model(key: "openrouter_citations:perplexity/sonar-pro")) ==
+               "perplexity"
+
+      # No vendor path segment: the api prefix is the best available label.
+      assert Listing.provider_label(model(key: "xai:grok-4")) == "xai"
+
+      # No prefix at all: the bare key gives no provider information.
+      assert Listing.provider_label(model(key: "some-model")) == "-"
+      assert Listing.provider_label(model(key: nil)) == "-"
+    end
+  end
+
+  describe "added filter and sort" do
+    setup do
+      # Names deliberately sort OPPOSITE to age so a name-sort fallback can
+      # never make the added-sort assertions pass by coincidence.
+      %{
+        models: [
+          model(name: "alpha", inserted_at: days_ago(40)),
+          model(name: "zeta", inserted_at: days_ago(2))
+        ]
+      }
+    end
+
+    test "an added window keeps only models created within it", %{models: models} do
+      assert names(Listing.apply(models, %{"added" => "7"})) == ["zeta"]
+      assert names(Listing.apply(models, %{"added" => "90"})) |> Enum.sort() == ["alpha", "zeta"]
+    end
+
+    test "an unknown window value is ignored", %{models: models} do
+      assert length(Listing.apply(models, %{"added" => "nope"}).models) == 2
+      assert length(Listing.apply(models, %{}).models) == 2
+    end
+
+    test "sorting by added orders by insertion time", %{models: models} do
+      assert names(Listing.apply(models, %{"sort" => "added", "dir" => "desc"})) ==
+               ["zeta", "alpha"]
+
+      assert names(Listing.apply(models, %{"sort" => "added", "dir" => "asc"})) ==
+               ["alpha", "zeta"]
     end
   end
 

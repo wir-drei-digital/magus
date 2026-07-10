@@ -5,6 +5,7 @@
 	import { cachedModelPreferences } from '$lib/chat/catalog';
 	import { toggleFavorite } from '$lib/chat/model-preferences';
 	import {
+		costPerMillionLabel,
 		groupModels,
 		prefsById,
 		FAVORITES_GROUP,
@@ -115,10 +116,9 @@
 		return 'text-destructive';
 	}
 
-	/** Raw input/output $/M, shown in the footer next to the context window. */
+	/** Input/output $/M, shown in the footer next to the context window. */
 	function perMillionLabel(model: ModelSummary): string | null {
-		if (!model.inputCost && !model.outputCost) return null;
-		return `${model.inputCost ?? '—'} / ${model.outputCost ?? '—'}`;
+		return costPerMillionLabel(model);
 	}
 </script>
 
