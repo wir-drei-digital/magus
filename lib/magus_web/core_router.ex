@@ -172,6 +172,13 @@ defmodule MagusWeb.CoreRouter do
         plug MagusWeb.Api.Plugs.RequireTokenScope
       end
 
+      # CLI websocket upgrade — token-authed at the HTTP upgrade. No
+      # RequireTokenScope: v1 lets any valid token chat (the `magus chat` GET
+      # passes read scope anyway; revocation/expiry are enforced at lookup).
+      pipeline :cli_socket do
+        plug MagusWeb.Api.Plugs.ApiTokenAuthPlug
+      end
+
       # Browser routes requiring authenticated user
       pipeline :require_auth_browser do
         plug :require_authenticated_user_browser
@@ -441,6 +448,16 @@ defmodule MagusWeb.CoreRouter do
           on_mount: [{MagusWeb.LiveUserAuth, :live_user_required}] do
           live "/onboarding/organization", OnboardingLive.CreateOrganizationLive, :create
         end
+      end
+
+      # CLI chat websocket upgrade for `magus chat` (token-authed at the upgrade).
+      # Registered before the SPA catch-all so `/cli/chat` reaches the controller
+      # instead of the browser shell. Kept separate from the browser-session
+      # `/cli/authorize` scope below (distinct path + pipeline, no conflict).
+      scope "/cli", MagusWeb.Cli do
+        pipe_through [:cli_socket]
+
+        get "/chat", ChatSocketController, :upgrade
       end
 
       # CLI authorization callback flow for `magus login`
