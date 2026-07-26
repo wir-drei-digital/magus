@@ -74,12 +74,41 @@ defmodule MagusWeb.Cli.ChatSocket do
     Magus.Chat.create_conversation(%{chat_mode: :chat}, actor: user)
   end
 
-  # --- chat / mcp_result : implemented in later tasks --------------------
+  # --- chat : implemented in later tasks --------------------------------
 
   defp handle_chat(_msg, state), do: {:ok, state}
+
+  # --- mcp_result : route the CLI's reply back to the waiting proxy ------
+
+  defp handle_mcp_result(%{"call_id" => call_id} = msg, state) do
+    case Map.pop(state.pending, call_id) do
+      {nil, _pending} ->
+        {:ok, state}
+
+      {waiter, pending} ->
+        send(waiter, {:mcp_result, call_id, msg["status"], msg["result"] || %{}, msg["error"]})
+        {:ok, %{state | pending: pending}}
+    end
+  end
+
   defp handle_mcp_result(_msg, state), do: {:ok, state}
 
+  # --- mcp_call : push the reverse-tunnel request to the CLI, track waiter
+
   @impl true
+  def handle_info({:mcp_call, call_id, tool_name, params, from_pid}, state) do
+    frame =
+      Jason.encode!(%{
+        "type" => "mcp_call",
+        "v" => 1,
+        "call_id" => call_id,
+        "tool_name" => tool_name,
+        "params" => params
+      })
+
+    {:push, {:text, frame}, %{state | pending: Map.put(state.pending, call_id, from_pid)}}
+  end
+
   def handle_info(_msg, state), do: {:ok, state}
 
   @impl true
