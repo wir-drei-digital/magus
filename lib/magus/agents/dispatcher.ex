@@ -91,6 +91,20 @@ defmodule Magus.Agents.Dispatcher do
       brain_id: metadata["brain_id"] || metadata[:brain_id],
       brain_page_id: metadata["brain_page_id"] || metadata[:brain_page_id]
     }
+    |> put_local_tools(metadata)
+  end
+
+  defp put_local_tools(data, metadata) do
+    case metadata["caller_session_id"] || metadata[:caller_session_id] do
+      nil ->
+        data
+
+      session_id ->
+        Map.merge(data, %{
+          caller_session_id: session_id,
+          local_tools: metadata["local_tools"] || metadata[:local_tools] || []
+        })
+    end
   end
 
   # Send-lock backstop: refuse to start a turn while a compaction is in flight
