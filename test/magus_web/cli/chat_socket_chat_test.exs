@@ -35,8 +35,9 @@ defmodule MagusWeb.Cli.ChatSocketChatTest do
     messages = Magus.Chat.message_history!(conv.id, actor: user) |> Enum.to_list()
     user_msg = Enum.find(messages, &(&1.role == :user and &1.text == "hi there"))
     assert user_msg
-    # Server-attributed: the STATE session id wins, the spoofed frame value is ignored.
-    assert user_msg.metadata["caller_session_id"] == "s-1"
+    # Server-attributed AND tenant-namespaced: the composite "<user_id>:<state session id>"
+    # wins, derived from state.user + state.session_id, never the spoofed frame value.
+    assert user_msg.metadata["caller_session_id"] == "#{user.id}:s-1"
     refute user_msg.metadata["caller_session_id"] == "spoofed-by-client"
     assert user_msg.metadata["local_tools"] == ["read_file"]
   end

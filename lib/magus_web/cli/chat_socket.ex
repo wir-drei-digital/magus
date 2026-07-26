@@ -38,9 +38,16 @@ defmodule MagusWeb.Cli.ChatSocket do
     advertised = get_in(msg, ["capabilities", "local_tools"]) || []
     accepted = Enum.filter(advertised, &Catalog.known?/1)
 
+    # Tenant isolation: the reverse-tunnel routing identity is namespaced by the
+    # AUTHENTICATED user (set by the controller at init), never trusting the raw
+    # client-supplied session_id alone. The registry key is an opaque composite —
+    # downstream (dispatcher/injection/ReadFile) treats caller_session_id as
+    # opaque, so this closes the cross-tenant hijack with no downstream changes.
+    routing_key = "#{state.user.id}:#{session_id}"
+
     case resolve_conversation(msg["conversation"], state.user) do
       {:ok, conversation} ->
-        {:ok, _} = Registry.register(@registry, session_id, nil)
+        {:ok, _} = Registry.register(@registry, routing_key, nil)
         Phoenix.PubSub.subscribe(Magus.PubSub, "agents:#{conversation.id}")
 
         state = %{
@@ -84,7 +91,9 @@ defmodule MagusWeb.Cli.ChatSocket do
           conversation_id: conv_id,
           text: text,
           metadata: %{
-            "caller_session_id" => state.session_id,
+            # Same namespaced routing key registered in handle_hello: derived from
+            # the authenticated user + connection's session_id, never the frame.
+            "caller_session_id" => "#{user.id}:#{state.session_id}",
             "local_tools" => state.accepted_tools
           }
         },

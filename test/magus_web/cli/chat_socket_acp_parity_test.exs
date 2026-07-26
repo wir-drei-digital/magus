@@ -39,8 +39,9 @@ defmodule MagusWeb.Cli.ChatSocketAcpParityTest do
     assert reply["accepted_tools"] == ["read_file"]
     assert is_binary(reply["conversation_id"])
 
-    # The session is registered for reverse-tunnel routing exactly as for a TUI peer.
-    assert [{pid, _}] = Registry.lookup(@registry, sid)
+    # The session is registered for reverse-tunnel routing exactly as for a TUI peer,
+    # under the user-namespaced routing key (tenant isolation).
+    assert [{pid, _}] = Registry.lookup(@registry, "#{user.id}:#{sid}")
     assert pid == self()
     assert new_state.conversation_id == reply["conversation_id"]
   end

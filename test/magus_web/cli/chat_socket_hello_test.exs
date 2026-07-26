@@ -39,7 +39,8 @@ defmodule MagusWeb.Cli.ChatSocketHelloTest do
     assert reply["accepted_tools"] == ["read_file"]
 
     assert new_state.conversation_id == reply["conversation_id"]
-    assert [{pid, _}] = Registry.lookup(@registry, sid)
+    # The registry key is namespaced by the authenticated user (tenant isolation).
+    assert [{pid, _}] = Registry.lookup(@registry, "#{user.id}:#{sid}")
     assert pid == self()
   end
 
@@ -58,6 +59,6 @@ defmodule MagusWeb.Cli.ChatSocketHelloTest do
              )
 
     assert Jason.decode!(json)["type"] == "error"
-    assert Registry.lookup(@registry, sid) == []
+    assert Registry.lookup(@registry, "#{other.id}:#{sid}") == []
   end
 end
