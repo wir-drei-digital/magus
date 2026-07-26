@@ -19,8 +19,15 @@ defmodule MagusWeb.Cli.ChatSocketChatTest do
       pending: %{}
     }
 
+    # The inbound frame carries a DIFFERENT session_id than the connection's state.
+    # The server must attribute the caller from its own state, never trust the frame.
     frame =
-      Jason.encode!(%{"type" => "chat", "v" => 1, "session_id" => "s-1", "text" => "hi there"})
+      Jason.encode!(%{
+        "type" => "chat",
+        "v" => 1,
+        "session_id" => "spoofed-by-client",
+        "text" => "hi there"
+      })
 
     assert {:ok, _state} = ChatSocket.handle_in({frame, [opcode: :text]}, state)
 
@@ -28,7 +35,9 @@ defmodule MagusWeb.Cli.ChatSocketChatTest do
     messages = Magus.Chat.message_history!(conv.id, actor: user) |> Enum.to_list()
     user_msg = Enum.find(messages, &(&1.role == :user and &1.text == "hi there"))
     assert user_msg
+    # Server-attributed: the STATE session id wins, the spoofed frame value is ignored.
     assert user_msg.metadata["caller_session_id"] == "s-1"
+    refute user_msg.metadata["caller_session_id"] == "spoofed-by-client"
     assert user_msg.metadata["local_tools"] == ["read_file"]
   end
 end

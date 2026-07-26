@@ -78,19 +78,29 @@ defmodule MagusWeb.Cli.ChatSocket do
 
   defp handle_chat(%{"text" => text}, %{conversation_id: conv_id, user: user} = state)
        when is_binary(conv_id) do
-    Magus.Chat.send_user_message(
-      %{
-        conversation_id: conv_id,
-        text: text,
-        metadata: %{
-          "caller_session_id" => state.session_id,
-          "local_tools" => state.accepted_tools
-        }
-      },
-      actor: user
-    )
+    result =
+      Magus.Chat.send_user_message(
+        %{
+          conversation_id: conv_id,
+          text: text,
+          metadata: %{
+            "caller_session_id" => state.session_id,
+            "local_tools" => state.accepted_tools
+          }
+        },
+        actor: user
+      )
 
-    {:ok, state}
+    case result do
+      {:ok, _} ->
+        {:ok, state}
+
+      # A pre-persistence failure (validation/auth) fires no broadcast, so the CLI
+      # would receive zero events and wedge its draining state. Surface an error
+      # frame to unblock the turn. Keep the message generic — never leak internals.
+      {:error, _reason} ->
+        {:push, error_frame("send_failed", "Could not start the turn"), state}
+    end
   end
 
   defp handle_chat(_msg, state), do: {:ok, state}

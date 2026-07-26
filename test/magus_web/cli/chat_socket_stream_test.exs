@@ -27,30 +27,41 @@ defmodule MagusWeb.Cli.ChatSocketStreamTest do
   end
 
   test "maps tool.start and tool.complete" do
-    assert push(%{
-             type: "tool.start",
-             event_id: "e1",
-             tool_name: "read_file",
-             display_name: "Reading...",
-             inputs: %{}
-           })["event"] ==
-             "tool.start"
+    start =
+      push(%{
+        type: "tool.start",
+        event_id: "e1",
+        tool_name: "read_file",
+        display_name: "Reading...",
+        inputs: %{}
+      })
 
-    assert push(%{
-             type: "tool.complete",
-             event_id: "e1",
-             tool_name: "read_file",
-             status: :success,
-             output_summary: "3 lines",
-             duration_ms: 0,
-             error: nil
-           })["event"] ==
-             "tool.complete"
+    assert start["event"] == "tool.start"
+    assert start["data"]["event_id"] == "e1"
+    assert start["data"]["tool_name"] == "read_file"
+
+    complete =
+      push(%{
+        type: "tool.complete",
+        event_id: "e1",
+        tool_name: "read_file",
+        status: :success,
+        output_summary: "3 lines",
+        duration_ms: 0,
+        error: nil
+      })
+
+    assert complete["event"] == "tool.complete"
+    # Pins the :output_summary -> "summary" and atom-status -> string mapping
+    # (the exact SseStreamer trap).
+    assert complete["data"]["summary"] == "3 lines"
+    assert complete["data"]["status"] == "success"
   end
 
   test "maps response.complete to turn.done" do
-    assert push(%{type: "response.complete", triggering_message_id: "req-1"})["event"] ==
-             "turn.done"
+    f = push(%{type: "response.complete", triggering_message_id: "req-1"})
+    assert f["event"] == "turn.done"
+    assert f["data"]["message_id"] == "req-1"
   end
 
   test "maps error using the error_message field" do
