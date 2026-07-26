@@ -74,7 +74,24 @@ defmodule MagusWeb.Cli.ChatSocket do
     Magus.Chat.create_conversation(%{chat_mode: :chat}, actor: user)
   end
 
-  # --- chat : implemented in later tasks --------------------------------
+  # --- chat : drive a turn via Chat.send_user_message -------------------
+
+  defp handle_chat(%{"text" => text}, %{conversation_id: conv_id, user: user} = state)
+       when is_binary(conv_id) do
+    Magus.Chat.send_user_message(
+      %{
+        conversation_id: conv_id,
+        text: text,
+        metadata: %{
+          "caller_session_id" => state.session_id,
+          "local_tools" => state.accepted_tools
+        }
+      },
+      actor: user
+    )
+
+    {:ok, state}
+  end
 
   defp handle_chat(_msg, state), do: {:ok, state}
 
@@ -93,9 +110,18 @@ defmodule MagusWeb.Cli.ChatSocket do
 
   defp handle_mcp_result(_msg, state), do: {:ok, state}
 
-  # --- mcp_call : push the reverse-tunnel request to the CLI, track waiter
+  # --- agent_signal : map PubSub broadcasts to chat_stream frames -------
 
   @impl true
+  def handle_info(%Phoenix.Socket.Broadcast{event: "agent_signal", payload: payload}, state) do
+    case map_signal(payload) do
+      nil -> {:ok, state}
+      {event, data} -> {:push, {:text, chat_stream_frame(event, data)}, state}
+    end
+  end
+
+  # --- mcp_call : push the reverse-tunnel request to the CLI, track waiter
+
   def handle_info({:mcp_call, call_id, tool_name, params, from_pid}, state) do
     frame =
       Jason.encode!(%{
@@ -115,6 +141,43 @@ defmodule MagusWeb.Cli.ChatSocket do
   def terminate(_reason, _state), do: :ok
 
   # --- helpers -----------------------------------------------------------
+
+  # CAVEAT: use the BROADCAST field names below (error_message, triggering_message_id,
+  # output_summary), NOT SseStreamer's payload[:message] / payload[:message_id] reads —
+  # those keys do not exist on the agent's broadcasts and resolve to nil. SseStreamer
+  # itself has this latent bug; do not mirror its field access, only its structure.
+  defp map_signal(%{type: "text.chunk"} = p),
+    do: {"text.delta", %{"delta" => p[:delta], "message_id" => p[:message_id]}}
+
+  defp map_signal(%{type: "text.complete"} = p),
+    do: {"text.done", %{"text" => p[:text], "message_id" => p[:message_id]}}
+
+  defp map_signal(%{type: "tool.start"} = p),
+    do:
+      {"tool.start",
+       %{"event_id" => p[:event_id], "tool_name" => p[:tool_name], "inputs" => p[:inputs]}}
+
+  defp map_signal(%{type: "tool.complete"} = p),
+    do:
+      {"tool.complete",
+       %{
+         "event_id" => p[:event_id],
+         "tool_name" => p[:tool_name],
+         "status" => to_string(p[:status]),
+         "summary" => p[:output_summary]
+       }}
+
+  defp map_signal(%{type: "response.complete"} = p),
+    do: {"turn.done", %{"message_id" => p[:triggering_message_id]}}
+
+  defp map_signal(%{type: "error"} = p),
+    do: {"error", %{"message" => p[:error_message]}}
+
+  defp map_signal(_), do: nil
+
+  defp chat_stream_frame(event, data) do
+    Jason.encode!(%{"type" => "chat_stream", "v" => 1, "event" => event, "data" => data})
+  end
 
   defp error_frame(code, message) do
     {:text, Jason.encode!(%{"type" => "error", "v" => 1, "code" => code, "message" => message})}
