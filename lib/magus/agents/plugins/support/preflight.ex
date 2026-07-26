@@ -150,6 +150,7 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
             |> maybe_put_runtime_field(:req_http_options, data)
             |> maybe_put_runtime_field(:system_prompt, data)
             |> maybe_put_runtime_field(:model_name, data)
+            |> Magus.Agents.Tools.Remote.Injection.augment(data)
             |> then(&Jido.Signal.new!("ai.react.query", &1))
 
           {:ok, {:continue, react_signal}}
