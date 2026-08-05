@@ -3,8 +3,8 @@ defmodule Magus.Agents.Tools.Remote.ReadFile do
   Reverse-tunnel proxy tool: reads a file on the *caller's* local machine.
 
   `run/2` resolves the caller's WebSocket handler from the connection registry
-  by the server-side `acting_user_id` (never by anything client-supplied, and
-  never by conversation), then does a synchronous `send`/`receive` round-trip
+  by the server-side `acting_user_id` + `conversation_id` (never by anything
+  client-supplied), then does a synchronous `send`/`receive` round-trip
   with a self-enforced timeout. We opt out of the runner's wall-clock
   (`execution_timeout_ms/0` -> :infinity) so our own timeout is the sole
   bound — a runner brutal-kill would surface as a RETRYABLE
@@ -29,7 +29,8 @@ defmodule Magus.Agents.Tools.Remote.ReadFile do
       path: [type: :string, required: true, doc: "File path to read"]
     ]
 
-  import Magus.Agents.Tools.Helpers, only: [validate_context: 2, get_param: 2]
+  import Magus.Agents.Tools.Helpers,
+    only: [validate_context: 2, get_param: 2, get_context_value: 2]
 
   alias Magus.Cli.ConnectionRegistry
 
@@ -54,15 +55,15 @@ defmodule Magus.Agents.Tools.Remote.ReadFile do
         {:ok, %{error: "A file path is required."}}
 
       {:ok, ctx} ->
-        round_trip(ctx.acting_user_id, path)
+        round_trip(ctx.acting_user_id, get_context_value(context, :conversation_id), path)
 
       {:error, message} ->
         {:ok, %{error: message}}
     end
   end
 
-  defp round_trip(user_id, path) do
-    case ConnectionRegistry.lookup(user_id) do
+  defp round_trip(user_id, conversation_id, path) do
+    case ConnectionRegistry.lookup(user_id, conversation_id) do
       nil ->
         {:ok,
          %{

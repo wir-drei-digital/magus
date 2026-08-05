@@ -9,6 +9,11 @@ defmodule MagusWeb.Cli.ChatSocket do
   pings automatically, so a CLI that pings (or sends) at least once a minute
   stays connected; an idle connection is closed and must reconnect with a
   fresh `hello` (using `conversation.resume` to keep its conversation).
+
+  Frame-size contract: the upgrade caps inbound frames at 1MB; Bandit CLOSES
+  the connection on an oversize frame. `mcp_result` payloads (file content)
+  must therefore stay comfortably under 1MB — the CLI truncates and sets
+  `result.truncated` instead of sending more.
   """
 
   @behaviour WebSock
@@ -50,9 +55,10 @@ defmodule MagusWeb.Cli.ChatSocket do
 
     case resolve_conversation(msg["conversation"], state.user) do
       {:ok, conversation} ->
-        # Reverse-tunnel routing identity is the AUTHENTICATED user, set by
-        # the controller at the upgrade. Client-supplied ids play no part.
-        :ok = ConnectionRegistry.register(state.user.id)
+        # Reverse-tunnel routing identity is the AUTHENTICATED user (set by
+        # the controller at the upgrade) plus the server-resolved conversation.
+        # Client-supplied ids play no part.
+        :ok = ConnectionRegistry.register(state.user.id, conversation.id)
         Phoenix.PubSub.subscribe(Magus.PubSub, "agents:#{conversation.id}")
 
         state = %{state | conversation_id: conversation.id, accepted_tools: accepted}

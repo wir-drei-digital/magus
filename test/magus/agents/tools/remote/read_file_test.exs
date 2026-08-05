@@ -4,14 +4,14 @@ defmodule Magus.Agents.Tools.Remote.ReadFileTest do
   alias Magus.Agents.Tools.Remote.ReadFile
   alias Magus.Cli.ConnectionRegistry
 
-  # Spawns a process that registers as `user_id`'s CLI connection and runs
-  # `reply_fun.(from, call_id)` when it receives the mcp_call. Returns once
-  # registration is confirmed.
-  defp stub_handler(user_id, reply_fun) do
+  # Spawns a process that registers as `user_id`'s CLI connection for
+  # `conversation_id` and runs `reply_fun.(from, call_id)` when it receives
+  # the mcp_call. Returns once registration is confirmed.
+  defp stub_handler(user_id, conversation_id \\ "conv-1", reply_fun) do
     test = self()
 
     spawn(fn ->
-      :ok = ConnectionRegistry.register(user_id)
+      :ok = ConnectionRegistry.register(user_id, conversation_id)
       send(test, :registered)
 
       receive do
@@ -47,12 +47,36 @@ defmodule Magus.Agents.Tools.Remote.ReadFileTest do
     end)
 
     # An attacker's turn carries the attacker's acting_user_id (set server-side
-    # by Preflight); nothing client-supplied can redirect it to the victim.
+    # by Preflight); nothing client-supplied can redirect it to the victim —
+    # including a legacy-style caller_session_id decoy smuggled into context,
+    # which must be dead weight (pins that no fallback ever reads it).
     assert {:ok, %{error: msg}} =
-             ReadFile.run(%{"path" => "~/.ssh/id_rsa"}, %{acting_user_id: uid()})
+             ReadFile.run(%{"path" => "~/.ssh/id_rsa"}, %{
+               acting_user_id: uid(),
+               caller_session_id: victim_id
+             })
 
     assert msg =~ "No active local connection"
     refute_receive {:got_call, _, _}, 100
+  end
+
+  test "prefers the connection on the turn's conversation over a newer one" do
+    user_id = uid()
+
+    stub_handler(user_id, "conv-laptop", fn from, call_id ->
+      send(from, {:mcp_result, call_id, "ok", %{"content" => "laptop"}, nil})
+    end)
+
+    # A newer connection on another conversation must not steal the call.
+    stub_handler(user_id, "conv-remote", fn from, call_id ->
+      send(from, {:mcp_result, call_id, "ok", %{"content" => "remote box"}, nil})
+    end)
+
+    assert {:ok, %{content: "laptop"}} =
+             ReadFile.run(%{"path" => "a.txt"}, %{
+               acting_user_id: user_id,
+               conversation_id: "conv-laptop"
+             })
   end
 
   test "no live connection is a terminal ok-wrapped error (not retryable)" do

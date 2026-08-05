@@ -35,4 +35,17 @@ defmodule Magus.Agents.Tools.Remote.InjectionTest do
     out = Injection.augment(%{tools: [SomeAgentTool]}, %{"local_tools" => ["read_file"]})
     assert out.tools == [SomeAgentTool, ReadFile]
   end
+
+  test "never threads a caller_session_id from data into tool_context" do
+    signal = %{tools: [SomeAgentTool], tool_context: %{user_id: "u1"}}
+
+    out =
+      Injection.augment(signal, %{
+        :local_tools => ["read_file"],
+        :caller_session_id => "victim-key",
+        "caller_session_id" => "victim-key"
+      })
+
+    assert out.tool_context == %{user_id: "u1"}
+  end
 end

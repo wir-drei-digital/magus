@@ -4,14 +4,15 @@ defmodule Magus.Agents.DispatcherLocalToolsTest do
   alias Magus.Agents.Dispatcher
   alias Magus.Chat.{Conversation, Message}
 
-  defp message(metadata) do
+  defp message(metadata, created_by_id \\ Ecto.UUID.generate()) do
     %Message{
       id: Ecto.UUID.generate(),
       text: "hi",
       mode: :chat,
       selected_model_id: nil,
       attachments: [],
-      metadata: metadata
+      metadata: metadata,
+      created_by_id: created_by_id
     }
   end
 
@@ -51,5 +52,19 @@ defmodule Magus.Agents.DispatcherLocalToolsTest do
 
     refute Map.has_key?(data, :caller_session_id)
     assert data[:local_tools] == ["read_file"]
+  end
+
+  test "drops local_tools on an unattributed message (nil created_by_id)" do
+    # Dispatchable messages without relate_actor (e.g. job triggers) resolve
+    # acting_user_id to the conversation OWNER in Preflight; they must never
+    # carry reverse-tunnel tools under that borrowed identity.
+    data =
+      Dispatcher.build_signal_data(
+        message(%{"local_tools" => ["read_file"]}, nil),
+        conversation(),
+        routed()
+      )
+
+    refute Map.has_key?(data, :local_tools)
   end
 end

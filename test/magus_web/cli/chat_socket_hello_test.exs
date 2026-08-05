@@ -34,8 +34,8 @@ defmodule MagusWeb.Cli.ChatSocketHelloTest do
     assert reply["accepted_tools"] == ["read_file"]
 
     assert new_state.conversation_id == reply["conversation_id"]
-    # Registered under the AUTHENTICATED user id — nothing client-supplied.
-    assert ConnectionRegistry.lookup(user.id) == self()
+    # Registered under the AUTHENTICATED user id + server-resolved conversation.
+    assert ConnectionRegistry.lookup(user.id, reply["conversation_id"]) == self()
   end
 
   test "a second hello on the same connection is rejected" do
@@ -70,6 +70,6 @@ defmodule MagusWeb.Cli.ChatSocketHelloTest do
              )
 
     assert Jason.decode!(json)["type"] == "error"
-    assert ConnectionRegistry.lookup(other.id) == nil
+    assert ConnectionRegistry.lookup(other.id, conv.id) == nil
   end
 end

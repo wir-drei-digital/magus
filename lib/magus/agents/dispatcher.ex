@@ -91,19 +91,26 @@ defmodule Magus.Agents.Dispatcher do
       brain_id: metadata["brain_id"] || metadata[:brain_id],
       brain_page_id: metadata["brain_page_id"] || metadata[:brain_page_id]
     }
-    |> put_local_tools(metadata)
+    |> put_local_tools(metadata, message.created_by_id)
   end
 
   # Message metadata is client-writable over RPC, so local_tools is untrusted
   # input: names are filtered against the fixed Remote.Catalog at injection,
   # and the reverse tunnel routes by the server-side acting_user_id — a forged
   # entry can only ever reach the forger's own CLI connection.
-  defp put_local_tools(data, metadata) do
+  #
+  # Attribution guard: unattributed dispatchable messages (created_by_id nil,
+  # e.g. job triggers without relate_actor) resolve acting_user_id to the
+  # conversation OWNER in Preflight; they must never carry reverse-tunnel
+  # tools under that borrowed identity.
+  defp put_local_tools(data, metadata, created_by_id) when is_binary(created_by_id) do
     case metadata["local_tools"] || metadata[:local_tools] do
       [_ | _] = tools -> Map.put(data, :local_tools, Enum.filter(tools, &is_binary/1))
       _ -> data
     end
   end
+
+  defp put_local_tools(data, _metadata, _created_by_id), do: data
 
   # Send-lock backstop: refuse to start a turn while a compaction is in flight
   # for this conversation. The composer already disables Send off the same
