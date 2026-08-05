@@ -204,7 +204,7 @@ defmodule Magus.Knowledge.Connectors.Onedrive do
 
   defp drain_delta(conn, url, acc) do
     case get_json(conn, url) do
-      {:ok, %{"value" => value} = body} ->
+      {:ok, %{"value" => value} = body} when is_list(value) ->
         new_acc = [value | acc]
 
         cond do
@@ -221,6 +221,11 @@ defmodule Magus.Knowledge.Connectors.Onedrive do
             # than persisting a bad cursor.
             {:error, :cursor_reset}
         end
+
+      # A 200 body without a "value" list is as untrustworthy as a missing
+      # deltaLink: self-heal via the reset contract (mirrors drain_pages).
+      {:ok, _body} ->
+        {:error, :cursor_reset}
 
       {:error, {:graph_api_error, 410, _body}} ->
         {:error, :cursor_reset}

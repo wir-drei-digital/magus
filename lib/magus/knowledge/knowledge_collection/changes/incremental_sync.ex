@@ -279,20 +279,40 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.IncrementalSync do
   defp process_change(
          _conn,
          _connector,
-         %{type: :deleted, item: item},
+         %{type: :deleted, item: item} = change,
          existing,
          _collection,
          _source,
          _actor
        ) do
-    case Map.get(existing, item.id) do
-      nil ->
+    # A `prefix: true` delete (Dropbox: a deleted folder yields ONE entry for
+    # the folder path, no per-child tombstones) removes the exact id AND every
+    # tracked file under `id/`; a plain delete stays an exact match.
+    ids =
+      if Map.get(change, :prefix, false) do
+        prefix = item.id <> "/"
+
+        existing
+        |> Map.keys()
+        |> Enum.filter(&(&1 == item.id or String.starts_with?(&1, prefix)))
+      else
+        if Map.has_key?(existing, item.id), do: [item.id], else: []
+      end
+
+    label = Map.get(item, :name) || item.id
+
+    case ids do
+      [] ->
         :ok
 
-      file ->
-        case SyncHelpers.delete_remote_gone_file(file) do
-          :ok -> {:ok, "Deleted: #{item.name || item.id}"}
-          :error -> {:error, "Failed to delete: #{item.name || item.id}"}
+      ids ->
+        results =
+          Enum.map(ids, fn id -> SyncHelpers.delete_remote_gone_file(Map.fetch!(existing, id)) end)
+
+        if Enum.all?(results, &(&1 == :ok)) do
+          {:ok, "Deleted: #{label}#{if length(ids) > 1, do: " (#{length(ids)} files)", else: ""}"}
+        else
+          {:error, "Failed to delete: #{label}"}
         end
     end
   end

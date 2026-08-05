@@ -12,7 +12,7 @@ defmodule Magus.Knowledge.Connectors.Webdav.Client do
   auth headers, and an absolute WebDAV `path`; the client does no path magic.
 
   Uses recursive `Depth: 1` PROPFIND requests instead of `Depth: infinity`
-  for compatibility — many WebDAV servers disable infinite depth.
+  for compatibility; many WebDAV servers disable infinite depth.
 
   Handles 429/503 rate limiting with automatic retry using the `Retry-After`
   header.
@@ -114,7 +114,8 @@ defmodule Magus.Knowledge.Connectors.Webdav.Client do
     case Req.Response.get_header(response, "retry-after") do
       [value | _] ->
         case Integer.parse(value) do
-          {seconds, _} when seconds > 0 and seconds <= 60 -> seconds
+          # Clamp long server backoffs to 15s instead of collapsing to 1s.
+          {seconds, _} when seconds > 0 -> min(seconds, 15)
           _ -> 1
         end
 

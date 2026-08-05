@@ -234,7 +234,11 @@ defmodule Magus.Knowledge.Connectors.Dropbox do
 
   defp entry_to_change(entry) do
     case entry[".tag"] do
-      "deleted" -> %{type: :deleted, item: %{id: entry["path_lower"]}}
+      # A DeletedMetadata entry does not say whether a file or a folder was
+      # deleted, and a deleted folder may yield ONE entry for the folder path
+      # with no per-child tombstones. Flag it as a prefix delete so the sync
+      # framework also removes everything under the path.
+      "deleted" -> %{type: :deleted, prefix: true, item: %{id: entry["path_lower"]}}
       "file" -> %{type: :updated, item: item_from_entry(entry)}
       _ -> nil
     end
@@ -270,7 +274,9 @@ defmodule Magus.Knowledge.Connectors.Dropbox do
            body: "",
            headers: [
              {"authorization", "Bearer #{token}"},
-             {"dropbox-api-arg", Jason.encode!(%{path: path})}
+             # Dropbox-API-Arg must be ASCII-safe JSON: non-ASCII path chars
+             # (umlauts etc.) are rejected unless \\uXXXX-escaped.
+             {"dropbox-api-arg", Jason.encode!(%{path: path}, escape: :unicode_safe)}
            ],
            receive_timeout: @content_download_timeout,
            max_retries: 0

@@ -6,7 +6,7 @@ defmodule Magus.Knowledge.Connectors.WebdavTest do
   alias Magus.Knowledge.Connectors.Webdav
 
   describe "connect/1" do
-    test "creates connection with valid credentials" do
+    test "splits base_url into origin and DAV root path" do
       config = %{
         "base_url" => "https://dav.example.com/remote/dav",
         "username" => "user",
@@ -14,7 +14,8 @@ defmodule Magus.Knowledge.Connectors.WebdavTest do
       }
 
       assert {:ok, conn} = Webdav.connect(config)
-      assert conn.base_url == "https://dav.example.com/remote/dav"
+      assert conn.origin == "https://dav.example.com"
+      assert conn.root_path == "/remote/dav"
       assert conn.username == "user"
       assert conn.password == "pass"
     end
@@ -27,7 +28,26 @@ defmodule Magus.Knowledge.Connectors.WebdavTest do
       }
 
       assert {:ok, conn} = Webdav.connect(config)
-      assert conn.base_url == "https://dav.example.com/remote/dav"
+      assert conn.root_path == "/remote/dav"
+    end
+
+    test "an origin-only base_url yields an empty root path" do
+      config = %{
+        "base_url" => "https://dav.example.com",
+        "username" => "user",
+        "password" => "pass"
+      }
+
+      assert {:ok, conn} = Webdav.connect(config)
+      assert conn.origin == "https://dav.example.com"
+      assert conn.root_path == ""
+    end
+
+    test "rejects a base_url without scheme or host" do
+      for bad <- ["dav.example.com/remote", "ftp://dav.example.com", "https://"] do
+        config = %{"base_url" => bad, "username" => "u", "password" => "p"}
+        assert {:error, :invalid_base_url} = Webdav.connect(config)
+      end
     end
 
     test "fails without credentials" do
@@ -60,14 +80,16 @@ defmodule Magus.Knowledge.Connectors.WebdavTest do
     end
   end
 
-  describe "list_folders/2 (Bypass PROPFIND round-trip)" do
+  describe "list_folders/2 (Bypass PROPFIND round-trip, path-bearing DAV root)" do
     setup do
       dav = Bypass.open()
-      base = "http://localhost:#{dav.port}"
+      # The realistic shape: the DAV root lives under a path (ownCloud, Koofr,
+      # Hetzner all do), and hrefs come back SERVER-absolute with that prefix.
+      base = "http://localhost:#{dav.port}/remote.php/dav/files/user"
       {:ok, dav: dav, base: base}
     end
 
-    test "sends Basic auth + Depth:1 to base_url directly (no /remote.php magic)",
+    test "sends Basic auth + Depth:1 to the rooted path, excludes self, strips prefix",
          %{dav: dav, base: base} do
       {:ok, conn} =
         Webdav.connect(%{
@@ -80,9 +102,52 @@ defmodule Magus.Knowledge.Connectors.WebdavTest do
 
       Bypass.expect_once(dav, fn conn ->
         assert conn.method == "PROPFIND"
-        assert conn.request_path == "/"
+        # Exactly ONE prefix: base path, not doubled.
+        assert conn.request_path == "/remote.php/dav/files/user/"
         assert Plug.Conn.get_req_header(conn, "authorization") == [expected_auth]
         assert Plug.Conn.get_req_header(conn, "depth") == ["1"]
+
+        multistatus = """
+        <?xml version="1.0"?>
+        <d:multistatus xmlns:d="DAV:">
+          <d:response>
+            <d:href>/remote.php/dav/files/user/</d:href>
+            <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat>
+          </d:response>
+          <d:response>
+            <d:href>/remote.php/dav/files/user/Reports/</d:href>
+            <d:propstat>
+              <d:prop>
+                <d:displayname>Reports</d:displayname>
+                <d:resourcetype><d:collection/></d:resourcetype>
+              </d:prop>
+            </d:propstat>
+          </d:response>
+        </d:multistatus>
+        """
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/xml")
+        |> Plug.Conn.resp(207, multistatus)
+      end)
+
+      assert {:ok, folders} = Webdav.list_folders(conn, "/")
+      # Self (the root) is excluded; the UI path is root-relative.
+      assert [%{name: "Reports", path: "/Reports/", id: "/remote.php/dav/files/user/Reports/"}] =
+               folders
+    end
+
+    test "works at an origin-only DAV root too", %{dav: dav} do
+      {:ok, conn} =
+        Webdav.connect(%{
+          "base_url" => "http://localhost:#{dav.port}",
+          "username" => "user",
+          "password" => "pass"
+        })
+
+      Bypass.expect_once(dav, fn conn ->
+        assert conn.method == "PROPFIND"
+        assert conn.request_path == "/"
 
         multistatus = """
         <?xml version="1.0"?>
@@ -113,14 +178,15 @@ defmodule Magus.Knowledge.Connectors.WebdavTest do
     end
   end
 
-  describe "list_items/3 (Bypass PROPFIND round-trip: folder + file with etag)" do
+  describe "list_items/3 (Bypass PROPFIND round-trip, path-bearing DAV root)" do
     setup do
       dav = Bypass.open()
-      base = "http://localhost:#{dav.port}"
+      base = "http://localhost:#{dav.port}/remote/dav"
       {:ok, dav: dav, base: base}
     end
 
-    test "returns files (not collections) with etag/mime/updated_at", %{dav: dav, base: base} do
+    test "uses collection hrefs verbatim (no double prefix) and returns files",
+         %{dav: dav, base: base} do
       {:ok, conn} =
         Webdav.connect(%{
           "base_url" => base,
@@ -128,21 +194,22 @@ defmodule Magus.Knowledge.Connectors.WebdavTest do
           "password" => "pass"
         })
 
-      # Root PROPFIND: one file + one subfolder.
+      # The collection external_id is an href from a prior PROPFIND: it
+      # already carries the DAV root prefix and must be used verbatim.
       Bypass.expect_once(dav, fn conn ->
         assert conn.method == "PROPFIND"
-        assert conn.request_path == "/Docs/"
+        assert conn.request_path == "/remote/dav/Docs/"
         assert Plug.Conn.get_req_header(conn, "depth") == ["1"]
 
         multistatus = """
         <?xml version="1.0"?>
         <d:multistatus xmlns:d="DAV:">
           <d:response>
-            <d:href>/Docs/</d:href>
+            <d:href>/remote/dav/Docs/</d:href>
             <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat>
           </d:response>
           <d:response>
-            <d:href>/Docs/report.pdf</d:href>
+            <d:href>/remote/dav/Docs/report.pdf</d:href>
             <d:propstat>
               <d:prop>
                 <d:displayname>report.pdf</d:displayname>
@@ -161,24 +228,96 @@ defmodule Magus.Knowledge.Connectors.WebdavTest do
         |> Plug.Conn.resp(207, multistatus)
       end)
 
-      assert {:ok, items, nil} = Webdav.list_items(conn, %{path: "/Docs"}, nil)
+      assert {:ok, items, nil} = Webdav.list_items(conn, %{path: "/remote/dav/Docs"}, nil)
       assert [item] = items
       assert item.name == "report.pdf"
-      assert item.id == "/Docs/report.pdf"
+      assert item.id == "/remote/dav/Docs/report.pdf"
       assert item.etag == "\"abc123\""
       assert item.mime_type == "application/pdf"
       assert %DateTime{} = item.updated_at
+    end
+
+    test "resolves a logical (non-prefixed) collection path onto the DAV root",
+         %{dav: dav, base: base} do
+      {:ok, conn} =
+        Webdav.connect(%{
+          "base_url" => base,
+          "username" => "user",
+          "password" => "pass"
+        })
+
+      Bypass.expect_once(dav, fn conn ->
+        assert conn.method == "PROPFIND"
+        assert conn.request_path == "/remote/dav/Docs/"
+
+        multistatus = """
+        <?xml version="1.0"?>
+        <d:multistatus xmlns:d="DAV:">
+          <d:response>
+            <d:href>/remote/dav/Docs/</d:href>
+            <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat>
+          </d:response>
+        </d:multistatus>
+        """
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/xml")
+        |> Plug.Conn.resp(207, multistatus)
+      end)
+
+      assert {:ok, [], nil} = Webdav.list_items(conn, %{path: "Docs"}, nil)
+    end
+
+    test "handles absolute-URI hrefs on the same origin", %{dav: dav, base: base} do
+      {:ok, conn} =
+        Webdav.connect(%{
+          "base_url" => base,
+          "username" => "user",
+          "password" => "pass"
+        })
+
+      origin = "http://localhost:#{dav.port}"
+
+      Bypass.expect_once(dav, fn conn ->
+        multistatus = """
+        <?xml version="1.0"?>
+        <d:multistatus xmlns:d="DAV:">
+          <d:response>
+            <d:href>#{origin}/remote/dav/Docs/</d:href>
+            <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat>
+          </d:response>
+          <d:response>
+            <d:href>#{origin}/remote/dav/Docs/notes.txt</d:href>
+            <d:propstat>
+              <d:prop>
+                <d:displayname>notes.txt</d:displayname>
+                <d:getcontenttype>text/plain</d:getcontenttype>
+                <d:resourcetype/>
+              </d:prop>
+            </d:propstat>
+          </d:response>
+        </d:multistatus>
+        """
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/xml")
+        |> Plug.Conn.resp(207, multistatus)
+      end)
+
+      assert {:ok, [item], nil} = Webdav.list_items(conn, %{path: "/remote/dav/Docs"}, nil)
+      assert item.id == "/remote/dav/Docs/notes.txt"
     end
   end
 
   describe "fetch_content/2 (Bypass GET with Basic auth)" do
     setup do
       dav = Bypass.open()
-      base = "http://localhost:#{dav.port}"
+      base = "http://localhost:#{dav.port}/remote/dav"
       {:ok, dav: dav, base: base}
     end
 
-    test "sends Basic auth header and returns the binary body", %{dav: dav, base: base} do
+    test "GETs origin <> item id (single prefix) and returns the binary body",
+         %{dav: dav, base: base} do
       {:ok, conn} =
         Webdav.connect(%{
           "base_url" => base,
@@ -188,14 +327,15 @@ defmodule Magus.Knowledge.Connectors.WebdavTest do
 
       expected_auth = "Basic " <> Base.encode64("user:secret")
 
-      Bypass.expect_once(dav, "GET", "/Docs/report.pdf", fn conn ->
+      Bypass.expect_once(dav, "GET", "/remote/dav/Docs/report.pdf", fn conn ->
         assert Plug.Conn.get_req_header(conn, "authorization") == [expected_auth]
         Plug.Conn.resp(conn, 200, "the real bytes")
       end)
 
       assert {:ok, "the real bytes", meta} =
-               Webdav.fetch_content(conn, %{id: "/Docs/report.pdf"})
+               Webdav.fetch_content(conn, %{id: "/remote/dav/Docs/report.pdf"})
 
+      # Member-visible metadata is root-relative.
       assert meta["path"] == "/Docs/report.pdf"
     end
   end

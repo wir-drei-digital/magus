@@ -93,7 +93,9 @@ defmodule Magus.Knowledge.KnowledgeCollection.Changes.SyncHelpers do
   def format_sync_error(:rate_limited),
     do: "Rate limited by the provider. The next scheduled sync will retry automatically."
 
-  def format_sync_error(reason), do: inspect(reason)
+  # Truncate: a {:webdav_error, 500, body} would otherwise dump a whole HTML
+  # error page into the member-visible last_error.
+  def format_sync_error(reason), do: reason |> inspect() |> String.slice(0, 500)
 
   @doc "SHA-256 hex digest used as the stored content fingerprint."
   def content_hash(content) when is_binary(content) do

@@ -19,6 +19,14 @@ defmodule Magus.Knowledge.Connectors.KdriveTest do
     |> Plug.Conn.resp(status, Jason.encode!(body))
   end
 
+  # Pagination terminates on an EMPTY page (a short page could just mean the
+  # server clamped per_page), so every listing endpoint serves its data on
+  # page 1 and an empty page afterwards.
+  defp paged(conn, data) do
+    page = conn.query_string |> URI.decode_query() |> Map.get("page", "1")
+    json(conn, 200, %{"data" => if(page == "1", do: data, else: [])})
+  end
+
   describe "connect/1" do
     test "creates a connection with an api token" do
       assert {:ok, conn} = Kdrive.connect(%{"api_token" => "kd-token"})
@@ -38,13 +46,11 @@ defmodule Magus.Knowledge.Connectors.KdriveTest do
     test "maps each drive to a composite-root folder", %{api: api} do
       {:ok, conn} = Kdrive.connect(%{"api_token" => "tok"})
 
-      Bypass.expect_once(api, "GET", "/2/drive", fn conn ->
-        json(conn, 200, %{
-          "data" => [
-            %{"id" => 111, "name" => "Team Drive"},
-            %{"id" => 222, "name" => "Personal"}
-          ]
-        })
+      Bypass.expect(api, "GET", "/2/drive", fn conn ->
+        paged(conn, [
+          %{"id" => 111, "name" => "Team Drive"},
+          %{"id" => 222, "name" => "Personal"}
+        ])
       end)
 
       assert {:ok, folders} = Kdrive.list_folders(conn, nil)
@@ -59,13 +65,11 @@ defmodule Magus.Knowledge.Connectors.KdriveTest do
     test "lists only child directories, translating :root to file id 1", %{api: api} do
       {:ok, conn} = Kdrive.connect(%{"api_token" => "tok"})
 
-      Bypass.expect_once(api, "GET", "/3/drive/111/files/1/files", fn conn ->
-        json(conn, 200, %{
-          "data" => [
-            %{"id" => 10, "name" => "Reports", "type" => "dir"},
-            %{"id" => 11, "name" => "notes.txt", "type" => "file"}
-          ]
-        })
+      Bypass.expect(api, "GET", "/3/drive/111/files/1/files", fn conn ->
+        paged(conn, [
+          %{"id" => 10, "name" => "Reports", "type" => "dir"},
+          %{"id" => 11, "name" => "notes.txt", "type" => "file"}
+        ])
       end)
 
       assert {:ok, folders} = Kdrive.list_folders(conn, "111:root")
@@ -75,12 +79,10 @@ defmodule Magus.Knowledge.Connectors.KdriveTest do
     test "lists child directories under a non-root file id", %{api: api} do
       {:ok, conn} = Kdrive.connect(%{"api_token" => "tok"})
 
-      Bypass.expect_once(api, "GET", "/3/drive/111/files/10/files", fn conn ->
-        json(conn, 200, %{
-          "data" => [
-            %{"id" => 20, "name" => "Sub", "type" => "dir"}
-          ]
-        })
+      Bypass.expect(api, "GET", "/3/drive/111/files/10/files", fn conn ->
+        paged(conn, [
+          %{"id" => 20, "name" => "Sub", "type" => "dir"}
+        ])
       end)
 
       assert {:ok, [%{id: "111:20"}]} = Kdrive.list_folders(conn, "111:10")
@@ -93,34 +95,30 @@ defmodule Magus.Knowledge.Connectors.KdriveTest do
       {:ok, conn} = Kdrive.connect(%{"api_token" => "tok"})
 
       # Root of the collection: one file + one subdir.
-      Bypass.expect_once(api, "GET", "/3/drive/111/files/1/files", fn conn ->
-        json(conn, 200, %{
-          "data" => [
-            %{
-              "id" => 100,
-              "name" => "top.pdf",
-              "type" => "file",
-              "mime_type" => "application/pdf",
-              "revised_at" => 1_720_000_000
-            },
-            %{"id" => 50, "name" => "Sub", "type" => "dir"}
-          ]
-        })
+      Bypass.expect(api, "GET", "/3/drive/111/files/1/files", fn conn ->
+        paged(conn, [
+          %{
+            "id" => 100,
+            "name" => "top.pdf",
+            "type" => "file",
+            "mime_type" => "application/pdf",
+            "revised_at" => 1_720_000_000
+          },
+          %{"id" => 50, "name" => "Sub", "type" => "dir"}
+        ])
       end)
 
       # The subdirectory: one more file.
-      Bypass.expect_once(api, "GET", "/3/drive/111/files/50/files", fn conn ->
-        json(conn, 200, %{
-          "data" => [
-            %{
-              "id" => 101,
-              "name" => "child.txt",
-              "type" => "file",
-              "mime_type" => "text/plain",
-              "revised_at" => 1_720_000_500
-            }
-          ]
-        })
+      Bypass.expect(api, "GET", "/3/drive/111/files/50/files", fn conn ->
+        paged(conn, [
+          %{
+            "id" => 101,
+            "name" => "child.txt",
+            "type" => "file",
+            "mime_type" => "text/plain",
+            "revised_at" => 1_720_000_500
+          }
+        ])
       end)
 
       collection = %{external_id: "111:1"}
@@ -143,12 +141,10 @@ defmodule Magus.Knowledge.Connectors.KdriveTest do
     test "falls back to updated_at when revised_at is absent, and default mime type", %{api: api} do
       {:ok, conn} = Kdrive.connect(%{"api_token" => "tok"})
 
-      Bypass.expect_once(api, "GET", "/3/drive/111/files/1/files", fn conn ->
-        json(conn, 200, %{
-          "data" => [
-            %{"id" => 100, "name" => "x", "type" => "file", "updated_at" => 1_720_000_777}
-          ]
-        })
+      Bypass.expect(api, "GET", "/3/drive/111/files/1/files", fn conn ->
+        paged(conn, [
+          %{"id" => 100, "name" => "x", "type" => "file", "updated_at" => 1_720_000_777}
+        ])
       end)
 
       assert {:ok, [item], nil} = Kdrive.list_items(conn, %{external_id: "111:1"}, nil)
@@ -185,12 +181,13 @@ defmodule Magus.Knowledge.Connectors.KdriveTest do
           |> Plug.Conn.put_resp_header("retry-after", "1")
           |> Plug.Conn.resp(429, "slow down")
         else
-          json(conn, 200, %{"data" => [%{"id" => 111, "name" => "Drive"}]})
+          paged(conn, [%{"id" => 111, "name" => "Drive"}])
         end
       end)
 
       assert {:ok, [%{id: "111:root"}]} = Kdrive.list_folders(conn, nil)
-      assert Agent.get(agent, & &1) == 2
+      # 429 + page-1 retry + empty terminal page.
+      assert Agent.get(agent, & &1) == 3
     end
   end
 

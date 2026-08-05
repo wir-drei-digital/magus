@@ -1,5 +1,7 @@
 defmodule Magus.Knowledge.ConnectTest do
-  use Magus.ResourceCase, async: true
+  # async: false: the kdrive end-to-end test overrides the global
+  # :kdrive_api_base_url Application env, which would race async tests.
+  use Magus.ResourceCase, async: false
 
   alias Magus.Integrations.Registry
   alias Magus.Knowledge
@@ -258,15 +260,16 @@ defmodule Magus.Knowledge.ConnectTest do
       assert summary.status == "active"
       assert is_binary(summary.id)
 
-      Bypass.expect_once(api, "GET", "/2/drive", fn conn ->
+      # Pagination terminates on an empty page, so serve data on page 1 and
+      # an empty page afterwards.
+      Bypass.expect(api, "GET", "/2/drive", fn conn ->
         assert Plug.Conn.get_req_header(conn, "authorization") == ["Bearer kd-secret"]
+        page = conn.query_string |> URI.decode_query() |> Map.get("page", "1")
+        data = if page == "1", do: [%{"id" => 111, "name" => "Team Drive"}], else: []
 
         conn
         |> Plug.Conn.put_resp_content_type("application/json")
-        |> Plug.Conn.resp(
-          200,
-          Jason.encode!(%{"data" => [%{"id" => 111, "name" => "Team Drive"}]})
-        )
+        |> Plug.Conn.resp(200, Jason.encode!(%{"data" => data}))
       end)
 
       assert {:ok, folders} =

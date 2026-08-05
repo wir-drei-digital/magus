@@ -10,9 +10,14 @@ defmodule Magus.Knowledge.TokenManager do
   (pausing its scheduled syncs, see the incremental_sync trigger) and notifies
   the owner once.
 
-  Concurrency: Google's standard OAuth clients do not rotate refresh tokens, so
-  concurrent refreshes across a source's collections are benign and we persist
-  last-write-wins rather than holding a DB lock across the refresh HTTP call.
+  Concurrency: refreshes persist last-write-wins rather than holding a DB lock
+  across the refresh HTTP call. Google and kDrive do not rotate refresh
+  tokens, so concurrent refreshes are benign there. Microsoft DOES rotate:
+  two concurrent OneDrive refreshes can race, and if the provider invalidates
+  the old refresh token on use the loser sees invalid_grant and flags reauth
+  even though a valid token was just persisted. Acceptable-rare today
+  (collections of one source rarely refresh in the same instant); serialize
+  per-source (advisory lock) before raising sync concurrency.
   """
 
   require Logger

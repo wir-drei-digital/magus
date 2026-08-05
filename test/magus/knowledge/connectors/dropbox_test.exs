@@ -305,7 +305,9 @@ defmodule Magus.Knowledge.Connectors.DropboxTest do
                Dropbox.detect_changes(conn, collection, ~U[1970-01-01 00:00:00Z])
 
       assert length(changes) == 2
-      assert %{type: :deleted, item: %{id: "/coll/removed.txt"}} in changes
+      # Dropbox deletes carry prefix: true (a deleted FOLDER yields one entry
+      # for the folder path; the framework must sweep everything under it).
+      assert %{type: :deleted, prefix: true, item: %{id: "/coll/removed.txt"}} in changes
 
       updated = Enum.find(changes, &(&1.type == :updated))
       assert updated.item.id == "/coll/changed.txt"

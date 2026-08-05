@@ -230,7 +230,10 @@ defmodule Magus.Knowledge.Connectors.Kdrive do
       {:ok, %{"data" => data}} when is_list(data) ->
         new_acc = [data | acc]
 
-        if length(data) < @page_size do
+        # Terminate ONLY on an empty page: if the server clamps per_page below
+        # our ask, every full page would look "short" and a shorter-than-asked
+        # check would silently drop everything after page 1.
+        if data == [] do
           {:ok, new_acc |> Enum.reverse() |> List.flatten()}
         else
           drain_pages(conn, url, page + 1, new_acc)
@@ -306,7 +309,8 @@ defmodule Magus.Knowledge.Connectors.Kdrive do
     case Req.Response.get_header(response, "retry-after") do
       [value | _] ->
         case Integer.parse(value) do
-          {seconds, _} when seconds > 0 and seconds <= 60 -> seconds
+          # Clamp long server backoffs to 15s instead of collapsing to 1s.
+          {seconds, _} when seconds > 0 -> min(seconds, 15)
           _ -> 1
         end
 

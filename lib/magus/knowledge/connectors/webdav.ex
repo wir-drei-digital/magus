@@ -3,10 +3,14 @@ defmodule Magus.Knowledge.Connectors.Webdav do
   Generic WebDAV knowledge connector.
 
   A thin adapter over `Magus.Knowledge.Connectors.Webdav.Client` for any
-  standards-compliant WebDAV server where the configured `base_url` is already
-  the DAV collection root. Unlike the Nextcloud connector there is no
-  path-prefix magic: PROPFIND/GET requests hit `base_url <> path` directly and
-  hrefs are used verbatim.
+  standards-compliant WebDAV server. The configured `base_url` is the DAV
+  collection root and may carry a path component (the common case:
+  ownCloud's `/remote.php/dav/files/{user}`, Koofr's `/dav/Koofr`, Hetzner
+  Storage Share's `/remote.php/webdav`). PROPFIND `href`s are SERVER-absolute
+  per RFC 4918 (they include that path component, and may even be absolute
+  URIs), so the connector splits `base_url` into origin + root path at
+  connect time: requests go to `origin <> server_path`, and logical paths are
+  resolved against the root path.
 
   Suitable for providers that expose a plain WebDAV endpoint, including:
 
@@ -37,7 +41,7 @@ defmodule Magus.Knowledge.Connectors.Webdav do
 
   @max_depth 10
 
-  defstruct [:base_url, :username, :password]
+  defstruct [:origin, :root_path, :username, :password]
 
   # --- Connector callbacks ---
 
@@ -46,15 +50,19 @@ defmodule Magus.Knowledge.Connectors.Webdav do
       when is_binary(base_url) and base_url != "" and
              is_binary(username) and username != "" and
              is_binary(password) and password != "" do
-    # Normalize base_url — strip trailing slash so it is a clean DAV root.
-    base_url = String.trim_trailing(base_url, "/")
+    case parse_base_url(base_url) do
+      {:ok, origin, root_path} ->
+        {:ok,
+         %__MODULE__{
+           origin: origin,
+           root_path: root_path,
+           username: username,
+           password: password
+         }}
 
-    {:ok,
-     %__MODULE__{
-       base_url: base_url,
-       username: username,
-       password: password
-     }}
+      :error ->
+        {:error, :invalid_base_url}
+    end
   end
 
   def connect(_auth_config) do
@@ -63,13 +71,15 @@ defmodule Magus.Knowledge.Connectors.Webdav do
 
   @impl true
   def list_folders(%__MODULE__{} = conn, path) do
-    webdav_path = build_path(path || "/")
+    webdav_path = build_path(conn, path || "/")
 
     case propfind(conn, webdav_path, 1) do
       {:ok, body} ->
         folders =
           body
           |> Client.parse_multistatus()
+          |> Enum.map(&%{&1 | href: href_to_path(conn, &1.href)})
+          |> Enum.reject(&is_nil(&1.href))
           |> Enum.filter(
             &(&1.is_collection &&
                 Client.normalize_href(&1.href) != Client.normalize_href(webdav_path))
@@ -78,7 +88,7 @@ defmodule Magus.Knowledge.Connectors.Webdav do
             %{
               id: entry.href,
               name: entry.display_name || Path.basename(URI.decode(entry.href)),
-              path: relative_path(entry.href)
+              path: relative_path(conn, entry.href)
             }
           end)
 
@@ -91,7 +101,7 @@ defmodule Magus.Knowledge.Connectors.Webdav do
 
   @impl true
   def list_items(%__MODULE__{} = conn, collection, _cursor) do
-    webdav_path = collection_path(collection)
+    webdav_path = collection_path(conn, collection)
 
     case list_items_recursive(conn, webdav_path, 0) do
       {:ok, entries} ->
@@ -108,7 +118,7 @@ defmodule Magus.Knowledge.Connectors.Webdav do
             }
           end)
 
-        # WebDAV has no cursor-based pagination — return all items
+        # WebDAV has no cursor-based pagination; return all items
         {:ok, items, nil}
 
       {:error, reason} ->
@@ -121,7 +131,11 @@ defmodule Magus.Knowledge.Connectors.Webdav do
   defp list_items_recursive(conn, webdav_path, depth) do
     case propfind(conn, webdav_path, 1) do
       {:ok, body} ->
-        entries = Client.parse_multistatus(body)
+        entries =
+          body
+          |> Client.parse_multistatus()
+          |> Enum.map(&%{&1 | href: href_to_path(conn, &1.href)})
+          |> Enum.reject(&is_nil(&1.href))
 
         # Separate files from subdirectories (exclude self)
         normalized_self = Client.normalize_href(webdav_path)
@@ -153,11 +167,11 @@ defmodule Magus.Knowledge.Connectors.Webdav do
   @impl true
   def fetch_content(%__MODULE__{} = conn, item) do
     path = item_path(item)
-    url = conn.base_url <> path
+    url = conn.origin <> path
 
     case Client.request_with_retry(:get, url, auth_headers(conn)) do
       {:ok, %Req.Response{status: 200, body: body}} ->
-        metadata = %{"path" => path, "format" => "raw"}
+        metadata = %{"path" => relative_path(conn, path), "format" => "raw"}
         {:ok, body, metadata}
 
       {:ok, %Req.Response{status: status, body: body}} ->
@@ -192,27 +206,42 @@ defmodule Magus.Knowledge.Connectors.Webdav do
 
   # --- Private helpers ---
 
-  defp propfind(%__MODULE__{} = conn, path, depth) do
-    Client.propfind(conn.base_url, auth_headers(conn), path, depth)
+  # Split the configured base_url into origin (scheme + host + port) and DAV
+  # root path. PROPFIND hrefs are server-absolute, so requests must be issued
+  # against the ORIGIN, never against base_url (that would double the path).
+  defp parse_base_url(base_url) do
+    case URI.parse(String.trim_trailing(base_url, "/")) do
+      %URI{scheme: scheme, host: host} = uri
+      when scheme in ["http", "https"] and is_binary(host) and host != "" ->
+        origin = %URI{scheme: scheme, host: host, port: uri.port} |> URI.to_string()
+        {:ok, String.trim_trailing(origin, "/"), uri.path || ""}
+
+      _ ->
+        :error
+    end
+  end
+
+  defp propfind(%__MODULE__{} = conn, server_path, depth) do
+    Client.propfind(conn.origin, auth_headers(conn), server_path, depth)
   end
 
   defp auth_headers(%__MODULE__{username: username, password: password}) do
     Client.basic_auth_headers(username, password)
   end
 
-  # base_url IS the DAV root, so there is no prefix: paths map straight onto it.
-  # Encode each segment and normalize to a trailing-slash collection path.
-  defp build_path(path) do
+  # Resolve a logical (user-facing) path onto the DAV root as a server-absolute
+  # collection path with a trailing slash.
+  defp build_path(%__MODULE__{root_path: root}, path) do
     path = String.trim_leading(path, "/")
 
     if path == "" do
-      "/"
+      ensure_trailing_slash(if root == "", do: "/", else: root)
     else
-      "/" <> Client.encode_path(path) <> "/"
+      ensure_trailing_slash(root <> "/" <> Client.encode_path(path))
     end
   end
 
-  defp collection_path(collection) do
+  defp collection_path(conn, collection) do
     path =
       case collection do
         %{path: p} when is_binary(p) -> p
@@ -222,13 +251,19 @@ defmodule Magus.Knowledge.Connectors.Webdav do
         _ -> "/"
       end
 
-    # An href captured from a prior PROPFIND is already an absolute, encoded DAV
-    # path (starts with "/"); use it verbatim, only ensuring a trailing slash so
-    # the server treats it as a collection. A user-supplied logical path gets
-    # encoded onto the root.
+    # An href captured from a prior PROPFIND is already a server-absolute,
+    # encoded DAV path (it starts with the root path); use it verbatim, only
+    # ensuring a trailing slash so the server treats it as a collection. A
+    # user-supplied logical path gets resolved onto the root.
     cond do
-      String.starts_with?(path, "/") -> ensure_trailing_slash(path)
-      true -> build_path(path)
+      conn.root_path != "" and String.starts_with?(path, conn.root_path) ->
+        ensure_trailing_slash(path)
+
+      conn.root_path == "" and String.starts_with?(path, "/") ->
+        ensure_trailing_slash(path)
+
+      true ->
+        build_path(conn, path)
     end
   end
 
@@ -236,9 +271,38 @@ defmodule Magus.Knowledge.Connectors.Webdav do
     if String.ends_with?(path, "/"), do: path, else: path <> "/"
   end
 
-  # base_url is the DAV root and hrefs are absolute paths under it, so the
-  # relative path is the href itself (prefix "").
-  defp relative_path(href), do: href
+  # Normalize a multistatus href to a server-absolute path. RFC 4918 allows
+  # absolute URIs; accept those only for the connection's own origin (a
+  # cross-origin href is dropped rather than fetched with our credentials).
+  defp href_to_path(_conn, nil), do: nil
+
+  defp href_to_path(conn, "http" <> _ = href) do
+    case URI.parse(href) do
+      %URI{scheme: scheme, host: host} = uri ->
+        if conn.origin ==
+             String.trim_trailing(
+               URI.to_string(%URI{scheme: scheme, host: host, port: uri.port}),
+               "/"
+             ) do
+          uri.path || "/"
+        else
+          Logger.warning("WebDAV: dropping cross-origin href #{href}")
+          nil
+        end
+    end
+  end
+
+  defp href_to_path(_conn, href), do: href
+
+  # Strip the DAV root prefix so collection paths read naturally in the UI.
+  defp relative_path(%__MODULE__{root_path: ""}, href), do: href
+
+  defp relative_path(%__MODULE__{root_path: root}, href) do
+    case String.replace_prefix(href, root, "") do
+      "" -> "/"
+      stripped -> stripped
+    end
+  end
 
   defp item_path(%{id: id}), do: id
   defp item_path(%{"id" => id}), do: id
