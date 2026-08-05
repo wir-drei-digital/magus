@@ -55,7 +55,7 @@ defmodule Magus.Agents.Plugins.InboundPluginTest do
 
   # Seed the catalog model that the chat-path tests reference by key, so the
   # phase 2b-2b hard-stop (which blocks an explicit selection that resolves to
-  # something else) does not fire — these tests exercise the transform/limit/
+  # something else) does not fire. These tests exercise the transform/limit/
   # slash behavior, not model degradation.
   defp seed_chat_model do
     _ = generate(model(key: "test-model"))

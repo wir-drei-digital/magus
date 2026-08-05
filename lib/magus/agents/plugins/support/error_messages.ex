@@ -20,6 +20,7 @@ defmodule Magus.Agents.Plugins.Support.ErrorMessages do
     * `:limit_exceeded` — usage plan limit hit (passes through the exception message)
     * `:request_failed` — LLM or worker failure (timeout, HTTP errors, etc.)
     * `:busy` — agent is already processing a request
+    * `:broken_model_selection` — explicit model selection no longer resolves (passes through the detail)
     * anything else — generic fallback
   """
   @spec format_user_friendly_error(atom(), term()) :: String.t()

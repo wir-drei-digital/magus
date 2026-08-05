@@ -54,7 +54,7 @@ defmodule Magus.Agents.Plugins.Support.PreflightTest do
   end
 
   # Use a resolvable catalog key so the phase 2b-2b hard-stop (which blocks an
-  # explicit selection that resolves to something else) does not fire — these
+  # explicit selection that resolves to something else) does not fire. These
   # tests exercise run_source threading, not model degradation.
   defp build_agent(conversation, user, model_key) do
     %{

@@ -1,8 +1,8 @@
 defmodule Magus.Chat.Model.Changes.RequireOwner do
   @moduledoc """
-  Enforces owner-only destroy for user-owned models. Model has no authorizer
-  (2b-1 convention: ownership is enforced in changes), so this guards
-  `:destroy_owned` by comparing the actor id to `owner_user_id`.
+  Enforces owner-only destroy for user-owned models. Model's policies only
+  cover the write floor (2b-2b: reads open, writes admin- or owner-gated), so
+  this guards `:destroy_owned` by comparing the actor id to `owner_user_id`.
   """
   use Ash.Resource.Change
 

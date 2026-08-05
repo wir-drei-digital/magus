@@ -203,7 +203,7 @@ defmodule Magus.Agents.Plugins.Support.PreflightHardstopTest do
 
       # B sends the triggering message (created actor-scoped but with
       # authorization off: membership/observer policy is not what this test
-      # exercises — the block is). acting_user_id then resolves to B, the sender.
+      # exercises, the block is). acting_user_id then resolves to B, the sender.
       {:ok, b_message} =
         Magus.Chat.create_message(
           %{text: "hi from B", conversation_id: conversation.id, mode: :chat},
@@ -234,6 +234,129 @@ defmodule Magus.Agents.Plugins.Support.PreflightHardstopTest do
       assert payload["requested_by"] == "id"
       assert payload["requested_value"] == model_a.id
       assert payload["scope"] == "conversation"
+    end
+  end
+
+  describe "broken_selection_scope/3 (unit)" do
+    # The key-based conversation branch is defensive: with conversation
+    # preloads present a matching key resolves via `find_preloaded` and never
+    # degrades, so it cannot be driven end-to-end. Pin the pure function.
+    test "key matching the conversation's own pin -> conversation" do
+      resolution = %Magus.Models.Resolution{
+        model: nil,
+        selection_source: :explicit,
+        requested_selection: %{by: :key, value: "openrouter:x/pinned"}
+      }
+
+      conversation = %{selected_model: %{key: "openrouter:x/pinned"}, custom_agent: nil}
+
+      assert Preflight.broken_selection_scope(resolution, conversation, :chat) == "conversation"
+    end
+
+    test "key matching the custom agent's pin -> conversation" do
+      resolution = %Magus.Models.Resolution{
+        model: nil,
+        selection_source: :explicit,
+        requested_selection: %{by: :key, value: "openrouter:x/agent-pinned"}
+      }
+
+      conversation = %{
+        selected_model: nil,
+        custom_agent: %{model: %{key: "openrouter:x/agent-pinned"}}
+      }
+
+      assert Preflight.broken_selection_scope(resolution, conversation, :chat) == "conversation"
+    end
+
+    test "key matching neither -> user" do
+      resolution = %Magus.Models.Resolution{
+        model: nil,
+        selection_source: :explicit,
+        requested_selection: %{by: :key, value: "openrouter:x/user-default"}
+      }
+
+      conversation = %{selected_model: nil, custom_agent: nil}
+
+      assert Preflight.broken_selection_scope(resolution, conversation, :chat) == "user"
+    end
+  end
+
+  describe "resume-path hard-stop" do
+    test "stale pinned key blocks the synthetic continuation", %{owner: owner} do
+      conversation = generate(conversation(actor: owner, selected_model_id: nil))
+
+      stale_key = "openrouter:vendor/removed-model-#{System.unique_integer([:positive])}"
+      agent = build_agent(conversation, owner, %{chat: stale_key})
+
+      signal = Jido.Signal.new!("agent.resume", %{completed_count: 1})
+
+      assert {:ok, {:override, @noop}} =
+               Preflight.build_resume_react_signal(signal, agent)
+
+      assert [event] = broken_selection_events(conversation.id)
+      assert event.tool_call_data["scope"] == "user"
+    end
+  end
+
+  describe "media-path hard-stop" do
+    test "stale image key blocks generation with a persisted event", %{owner: owner} do
+      conversation = generate(conversation(actor: owner))
+      message_id = seed_user_message(conversation, owner)
+
+      stale_key = "openrouter:vendor/removed-image-#{System.unique_integer([:positive])}"
+
+      agent = %{
+        id: "conv:#{conversation.id}",
+        state: %{
+          conversation_id: conversation.id,
+          user_id: owner.id,
+          mode: :image_generation,
+          model_keys: %{chat: :auto, image: stale_key},
+          __strategy__: %{}
+        }
+      }
+
+      signal =
+        make_signal(%{text: "draw a cat", message_id: message_id, mode: :image_generation})
+
+      assert {:ok, {:override, @noop}} =
+               Magus.Agents.Plugins.Support.MediaBypass.handle(signal, agent, :image_generation)
+
+      assert [event] = broken_selection_events(conversation.id)
+      assert event.tool_call_data["requested_value"] == stale_key
+    end
+  end
+
+  describe "blocked turns settle their AgentRun" do
+    test "a run-driven turn blocked by the hard-stop fails the run instead of leaving it running",
+         %{owner: owner} do
+      conversation = generate(conversation(actor: owner, selected_model_id: nil))
+      message_id = seed_user_message(conversation, owner)
+
+      run =
+        sub_agent_run(
+          source_conversation_id: conversation.id,
+          target_conversation_id: conversation.id,
+          source: :heartbeat
+        )
+
+      stale_key = "openrouter:vendor/removed-model-#{System.unique_integer([:positive])}"
+      agent = build_agent(conversation, owner, %{chat: stale_key})
+
+      signal =
+        make_signal(%{
+          text: "wake up",
+          message_id: message_id,
+          mode: :chat,
+          run_id: run.id
+        })
+
+      assert {:ok, {:override, @noop}} =
+               Preflight.build_react_signal(signal, agent, :chat)
+
+      settled = Magus.Agents.get_agent_run!(run.id, authorize?: false)
+      assert settled.status == :error
+      assert settled.error_message =~ "broken model selection"
     end
   end
 end

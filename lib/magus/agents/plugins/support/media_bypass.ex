@@ -46,7 +46,8 @@ defmodule Magus.Agents.Plugins.Support.MediaBypass do
     message_id = data[:message_id] || data["message_id"]
 
     # Hard-stop (phase 2b-2b): a broken EXPLICIT media selection blocks the turn
-    # before any generation call, on the same error/event rails as the text path.
+    # before any generation call, on the same error/event rails as the text
+    # path. `handle_broken_selection` already emits idle + response_complete.
     if Resolution.degraded?(resolution) do
       conversation = load_conversation_for_scope(conversation_id)
 
@@ -57,8 +58,7 @@ defmodule Magus.Agents.Plugins.Support.MediaBypass do
         Preflight.broken_selection_scope(resolution, conversation, mode)
       )
 
-      Signals.state_change(conversation_id, :idle)
-      Signals.response_complete(conversation_id, %{})
+      Preflight.settle_blocked_run(data, "broken model selection")
       {:ok, {:override, Jido.Actions.Control.Noop}}
     else
       dispatch_after_limit_check(

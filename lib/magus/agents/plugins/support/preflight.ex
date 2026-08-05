@@ -119,6 +119,7 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
         broken_selection_scope(resolution, conversation, mode)
       )
 
+      settle_blocked_run(data, "broken model selection")
       {:ok, {:override, Jido.Actions.Control.Noop}}
     else
       # Enforce the spend gate against the member who sent the triggering message,
@@ -202,6 +203,7 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
 
       {:error, error} ->
         handle_limit_exceeded(conversation_id, message_id, error)
+        settle_blocked_run(data, "usage limit exceeded")
         {:ok, {:override, Jido.Actions.Control.Noop}}
     end
   end
@@ -263,6 +265,7 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
         broken_selection_scope(resolution, conversation, mode)
       )
 
+      settle_blocked_run(data, "broken model selection")
       {:ok, {:override, Jido.Actions.Control.Noop}}
     else
       build_resume_react_signal_after_check(
@@ -515,6 +518,25 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
   end
 
   def broken_selection_scope(_resolution, _conversation, _mode), do: "user"
+
+  @doc """
+  Settle the AgentRun of a turn blocked at preflight (hard-stop or spend gate).
+
+  A preflight block never dispatches the ReAct worker, so no
+  `ai.request.failed` reaches `AgentRunCompletionPlugin`; without this the run
+  idles until the stale-reap marks it `:timed_out`, and heartbeats retry a
+  deterministically-blocked turn every cycle. No-op when the payload carries no
+  `run_id` (plain user turns). Public so `MediaBypass` can reuse it.
+  """
+  def settle_blocked_run(data, reason) do
+    run_id = is_map(data) && (data[:run_id] || data["run_id"])
+
+    if is_binary(run_id) and run_id != "" do
+      Magus.Agents.Plugins.AgentRunCompletionPlugin.fail_blocked_run(run_id, reason)
+    end
+
+    :ok
+  end
 
   defp conversation_level_keys(conversation, mode) when is_map(conversation) do
     custom_agent =

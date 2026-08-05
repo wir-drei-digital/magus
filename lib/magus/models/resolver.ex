@@ -5,10 +5,10 @@ defmodule Magus.Models.Resolver do
 
   Total: always returns `{:ok, %Resolution{}}`, producing the same model the
   legacy resolver did. A broken explicit selection degrades to the inherited
-  model (unchanged behavior) and is
-  reported via `requested_selection` plus a
+  model and is reported via `requested_selection` plus a
   `[:magus, :models, :resolution, :degraded]` telemetry event. Whether to
-  hard-stop on a degradation is a caller policy, off in this phase.
+  hard-stop on a degradation is caller policy: since phase 2b-2b, `Preflight`
+  blocks the turn on degraded explicit selections.
   """
 
   require Ash.Query

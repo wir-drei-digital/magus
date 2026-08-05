@@ -209,6 +209,24 @@ defmodule Magus.Agents.Plugins.AgentRunCompletionPlugin do
     :ok
   end
 
+  @doc """
+  Fail a run whose turn was blocked at preflight (broken selection hard-stop,
+  spend gate) before any ReAct dispatch. Runs the full failure path — spawn
+  output, inbox unlink, orchestrator advance, failure streak — exactly as an
+  `ai.request.failed` would. No-op if the run is already terminal.
+  """
+  def fail_blocked_run(run_id, error_message) when is_binary(run_id) do
+    case Magus.Agents.get_agent_run(run_id, authorize?: false) do
+      {:ok, %{status: status} = run} when status in [:pending, :running] ->
+        fail_run(run, error_message)
+
+      _ ->
+        :ok
+    end
+  end
+
+  def fail_blocked_run(_run_id, _error_message), do: :ok
+
   defp fail_run(run, error_message) do
     case Magus.Agents.fail_agent_run(run, %{error_message: error_message}, authorize?: false) do
       {:ok, failed_run} ->
