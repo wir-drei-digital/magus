@@ -78,15 +78,17 @@ defmodule Magus.Agents.Plugins.Support.PreflightTest do
       user = generate(user())
       :ok = ensure_active_subscription(user)
       conversation = generate(conversation(actor: user))
+      model = generate(model())
 
-      %{user: user, conversation: conversation}
+      %{user: user, conversation: conversation, model_key: model.key}
     end
 
     test "recovery_retry appends a do-not-redo note to initial_messages", %{
       user: user,
-      conversation: conversation
+      conversation: conversation,
+      model_key: model_key
     } do
-      jido_agent = build_agent(conversation, user)
+      jido_agent = build_agent(conversation, user, model_key)
 
       signal =
         make_signal(%{
@@ -104,8 +106,12 @@ defmodule Magus.Agents.Plugins.Support.PreflightTest do
       assert last_text =~ "not redo"
     end
 
-    test "normal turns get no recovery note", %{user: user, conversation: conversation} do
-      jido_agent = build_agent(conversation, user)
+    test "normal turns get no recovery note", %{
+      user: user,
+      conversation: conversation,
+      model_key: model_key
+    } do
+      jido_agent = build_agent(conversation, user, model_key)
 
       signal =
         make_signal(%{
