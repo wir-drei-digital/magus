@@ -170,6 +170,9 @@ defmodule Magus.Agents.IntegrationTest do
       user: user,
       conversation: conversation
     } do
+      # A resolvable catalog key: a made-up key would degrade and trip the
+      # phase 2b-2b hard-stop; this test exercises overrides, not the block.
+      chat_model = generate(model())
       agent = ConversationAgent.new(id: "conv:#{conversation.id}")
 
       agent =
@@ -177,7 +180,7 @@ defmodule Magus.Agents.IntegrationTest do
           conversation_id: conversation.id,
           user_id: user.id,
           mode: :chat,
-          model_keys: %{chat: "test-model"}
+          model_keys: %{chat: chat_model.key}
         })
 
       context = build_plugin_context(agent)
@@ -192,7 +195,7 @@ defmodule Magus.Agents.IntegrationTest do
 
       assert {:ok, {:continue, react_signal}} = InboundPlugin.handle_signal(signal, context)
       assert react_signal.type == "ai.react.query"
-      assert react_signal.data[:model] == "test-model"
+      assert react_signal.data[:model] == chat_model.key
       assert react_signal.data[:max_iterations] == 4
       assert react_signal.data[:llm_opts] == %{temperature: 0.6}
     end
