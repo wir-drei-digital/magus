@@ -237,6 +237,54 @@ defmodule Magus.Agents.Plugins.Support.PreflightHardstopTest do
     end
   end
 
+  describe "no-allowed-providers block" do
+    test "a model whose denies empty the allow-list blocks with a persisted event", %{
+      owner: owner
+    } do
+      # Controlled provider table: exactly one allowed provider, denied by the
+      # model, so build_provider_routing returns {:error, :no_allowed_providers}.
+      Magus.Repo.delete_all(Magus.Models.OpenRouterProvider)
+
+      {:ok, provider} =
+        Magus.Models.upsert_open_router_provider(%{slug: "solo", name: "Solo"},
+          authorize?: false
+        )
+
+      {:ok, _} =
+        Magus.Models.set_open_router_provider_allowed(provider, true, authorize?: false)
+
+      blocked_model =
+        Ash.create!(
+          Magus.Chat.Model,
+          %{
+            name: "Blocked",
+            key: "openrouter:test/blocked-#{System.unique_integer([:positive])}",
+            provider: "test",
+            api_provider: :openrouter,
+            denied_providers: ["solo"]
+          },
+          action: :create,
+          authorize?: false
+        )
+
+      conversation = generate(conversation(actor: owner, selected_model_id: nil))
+      message_id = seed_user_message(conversation, owner)
+      agent = build_agent(conversation, owner, %{chat: blocked_model.key})
+
+      signal = make_signal(%{text: "hi", message_id: message_id, mode: :chat})
+
+      assert {:ok, {:override, @noop}} =
+               Preflight.build_react_signal(signal, agent, :chat)
+
+      events =
+        Magus.Chat.Message
+        |> Ash.Query.filter(conversation_id == ^conversation.id and message_type == :event)
+        |> Ash.read!(authorize?: false)
+
+      assert Enum.any?(events, &(&1.text =~ "No provider is currently allowed"))
+    end
+  end
+
   describe "broken_selection_scope/3 (unit)" do
     # The key-based conversation branch is defensive: with conversation
     # preloads present a matching key resolves via `find_preloaded` and never

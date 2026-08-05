@@ -194,6 +194,7 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
               |> maybe_put_runtime_field(:req_http_options, data)
               |> maybe_put_runtime_field(:system_prompt, data)
               |> maybe_put_runtime_field(:model_name, data)
+              |> reapply_provider_routing(provider_routing)
               |> Magus.Agents.Tools.Remote.Injection.augment(data)
               |> then(&Jido.Signal.new!("ai.react.query", &1))
 
@@ -299,6 +300,23 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
     request_context =
       build_request_context(conversation_id, state, context_data, mode, model, conversation)
 
+    # Resume turns are real OpenRouter calls: apply the same allow-list
+    # routing as user turns. There is no user message to attach an error to,
+    # so a fully-denied model skips routing with a log instead of blocking.
+    llm_opts_with_routing =
+      case Magus.Providers.Routing.build_provider_routing(model) do
+        {:error, :no_allowed_providers} ->
+          Logger.warning(
+            "Resume turn for conversation #{conversation_id}: model #{inspect(model.key)} " <>
+              "has no allowed providers; continuing unrouted"
+          )
+
+          request_context.llm_opts
+
+        provider_routing ->
+          merge_provider_routing(request_context.llm_opts, provider_routing)
+      end
+
     resolved_model_key = model.key || model_key_for_mode(raw_model_keys, mode)
 
     react_signal =
@@ -312,7 +330,7 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
       |> maybe_put_field(:tool_context, request_context.tool_context)
       |> maybe_put_field(:tools, request_context.tools)
       |> maybe_put_field(:max_iterations, request_context.max_iterations)
-      |> maybe_put_field(:llm_opts, request_context.llm_opts)
+      |> maybe_put_field(:llm_opts, llm_opts_with_routing)
       |> maybe_put_field(:initial_messages, request_context.initial_messages)
       |> then(&Jido.Signal.new!("ai.react.query", &1))
 
@@ -1273,6 +1291,20 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
 
   @doc false
   def apply_provider_routing(llm_opts, routing), do: merge_provider_routing(llm_opts, routing)
+
+  # A runtime llm_opts override in signal data (test scaffolding, remote
+  # injection) replaces the routed opts wholesale; re-merge the routing so an
+  # override cannot silently drop the provider allow-list.
+  defp reapply_provider_routing(fields, routing) when is_map(routing) do
+    Map.update(
+      fields,
+      :llm_opts,
+      merge_provider_routing(nil, routing),
+      &merge_provider_routing(&1, routing)
+    )
+  end
+
+  defp reapply_provider_routing(fields, _routing), do: fields
 
   defp handle_no_allowed_providers(conversation_id, message_id) do
     error_message =

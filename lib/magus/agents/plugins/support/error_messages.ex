@@ -26,6 +26,13 @@ defmodule Magus.Agents.Plugins.Support.ErrorMessages do
   @spec format_user_friendly_error(atom(), term()) :: String.t()
   def format_user_friendly_error(:broken_model_selection, error) when is_binary(error), do: error
 
+  # Keep the actionable admin instruction in the persisted event, not just the
+  # ephemeral error signal.
+  def format_user_friendly_error(:no_allowed_providers, error) when is_binary(error), do: error
+
+  def format_user_friendly_error(:no_allowed_providers, error) when is_exception(error),
+    do: Exception.message(error)
+
   def format_user_friendly_error(:limit_exceeded, error) when is_binary(error), do: error
 
   def format_user_friendly_error(:limit_exceeded, %Magus.Usage.PolicyError{} = error) do
