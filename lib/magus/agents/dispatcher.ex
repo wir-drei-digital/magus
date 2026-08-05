@@ -94,16 +94,14 @@ defmodule Magus.Agents.Dispatcher do
     |> put_local_tools(metadata)
   end
 
+  # Message metadata is client-writable over RPC, so local_tools is untrusted
+  # input: names are filtered against the fixed Remote.Catalog at injection,
+  # and the reverse tunnel routes by the server-side acting_user_id — a forged
+  # entry can only ever reach the forger's own CLI connection.
   defp put_local_tools(data, metadata) do
-    case metadata["caller_session_id"] || metadata[:caller_session_id] do
-      nil ->
-        data
-
-      session_id ->
-        Map.merge(data, %{
-          caller_session_id: session_id,
-          local_tools: metadata["local_tools"] || metadata[:local_tools] || []
-        })
+    case metadata["local_tools"] || metadata[:local_tools] do
+      [_ | _] = tools -> Map.put(data, :local_tools, Enum.filter(tools, &is_binary/1))
+      _ -> data
     end
   end
 

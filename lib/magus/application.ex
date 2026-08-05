@@ -121,7 +121,7 @@ defmodule Magus.Application do
         {DNSCluster, query: Application.get_env(:magus, :dns_cluster_query) || :ignore},
         {Oban, oban_config()},
         {Phoenix.PubSub, name: Magus.PubSub},
-        {Registry, keys: :unique, name: Magus.Cli.ConnectionRegistry},
+        Magus.Cli.ConnectionRegistry,
         Magus.Presence,
         # Jido instance for agent execution
         Magus.Jido

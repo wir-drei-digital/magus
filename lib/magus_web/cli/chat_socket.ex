@@ -1,21 +1,25 @@
 defmodule MagusWeb.Cli.ChatSocket do
   @moduledoc """
   Raw WebSocket handler for `magus chat`. Authenticated at the HTTP upgrade
-  (see ChatSocketController). One connection = one process = one identity; local
-  tools and routing follow this connection, never the conversation.
+  (see ChatSocketController). One connection = one process = one identity:
+  local tools and reverse-tunnel routing follow the AUTHENTICATED user, never
+  the conversation and never anything the client sends.
+
+  Idle contract: the upgrade sets a 60s receive timeout. Bandit answers WS
+  pings automatically, so a CLI that pings (or sends) at least once a minute
+  stays connected; an idle connection is closed and must reconnect with a
+  fresh `hello` (using `conversation.resume` to keep its conversation).
   """
 
   @behaviour WebSock
 
   alias Magus.Agents.Tools.Remote.Catalog
-
-  @registry Magus.Cli.ConnectionRegistry
+  alias Magus.Cli.ConnectionRegistry
 
   @impl true
   def init(state) do
-    # state seeded by the controller: %{user: %User{}, token: %ApiToken{}}
-    {:ok,
-     Map.merge(%{session_id: nil, conversation_id: nil, accepted_tools: [], pending: %{}}, state)}
+    # state seeded by the controller: %{user: %User{}}
+    {:ok, Map.merge(%{conversation_id: nil, accepted_tools: [], pending: %{}}, state)}
   end
 
   @impl true
@@ -33,29 +37,25 @@ defmodule MagusWeb.Cli.ChatSocket do
 
   # --- hello -------------------------------------------------------------
 
+  # One hello per connection: re-initialization would leak the previous
+  # conversation subscription and duplicate the registry entry.
+  defp handle_hello(_msg, %{conversation_id: conv_id} = state) when is_binary(conv_id) do
+    {:push, error_frame("already_initialized", "hello already completed on this connection"),
+     state}
+  end
+
   defp handle_hello(msg, state) do
-    session_id = msg["session_id"]
     advertised = get_in(msg, ["capabilities", "local_tools"]) || []
     accepted = Enum.filter(advertised, &Catalog.known?/1)
 
-    # Tenant isolation: the reverse-tunnel routing identity is namespaced by the
-    # AUTHENTICATED user (set by the controller at init), never trusting the raw
-    # client-supplied session_id alone. The registry key is an opaque composite —
-    # downstream (dispatcher/injection/ReadFile) treats caller_session_id as
-    # opaque, so this closes the cross-tenant hijack with no downstream changes.
-    routing_key = "#{state.user.id}:#{session_id}"
-
     case resolve_conversation(msg["conversation"], state.user) do
       {:ok, conversation} ->
-        {:ok, _} = Registry.register(@registry, routing_key, nil)
+        # Reverse-tunnel routing identity is the AUTHENTICATED user, set by
+        # the controller at the upgrade. Client-supplied ids play no part.
+        :ok = ConnectionRegistry.register(state.user.id)
         Phoenix.PubSub.subscribe(Magus.PubSub, "agents:#{conversation.id}")
 
-        state = %{
-          state
-          | session_id: session_id,
-            conversation_id: conversation.id,
-            accepted_tools: accepted
-        }
+        state = %{state | conversation_id: conversation.id, accepted_tools: accepted}
 
         frame =
           Jason.encode!(%{
@@ -84,18 +84,16 @@ defmodule MagusWeb.Cli.ChatSocket do
   # --- chat : drive a turn via Chat.send_user_message -------------------
 
   defp handle_chat(%{"text" => text}, %{conversation_id: conv_id, user: user} = state)
-       when is_binary(conv_id) do
+       when is_binary(conv_id) and is_binary(text) do
     result =
       Magus.Chat.send_user_message(
         %{
           conversation_id: conv_id,
           text: text,
-          metadata: %{
-            # Same namespaced routing key registered in handle_hello: derived from
-            # the authenticated user + connection's session_id, never the frame.
-            "caller_session_id" => "#{user.id}:#{state.session_id}",
-            "local_tools" => state.accepted_tools
-          }
+          # local_tools marks this turn as CLI-driven; the reverse tunnel
+          # routes by the server-side acting_user_id, so metadata carries no
+          # routing identity (there is nothing to forge).
+          metadata: %{"local_tools" => state.accepted_tools}
         },
         actor: user
       )
@@ -112,7 +110,13 @@ defmodule MagusWeb.Cli.ChatSocket do
     end
   end
 
-  defp handle_chat(_msg, state), do: {:ok, state}
+  # Both malformed shapes get an explicit error frame — a silent drop would
+  # wedge the CLI's draining state exactly like the send_failed case above.
+  defp handle_chat(_msg, %{conversation_id: nil} = state),
+    do: {:push, error_frame("not_ready", "Send hello before chat"), state}
+
+  defp handle_chat(_msg, state),
+    do: {:push, error_frame("bad_frame", "chat requires a text field"), state}
 
   # --- mcp_result : route the CLI's reply back to the waiting proxy ------
 
@@ -122,12 +126,30 @@ defmodule MagusWeb.Cli.ChatSocket do
         {:ok, state}
 
       {waiter, pending} ->
-        send(waiter, {:mcp_result, call_id, msg["status"], msg["result"] || %{}, msg["error"]})
+        # Normalize the untrusted wire shape at this boundary so the waiting
+        # proxy tool can never crash on it (a raise would be classified as
+        # retryable by the ReAct loop and re-prompt the user's machine).
+        send(
+          waiter,
+          {:mcp_result, call_id, normalize_status(msg["status"]), normalize_result(msg["result"]),
+           normalize_error(msg["error"])}
+        )
+
         {:ok, %{state | pending: pending}}
     end
   end
 
   defp handle_mcp_result(_msg, state), do: {:ok, state}
+
+  defp normalize_status(status) when status in ["ok", "denied", "error"], do: status
+  defp normalize_status(_), do: "error"
+
+  defp normalize_result(%{} = result), do: result
+  defp normalize_result(_), do: %{}
+
+  defp normalize_error(%{} = error), do: error
+  defp normalize_error(error) when is_binary(error), do: %{"message" => error}
+  defp normalize_error(_), do: nil
 
   # --- agent_signal : map PubSub broadcasts to chat_stream frames -------
 
@@ -142,6 +164,11 @@ defmodule MagusWeb.Cli.ChatSocket do
   # --- mcp_call : push the reverse-tunnel request to the CLI, track waiter
 
   def handle_info({:mcp_call, call_id, tool_name, params, from_pid}, state) do
+    # Monitor the waiter so calls whose tool timed out (the runner task dies at
+    # the end of the turn) never leave dead entries in `pending` for the
+    # connection's lifetime — see the :DOWN clause below.
+    Process.monitor(from_pid)
+
     frame =
       Jason.encode!(%{
         "type" => "mcp_call",
@@ -152,6 +179,11 @@ defmodule MagusWeb.Cli.ChatSocket do
       })
 
     {:push, {:text, frame}, %{state | pending: Map.put(state.pending, call_id, from_pid)}}
+  end
+
+  def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
+    pending = state.pending |> Enum.reject(fn {_id, waiter} -> waiter == pid end) |> Map.new()
+    {:ok, %{state | pending: pending}}
   end
 
   def handle_info(_msg, state), do: {:ok, state}

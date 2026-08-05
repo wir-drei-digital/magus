@@ -1,34 +1,29 @@
-# test/magus_web/cli/chat_socket_hello_test.exs
 defmodule MagusWeb.Cli.ChatSocketHelloTest do
   use Magus.DataCase, async: true
   import Magus.Generators
 
+  alias Magus.Cli.ConnectionRegistry
   alias MagusWeb.Cli.ChatSocket
 
-  @registry Magus.Cli.ConnectionRegistry
-
-  defp initial_state(user),
-    do: %{user: user, session_id: nil, conversation_id: nil, accepted_tools: []}
-
-  defp hello_frame(session_id, tools, conversation \\ %{"new" => true}) do
+  defp hello_frame(tools, conversation \\ %{"new" => true}) do
     Jason.encode!(%{
       "type" => "hello",
       "v" => 1,
-      "session_id" => session_id,
+      # A client-supplied session id is protocol noise: the server must ignore
+      # it — routing identity is the authenticated user, set at the upgrade.
+      "session_id" => "client-chosen-#{System.unique_integer([:positive])}",
       "capabilities" => %{"local_tools" => tools},
       "conversation" => conversation
     })
   end
 
-  test "hello creates a conversation, registers the session, and replies server_hello" do
+  test "hello creates a conversation, registers the connection, and replies server_hello" do
     user = generate(user())
-    sid = "s-#{System.unique_integer([:positive])}"
-
-    {:ok, state} = ChatSocket.init(initial_state(user))
+    {:ok, state} = ChatSocket.init(%{user: user})
 
     assert {:push, {:text, json}, new_state} =
              ChatSocket.handle_in(
-               {hello_frame(sid, ["read_file", "exec_command"]), [opcode: :text]},
+               {hello_frame(["read_file", "exec_command"]), [opcode: :text]},
                state
              )
 
@@ -39,26 +34,42 @@ defmodule MagusWeb.Cli.ChatSocketHelloTest do
     assert reply["accepted_tools"] == ["read_file"]
 
     assert new_state.conversation_id == reply["conversation_id"]
-    # The registry key is namespaced by the authenticated user (tenant isolation).
-    assert [{pid, _}] = Registry.lookup(@registry, "#{user.id}:#{sid}")
-    assert pid == self()
+    # Registered under the AUTHENTICATED user id — nothing client-supplied.
+    assert ConnectionRegistry.lookup(user.id) == self()
   end
 
-  test "resume of a conversation the user does not own is rejected" do
+  test "a second hello on the same connection is rejected" do
+    user = generate(user())
+    {:ok, state} = ChatSocket.init(%{user: user})
+
+    assert {:push, {:text, _}, state} =
+             ChatSocket.handle_in({hello_frame(["read_file"]), [opcode: :text]}, state)
+
+    first_conversation = state.conversation_id
+
+    assert {:push, {:text, json}, state} =
+             ChatSocket.handle_in({hello_frame(["read_file"]), [opcode: :text]}, state)
+
+    assert Jason.decode!(json)["type"] == "error"
+    # The connection keeps its original conversation and single registration.
+    assert state.conversation_id == first_conversation
+    assert Registry.lookup(ConnectionRegistry, user.id) |> length() == 1
+  end
+
+  test "resume of a conversation the user does not own is rejected and nothing is registered" do
     owner = generate(user())
     other = generate(user())
     {:ok, conv} = Magus.Chat.create_conversation(%{chat_mode: :chat}, actor: owner)
 
-    {:ok, state} = ChatSocket.init(initial_state(other))
-    sid = "s-#{System.unique_integer([:positive])}"
+    {:ok, state} = ChatSocket.init(%{user: other})
 
     assert {:push, {:text, json}, _state} =
              ChatSocket.handle_in(
-               {hello_frame(sid, ["read_file"], %{"resume" => conv.id}), [opcode: :text]},
+               {hello_frame(["read_file"], %{"resume" => conv.id}), [opcode: :text]},
                state
              )
 
     assert Jason.decode!(json)["type"] == "error"
-    assert Registry.lookup(@registry, "#{other.id}:#{sid}") == []
+    assert ConnectionRegistry.lookup(other.id) == nil
   end
 end

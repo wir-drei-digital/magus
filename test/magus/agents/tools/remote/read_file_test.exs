@@ -1,17 +1,17 @@
 defmodule Magus.Agents.Tools.Remote.ReadFileTest do
-  # mutates Application env in the timeout case
+  # mutates Application env in the timeout cases
   use ExUnit.Case, async: false
   alias Magus.Agents.Tools.Remote.ReadFile
+  alias Magus.Cli.ConnectionRegistry
 
-  @registry Magus.Cli.ConnectionRegistry
-
-  # Spawns a process that registers under `sid` and runs `reply_fun.(from, call_id)`
-  # when it receives the mcp_call. Returns once registration is confirmed.
-  defp stub_handler(sid, reply_fun) do
+  # Spawns a process that registers as `user_id`'s CLI connection and runs
+  # `reply_fun.(from, call_id)` when it receives the mcp_call. Returns once
+  # registration is confirmed.
+  defp stub_handler(user_id, reply_fun) do
     test = self()
 
     spawn(fn ->
-      {:ok, _} = Registry.register(@registry, sid, nil)
+      :ok = ConnectionRegistry.register(user_id)
       send(test, :registered)
 
       receive do
@@ -24,49 +24,93 @@ defmodule Magus.Agents.Tools.Remote.ReadFileTest do
     assert_receive :registered, 1_000
   end
 
-  test "returns content on an ok result" do
-    sid = "s-#{System.unique_integer([:positive])}"
+  defp uid, do: "user-#{System.unique_integer([:positive])}"
 
-    stub_handler(sid, fn from, call_id ->
+  test "returns content on an ok result" do
+    user_id = uid()
+
+    stub_handler(user_id, fn from, call_id ->
       send(from, {:mcp_result, call_id, "ok", %{"content" => "hello\nworld"}, nil})
     end)
 
     assert {:ok, %{content: "hello\nworld", path: "a.txt"}} =
-             ReadFile.run(%{"path" => "a.txt"}, %{caller_session_id: sid})
+             ReadFile.run(%{"path" => "a.txt"}, %{acting_user_id: user_id})
 
     assert_receive {:got_call, "read_file", %{path: "a.txt"}}
   end
 
-  test "no live connection is a terminal ok-wrapped error (not retryable)" do
-    assert {:ok, %{error: msg}} =
-             ReadFile.run(%{"path" => "a.txt"}, %{caller_session_id: "missing"})
+  test "routes by the server-side acting user, never to another user's connection" do
+    victim_id = uid()
 
+    stub_handler(victim_id, fn from, call_id ->
+      send(from, {:mcp_result, call_id, "ok", %{"content" => "VICTIM PRIVATE KEY"}, nil})
+    end)
+
+    # An attacker's turn carries the attacker's acting_user_id (set server-side
+    # by Preflight); nothing client-supplied can redirect it to the victim.
+    assert {:ok, %{error: msg}} =
+             ReadFile.run(%{"path" => "~/.ssh/id_rsa"}, %{acting_user_id: uid()})
+
+    assert msg =~ "No active local connection"
+    refute_receive {:got_call, _, _}, 100
+  end
+
+  test "no live connection is a terminal ok-wrapped error (not retryable)" do
+    assert {:ok, %{error: msg}} = ReadFile.run(%{"path" => "a.txt"}, %{acting_user_id: uid()})
     assert msg =~ "No active local connection"
   end
 
   test "denied maps to a terminal error" do
-    sid = "s-#{System.unique_integer([:positive])}"
+    user_id = uid()
 
-    stub_handler(sid, fn from, call_id ->
+    stub_handler(user_id, fn from, call_id ->
       send(from, {:mcp_result, call_id, "denied", %{}, nil})
     end)
 
-    assert {:ok, %{error: msg}} = ReadFile.run(%{"path" => "secret"}, %{caller_session_id: sid})
+    assert {:ok, %{error: msg}} = ReadFile.run(%{"path" => "secret"}, %{acting_user_id: user_id})
     assert msg =~ "denied"
   end
 
-  test "missing caller_session_id is terminal" do
+  test "missing acting_user_id is terminal" do
     assert {:ok, %{error: _}} = ReadFile.run(%{"path" => "a.txt"}, %{})
+  end
+
+  test "a missing or blank path is terminal and never contacts the connection" do
+    user_id = uid()
+
+    stub_handler(user_id, fn from, call_id ->
+      send(from, {:mcp_result, call_id, "ok", %{}, nil})
+    end)
+
+    assert {:ok, %{error: _}} = ReadFile.run(%{}, %{acting_user_id: user_id})
+    assert {:ok, %{error: _}} = ReadFile.run(%{"path" => ""}, %{acting_user_id: user_id})
+    refute_receive {:got_call, _, _}, 100
+  end
+
+  test "an unrecognized result status is terminal, not a hang until timeout" do
+    Application.put_env(:magus, :remote_tool_timeout_ms, 500)
+    on_exit(fn -> Application.delete_env(:magus, :remote_tool_timeout_ms) end)
+
+    user_id = uid()
+
+    stub_handler(user_id, fn from, call_id ->
+      send(from, {:mcp_result, call_id, "partial", %{}, nil})
+    end)
+
+    started = System.monotonic_time(:millisecond)
+    assert {:ok, %{error: _}} = ReadFile.run(%{"path" => "a.txt"}, %{acting_user_id: user_id})
+    # Returned from the catch-all clause, not by burning the full timeout.
+    assert System.monotonic_time(:millisecond) - started < 400
   end
 
   test "times out when the handler never replies" do
     Application.put_env(:magus, :remote_tool_timeout_ms, 50)
     on_exit(fn -> Application.delete_env(:magus, :remote_tool_timeout_ms) end)
 
-    sid = "s-#{System.unique_integer([:positive])}"
-    stub_handler(sid, fn _from, _call_id -> Process.sleep(1_000) end)
+    user_id = uid()
+    stub_handler(user_id, fn _from, _call_id -> Process.sleep(1_000) end)
 
-    assert {:ok, %{error: msg}} = ReadFile.run(%{"path" => "a.txt"}, %{caller_session_id: sid})
+    assert {:ok, %{error: msg}} = ReadFile.run(%{"path" => "a.txt"}, %{acting_user_id: user_id})
     assert msg =~ "Timed out"
   end
 end

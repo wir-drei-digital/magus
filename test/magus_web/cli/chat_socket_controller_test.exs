@@ -16,7 +16,22 @@ defmodule MagusWeb.Cli.ChatSocketControllerTest do
     assert json_response(conn, 401)["error"]["code"] == "invalid_token"
   end
 
-  test "a valid token passes auth and the connection is upgraded", %{conn: conn} do
+  test "rejects a read-scoped token with 403", %{conn: conn} do
+    # RequireTokenScope gates on HTTP method, which is meaningless for a GET
+    # that upgrades into a full-duplex channel: the bridge drives turns and
+    # local file reads, so it must demand :write explicitly.
+    user = generate(user())
+    {_token, plaintext} = api_token(actor: user, scope: :read)
+
+    conn =
+      conn
+      |> put_req_header("authorization", "Bearer #{plaintext}")
+      |> get("/cli/chat")
+
+    assert json_response(conn, 403)["error"]["code"] == "insufficient_scope"
+  end
+
+  test "a valid write token passes auth and the connection is upgraded", %{conn: conn} do
     user = generate(user())
     {_token, plaintext} = api_token(actor: user, scope: :write)
 
@@ -42,9 +57,10 @@ defmodule MagusWeb.Cli.ChatSocketControllerTest do
     assert conn.state == :upgraded
 
     # The Plug.Test adapter forwards the upgrade to the owner process; confirm the
-    # ChatSocket handler was chosen and seeded with the authed user + token.
-    assert_received {_ref, :upgrade, {:websocket, {MagusWeb.Cli.ChatSocket, state, _opts}}}
+    # ChatSocket handler was chosen, seeded with the authed user, and capped.
+    assert_received {_ref, :upgrade, {:websocket, {MagusWeb.Cli.ChatSocket, state, opts}}}
     assert state.user.id == user.id
-    assert state.token.id
+    # A frame-size cap must be set: the Bandit default is unlimited buffering.
+    assert opts[:max_frame_size]
   end
 end

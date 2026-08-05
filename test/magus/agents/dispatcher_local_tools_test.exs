@@ -18,21 +18,38 @@ defmodule Magus.Agents.DispatcherLocalToolsTest do
   defp conversation, do: %Conversation{chat_mode: :chat}
   defp routed, do: %{routing_reason: nil, model_keys: %{}}
 
-  test "threads caller_session_id and local_tools from metadata into signal data" do
+  test "threads local_tools from metadata into signal data" do
     data =
       Dispatcher.build_signal_data(
-        message(%{"caller_session_id" => "s1", "local_tools" => ["read_file"]}),
+        message(%{"local_tools" => ["read_file"]}),
         conversation(),
         routed()
       )
 
-    assert data[:caller_session_id] == "s1"
     assert data[:local_tools] == ["read_file"]
   end
 
-  test "omits the local-tool keys when metadata has none" do
-    data = Dispatcher.build_signal_data(message(%{}), conversation(), routed())
+  test "omits the local-tools key when metadata has none or an empty list" do
+    for metadata <- [%{}, %{"local_tools" => []}] do
+      data = Dispatcher.build_signal_data(message(metadata), conversation(), routed())
+      refute Map.has_key?(data, :local_tools)
+    end
+  end
+
+  test "drops non-string entries and never threads a caller_session_id (routing is server-side)" do
+    data =
+      Dispatcher.build_signal_data(
+        message(%{
+          # metadata is client-writable over RPC — a forged routing identity
+          # must not survive into the signal data
+          "caller_session_id" => "victim-user:victim-session",
+          "local_tools" => ["read_file", 42, %{"evil" => true}]
+        }),
+        conversation(),
+        routed()
+      )
+
     refute Map.has_key?(data, :caller_session_id)
-    refute Map.has_key?(data, :local_tools)
+    assert data[:local_tools] == ["read_file"]
   end
 end

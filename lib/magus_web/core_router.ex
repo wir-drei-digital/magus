@@ -172,9 +172,10 @@ defmodule MagusWeb.CoreRouter do
         plug MagusWeb.Api.Plugs.RequireTokenScope
       end
 
-      # CLI websocket upgrade — token-authed at the HTTP upgrade. No
-      # RequireTokenScope: v1 lets any valid token chat (the `magus chat` GET
-      # passes read scope anyway; revocation/expiry are enforced at lookup).
+      # CLI websocket upgrade — token-authed at the HTTP upgrade
+      # (revocation/expiry enforced at lookup). Scope is enforced in the
+      # controller, not via RequireTokenScope: that plug gates on HTTP method,
+      # which is meaningless for a GET that upgrades to a full-duplex channel.
       pipeline :cli_socket do
         plug MagusWeb.Api.Plugs.ApiTokenAuthPlug
       end
