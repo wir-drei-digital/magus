@@ -59,7 +59,8 @@ defmodule Magus.Repo.Migrations.AddMemoryProfileSchema do
             name: "user_profiles_user_id_fkey",
             type: :uuid,
             prefix: "public"
-          ), null: false
+          ),
+          null: false
 
       add :workspace_id,
           references(:workspaces,

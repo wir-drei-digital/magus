@@ -281,6 +281,7 @@ defmodule Magus.Skills.Skill do
     attribute :bundle_sha, :string do
       allow_nil? true
       public? true
+
       description "sha256 hex of the bundle zip; nil for prompt-only skills. Approvals bind to this."
     end
 

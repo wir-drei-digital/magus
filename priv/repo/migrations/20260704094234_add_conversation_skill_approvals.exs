@@ -28,7 +28,8 @@ defmodule Magus.Repo.Migrations.AddConversationSkillApprovals do
             type: :uuid,
             prefix: "public",
             on_delete: :delete_all
-          ), null: false
+          ),
+          null: false
 
       add :skill_id,
           references(:skills,
@@ -37,7 +38,8 @@ defmodule Magus.Repo.Migrations.AddConversationSkillApprovals do
             type: :uuid,
             prefix: "public",
             on_delete: :delete_all
-          ), null: false
+          ),
+          null: false
 
       add :approved_by_id,
           references(:users,
