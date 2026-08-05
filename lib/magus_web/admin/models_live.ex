@@ -1336,7 +1336,7 @@ defmodule MagusWeb.Admin.ModelsLive do
               <div>
                 <h3 class="text-lg font-semibold text-base-content mb-4">Provider routing</h3>
                 <%= if @openrouter_provider_slugs == [] do %>
-                  <p class="text-sm text-base-content/60">
+                  <p class="text-sm text-base-content/60" data-testid="denied-providers-empty-hint">
                     Sync OpenRouter providers first to configure denied providers.
                   </p>
                 <% else %>

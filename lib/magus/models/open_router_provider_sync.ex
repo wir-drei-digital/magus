@@ -30,7 +30,13 @@ defmodule Magus.Models.OpenRouterProviderSync do
           end
         end)
 
-      {:ok, %{synced: count}}
+      # A non-empty payload where every row failed to upsert is a failure,
+      # not "Synced 0 providers": surface it instead of a success flash.
+      if count == 0 and providers != [] do
+        {:error, :nothing_synced}
+      else
+        {:ok, %{synced: count}}
+      end
     end
   end
 

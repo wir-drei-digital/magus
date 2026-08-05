@@ -28,7 +28,14 @@ defmodule Magus.Providers.Routing do
         %{"data_collection" => "deny"}
 
       _ ->
-        denied = Map.get(model, :denied_providers) || []
+        # is_list guard: a select-limited model would carry %Ash.NotLoaded{}
+        # (truthy), and list subtraction on it raises.
+        denied =
+          case Map.get(model, :denied_providers) do
+            denied when is_list(denied) -> denied
+            _ -> []
+          end
+
         only = allowed -- denied
 
         if only == [] do

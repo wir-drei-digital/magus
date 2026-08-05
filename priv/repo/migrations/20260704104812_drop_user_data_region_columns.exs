@@ -15,8 +15,14 @@ defmodule Magus.Repo.Migrations.DropUserDataRegionColumns do
   end
 
   def down do
+    # Restore the ORIGINAL default (see 20260314125510): the old region code
+    # treats an empty preference list as "no regions allowed", so a rollback
+    # with default [] would block every OpenRouter model for every user.
     alter table(:users) do
-      add :data_region_preference, {:array, :text}, null: false, default: []
+      add :data_region_preference, {:array, :text},
+        null: false,
+        default: fragment("ARRAY['US', 'EU', 'CH']::text[]")
+
       add :data_region_consents, :map, null: false, default: %{}
     end
   end

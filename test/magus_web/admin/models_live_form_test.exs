@@ -241,7 +241,7 @@ defmodule MagusWeb.Admin.ModelsLiveFormTest do
       {:ok, _view, html} = live(conn, ~p"/admin/models/#{model.id}/edit")
 
       refute html =~ ~s(name="form[denied_providers][]")
-      assert html =~ "Sync OpenRouter providers first"
+      assert html =~ ~s(data-testid="denied-providers-empty-hint")
     end
   end
 end
