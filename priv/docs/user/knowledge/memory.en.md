@@ -6,7 +6,7 @@ order: 4
 
 # Memory
 
-Magus agents can remember things across conversations. Memories persist between sessions, so your agent can recall preferences, facts, and context without you needing to repeat yourself every time. You can let the AI build memories automatically, or add them yourself through agent settings.
+Magus agents can remember things across conversations. Memories persist between sessions, so your agent can recall preferences, facts, and context without you needing to repeat yourself every time. You can let the AI build memories automatically, or ask it directly in chat to remember something.
 
 ## Memory Scopes
 
@@ -14,19 +14,21 @@ Every memory has a **scope** that controls which agents can access it.
 
 ### Conversation-Scoped (Local)
 
-Local memories live inside a single conversation. The agent uses them for project context, task lists, and threads of work that don't apply elsewhere. They disappear from view when you switch to another conversation.
+Local memories live inside a single conversation. The agent uses them for project context, task lists, and threads of work that don't apply elsewhere. They are not carried over when you switch to another conversation. This is where everything the AI picks up on its own is stored.
 
 ### Agent-Scoped
 
-Memories stored at the agent scope are only visible to a specific agent. Use this for things that are relevant to one agent's purpose but not others — for example, a code review agent remembering your team's naming conventions.
+Memories stored at the agent scope are only visible to a specific agent. Use this for things that are relevant to one agent's purpose but not others, for example, a code review agent remembering your team's naming conventions.
 
 ### User-Scoped
 
 User-scoped memories are your personal facts and preferences (your name, location, communication style, coding style, and so on). They follow you across conversations.
 
-**User memories are isolated per workspace.** If you belong to multiple workspaces (for example, a Work workspace and a Personal one), each workspace has its own bucket of user memories — none of them ever leak into another. Your personal-mode memories (when you're not inside any workspace) are a separate bucket too. So:
+The agent only saves a user-scoped memory when you explicitly ask for something to apply everywhere, with phrasing like "always", "generally", or "remember this for all my projects". Everything else it notices stays in the conversation where it came up.
 
-- Saying "remember I prefer TypeScript" in your Work workspace doesn't surface that preference in your Personal workspace.
+**User memories are isolated per workspace.** If you belong to multiple workspaces (for example, a Work workspace and a Personal one), each workspace has its own bucket of user memories, and none of them ever leak into another. Your personal-mode memories (when you're not inside any workspace) are a separate bucket too. So:
+
+- Saying "remember I always prefer TypeScript" in your Work workspace doesn't surface that preference in your Personal workspace.
 - Each workspace can have its own version of a memory with the same name (for example, "current_project" can mean different things in different workspaces).
 - Other workspace members never see your user memories. They are private to you, scoped to that one workspace.
 
@@ -44,55 +46,46 @@ Each memory has a **kind** that describes what type of information it contains. 
 | **Observation** | A pattern the agent noticed over time |
 | **Summary** | A condensed recap of a longer conversation or topic |
 | **Preference** | How you like things done (e.g., "Prefers concise responses") |
-| **Goal** | Something to work toward, with optional progress tracking and deadlines |
+| **Goal** | Something to work toward |
 | **Topic** | A knowledge area for research or learning (e.g., "color theory") |
 | **Habit** | A recurring practice to track (e.g., "30 minutes of drawing daily") |
 | **Reflection** | A timestamped review or assessment, often linked to goals |
 
-### Structured Data
-
-Some memory kinds can carry additional structured information alongside their free-form content. For example, a goal memory might track a deadline and progress percentage, while a habit memory might track a streak count and last completion date. This structured data is stored as flexible metadata that the AI uses to make more informed decisions during coaching and planning sessions.
-
-## Confidence Scores
-
-Each memory has a confidence score between 0 and 1. A score of 1.0 means the agent is certain about the memory. Lower scores indicate uncertainty, often used for hypotheses or inferences. You can see and adjust confidence scores when editing memories manually.
-
-When the AI retrieves memories to inform a response, it considers confidence scores. Lower-confidence memories are used more cautiously, while high-confidence memories are treated as reliable.
-
 ## How the AI Creates Memories
 
-Agents can create memories automatically during conversations. When the AI notices something worth remembering, such as a stated preference, a useful fact, or a pattern, it stores it without interrupting the conversation. You may see a brief notification when this happens.
+Agents create memories automatically during conversations. After you exchange messages, the AI reviews the turns and stores facts, decisions, and context worth keeping as conversation-scoped memories. It is selective: it skips hypotheticals and transient details and focuses on what the conversation will need later.
 
-The AI uses semantic understanding to decide what's worth remembering. It avoids storing every detail and instead focuses on information that is likely to be useful in future conversations.
+Each conversation keeps a bounded set of memories (around 20). When new memories push a conversation past that limit, the least recently updated ones are removed to make room.
 
-## Adding Memories Manually
+When you ask the agent directly to remember something ("Remember that the deadline is Friday"), it saves the memory right away with its memory tool, and you see that step in the conversation.
 
-You can add memories directly from an agent's settings page:
+## Your Profile
 
-1. Go to **Agents** and open the agent you want to configure
-2. Navigate to the **Memory** tab
-3. Click **Add Memory**
-4. Choose a scope (Agent, User, or Local), a kind, and enter the content
-5. Optionally set a confidence score
-6. Save
+Durable facts about you reach every conversation through your **profile**: a short living summary that Magus distills once a day from your recent conversation memories. Each workspace bucket has its own profile, and your personal mode has one too.
 
-User-scoped memories created from a workspace conversation belong to that workspace's bucket. Memories created from personal-mode conversations belong to your personal bucket.
+You can view the profile under **Settings** > **Memory**. From there you can also:
 
-Manually added memories are treated just like agent-created ones. They show up in search and can be retrieved during conversations.
+- Toggle the profile on or off (it requires memory to be on).
+- Read the distilled summary for the selected workspace.
+- Reset the profile. It then rebuilds from your memories over time.
 
-## Searching Memories
+The profile replaces nothing you said explicitly: memories you asked the agent to keep everywhere stay as individual user-scoped entries that you can delete one by one.
 
-From an agent's Memory tab, you can search through stored memories using keywords. The search uses semantic similarity, so you don't need to match exact phrases. Results show the memory content, kind, scope, confidence score, and when the memory was created or last updated.
+## Managing Your Memories
 
-You can also edit or delete any memory directly from the search results.
+**Settings** > **Memory** lists your user-scoped memories. Use the bucket selector to switch between your personal bucket and each of your workspaces. Expand an entry to see its scope and stored content, and delete any entry you no longer want.
+
+A custom agent's memories live in the agent's editor: open **Agents**, pick the agent, and find the **Memory** section. There you can review each memory, edit its summary and kind, or delete it.
+
+You can also simply ask in chat. "What do you remember about this project?" makes the agent search its memories, and "Please forget that I prefer short responses" makes it remove the matching entry.
 
 ## Forgetting Memories
 
-To remove a memory, find it in the Memory tab and click **Delete**. You can also ask your agent to forget something during a conversation: "Please forget that I prefer short responses." The agent will use the Forget Memory tool to remove the relevant entry.
-
-If you want to clear all memories for an agent, use the **Clear All** option in the Memory tab. This only removes memories scoped to that agent. User-scoped and conversation-scoped memories are not affected.
+Deleting a memory is permanent. There is no trash or undo for memories, so a deleted entry is gone for good. Open conversations notice the deletion immediately.
 
 If a workspace is deleted, all user, agent, and conversation memories that lived inside that workspace are deleted with it. Your personal-bucket memories and memories in your other workspaces are untouched.
+
+Magus never deletes your memories in the background on its own. Apart from the per-conversation limit above, memories only disappear when you or your agent explicitly delete them.
 
 ## Turning Memory Off
 
