@@ -6,7 +6,7 @@ order: 2
 
 # Chat-Modi
 
-Magus bietet mehrere Chat-Modi, die jeweils für eine andere Art von Aufgabe ausgelegt sind. Du kannst den Modus jederzeit über den Modus-Selektor im Chat-Eingabebereich wechseln.
+Magus bietet mehrere Chat-Modi, die jeweils für eine andere Art von Aufgabe ausgelegt sind. Du kannst den Modus jederzeit über die Umschalter im Chat-Eingabebereich wechseln.
 
 ## Chat
 
@@ -30,6 +30,6 @@ Der Video Generation-Modus funktioniert wie Image Generation, erzeugt aber kurze
 
 ## Modus wechseln
 
-Klicke auf den Modus-Selektor im Chat-Eingabebereich (er zeigt den Namen des aktuellen Modus). Ein Menü erscheint mit allen verfügbaren Modi. Klicke auf den gewünschten, um sofort zu wechseln.
+Der Chat-Eingabebereich hat einen Bild- und einen Video-Umschalter. Klicke auf einen, um die Unterhaltung in diesen Generierungsmodus zu versetzen; klicke erneut, um zum normalen Chat zurückzukehren. Auf Mobilgeräten findest du dieselben Optionen im **+**-Menü des Composers.
 
 Ein Moduswechsel mitten in einer Unterhaltung ist problemlos möglich. Die KI verwendet den neuen Modus für deine nächste Nachricht und alle darauffolgenden Nachrichten in dieser Unterhaltung.

@@ -12,63 +12,58 @@ A workspace is a shared environment for a team. It gives everyone a common home 
 
 ## Creating a workspace
 
-1. Click your account name or avatar in the sidebar to open the account menu.
+1. Click the workspace switcher at the top of the sidebar.
 2. Select **New workspace**.
 3. Enter a workspace **name** (for example, "Design Team" or "Engineering").
-4. Choose a **URL slug**: this is the short identifier used in the workspace's URL (for example, `design-team`). Slugs can only contain lowercase letters, numbers, and hyphens.
+4. Adjust the **URL slug** if you like: this is the short identifier used in the workspace's URL (for example, `design-team`). It is derived from the name automatically and can only contain lowercase letters, numbers, and hyphens.
 5. Click **Create workspace**.
 
-You are the Owner of the new workspace.
+You are the admin of the new workspace.
 
 ## Inviting team members
 
-1. Go to the workspace's **Settings** page.
-2. Select the **Members** tab.
+1. Open the workspace switcher and choose **Workspace settings**.
+2. Go to the **Members** section.
 3. Enter the email address of the person you want to invite.
-4. Choose their role (see below).
-5. Click **Invite**.
+4. Click **Invite**.
 
 Invited members receive an email. If they already have a Magus account, they can accept the invitation to join immediately. New users are prompted to create an account first.
 
 ## Member roles
 
-| Role | Can chat | Create conversations | Manage members | Workspace settings |
-|------|----------|----------------------|----------------|--------------------|
-| Owner | Yes | Yes | Yes | Yes |
-| Editor | Yes | Yes | No | No |
-| Member | Yes | No | No | No |
-| Observer | Read-only | No | No | No |
+There are two roles in a workspace:
 
-**Owner** has full control over the workspace, including billing, settings, and member management. There can be multiple owners.
+**Admin** has full control over the workspace: settings, member management, and implicit owner access to every shared resource in the workspace. The admin can transfer ownership to another member.
 
-**Editor** can create new conversations and participate in all team conversations.
+**Member** has standard access: they can participate in shared conversations, create their own, and share resources with the team.
 
-**Member** can participate in team conversations but cannot create new ones.
-
-**Observer** can read team conversations but cannot send messages.
+(Read-only participation exists at the conversation level: see the Observer role in [Multiplayer](./multiplayer.en.md).)
 
 ## Team conversations vs personal conversations
 
 Within a workspace, there are two kinds of conversations:
 
-**Team conversations** are visible to all workspace members (according to their roles). They appear in the shared sidebar view. Use these for discussions the whole team should be able to see.
+**Shared conversations** are visible to all workspace members. They appear in the **Shared** section of the sidebar. Use these for discussions the whole team should be able to see.
 
 **Personal conversations** are private to you. They are not visible to other workspace members. Use these for individual work you want to keep separate from shared team activity.
 
-When creating a new conversation, you can choose whether it belongs to the workspace (team) or to yourself (personal).
+New conversations start personal. To share one with the team, hover over it in the sidebar and click the share toggle (**Share with team**); the same toggle makes it private again.
 
 ## Workspace settings
 
-Access workspace settings by going to **Settings** from the workspace menu. From there you can:
+Open the workspace switcher and choose **Workspace settings**. From there you can:
 
-- **Rename** the workspace or change the URL slug.
-- **Manage members**: invite new members, change roles, or remove members.
+- **Rename** the workspace and toggle whether it is active.
+- **Set a default agent** for the workspace.
+- **Manage members**: invite new members, resend invitations, or remove members.
 - **Transfer ownership** to another member.
-- **Delete the workspace**: this permanently removes all team conversations and cannot be undone.
+- **Delete the workspace**: this permanently removes the workspace and all its conversations, files, prompts, and agents. You confirm by typing the workspace name. This cannot be undone.
+
+The URL slug is fixed when the workspace is created.
 
 ## Switching between workspaces
 
-If you belong to multiple workspaces, you can switch between them using the workspace selector at the top of the sidebar. Each workspace shows its own set of team conversations and members.
+If you belong to multiple workspaces, you can switch between them (and your personal space) using the workspace switcher at the top of the sidebar. Each workspace shows its own set of conversations and members.
 
 ## Memory isolation across workspaces
 

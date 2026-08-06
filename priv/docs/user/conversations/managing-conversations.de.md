@@ -10,45 +10,43 @@ Mit wachsendem Verlauf bietet Magus dir mehrere Werkzeuge, um den Überblick zu 
 
 ## Ordner erstellen
 
-Ordner ermöglicht es dir, verwandte Unterhaltungen zu gruppieren. So erstellst du einen Ordner:
+Ordner ermöglichen es dir, verwandte Unterhaltungen zu gruppieren. So erstellst du einen Ordner:
 
-1. Klicke auf den Button **Neuer Ordner** in der Seitenleiste (das Ordner-Icon mit einem Plus-Zeichen).
+1. Klicke auf den Button **Neuer Ordner** in der Seitenleiste (das Ordner-Icon mit einem Plus-Zeichen, neben der Ordner-Überschrift).
 2. Gib einen Namen für den Ordner ein und drücke **Enter**.
 
-Der Ordner erscheint in deiner Seitenleiste. Ordner lassen sich einklappen, um Platz zu sparen.
+Der Ordner erscheint in deiner Seitenleiste. Ordner lassen sich einklappen, um Platz zu sparen, und du kannst Ordner ineinander verschachteln, indem du einen auf einen anderen ziehst.
 
 ## Unterhaltungen in Ordner verschieben
 
-Um eine Unterhaltung in einen Ordner zu verschieben, fahre mit der Maus über die Unterhaltung in der Seitenleiste und ziehe sie auf den Ordner. Du kannst auch per Rechtsklick (oder langem Drücken auf dem Handy) ein Kontextmenü öffnen und dort "In Ordner verschieben" auswählen.
-
-Um eine Unterhaltung aus einem Ordner zu entfernen, verwende dasselbe Kontextmenü und wähle "Aus Ordner entfernen".
+Um eine Unterhaltung in einen Ordner zu verschieben, ziehe sie in der Seitenleiste auf den Ordner. Um sie woanders abzulegen, ziehe sie auf einen anderen Ordner. Jeder Ordner hat ausserdem einen eigenen Eintrag **Neuer Chat**, um eine Unterhaltung direkt darin zu starten.
 
 ## Favoriten
 
 Markiere eine Unterhaltung mit einem Stern, um sie oben in der Seitenleiste im Favoriten-Bereich anzuheften. Das ist praktisch für Unterhaltungen, zu denen du regelmässig zurückkehrst.
 
-Um eine Unterhaltung als Favorit zu markieren, fahre mit der Maus darüber in der Seitenleiste und klicke auf das Stern-Icon. Klicke den Stern erneut, um sie aus den Favoriten zu entfernen.
+Um eine Unterhaltung als Favorit zu markieren, fahre mit der Maus darüber in der Seitenleiste und klicke auf das Stern-Icon. Klicke den Stern erneut, um sie aus den Favoriten zu entfernen. Der Stern in der Kopfzeile der Unterhaltung tut dasselbe.
 
 ## Unterhaltungen suchen
 
-Nutze die Suchleiste oben in der Seitenleiste, um Unterhaltungen nach Titel oder Inhalt zu finden. Die Ergebnisse aktualisieren sich während des Tippens. Klicke auf ein Ergebnis, um direkt zu dieser Unterhaltung zu springen.
+Klicke auf **Suche** oben in der Seitenleiste (oder drücke **Cmd/Ctrl+K**), um die Such-Übersicht zu öffnen. Gib deine Anfrage ein und drücke **Enter**, um Ergebnisse aus Nachrichten, Unterhaltungen und Dateien zu sehen. Die Verlaufsseite hat zusätzlich ein eigenes Suchfeld für Titel und Nachrichteninhalte.
 
 ## Verlaufsseite
 
-Die Verlaufsseite zeigt dir eine vollständige Liste aller deiner Unterhaltungen mit Sortier- und Filteroptionen. Erreichbar über den Link **Verlauf** in der Hauptnavigation. Von hier aus kannst du:
+Die Verlaufsseite zeigt dir eine vollständige Liste aller deiner Unterhaltungen. Öffne sie über **Verlauf anzeigen** unten in der Chat-Seitenleiste. Von hier aus kannst du:
 
-- Unterhaltungen nach Datum durchstöbern
-- Nach Ordner oder Tag filtern
-- Mehrere Unterhaltungen für Massen-Aktionen auswählen
+- Alle Unterhaltungen durchstöbern, neueste zuerst, mit Seitennavigation
+- Unterhaltungen und Nachrichten durchsuchen
+- Zum Tab **Papierkorb** wechseln, um gelöschte Unterhaltungen zu sehen
 
 ## Unterhaltungen löschen
 
-Um eine Unterhaltung zu löschen, fahre mit der Maus in der Seitenleiste darüber und klicke auf das Papierkorb-Icon, oder öffne das Kontextmenü und wähle "Löschen". Du wirst zur Bestätigung aufgefordert, bevor die Unterhaltung gelöscht wird.
+Um eine Unterhaltung zu löschen, fahre mit der Maus in der Seitenleiste darüber und klicke auf das Papierkorb-Icon. Du wirst zur Bestätigung aufgefordert und kannst die Aktion direkt danach rückgängig machen.
 
-Gelöschte Unterhaltungen werden in den Papierkorb verschoben und können für kurze Zeit wiederhergestellt werden.
+Gelöschte Unterhaltungen werden in den Papierkorb verschoben und können wiederhergestellt werden.
 
 ## Aus dem Papierkorb wiederherstellen
 
-Um eine gelöschte Unterhaltung wiederherzustellen, gehe über den Papierkorb-Link unten in der Seitenleiste oder die Verlaufsseite zum Papierkorb. Finde die Unterhaltung, die du wiederherstellen möchtest, klicke darauf und wähle **Wiederherstellen**. Die Unterhaltung kehrt genau so in deine Liste zurück, wie sie war.
+Um eine gelöschte Unterhaltung wiederherzustellen, öffne **Verlauf anzeigen** unten in der Seitenleiste und wechsle zum Tab **Papierkorb**. Finde die Unterhaltung und klicke auf **Wiederherstellen**. Sie kehrt genau so in deine Liste zurück, wie sie war.
 
-Unterhaltungen im Papierkorb werden nach 30 Tagen endgültig gelöscht.
+Im Papierkorb-Tab kannst du einzelne Unterhaltungen auch endgültig löschen oder den ganzen Papierkorb leeren. Unterhaltungen im Papierkorb werden nach 30 Tagen endgültig gelöscht.

@@ -37,11 +37,11 @@ Custom agents save you from explaining the same context every time. The instruct
 
 ## Where to find agents
 
-Visit [your agents page](/agents) to see all the agents you have created, browse examples, and create new ones. From there you can also set which agent a conversation uses.
+Switch to the **Agents** mode in the left rail (or visit [/agents](/agents)) to see all the agents you have created and create new ones. Clicking an agent opens its configuration page.
 
-## Assigning an agent to a conversation
+## Chatting with an agent
 
-When creating a new conversation, or from the conversation settings panel, you can select which agent to use. The conversation will use that agent's instructions, tools, and integrations for every message.
+On an agent's page, click **Start chat** to open a new conversation powered by that agent. The conversation will use that agent's instructions, tools, and integrations for every message. In a workspace, an admin can also set a default agent that new conversations use.
 
 ## Mentioning agents with @
 

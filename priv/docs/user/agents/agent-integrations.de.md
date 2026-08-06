@@ -32,28 +32,26 @@ Verbindet deinen Agenten mit einem Anwendungs-Log-Stream. Der Agent kann nach Fe
 
 ## Eine Integration verbinden
 
-1. Öffne deinen Agenten im Agenten-Editor.
-2. Scrolle zum Bereich **Integrationen**.
-3. Klicke auf **Integration hinzufügen** oder **Verbinden** neben dem gewünschten Dienst.
-4. Ein Einrichtungs-Assistent öffnet sich. Folge den Schritten für die jeweilige Integration. Die meisten erfordern, dass du Magus den Zugriff auf den externen Dienst genehmigst (z. B. Anmeldung mit Google für Kalender oder Angabe eines Bot-Tokens für Telegram).
+1. Öffne die Seite deines Agenten.
+2. Gehe zum Bereich **Integrations**.
+3. Klicke auf **+ Neu verbinden**.
+4. Ein Einrichtungs-Assistent öffnet sich: Wähle den Dienst und folge seinen Schritten. Die meisten erfordern, dass du Magus den Zugriff auf den externen Dienst genehmigst (z. B. Anmeldung mit Google für Kalender oder Angabe eines Bot-Tokens für Telegram).
 5. Schliesse den Assistenten ab. Die Integration erscheint als verbunden in der Liste.
 
-Jede Integration kann nach dem Verbinden zusätzliche Einstellungen anzeigen, z. B. welchen Kalender du lesen oder welchen Telegram-Bot du verwenden möchtest.
+Jede Integration kann nach dem Verbinden zusätzliche Einstellungen auf ihrer Karte anzeigen.
 
 ## Integrationsspezifische Einstellungen
 
-Sobald eine Integration verbunden ist, klicke darauf, um ihre Einstellungen zu sehen. Häufige Optionen sind:
+Jede verbundene Integration wird als Karte mit Anbietername und Status angezeigt. Je nach Dienst bietet die Karte:
 
-- **Label**: Ein freundlicher Name, um diese Verbindung zu identifizieren.
-- **Welches Konto oder welche Ressource**: Z. B. welches Google-Konto oder welcher Telegram-Bot.
-- **Berechtigungen**: Was der Agent tun darf (nur lesen vs. lesen und schreiben, je nach Dienst).
+- **Tools**: Einzelne Umschalter für die Tools, die diese Integration dem Agenten gibt. Schalte aus, was der Agent nicht nutzen soll.
+- **Konfigurationsfelder**: Anbieterspezifische Einstellungen, direkt auf der Karte editierbar.
 
 ## Eine Integration trennen
 
-1. Öffne den Agenten-Editor und gehe zum Bereich **Integrationen**.
-2. Klicke auf die Integration, die du entfernen möchtest.
-3. Klicke auf **Trennen** oder **Entfernen**.
-4. Bestätige die Entfernung.
+1. Öffne die Seite des Agenten und gehe zum Bereich **Integrations**.
+2. Suche die Integration, die du entfernen möchtest.
+3. Klicke auf **Trennen** und bestätige.
 
 Das Trennen entzieht dem Agenten sofort den Zugriff auf diesen Dienst. Deine Daten im externen Dienst bleiben davon unberührt.
 

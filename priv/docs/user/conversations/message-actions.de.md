@@ -14,9 +14,7 @@ Klicke auf das **Kopieren**-Icon, um den vollständigen Text einer Nachricht in 
 
 ## Nachricht wiederholen
 
-Der **Wiederholen**-Button generiert die KI-Antwort auf deine Nachricht neu. Verwende ihn, wenn die Antwort nicht ganz das war, was du gesucht hast, oder wenn du eine alternative Antwort sehen möchtest. Die vorherige Antwort wird durch die neue ersetzt.
-
-Bei deinen eigenen Nachrichten sendet "Wiederholen" die Nachricht mit demselben Inhalt erneut.
+Der **Wiederholen**-Button erscheint bei deinen eigenen Nachrichten. Er sendet die Nachricht mit demselben Inhalt erneut, sodass die KI eine frische Antwort generiert. Verwende ihn, wenn die Antwort nicht ganz das war, was du gesucht hast, oder wenn du eine alternative Antwort sehen möchtest. Der frühere Austausch bleibt im Unterhaltungsverlauf erhalten.
 
 ## Aus dem Kontext ausblenden
 
@@ -28,13 +26,13 @@ Ausgeblendete Nachrichten werden mit einem visuellen Hinweis angezeigt, damit du
 
 ## Einen Prompt aus einer Nachricht erstellen
 
-Der **Als Prompt speichern**-Button (Zauberstab- oder Lesezeichen-Icon) ermöglicht es dir, eine Nachricht in einen wiederverwendbaren Prompt in deiner Bibliothek umzuwandeln. Das ist praktisch, wenn du eine besonders wirkungsvolle Anweisung oder Frage formuliert hast und sie in zukünftigen Unterhaltungen erneut verwenden möchtest.
+Der **Prompt erstellen**-Button (Funkeln-Icon) ermöglicht es dir, eine Nachricht in einen wiederverwendbaren Prompt in deiner Bibliothek umzuwandeln. Das ist praktisch, wenn du eine besonders wirkungsvolle Anweisung oder Frage formuliert hast und sie in zukünftigen Unterhaltungen erneut verwenden möchtest.
 
-Ein Klick darauf öffnet einen Dialog, in dem du dem Prompt einen Namen geben und ihn optional vor dem Speichern bearbeiten kannst. Der gespeicherte Prompt erscheint in deiner Prompts-Bibliothek.
+Ein Klick darauf öffnet einen Dialog mit dem vorausgefüllten Nachrichtentext, in dem du dem Prompt einen Namen geben und ihn optional vor dem Speichern bearbeiten kannst. Der gespeicherte Prompt erscheint in deiner Library.
 
 ## Einen Thread starten
 
-Der **Thread**-Button (Antwort-Pfeil-Icon) erstellt einen neuen Thread, der von dieser Nachricht abzweigt. Der Thread erbt den vollständigen Unterhaltungskontext bis zu diesem Punkt und läuft dann unabhängig weiter.
+Der **Thread**-Button (Sprechblasen-Icon) erstellt einen neuen Thread, der von dieser Nachricht abzweigt. Der Thread erbt den vollständigen Unterhaltungskontext bis zu diesem Punkt und läuft dann unabhängig weiter.
 
 Wenn für diese Nachricht bereits ein Thread existiert, öffnet ein Klick auf den Button den vorhandenen Thread.
 

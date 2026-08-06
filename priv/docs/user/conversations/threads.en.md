@@ -22,7 +22,7 @@ Each thread runs its own agent process. This means:
 
 ### From a message
 
-Hover over any message in a conversation and click the thread icon (arrow). This creates a new thread branching from that message.
+Hover over any message in a conversation and click the thread icon (speech bubbles). This creates a new thread branching from that message.
 
 If a thread already exists for that message, clicking the icon opens the existing thread instead of creating a new one.
 
@@ -54,17 +54,17 @@ Close the panel with the X button. The thread persists, and you can reopen it an
 
 ### Mobile
 
-On mobile, the thread takes over the full screen with a back button to return to the parent conversation.
+On mobile, the thread takes over the full width. A switcher bar at the top lets you flip between the thread and the parent conversation.
 
 ## Finding threads
 
 ### On messages
 
-Messages that have threads show a reply count indicator below them (e.g., "3 replies"). Click it to open the thread.
+On messages that have a thread, the thread icon stays highlighted and shows a small reply count. Click it to open the thread.
 
 ### In the sidebar
 
-Threads appear nested under their parent conversation in the sidebar. Click a thread to navigate to the parent conversation and open the thread panel. Threads are ordered by creation date and are not draggable.
+Threads appear nested under their parent conversation in the sidebar. Click a thread to navigate to the parent conversation and open the thread panel. Threads cannot be dragged into folders.
 
 ## Thread behavior
 

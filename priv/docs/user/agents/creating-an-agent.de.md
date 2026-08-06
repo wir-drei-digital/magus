@@ -8,23 +8,21 @@ order: 2
 
 Eigene Agenten ermöglichen es dir, einen spezialisierten Assistenten zu bauen, der auf eine bestimmte Aufgabe oder einen bestimmten Workflow zugeschnitten ist. So erstellst du einen.
 
-## Schritt 1: Zur Agenten-Seite navigieren
+## Schritt 1: Zu Agents wechseln
 
-Gehe zu [/agents](/agents). Du siehst alle Agenten, die du bereits erstellt hast, sowie einen Button zum Erstellen eines neuen.
+Wechsle in den Modus **Agents** in der linken Leiste. Die Seitenleiste listet alle Agenten, die du bereits erstellt hast.
 
-## Schritt 2: Auf Erstellen klicken
+## Schritt 2: Auf Neuer Agent klicken
 
-Klicke auf den Button **Agenten erstellen** (oder das **+**-Symbol). Ein Erstellungsformular öffnet sich.
+Klicke oben in der Seitenleiste auf **Neuer Agent**. Ein kleiner Dialog fragt nach einem Namen und optionalen Anweisungen. Klicke auf **Erstellen**, und die Konfigurationsseite des Agenten öffnet sich.
 
-## Schritt 3: Name und Symbol wählen
+## Schritt 3: Das Profil ausfüllen
 
-Gib deinem Agenten einen klaren Namen, der beschreibt, was er tut. Zum Beispiel: "Code-Reviewer", "Recherche-Assistent" oder "Support-Bot".
+Auf der Agenten-Seite enthält der Bereich **General** das Profil:
 
-Für das Symbol hast du einige Optionen:
-
-- **Emoji**: Wähle ein beliebiges Emoji als einfaches Symbol. Schnell und ausdrucksstark.
-- **Eigenes Bild**: Lade eine eigene Bilddatei hoch.
-- **KI-generiertes Bild**: Beschreibe, was du dir vorstellst, und Magus generiert ein Bild für dich. Das ist eine großartige Möglichkeit, deinem Agenten eine einzigartige visuelle Identität zu geben, ohne Designarbeit.
+- **Name und Beschreibung**: Gib deinem Agenten einen klaren Namen, der beschreibt, was er tut, zum Beispiel "Code-Reviewer", "Recherche-Assistent" oder "Support-Bot".
+- **Bild**: Lade ein eigenes Bild hoch oder klicke auf **Generieren**, beschreibe, was du dir vorstellst, und lass Magus ein Bild für deinen Agenten erstellen. So bekommt er eine einzigartige visuelle Identität ohne Designarbeit.
+- **Icon**: Alternativ ein einzelnes Emoji, das in Listen und Menüs angezeigt wird, wenn kein Bild gesetzt ist.
 
 ## Schritt 4: Die Anweisungen schreiben
 
@@ -47,21 +45,21 @@ Ein paar Tipps:
 
 ## Schritt 5: Standard-Chat-Modus festlegen
 
-Wähle den Standard-Modus für Unterhaltungen, die diesen Agenten verwenden:
+Wähle im Bereich **Tools** des Agenten den **Standard-Modus** für Unterhaltungen, die diesen Agenten verwenden:
 
 - **Chat**: Normaler Unterhaltungsmodus.
 - **Search**: Der Agent durchsucht das Web, bevor er antwortet.
 - **Reasoning**: Der Agent nimmt sich mehr Zeit, um komplexe Probleme durchzudenken.
-- **Image generation**: Der Agent erzeugt Bilder aus Beschreibungen.
+- **Image generation** / **Video generation**: Der Agent erzeugt Bilder oder Videos aus Beschreibungen.
 
 Du kannst den Modus jederzeit pro Unterhaltung ändern. Der Standard ist nur der Ausgangspunkt des Agenten.
 
 ## Schritt 6: Speichern
 
-Klicke auf **Speichern** (oder **Erstellen**). Dein Agent ist nun einsatzbereit.
+Jeder Bereich hat einen eigenen **Speichern**-Button für Textfelder; Umschalter greifen sofort. Dein Agent ist nun einsatzbereit.
 
 ## Den Agenten verwenden
 
-Um deinen neuen Agenten zu nutzen, starte eine neue Unterhaltung und wähle ihn in der Agenten-Auswahl aus, oder wechsle den Agenten in einer bestehenden Unterhaltung über das Einstellungs-Panel. Die Anweisungen, Tools und Integrationen des Agenten sind aktiv, sobald du zu ihm wechselst.
+Klicke oben auf der Seite des Agenten auf **Chat starten**, um eine Unterhaltung mit ihm zu öffnen, oder erwähne ihn in einer beliebigen Unterhaltung mit **@** gefolgt von seinem Handle. Die Anweisungen, Tools und Integrationen des Agenten sind ab der ersten Nachricht aktiv.
 
-Du kannst deinen Agenten jederzeit bearbeiten, indem du zu [/agents](/agents) zurückgehst und auf seinen Namen klickst.
+Du kannst deinen Agenten jederzeit bearbeiten, indem du zu **Agents** zurückgehst und auf seinen Namen klickst.

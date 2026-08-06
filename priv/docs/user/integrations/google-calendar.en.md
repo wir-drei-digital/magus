@@ -24,11 +24,10 @@ All actions are performed on your behalf using your Google account. The agent wi
 ## Connecting Google Calendar
 
 1. Go to **Agents** and open the agent you want to connect
-2. Navigate to the **Integrations** tab
-3. Click **Add Integration** and select **Google Calendar**
-4. Click **Connect with Google**
-5. Google will ask you to sign in (if you aren't already) and grant Magus permission to access your calendar
-6. After approving, you'll be redirected back to Magus and the integration will be active
+2. Go to the **Integrations** section
+3. Click **+ Connect new** and select **Google Calendar**
+4. Google will ask you to sign in (if you aren't already) and grant Magus permission to access your calendar
+5. After approving, you'll be redirected back to Magus and the integration will be active
 
 Magus requests only the permissions it needs: reading and writing to your calendar. It does not access your Gmail, Drive, or other Google services.
 
@@ -38,7 +37,7 @@ Google Calendar stores events in your account's timezone. Magus reads this timez
 
 If you ask your agent to schedule something at "2pm", it will use your Google account's timezone unless you specify otherwise. You can always clarify: "Schedule a call at 2pm Eastern" or "Set up a reminder for 9am my time."
 
-Your Magus account also has a timezone setting (in **Account Settings**). For best results, make sure both settings match your actual timezone.
+Your Magus account also has a timezone setting (under **Settings → Preferences**). For best results, make sure both settings match your actual timezone.
 
 ## Using It in Conversation
 
@@ -69,9 +68,9 @@ The agent uses natural language to understand your intent, so you don't need to 
 
 To view or remove the Google Calendar integration:
 
-1. Open your agent's **Integrations** tab
-2. Find the Google Calendar integration
-3. Click **Manage** to see the connection status, or **Disconnect** to remove it
+1. Open your agent's **Integrations** section
+2. Find the Google Calendar integration; its card shows the connection status
+3. Click **Disconnect** to remove it
 
 Disconnecting removes Magus's access to your Google account. Any events already created on your calendar will remain there; disconnecting does not delete them.
 

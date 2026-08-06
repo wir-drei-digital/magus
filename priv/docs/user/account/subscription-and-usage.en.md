@@ -21,13 +21,13 @@ Your monthly bill
                             no markup, you pay exactly what we pay
 ```
 
-**Why a base fee?** Running Magus costs real money even before a single AI request: the database, hosting, file storage, and the external API providers we integrate (such as the search API) all have to be paid. The base fee exists to get the platform going and keep it running — **we don't earn money on it**. What you get is an online, hosted service that is managed by us — and that we use ourselves every day. The current base fee is always shown in **Account Settings → Subscription**, and it goes *down* for everyone as more people join, because the fixed costs are shared across more users.
+**Why a base fee?** Running Magus costs real money even before a single AI request: the database, hosting, file storage, and the external API providers we integrate (such as the search API) all have to be paid. The base fee exists to get the platform going and keep it running — **we don't earn money on it**. What you get is an online, hosted service that is managed by us — and that we use ourselves every day. The current base fee is always shown in **Settings → Subscription**, and it goes *down* for everyone as more people join, because the fixed costs are shared across more users.
 
 ## Plans
 
 ### Free
 
-The free plan lets you try Magus at no cost. It includes a **small one-time trial allowance — enough for roughly 10 typical chat messages** — with access to standard models (up to the 2x cost tier). It costs us practically nothing and lets you test the full harness: real conversations, agents, and tools. Your trial usage is displayed in **Account Settings → Subscription** exactly like paid usage, so you always see how much is left. When the allowance is used up, AI responses pause until you subscribe to Pay-as-you-go.
+The free plan lets you try Magus at no cost. It includes a **small one-time trial allowance — enough for roughly 10 typical chat messages** — with access to standard models (up to the 2x cost tier). It costs us practically nothing and lets you test the full harness: real conversations, agents, and tools. Your trial usage is displayed in **Settings → Subscription** exactly like paid usage, so you always see how much is left. When the allowance is used up, AI responses pause until you subscribe to Pay-as-you-go.
 
 Storage is limited on the free plan, and premium or high-cost models are not available. Spending controls are not needed (and not active) — you can't spend money on the free plan.
 
@@ -45,7 +45,7 @@ These are the only two plans. Usage is controlled with spending limits, not prep
 
 ## Spending limits
 
-Because usage is billed at cost, you control how much you can spend. The controls live in **Account Settings → Subscription → Spending controls** (they require an active Pay-as-you-go subscription).
+Because usage is billed at cost, you control how much you can spend. The controls live in **Settings → Subscription → Spending controls** (they require an active Pay-as-you-go subscription).
 
 - **Monthly spend cap** — a hard limit on your AI usage per billing period. If you don't set one, a default cap of CHF 20 applies. When the cap is reached, AI responses pause until the next billing period or until you raise the cap — you can never be surprised by a bill.
 - **Pick your own cap** — use the slider, a preset, or a custom amount.
@@ -56,25 +56,25 @@ If you have a wallet balance (for example from an annual-plan price adjustment),
 
 ## Storage limits
 
-Your plan determines how much file storage you have and the maximum size for individual uploads. You can see your current usage in **Account Settings** under **Storage**.
+Your plan determines how much file storage you have and the maximum size for individual uploads. You can see your current usage under **Settings → Storage**.
 
 If you're running low on storage, you can:
-- Delete files you no longer need (see [Files & Storage](../files/files-and-storage.en.md))
+- Delete files you no longer need (see [Files & Storage](../knowledge/files-and-storage.en.md))
 - Subscribe to Pay-as-you-go for higher storage limits
 
 ## Viewing your current usage
 
-1. Go to **Account Settings**
+1. Go to **Settings**
 2. Open the **Subscription** section
 
-You'll see what you've spent this billing period in CHF, your cap, tokens used, and your wallet balance if you have one. The workbench sidebar shows the same numbers at a glance.
+You'll see your plan, what you've spent this billing period in CHF, your cap, and tokens used. The usage indicator in the left rail shows the same numbers at a glance, and the **Usage** section in Settings offers a detailed breakdown with time ranges and a model filter.
 
 ## Subscribing
 
-1. Go to **Account Settings**
+1. Go to **Settings**
 2. Open the **Subscription** section
-3. Choose **Subscribe monthly** or **Subscribe annually**
-4. Complete the Stripe checkout
+3. Click **Upgrade**
+4. Complete the Stripe checkout (monthly or annual)
 
 Your subscription is active immediately. You'll receive a confirmation email from Stripe.
 
@@ -84,15 +84,15 @@ Magus uses Stripe to handle payments securely. Your card details are stored by S
 
 To manage your payment method or billing information:
 
-1. Go to **Account Settings**
+1. Go to **Settings**
 2. Open the **Subscription** section
-3. Click **Manage subscription**
+3. Click **Manage billing**
 
 This opens the Stripe customer portal, where you can update your payment method, download invoices, view your billing history, or change your billing cycle.
 
 ## Canceling
 
-Cancel anytime via **Manage subscription** in the Stripe portal. Your plan remains active until the end of the current billing period; outstanding usage is billed with the final invoice. After that, your account reverts to the free plan. Your data (conversations, agents, prompts) is retained — you won't lose anything, but free plan limits apply again.
+Cancel anytime via **Manage billing** in the Stripe portal. Your plan remains active until the end of the current billing period; outstanding usage is billed with the final invoice. After that, your account reverts to the free plan. Your data (conversations, agents, prompts) is retained — you won't lose anything, but free plan limits apply again.
 
 ## Usage overrides
 

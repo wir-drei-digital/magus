@@ -22,11 +22,11 @@ Nicht alle Modelle sind für denselben Zweck gebaut:
 
 Im Modell-Selektor siehst du kleine Badges an jedem Modell, die seine besonderen Fähigkeiten anzeigen:
 
-- **Search:** Das Modell kann aktuelle Informationen im Web nachschlagen.
-- **Reasoning:** Das Modell unterstützt erweitertes Denken für komplexe Probleme.
-- **Tools:** Das Modell kann Magus-Tools verwenden (Speicher, Websuche, Planung usw.).
+- **search:** Das Modell kann aktuelle Informationen im Web nachschlagen.
+- **reason:** Das Modell unterstützt erweitertes Denken für komplexe Probleme.
+- **Modalitäts-Chips** (etwa `image` oder `→image`): was das Modell über reinen Text hinaus lesen und erzeugen kann.
 
-Nicht alle Modelle haben alle Fähigkeiten. Wenn eine Funktion nach dem Wechsel des Modells ausgegraut ist, wird sie von diesem Modell möglicherweise nicht unterstützt.
+Jeder Eintrag zeigt ausserdem die ungefähren Kosten pro Anfrage und die Grösse des Kontextfensters. Nicht alle Modelle haben alle Fähigkeiten; wenn etwas nach dem Modellwechsel nicht funktioniert, wird es von diesem Modell möglicherweise nicht unterstützt.
 
 ## Das Modell in einer Unterhaltung wechseln
 
@@ -44,7 +44,7 @@ Magus unterstützt drei separate Standardmodelle:
 - **Bildmodell:** Wird verwendet, wenn du in den Bildgenerierungsmodus wechselst.
 - **Videomodell:** Wird verwendet, wenn du in den Videogenerierungsmodus wechselst.
 
-Um deine Standardmodelle zu ändern, gehe zu **Einstellungen** und suche den Abschnitt für Modelleinstellungen. Änderungen gelten für alle neuen Unterhaltungen ab diesem Zeitpunkt. Bestehende Unterhaltungen behalten das Modell, das sie bisher verwendet haben.
+Um deine Standardmodelle zu ändern, gehe zu **Einstellungen → Präferenzen** und nutze den Abschnitt **Standardmodelle**. Änderungen gelten für alle neuen Unterhaltungen ab diesem Zeitpunkt. Bestehende Unterhaltungen behalten das Modell, das sie bisher verwendet haben.
 
 ## Eigene Modelle verwenden
 

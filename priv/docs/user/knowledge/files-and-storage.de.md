@@ -14,36 +14,34 @@ Mit Magus kannst du Dateien an Unterhaltungen anhängen, sodass deine Agenten si
 
 Am einfachsten lädst du eine Datei direkt in einer Unterhaltung hoch:
 
-- **Drag & Drop:** Ziehe eine Datei von deinem Desktop in das Chat-Fenster und lasse sie im Nachrichteneingabebereich fallen
-- **Dateiauswahl:** Klicke auf das Anhang-Symbol (Büroklammer) im Nachrichteneingabebereich und wähle eine Datei von deinem Gerät aus
+- **Drag & Drop:** Ziehe eine Datei von deinem Desktop auf den Chat-Eingabebereich
+- **Dateiauswahl:** Öffne das **+**-Menü im Nachrichteneingabebereich, wähle **Datei anhängen** und dann eine Datei von deinem Gerät
 
 Die Datei wird an deine Nachricht angehängt. Sobald die Nachricht gesendet wurde, kann der Agent die Datei abrufen und ihren Inhalt in seiner Antwort referenzieren.
 
 ### Über den Datei-Browser
 
-Für Dateien, die du in mehreren Unterhaltungen verwenden möchtest, öffne den **Datei-Browser** über das Files-Symbol in der Seitenleiste, oder rufe direkt `/files` auf. Über die obere Leiste des Browsers:
+Für Dateien, die du in mehreren Unterhaltungen verwenden möchtest, wechsle in den Modus **Files** in der linken Leiste (oder rufe `/files` auf). Dann:
 
-- Klicke auf **Upload**, um Dateien von deinem Gerät auszuwählen. Sie werden in die aktuelle Ansicht hochgeladen (in den geöffneten Ordner oder in deine Stammdateien, falls keiner offen ist).
-- Ziehe Dateien an eine beliebige Stelle des Rasters, um sie direkt dort hochzuladen.
+- Klicke auf **Upload** in der oberen Leiste des Browsers (oder auf **Dateien hochladen** in der Seitenleiste), um Dateien von deinem Gerät auszuwählen. Sie werden in die aktuelle Ansicht hochgeladen (in den geöffneten Ordner oder in deine Stammdateien, falls keiner offen ist).
+- Ziehe Dateien an eine beliebige Stelle des Browsers, um sie direkt dort hochzuladen.
 
 Hier hochgeladene Dateien sind sofort verfügbar und bleiben über eine einzelne Unterhaltung hinaus erhalten.
 
 ## Der Datei-Browser
 
-Der Datei-Browser ist eine Drive-artige Ansicht für alles, was du hochgeladen hast oder was für dich generiert wurde. Klicke auf das Files-Symbol in der Workbench-Seitenleiste, um ihn zu öffnen.
+Der Datei-Browser ist eine Drive-artige Ansicht für alles, was du hochgeladen hast oder was für dich generiert wurde. Klicke auf das Files-Symbol in der linken Leiste, um ihn zu öffnen.
 
 ### Einstiegspunkte in der Seitenleiste
 
 Die Seitenleiste listet Orte auf, von denen aus du starten kannst:
 
-- **My Files**: deine persönlichen Dateien und Ordner.
-- **Shared with me**: in einem Team-Workspace die Dateien, die andere mit dem Team geteilt haben.
-- **Recent**: Dateien, die in den letzten 30 Tagen geändert wurden.
+- **My files**: deine persönlichen Dateien und Ordner.
+- **Recent**: kürzlich geänderte Dateien.
 - **Templates**: Dateien, die du als Vorlagen markiert hast, um sie wiederzuverwenden.
-- **Verbundene Quellen**: Sammlungen, die aus externen Diensten synchronisiert werden. Klicke auf den Pfeil, um sie einzublenden.
+- **Shared with me**: in einem Team-Workspace die Dateien, die andere mit dem Team geteilt haben.
+- **Verbundene Quellen**: Sammlungen, die aus externen Diensten synchronisiert werden, jeweils mit Anzahl und Sync-Status.
 - **Trash**: Dateien, die du in den Papierkorb verschoben hast. In dieser Version schreibgeschützt.
-
-Unter den Einstiegspunkten findest du drei Filter-Pills: **Type**, **Modified**, **Source**. Wähle einen Wert, um die aktuelle Ansicht einzugrenzen, oder "Any", um den Filter zu löschen.
 
 Am unteren Rand der Seitenleiste siehst du auf einen Blick deine Speichernutzung.
 
@@ -52,11 +50,12 @@ Am unteren Rand der Seitenleiste siehst du auf einen Blick deine Speichernutzung
 Die obere Leiste des Browsers enthält:
 
 - **Breadcrumbs**: klicke auf ein Segment, um zu einem übergeordneten Ordner oder Bereich zurückzuspringen.
-- **Suche**: filtert die aktuelle Ansicht nach Namen. Die URL aktualisiert sich beim Tippen, sodass du eine Suche als Lesezeichen speichern kannst.
+- **Suche**: filtert die aktuelle Ansicht nach Namen.
 - **Sortierung**: nach "Modified" (Standard), "Name" oder "Size", aufsteigend oder absteigend.
-- **List- / Grid-Umschalter**: zwischen Tabellen- und Kachelansicht wechseln. Deine Wahl wird auf deinem Konto gespeichert.
-- **+ New folder**: einen neuen Ordner an der aktuellen Stelle anlegen.
+- **Filters**: ein Popover mit den Filtern **Type**, **Modified** und **Source**. Wähle einen Wert, um die aktuelle Ansicht einzugrenzen, oder "Any", um den Filter zu löschen.
+- **New folder**: einen neuen Ordner an der aktuellen Stelle anlegen.
 - **Upload**: Dateien aus dem Dateisystem auswählen.
+- **List- / Grid-Umschalter**: zwischen Tabellen- und Kachelansicht wechseln. Deine Wahl wird auf deinem Konto gespeichert.
 
 ### Ordner-Navigation
 
@@ -64,37 +63,35 @@ Klicke auf eine Ordnerkachel oder -zeile, um sie zu öffnen. Die Breadcrumbs akt
 
 ### Datei-Aktionen
 
-Klicke auf eine Datei, um ihre Detailansicht in einem neuen Tab zu öffnen. Per Rechtsklick auf eine Datei oder einen Ordner erreichst du das Aktionsmenü:
+Klicke auf eine Datei, um ihre Detailansicht zu öffnen. Fahre mit der Maus über eine Datei oder einen Ordner und klicke auf den **⋯**-Button für das Aktionsmenü:
 
-- Open, Open in new tab, Download
-- Open chat about this file
-- Rename, Move to, Share to workspace
-- Toggle template (nur bei Dateien)
-- Move to trash
-
-**Move to** öffnet eine Ordnerauswahl, in der du das Ziel wählst. **Rename** öffnet einen Inline-Editor.
+- **Open** und **Download**
+- **Rename** und **Move…** (öffnet eine Ordnerauswahl für das Ziel)
+- **Mark as template** / **Remove from templates** (nur bei Dateien)
+- **Share with team** / **Make private** (in einem Workspace)
+- **Move to trash** (Dateien) / **Delete** (Ordner)
 
 Der Trash-Bereich ist in dieser Version schreibgeschützt. Wiederherstellen oder endgültiges Löschen kommt in einem späteren Update.
 
 ## Geltungsbereiche für Dateien
 
-Jede Datei hat einen **Geltungsbereich**, der steuert, wer darauf zugreifen kann und in welchen Unterhaltungen.
+Wo eine Datei liegt, entscheidet, wer darauf zugreifen kann und in welchen Unterhaltungen:
 
 | Geltungsbereich | Wer kann darauf zugreifen |
 |-----------------|---------------------------|
-| **Chat** | Nur die aktuelle Unterhaltung |
-| **Folder** | Alle Unterhaltungen im selben Ordner |
-| **Workspace** | Alle Mitglieder deines Workspace (Teamzugriff) |
-| **Global** | Alle deine Unterhaltungen, über alle Agenten hinweg |
+| **Chat** | Eine an eine Unterhaltung angehängte Datei gehört zu dieser Unterhaltung |
+| **Folder** | Eine Datei in einem Ordner steht Unterhaltungen in diesem Ordner zur Verfügung |
+| **Workspace** | Eine mit dem Team geteilte Datei steht allen Workspace-Mitgliedern zur Verfügung |
+| **Bibliothek** | Eine Datei in deiner persönlichen Bibliothek steht über deine Unterhaltungen hinweg zur Verfügung |
 
-Wähle den passenden Geltungsbereich je nachdem, wie weit die Datei verfügbar sein soll. Für sensible Dokumente hält der Geltungsbereich **Chat** die Datei auf eine Unterhaltung beschränkt. Für Referenzmaterial, das das ganze Team nutzt, macht der Geltungsbereich **Workspace** es überall verfügbar.
+Für sensible Dokumente hält das Anhängen an eine einzelne Unterhaltung sie isoliert. Referenzmaterial, das das ganze Team nutzt, teilst du mit dem Workspace.
 
 ## Dateien herunterladen
 
 So lädst du eine Datei herunter:
 
-- Klicke in einer Unterhaltung auf den Dateianhang, um ihn zu öffnen, und klicke dann auf **Herunterladen**
-- Finde im Files-Tab die Datei und klicke auf das **Download**-Symbol daneben
+- Fahre in einer Unterhaltung mit der Maus über den Anhang und nutze seinen Download-Button (Bilder und Videos), oder öffne den Anhang und lade von dort herunter
+- Öffne im Datei-Browser das **⋯**-Menü der Datei und wähle **Download**
 
 Vom Agenten generierte Dateien (zum Beispiel Bilder, die von einem Bildgenerierungsmodell erstellt wurden, oder Ausgaben aus der Code-Ausführung) erscheinen in der Unterhaltung und können auf dieselbe Weise heruntergeladen werden.
 
@@ -118,7 +115,7 @@ Der verfügbare Speicher hängt von deinem Abonnementplan ab:
 - **Free-Plan:** Begrenzter Speicher inklusive
 - **Bezahlte Pläne:** Mehr Speicher, mit höheren Upload-Limits pro Datei
 
-Du kannst deine aktuelle Speichernutzung in den **Account Settings** unter **Storage** einsehen. Die Anzeige zeigt, wie viel du genutzt hast und wie viel dein Plan erlaubt.
+Du kannst deine aktuelle Speichernutzung unter **Einstellungen → Speicher** einsehen. Die Anzeige zeigt, wie viel du genutzt hast und wie viel dein Plan erlaubt.
 
 Wenn du dein Speicherlimit erreichst, musst du Dateien löschen oder deinen Plan upgraden, bevor du weitere Dateien hochladen kannst.
 
@@ -126,7 +123,7 @@ Wenn du dein Speicherlimit erreichst, musst du Dateien löschen oder deinen Plan
 
 ### Speichernutzung einsehen
 
-Am unteren Rand der Seitenleiste des Datei-Browsers siehst du eine kompakte Speicheranzeige mit deiner aktuellen Nutzung. Eine ausführliche Übersicht findest du in den **Account Settings** unter **Storage**.
+Am unteren Rand der Seitenleiste des Datei-Browsers siehst du eine kompakte Speicheranzeige mit deiner aktuellen Nutzung. Eine ausführliche Übersicht findest du unter **Einstellungen → Speicher**.
 
 ### Dateien löschen, um Speicher freizugeben
 
@@ -134,7 +131,7 @@ So löschst du eine Datei:
 
 1. Öffne den Datei-Browser unter `/files`
 2. Finde die Datei (mit Suche oder Filter eingrenzen)
-3. Rechtsklick auf die Datei und **Move to trash** wählen
+3. Öffne das **⋯**-Menü der Datei und wähle **Move to trash**
 
 Die Datei wandert in den **Trash** und ist aus deinen aktiven Ansichten ausgeblendet. In dieser Version zählt sie weiterhin zur Speichernutzung. Endgültiges Löschen, das Speicher tatsächlich freigibt, kommt in einem späteren Update.
 

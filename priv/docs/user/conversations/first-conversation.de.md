@@ -8,7 +8,7 @@ order: 1
 
 ## Eine neue Unterhaltung starten
 
-Klicke auf **Neue Unterhaltung** oben links in der Seitenleiste. Eine frische Unterhaltung öffnet sich im Chat-Bereich, bereit für deine erste Nachricht.
+Klicke auf **Neuer Chat** oben in der Seitenleiste. Eine frische Unterhaltung öffnet sich im Chat-Bereich, bereit für deine erste Nachricht.
 
 Du kannst beliebig viele Unterhaltungen führen. Jede behält ihren eigenen Kontext, ihre Einstellungen und ihren Nachrichtenverlauf unabhängig.
 
@@ -22,7 +22,7 @@ Die KI beginnt sofort zu antworten. Du siehst den Text, während er generiert wi
 
 Antworten werden mit vollständiger Markdown-Formatierung dargestellt. Das bedeutet:
 
-- **Code** erscheint in hervorgehobenen Code-Blöcken mit einem Kopieren-Button.
+- **Code** erscheint in hervorgehobenen Code-Blöcken.
 - **Listen und Tabellen** sind für einfaches Lesen formatiert.
 - **Fetter und kursiver Text** wird als formatierter Text dargestellt, nicht als rohe Sternchen.
 - **Bilder**, die von der KI generiert wurden, erscheinen direkt im Chat.
@@ -37,8 +37,8 @@ Magus generiert automatisch einen Titel für jede Unterhaltung, basierend auf de
 
 Wenn der automatisch generierte Titel nicht passt, kannst du ihn ändern:
 
-1. Fahre mit der Maus über den Unterhaltungsnamen in der Seitenleiste.
-2. Klicke auf das Stift-Icon, das erscheint.
+1. Öffne die Unterhaltung.
+2. Klicke auf den Titel in der Kopfzeile oben im Chat-Bereich.
 3. Tippe deinen neuen Titel und drücke **Enter** zum Speichern.
 
-Du kannst eine Unterhaltung auch im Chat-Bereich umbenennen, indem du auf den Titel in der Kopfzeile oben klickst.
+Das Unterhaltungsmenü in der Kopfzeile (der Drei-Punkte-Button) bietet ebenfalls eine Option **Umbenennen**.

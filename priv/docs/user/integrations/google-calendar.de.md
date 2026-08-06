@@ -24,11 +24,10 @@ Alle Aktionen werden in deinem Namen mit deinem Google-Konto ausgeführt. Der Ag
 ## Google Calendar verbinden
 
 1. Gehe zu **Agents** und öffne den Agenten, den du verbinden möchtest
-2. Navigiere zum Tab **Integrations**
-3. Klicke auf **Integration hinzufügen** und wähle **Google Calendar**
-4. Klicke auf **Mit Google verbinden**
-5. Google fordert dich auf, dich anzumelden (sofern noch nicht geschehen) und Magus den Zugriff auf deinen Kalender zu erlauben
-6. Nach der Genehmigung wirst du zurück zu Magus weitergeleitet, und die Integration ist aktiv
+2. Gehe zum Bereich **Integrations**
+3. Klicke auf **+ Neu verbinden** und wähle **Google Calendar**
+4. Google fordert dich auf, dich anzumelden (sofern noch nicht geschehen) und Magus den Zugriff auf deinen Kalender zu erlauben
+5. Nach der Genehmigung wirst du zurück zu Magus weitergeleitet, und die Integration ist aktiv
 
 Magus fordert nur die Berechtigungen an, die es benötigt: Lesen und Schreiben in deinem Kalender. Es greift nicht auf dein Gmail, Drive oder andere Google-Dienste zu.
 
@@ -38,7 +37,7 @@ Google Calendar speichert Ereignisse in der Zeitzone deines Kontos. Magus liest 
 
 Wenn du deinen Agenten bittest, etwas "um 14 Uhr" zu planen, verwendet er die Zeitzone deines Google-Kontos, es sei denn, du gibst etwas anderes an. Du kannst jederzeit konkretisieren: "Plane einen Anruf um 14 Uhr MEZ" oder "Erstelle eine Erinnerung für 9 Uhr morgens bei mir."
 
-Dein Magus-Konto hat ebenfalls eine Zeitzoneneinstellung (unter **Account Settings**). Für beste Ergebnisse stelle sicher, dass beide Einstellungen mit deiner tatsächlichen Zeitzone übereinstimmen.
+Dein Magus-Konto hat ebenfalls eine Zeitzoneneinstellung (unter **Einstellungen → Präferenzen**). Für beste Ergebnisse stelle sicher, dass beide Einstellungen mit deiner tatsächlichen Zeitzone übereinstimmen.
 
 ## Im Gespräch nutzen
 
@@ -69,9 +68,9 @@ Der Agent versteht deine Absicht durch natürliche Sprache, du brauchst keine sp
 
 Um die Google Calendar-Integration einzusehen oder zu entfernen:
 
-1. Öffne den Tab **Integrations** deines Agenten
-2. Finde die Google Calendar-Integration
-3. Klicke auf **Verwalten**, um den Verbindungsstatus einzusehen, oder auf **Trennen**, um sie zu entfernen
+1. Öffne den Bereich **Integrations** deines Agenten
+2. Finde die Google Calendar-Integration; ihre Karte zeigt den Verbindungsstatus
+3. Klicke auf **Trennen**, um sie zu entfernen
 
 Beim Trennen wird Magus der Zugriff auf dein Google-Konto entzogen. Bereits in deinem Kalender erstellte Ereignisse bleiben erhalten; das Trennen löscht sie nicht.
 

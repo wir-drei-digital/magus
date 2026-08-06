@@ -10,12 +10,13 @@ You can attach files to your messages so the AI can read, analyze, and work with
 
 ## Attaching files
 
-There are two ways to attach a file:
+There are three ways to attach a file:
 
 - **Drag and drop**: Drag a file from your computer directly onto the chat input area.
-- **Click to browse**: Click the attachment icon (paperclip) in the chat input area to open a file picker.
+- **Click to browse**: Open the **+** menu in the chat input area and choose **Attach file** to open a file picker.
+- **Paste**: Paste an image or file from your clipboard straight into the input.
 
-Attached files appear as thumbnails above the message input before you send. You can remove an attachment by clicking the X on its thumbnail.
+Attached files appear as small chips above the message input before you send. You can remove an attachment by clicking the X on its chip.
 
 ## Supported file types
 
@@ -30,8 +31,7 @@ Magus can extract text from a wide range of file formats:
 
 ## Size limits
 
-- **Per file**: Up to 50 MB per attachment.
-- **Per message**: Up to 5 files per message.
+The maximum size per file depends on your subscription plan, and your total storage is capped by the plan as well. See [Subscription & Usage](../account/subscription-and-usage.en.md).
 
 If a file exceeds the size limit, you'll see an error message and the file won't be attached.
 
@@ -50,4 +50,4 @@ The AI reads the full content of text-based files. For images, it uses vision ca
 
 ## Files in the conversation
 
-Files you've attached are listed in the **Files** tab of the right panel. You can view and re-reference files from previous messages in the same conversation by clicking on them there.
+Files you've attached are listed in the **Files** tab of the Tools panel (the **Tools** button in the conversation header). You can view and re-reference files from previous messages in the same conversation there.

@@ -10,11 +10,11 @@ Tools geben deinem Agenten Fähigkeiten, die über einfache Textgenerierung hina
 
 ## Tool-Kategorien
 
-### Web
+### Web search
 
 Ermöglicht dem Agenten, das Internet zu durchsuchen und Inhalte von URLs abzurufen. Nützlich für Rechercheaufgaben, das Nachschlagen aktueller Informationen und das Lesen von Dokumentation oder Artikeln, mit denen das Modell nicht trainiert wurde.
 
-### Code
+### Code execution
 
 Gibt dem Agenten Zugang zu einer Sandbox-Umgebung für die Code-Ausführung. Der Agent kann Python-Code schreiben und ausführen, Pakete installieren, Dateien lesen und schreiben sowie Dienste starten. Das ist leistungsstark für Datenanalyse, Automatisierungsskripte und alle Aufgaben, die von echter Berechnung profitieren, anstatt zu raten.
 
@@ -40,18 +40,16 @@ Ermöglicht dem Agenten, mit externen Diensten zu interagieren, die du verbunden
 
 ## Tool-Kategorien aktivieren und deaktivieren
 
-Im Agenten-Editor findest du einen Bereich **Tools** mit jeder Kategorie und einem Schalter. Schalte eine Kategorie ein oder aus, um dem Agenten diese Fähigkeit zu gewähren oder zu entziehen.
+Auf der Seite des Agenten enthält der Bereich **Tools** die **Tool-Kategorien**, jede mit einem Schalter. Schalte eine Kategorie ein oder aus, um dem Agenten diese Fähigkeit zu gewähren oder zu entziehen.
 
 Als Faustregel gilt: Aktiviere nur die Tools, die der Agent wirklich braucht. Ein fokussiertes Tool-Set verringert die Chance, dass der Agent zum falschen Tool greift, und macht sein Verhalten vorhersehbarer.
 
 ## Ein Modell auswählen
 
-Öffne im Agenten-Editor den Bereich **Modell**. Du kannst:
+Im selben Bereich **Tools** findest du die **Modell-Voreinstellungen**, mit je einer Modellauswahl für Chat, Bildgenerierung und Videogenerierung:
 
-- **Automatisch auswählen**: Lass den Agenten für jede Aufgabe das beste Modell wählen, basierend auf dem Chat-Modus und der Frage. Das ist ein guter Standard, wenn dein Agent verschiedene Aufgaben erledigt.
+- **Auto**: Lass den Router für jede Aufgabe das beste Modell wählen. Das ist ein guter Standard, wenn dein Agent verschiedene Aufgaben erledigt.
 - **Bestimmtes Modell**: Lege den Agenten auf ein bestimmtes Modell fest. Nutze das, wenn du konsistentes Verhalten, vorhersehbare Kosten oder ein Modell mit spezifischen Fähigkeiten benötigst (z. B. eines mit sehr langem Kontext oder starkem Reasoning).
-
-Du kannst separate Modelle für Chat, Bildgenerierung und Videogenerierung festlegen, wenn dein Agent mehrere Modi nutzt.
 
 ## Maximale Iterationen
 

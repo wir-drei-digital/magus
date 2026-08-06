@@ -14,36 +14,34 @@ Magus lets you attach files to conversations so your agents can read and referen
 
 The easiest way to upload a file is directly in a conversation:
 
-- **Drag and drop:** Drag a file from your desktop into the chat window and drop it anywhere in the message area
-- **File picker:** Click the attachment icon (paperclip) in the message input area and select a file from your device
+- **Drag and drop:** Drag a file from your desktop onto the chat input area
+- **File picker:** Open the **+** menu in the message input area, choose **Attach file**, and select a file from your device
 
 The file will be attached to your message. Once the message is sent, the agent can access the file and reference its contents in its response.
 
 ### From the File Browser
 
-For files you want to use across multiple conversations, open the **File Browser** from the workbench's Files icon, or visit `/files` directly. From the top bar of the browser:
+For files you want to use across multiple conversations, switch to the **Files** mode in the left rail (or visit `/files`). Then:
 
-- Click **Upload** to pick files from your device. They upload into the current view (the open folder, or your root files if none is open).
-- Drop files anywhere on the grid to upload them in place.
+- Click **Upload** in the browser's top bar (or **Upload files** in the sidebar) to pick files from your device. They upload into the current view (the open folder, or your root files if none is open).
+- Drop files anywhere on the browser to upload them in place.
 
 Files uploaded here are available immediately and persist beyond any single conversation.
 
 ## The File Browser
 
-The file browser is a Drive-style view for everything you have uploaded or that has been generated for you. Click the Files icon in the workbench sidebar to open it.
+The file browser is a Drive-style view for everything you have uploaded or that has been generated for you. Click the Files icon in the left rail to open it.
 
 ### Sidebar entry points
 
 The sidebar lists places to start from:
 
-- **My Files**: your personal files and folders.
-- **Shared with me**: when you are in a team workspace, files others have shared with the team.
-- **Recent**: files modified in the last 30 days.
+- **My files**: your personal files and folders.
+- **Recent**: recently modified files.
 - **Templates**: files you have marked as templates so they can be reused.
-- **Connected Sources**: collections synced from external services. Click the chevron to see them.
+- **Shared with me**: when you are in a team workspace, files others have shared with the team.
+- **Connected sources**: collections synced from external services, each listed with its item count and sync status.
 - **Trash**: files you have moved to trash. Read-only in this version.
-
-Below the entry points are three filter pills: **Type**, **Modified**, **Source**. Pick a value to narrow the current view, or pick "Any" to clear.
 
 The bottom of the sidebar shows your storage usage at a glance.
 
@@ -52,11 +50,12 @@ The bottom of the sidebar shows your storage usage at a glance.
 The browser's top bar has:
 
 - **Breadcrumbs**: click any segment to jump back to a parent folder or scope.
-- **Search**: filter the current view by name. The URL updates as you type, so you can bookmark a search.
+- **Search**: filter the current view by name.
 - **Sort**: sort by Modified (default), Name, or Size, ascending or descending.
-- **List / Grid toggle**: switch between table and card views. Your choice is saved on your account.
-- **+ New folder**: insert a new folder in the current location.
+- **Filters**: a popover with **Type**, **Modified**, and **Source** filters. Pick a value to narrow the current view, or "Any" to clear.
+- **New folder**: insert a new folder in the current location.
 - **Upload**: pick files from the file system.
+- **List / Grid toggle**: switch between table and card views. Your choice is saved on your account.
 
 ### Folder navigation
 
@@ -64,37 +63,35 @@ Click a folder card or row to open it. The breadcrumb updates and the URL change
 
 ### File actions
 
-Click a file to open its detail view in a new tab. Right-click any file or folder for the action menu:
+Click a file to open its detail view. Hover over any file or folder and click the **⋯** button for the action menu:
 
-- Open, Open in new tab, Download
-- Open chat about this file
-- Rename, Move to, Share to workspace
-- Toggle template (files only)
-- Move to trash
-
-Selecting **Move to** opens a folder picker so you can choose the destination. Selecting **Rename** opens an inline editor.
+- **Open** and **Download**
+- **Rename** and **Move…** (opens a folder picker for the destination)
+- **Mark as template** / **Remove from templates** (files only)
+- **Share with team** / **Make private** (in a workspace)
+- **Move to trash** (files) / **Delete** (folders)
 
 The trash view is read-only in this version. Restoring or permanently deleting files will be added in a future update.
 
 ## File Scopes
 
-Every file has a **scope** that controls who can access it and in which conversations.
+Where a file lives decides who can access it and in which conversations:
 
 | Scope | Who can access it |
 |-------|-------------------|
-| **Chat** | Only the current conversation |
-| **Folder** | All conversations inside the same folder |
-| **Workspace** | All members of your workspace (team access) |
-| **Global** | All your conversations, across all agents |
+| **Chat** | A file attached to a conversation belongs to that conversation |
+| **Folder** | A file in a folder is available to conversations in that folder |
+| **Workspace** | A file shared with the team is available to all workspace members |
+| **Library** | A file in your personal library is available across your conversations |
 
-Choose the right scope based on how broadly you need the file to be available. For sensitive documents, **Chat** scope keeps the file isolated to one conversation. For reference material your whole team uses, **Workspace** scope makes it available everywhere.
+For sensitive documents, attaching them to a single conversation keeps them isolated. For reference material your whole team uses, share them with the workspace.
 
 ## Downloading Files
 
 To download a file:
 
-- In a conversation, click the file attachment to expand it, then click the **Download** button
-- In the Files tab, find the file and click the **Download** icon next to it
+- In a conversation, hover over the attachment and use its download button (images and videos), or open the attachment and download from there
+- In the file browser, open the file's **⋯** menu and choose **Download**
 
 Agent-generated files (such as images generated by an image model or outputs from code execution) appear in the conversation and can be downloaded the same way.
 
@@ -118,7 +115,7 @@ Your available storage depends on your subscription plan:
 - **Free plan:** Limited storage included
 - **Paid plans:** More storage, with higher per-file upload limits
 
-You can see your current storage usage in **Account Settings** under **Storage**. The display shows how much you've used and how much your plan allows.
+You can see your current storage usage under **Settings → Storage**. The display shows how much you've used and how much your plan allows.
 
 If you reach your storage limit, you'll need to delete files or upgrade your plan before uploading more.
 
@@ -126,7 +123,7 @@ If you reach your storage limit, you'll need to delete files or upgrade your pla
 
 ### Viewing Storage Usage
 
-The bottom of the file browser sidebar shows a quick storage bar with your current usage. For a fuller breakdown, open **Account Settings** and look for the **Storage** section.
+The bottom of the file browser sidebar shows a quick storage bar with your current usage. For a fuller breakdown, open **Settings → Storage**.
 
 ### Deleting Files to Free Up Space
 
@@ -134,7 +131,7 @@ To delete a file:
 
 1. Open the file browser at `/files`
 2. Find the file (use Search or a filter to narrow down)
-3. Right-click the file and choose **Move to trash**
+3. Open the file's **⋯** menu and choose **Move to trash**
 
 The file moves to the **Trash** entry point and is hidden from your active views. It still counts against storage in this version. Permanent deletion to fully free space will be added in a future update.
 

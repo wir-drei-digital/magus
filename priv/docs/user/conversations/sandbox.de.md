@@ -1,6 +1,6 @@
 ---
 title: Sandbox & Services
-description: Code ausführen, Pakete installieren, Webservices in einer sicheren Sandbox starten und Screenshots aus der Live-Vorschau an den Chat senden
+description: Code ausführen, Pakete installieren und Webservices mit Live-Vorschau in einer sicheren Sandbox starten
 order: 10
 ---
 
@@ -21,41 +21,23 @@ Die Sandbox startet automatisch, wenn die KI zum ersten Mal Code in einer Unterh
 
 ## Einen Service starten
 
-Die KI kann Webservices in der Sandbox starten, zum Beispiel eine Flask-App, einen Node.js-Server oder jeden Prozess, der auf einem Port lauscht. Wenn ein Service startet, öffnet sich rechts neben dem Chat ein **Service-Vorschau**-Panel.
+Die KI kann Webservices in der Sandbox starten, zum Beispiel eine Flask-App, einen Node.js-Server oder jeden Prozess, der auf einem Port lauscht. Wenn ein Service startet, öffnet sich neben dem Chat ein Service-Panel mit einer Live-Vorschau.
 
 Das Service-Panel zeigt:
 
 - Eine Live-Vorschau des laufenden Service in einem eingebetteten Frame
-- Den Service-Status (running, suspended, stopped oder error)
-- Einen Button, um den Service in einem neuen Browser-Tab zu öffnen
-- Einen Reload-Button, um den Service neu zu starten
+- Einen **Reload**-Button, um die Vorschau zu aktualisieren
+- Einen **Open**-Button, um den Service in einem neuen Browser-Tab zu öffnen
 
-Du kannst weiter mit der KI chatten, während der Service läuft. Bitte sie, Änderungen am Code vorzunehmen, und klicke dann auf den Reload-Button im Panel, um den Service mit dem aktualisierten Code neu zu starten.
+Du kannst weiter mit der KI chatten, während der Service läuft. Bitte sie, Änderungen am Code vorzunehmen, und klicke dann auf **Reload** im Panel, um das aktualisierte Ergebnis zu sehen.
 
 ## Das Service-Panel
 
-Das Service-Panel funktioniert wie andere Seitenpanels (Drafts, Threads). Es öffnet sich automatisch, wenn ein Service startet, und bleibt geöffnet, während du navigierst. Wenn du es schließt, kannst du es wieder öffnen, indem du auf **Im Panel anzeigen** auf der Service-Karte im Nachrichtenverlauf klickst.
+Das Service-Panel funktioniert wie andere Seitenpanels (Drafts, Threads). Es öffnet sich automatisch, wenn ein Service startet. Wenn du es schliesst, kannst du es wieder öffnen, indem du auf **View in Pane** auf der Service-Karte im Nachrichtenverlauf klickst.
 
-Der Panel-Zustand bleibt bei Seitenaktualisierungen erhalten. Wenn du die Seite neu lädst oder weg und zurück navigierst, öffnet sich das Service-Panel in seinem letzten Zustand.
+## Pausierte Services
 
-## Einen pausierten Service neu starten
-
-Wenn die Sandbox nach 15 Minuten Inaktivität pausiert, zeigt das Service-Panel den Status "suspended" mit einem **Service neu starten**-Button. Ein Klick darauf weckt die Sandbox auf und startet den Service mit demselben Befehl und derselben Konfiguration wie beim ursprünglichen Start.
-
-Du kannst auch jederzeit den Reload-Button in der Panel-Kopfzeile klicken, um den Service neu zu starten, auch während er läuft. Das stoppt den aktuellen Prozess und startet einen neuen.
-
-## Screenshots aufnehmen
-
-Du kannst einen Screenshot der Service-Vorschau aufnehmen und an den Chat senden. Das ist nützlich, wenn du auf ein visuelles Problem hinweisen, die KI nach etwas auf dem Bildschirm fragen oder einen bestimmten Teil der Oberfläche referenzieren möchtest.
-
-1. Klicke auf das **Kamera**-Symbol in der Kopfzeile des Service-Panels. Der Button wird hervorgehoben, um den Screenshot-Modus anzuzeigen.
-2. Klicke und ziehe ein Rechteck über den Bereich, den du aufnehmen möchtest.
-3. Ein **Ask**-Button erscheint neben deiner Auswahl. Klicke darauf, um den Screenshot an deine nächste Nachricht anzuhängen.
-4. Der Screenshot erscheint als Vorschau-Badge im Chat-Eingabefeld. Tippe deine Frage oder deinen Kommentar ein und sende die Nachricht wie gewohnt.
-
-Zum Abbrechen drücke **Escape** oder klicke erneut auf das Kamera-Symbol, um den Screenshot-Modus zu verlassen. Du kannst einen angehängten Screenshot auch entfernen, indem du auf das **X** an seinem Badge im Chat-Eingabefeld klickst.
-
-Der Screenshot wird als Bild in den Nachricht-Metadaten gespeichert, sodass die KI genau sehen kann, worauf du dich beziehst.
+Wenn die Sandbox nach 15 Minuten Inaktivität pausiert, zeigt die Vorschau eine Fehlerseite statt deines Service. Führe die Unterhaltung einfach fort: Die Sandbox wacht automatisch auf, sobald die KI sie wieder nutzt, und du kannst die KI bitten, den Service erneut zu starten.
 
 ## Einschränkungen
 

@@ -8,59 +8,55 @@ order: 3
 
 Magus is organized into a few main areas. Here's a quick tour so you know where everything lives.
 
-## Top header
+## Mode strip
 
-The header runs across the top of the screen and contains:
-
-- **Logo / home link**: Click to return to the main conversation view.
-- **Navigation links**: Jump to the Prompts library, Agents, and other main sections.
-- **Notifications bell**: See alerts and activity updates.
-- **Resources menu**: Quick access to files, usage stats, and account settings.
-
-## Workbench modes
-
-A narrow strip on the far left holds icons for the workbench's main modes:
+A narrow strip on the far left holds the Magus logo and an icon for each workbench mode:
 
 - **Chat**: conversations and the message composer.
 - **Brain**: knowledge brains and pages.
+- **Files**: the file browser. A Drive-style view of everything you have uploaded or had generated. See **Files & Storage** for the full tour.
+- **Library**: your prompts and skills.
 - **Agents**: your custom agents.
-- **Prompts**: the prompt library.
-- **Files**: the file browser. Click the icon (or visit `/files`) to open a Drive-style browser of everything you have uploaded or had generated. See **Files & Storage** for the full tour.
 
-Whichever mode you are in, the sidebar to its right shows the navigator for that mode.
+At the bottom of the strip you'll find your usage indicator, the notifications bell, a help menu (documentation, FAQ, support), and your avatar. The avatar menu holds **Scheduled Jobs**, **Settings**, the theme picker, and sign out.
 
-## Left sidebar
+## Navigation pane
 
-In Chat mode the sidebar is your conversation navigator. It contains:
+Next to the mode strip sits the navigation pane. It always shows the workspace switcher and a **Search** entry (also available via **Cmd/Ctrl+K**), plus the navigator for the current mode.
 
-- **New Conversation button**: Start a fresh conversation at any time.
-- **Conversation list**: All your recent conversations, ordered by activity. Click any conversation to open it.
-- **Folders**: Group related conversations together. Drag conversations into folders to keep things organized.
-- **Favorites**: Conversations you've starred appear at the top of the list for quick access.
-- **Threads**: Threads are nested under their parent conversation. Click a thread to jump to it.
+In Chat mode it contains:
 
-You can collapse the sidebar to give the chat area more room.
+- **New chat**: start a fresh conversation at any time.
+- **Favorites**: conversations you've starred appear in their own section.
+- **Folders**: group related conversations together. Drag conversations onto folders to organize them.
+- **Conversation list**: your recent conversations, grouped by date. Click any conversation to open it.
+- **Threads**: nested under their parent conversation. Click a thread to jump to it.
+- **Show history**: opens the full conversation history and trash.
 
 ## Chat area
 
 The center of the screen is where your conversations happen.
 
-- **Message history**: All messages in the conversation, rendered with full markdown support, including code blocks, tables, and images.
+- **Header**: the conversation title (click it to rename), the favorite star, the **Tools** button, and a menu with rename, share, and archive actions.
+- **Message history**: all messages, rendered with full markdown support, including code blocks, tables, and images.
 - **Streaming responses**: AI responses appear in real time as they are generated.
-- **Tool activity**: When the AI uses tools (like web search), you'll see progress cards inline with the messages.
-- **Chat input**: The text box at the bottom. Type your message and press **Enter** to send, or **Shift+Enter** for a new line. The input area also contains the model selector, chat mode selector, and attachment button.
+- **Tool activity**: when the AI uses tools (like web search), you'll see progress cards inline with the messages.
+- **Composer**: the text box at the bottom. Type your message and press **Enter** to send, or **Shift+Enter** for a new line. The row below the text holds the **+** menu (attach files, insert prompts, slash commands), the image and video generation toggles, the model selector, and the context-window indicator.
 
-## Right panel
+## Tools panel
 
-The right panel slides open alongside the chat area and contains several tabs:
+The **Tools** button in the conversation header opens a panel with several tabs:
 
-- **Library**: Browse and activate prompts from your personal collection or the public library.
-- **Drafts**: Saved draft messages you've written but not yet sent.
-- **Files**: Files attached to the current conversation.
-- **Settings**: Conversation-specific settings, including the active system prompt, sampling settings (temperature, max tokens), and custom agent selection.
+- **Prompts**: browse and activate prompts from your library.
+- **Brains**: open brain pages next to the chat.
+- **Drafts**: documents the AI has written in this conversation.
+- **Tasks**: the conversation's task list.
+- **Files**: files attached to the current conversation.
+- **Members**: participants in a shared conversation.
+- **Settings**: conversation-specific settings such as a custom system prompt and sampling values.
 
-Open the panel by clicking the icons on the right edge of the chat area. Close it by clicking the active icon.
+Some items (threads, drafts, brain pages, PDFs) open in a companion pane beside the chat so you can see both at once.
 
 ## Tab bar (optional)
 
-The workbench can show a horizontal tab bar above the main panel for switching between open conversations, files, and other items. The tab bar is **off by default**; you can turn it on under **Settings → Preferences → Layout → Show tabs**.
+The workbench can show a horizontal tab bar above the main panel for switching between open conversations and pages. The tab bar is **off by default**; turn it on under **Settings → Preferences → Interface → Show tabs**.

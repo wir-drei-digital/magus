@@ -20,7 +20,7 @@ Go to **Agents** and create a new agent. Configure its system prompt, tools, and
 
 ### Step 2: Create an API integration
 
-Go to **Integrations** and add a new **API** integration. Select the agent you created in step 1. Once activated, you'll receive an API key (shown once; save it securely).
+On the agent's page, go to the **Integrations** section, click **+ Connect new**, and select **API**. Once connected, you'll receive an API key (shown once; save it securely).
 
 The API key looks like: `magus_sk_a1b2c3d4e5f6...`
 

@@ -14,7 +14,7 @@ Im Mittelpunkt von Magus stehen **Unterhaltungen**. Jede Unterhaltung hat ihren 
 
 **Agenten** sind die KI-Persönlichkeiten hinter deinen Unterhaltungen. Jede Unterhaltung verwendet einen Standard-Agenten, aber du kannst eigene Agenten mit spezifischen System-Prompts, Tool-Konfigurationen und Integrationen erstellen. Eigene Agenten sind ideal für wiederkehrende Aufgaben, zum Beispiel ein Code-Review-Agent mit Zugriff auf deine Repository-Logs oder ein Recherche-Agent, der mit RSS-Feeds verbunden ist.
 
-**Prompts** helfen dir, das KI-Verhalten konsistent zu steuern. System-Prompts wirken als Personas, die die Antworten des Agenten formen, während Benutzer-Prompts wiederverwendbare Vorlagen für häufige Aufgaben sind. Du kannst Prompts über die öffentliche Prompt-Bibliothek durchstöbern und teilen oder deine eigene Sammlung privat halten. Wenn du einen System-Prompt in einer Unterhaltung aktivierst, wird er jeder Nachricht vorangestellt, die der Agent sieht.
+**Prompts** helfen dir, das KI-Verhalten konsistent zu steuern. System-Prompts wirken als Personas, die die Antworten des Agenten formen, während Benutzer-Prompts wiederverwendbare Vorlagen für häufige Aufgaben sind. Deine Prompts liegen in der Library, wo du sie privat halten oder mit deinem Workspace teilen kannst. Wenn du einen System-Prompt in einer Unterhaltung aktivierst, wird er jeder Nachricht vorangestellt, die der Agent sieht.
 
 ## Modelle wählen
 

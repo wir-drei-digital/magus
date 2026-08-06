@@ -32,28 +32,26 @@ Connects your agent to an application log stream. The agent can monitor for erro
 
 ## Connecting an integration
 
-1. Open your agent in the agent editor.
-2. Scroll to the **Integrations** section.
-3. Click **Add integration** or **Connect** next to the service you want.
-4. A setup wizard opens. Follow the steps for that specific integration. Most require authorizing Magus to access the external service (for example, signing in with Google for Calendar, or providing a bot token for Telegram).
+1. Open your agent's page.
+2. Go to the **Integrations** section.
+3. Click **+ Connect new**.
+4. A setup wizard opens: pick the service and follow its steps. Most require authorizing Magus to access the external service (for example, signing in with Google for Calendar, or providing a bot token for Telegram).
 5. Complete the wizard. The integration appears as connected in the list.
 
-Each integration may have additional settings that appear after connecting, such as which calendar to read or which Telegram bot to use.
+Each integration may have additional settings that appear on its card after connecting.
 
 ## Integration-specific settings
 
-Once an integration is connected, click on it to see its settings. Common options include:
+Each connected integration is shown as a card with its provider name and status. Depending on the service, the card offers:
 
-- **Label**: A friendly name to identify this connection.
-- **Which account or resource**: For example, which Google account or which Telegram bot.
-- **Permissions**: What the agent is allowed to do (read-only vs read and write, depending on the service).
+- **Tools**: individual toggles for the tools this integration gives the agent. Turn off the ones the agent shouldn't use.
+- **Configuration fields**: provider-specific settings, editable right on the card.
 
 ## Disconnecting an integration
 
-1. Open the agent editor and go to the **Integrations** section.
-2. Click on the integration you want to remove.
-3. Click **Disconnect** or **Remove**.
-4. Confirm the removal.
+1. Open the agent's page and go to the **Integrations** section.
+2. Find the integration you want to remove.
+3. Click **Disconnect** and confirm.
 
 Disconnecting removes the agent's access to that service immediately. Your data in the external service is not affected.
 

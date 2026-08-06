@@ -20,7 +20,7 @@ Gehe zu **Agenten** und erstelle einen neuen Agenten. Konfiguriere seinen System
 
 ### Schritt 2: API-Integration erstellen
 
-Gehe zu **Integrationen** und fuege eine neue **API**-Integration hinzu. Wähle den Agenten, den du in Schritt 1 erstellt hast. Nach der Aktivierung erhältst du einen API-Schluessel (wird nur einmal angezeigt, speichere ihn sicher).
+Gehe auf der Seite des Agenten zum Bereich **Integrations**, klicke auf **+ Neu verbinden** und wähle **API**. Nach dem Verbinden erhältst du einen API-Schlüssel (wird nur einmal angezeigt, speichere ihn sicher).
 
 Der API-Schluessel sieht so aus: `magus_sk_a1b2c3d4e5f6...`
 

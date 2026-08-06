@@ -1,6 +1,6 @@
 ---
 title: Sandbox & Services
-description: Run code, install packages, start web services in a secure sandbox, and capture screenshots from the live preview to send to chat
+description: Run code, install packages, and start web services with a live preview in a secure sandbox
 order: 10
 ---
 
@@ -21,41 +21,23 @@ The sandbox starts automatically the first time the AI runs code in a conversati
 
 ## Starting a service
 
-The AI can start web services in the sandbox, such as a Flask app, a Node.js server, or any process that listens on a port. When a service starts, a **Service Preview** pane opens on the right side of the chat.
+The AI can start web services in the sandbox, such as a Flask app, a Node.js server, or any process that listens on a port. When a service starts, a service pane with a live preview opens beside the chat.
 
 The service pane shows:
 
 - A live preview of the running service in an embedded frame
-- The service status (running, suspended, stopped, or error)
-- A button to open the service in a new browser tab
-- A reload button to restart the service
+- A **Reload** button to refresh the preview
+- An **Open** button to open the service in a new browser tab
 
-You can keep chatting with the AI while the service runs. Ask it to make changes to the code, and then click the reload button in the pane to restart the service with the updated code.
+You can keep chatting with the AI while the service runs. Ask it to make changes to the code, then click **Reload** in the pane to see the updated result.
 
 ## The service pane
 
-The service pane works like other side panes (drafts, threads). It opens automatically when a service starts and stays open as you navigate. If you close it, you can reopen it by clicking **View in Pane** on the service card in the message stream.
+The service pane works like other side panes (drafts, threads). It opens automatically when a service starts. If you close it, you can reopen it by clicking **View in Pane** on the service card in the message stream.
 
-The pane state persists across page reloads. If you reload the page or navigate away and come back, the service pane reopens in its last state.
+## Suspended services
 
-## Restarting a suspended service
-
-When the sandbox suspends after 15 minutes of inactivity, the service pane shows a "suspended" status with a **Restart Service** button. Clicking it wakes the sandbox and restarts the service using the same command and configuration from when it was originally started.
-
-You can also click the reload button in the pane header at any time to restart the service, even while it is running. This stops the current process and starts a fresh one.
-
-## Taking screenshots
-
-You can capture a screenshot of the service preview and send it to the chat. This is useful when you want to point out a visual issue, ask the AI about something on screen, or reference a specific part of the UI.
-
-1. Click the **camera** icon in the service pane header. The button highlights to indicate you are in screenshot mode.
-2. Click and drag to draw a rectangle over the area you want to capture.
-3. An **Ask** button appears next to your selection. Click it to attach the screenshot to your next message.
-4. The screenshot appears as a thumbnail badge in the chat input. Type your question or comment and send the message as usual.
-
-To cancel, press **Escape** or click the camera icon again to exit screenshot mode. You can also dismiss an attached screenshot by clicking the **X** on its badge in the chat input.
-
-The screenshot is included as an image in the message metadata, so the AI can see exactly what you are referring to.
+When the sandbox suspends after 15 minutes of inactivity, the preview shows an error page instead of your service. Just continue the conversation: the sandbox wakes up automatically the next time the AI uses it, and you can ask the AI to start the service again.
 
 ## Limitations
 

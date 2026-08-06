@@ -14,7 +14,7 @@ At the heart of Magus are **conversations**. Each conversation runs its own AI a
 
 **Agents** are the AI personalities behind your conversations. Every conversation uses a default agent, but you can create custom agents with specific system prompts, tool configurations, and integrations. Custom agents are ideal for recurring tasks, for example, a code review agent with access to your repository logs, or a research agent connected to RSS feeds.
 
-**Prompts** help you guide AI behavior consistently. System prompts act as personas that shape how the agent responds, while user prompts are reusable templates for common tasks. You can browse and share prompts through the public prompt library, or keep your own collection private. When you activate a system prompt on a conversation, it's prepended to every message the agent sees.
+**Prompts** help you guide AI behavior consistently. System prompts act as personas that shape how the agent responds, while user prompts are reusable templates for common tasks. Your prompts live in the Library, where you can keep them private or share them with your workspace. When you activate a system prompt on a conversation, it's prepended to every message the agent sees.
 
 ## Choosing Models
 

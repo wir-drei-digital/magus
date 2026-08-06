@@ -10,12 +10,13 @@ Du kannst Dateien an deine Nachrichten anhängen, damit die KI deren Inhalt lese
 
 ## Dateien anhängen
 
-Es gibt zwei Wege, eine Datei anzuhängen:
+Es gibt drei Wege, eine Datei anzuhängen:
 
 - **Drag & Drop**: Ziehe eine Datei von deinem Computer direkt auf den Chat-Eingabebereich.
-- **Klicken und durchsuchen**: Klicke auf das Anhang-Icon (Büroklammer) im Chat-Eingabebereich, um einen Datei-Browser zu öffnen.
+- **Klicken und durchsuchen**: Öffne das **+**-Menü im Chat-Eingabebereich und wähle **Datei anhängen**, um einen Datei-Browser zu öffnen.
+- **Einfügen**: Füge ein Bild oder eine Datei aus der Zwischenablage direkt in die Eingabe ein.
 
-Angehängte Dateien erscheinen als Vorschaubilder über dem Nachrichteneingabefeld, bevor du sendest. Du kannst einen Anhang entfernen, indem du auf das X seines Vorschaubildes klickst.
+Angehängte Dateien erscheinen als kleine Chips über dem Nachrichteneingabefeld, bevor du sendest. Du kannst einen Anhang entfernen, indem du auf das X seines Chips klickst.
 
 ## Unterstützte Dateitypen
 
@@ -30,8 +31,7 @@ Magus kann Text aus einer Vielzahl von Dateiformaten extrahieren:
 
 ## Grössenlimits
 
-- **Pro Datei**: Bis zu 50 MB pro Anhang.
-- **Pro Nachricht**: Bis zu 5 Dateien pro Nachricht.
+Die maximale Grösse pro Datei hängt von deinem Abo-Plan ab, und auch dein Gesamtspeicher ist durch den Plan begrenzt. Siehe [Abo & Nutzung](../account/subscription-and-usage.de.md).
 
 Wenn eine Datei das Grössenlimit überschreitet, erscheint eine Fehlermeldung und die Datei wird nicht angehängt.
 
@@ -50,4 +50,4 @@ Die KI liest den vollständigen Inhalt textbasierter Dateien. Bei Bildern nutzt 
 
 ## Dateien in der Unterhaltung
 
-Angehängte Dateien sind im **Files**-Tab des rechten Panels aufgelistet. Du kannst dort Dateien aus früheren Nachrichten derselben Unterhaltung ansehen und erneut darauf verweisen, indem du sie anklickst.
+Angehängte Dateien sind im **Files**-Tab des Tools-Panels aufgelistet (der **Tools**-Button in der Kopfzeile der Unterhaltung). Du kannst dort Dateien aus früheren Nachrichten derselben Unterhaltung ansehen und erneut darauf verweisen.

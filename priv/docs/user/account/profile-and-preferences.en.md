@@ -6,7 +6,7 @@ order: 1
 
 # Profile & Preferences
 
-Your profile and preferences control how Magus looks and behaves for you personally. Changes here only affect your account.
+Your profile and preferences control how Magus looks and behaves for you personally. Changes here only affect your account. You reach them via your avatar at the bottom of the left rail: open the menu and choose **Settings**.
 
 ## Profile Settings
 
@@ -14,37 +14,34 @@ Your profile and preferences control how Magus looks and behaves for you persona
 
 Your display name appears in conversations and in shared or multiplayer spaces. To change it:
 
-1. Go to **Account Settings**
-2. Under **Profile**, update the **Display Name** field
+1. Go to **Settings → Profile**
+2. Update the **Display name** field (there is also a separate **Full name** field)
 3. Click **Save**
 
 ### Email Address
 
 Your email address is used for login and notifications. To update it:
 
-1. Go to **Account Settings**
-2. Under **Profile**, enter your new email address
-3. Click **Save**
-
-You may need to verify the new address before the change takes effect.
+1. Go to **Settings → Profile**
+2. In the **Email** section, enter your new email address
+3. Confirm the change via the email you receive
 
 ### Avatar
 
-Your avatar is the profile picture shown next to your messages. You have two options:
+Your avatar is the profile picture shown next to your messages. In the **Avatar** section of **Settings → Profile** you have two options:
 
-- **Upload an image:** Click the avatar circle and choose a photo from your device. Square images work best.
-- **AI-generated avatar:** Click **Generate Avatar** and the system will create a unique avatar image for you automatically.
+- **Upload an image:** Click **Upload** and choose a photo from your device. Square images work best.
+- **AI-generated avatar:** Click **Generate**, describe what you want, and Magus creates an avatar image for you.
 
-To remove your current avatar and go back to the default, click **Remove Avatar**.
+To remove your current avatar and go back to the default, click **Remove**.
 
 ## Changing Your Password
 
-If you signed up with a password (rather than a magic link), you can change it from Account Settings:
+You can change (or set) your password from **Settings → Profile**:
 
-1. Go to **Account Settings**
-2. Open the **Security** section
-3. Enter your current password, then your new password twice
-4. Click **Update Password**
+1. Scroll to the **Change password** section (it reads **Set a password** if you signed up without one)
+2. Enter your current password, then your new password twice
+3. Save
 
 If you've forgotten your current password, use the **Forgot Password** link on the login page to receive a reset link by email.
 
@@ -52,18 +49,17 @@ If you've forgotten your current password, use the **Forgot Password** link on t
 
 Magus is available in English and German. To change your language:
 
-1. Go to **Account Settings**
-2. Under **Preferences**, find the **Language** dropdown
-3. Select your preferred language
-4. The interface will update immediately
+1. Go to **Settings → Profile**
+2. Pick your language in the **Language** dropdown
+3. Click **Save**
 
 ## Timezone
 
 Your timezone setting affects how times are displayed in conversations and how your agents interpret time-based requests like "schedule something for 3pm tomorrow."
 
-1. Go to **Account Settings**
-2. Under **Preferences**, find the **Timezone** dropdown
-3. Select your timezone
+1. Go to **Settings → Preferences**
+2. Enter your IANA timezone (for example `Europe/Zurich`) in the **Timezone** field
+3. Click **Save**
 
 Note: timezone changes are rate-limited. You can change your timezone once every 30 days to prevent abuse.
 
@@ -73,7 +69,9 @@ Note: timezone changes are rate-limited. You can change your timezone once every
 
 When autoscroll is enabled, the chat window automatically scrolls to the bottom as new messages come in. This is the default behavior and is recommended for most users.
 
-To disable it, go to **Account Settings**, find the **Autoscroll** toggle under **Interface**, and turn it off. With autoscroll off, the chat stays in place while new content arrives, which can be useful if you're reading earlier messages during a long response.
+To disable it, go to **Settings → Preferences**, find the **Autoscroll while streaming** toggle under **Interface**, and turn it off. With autoscroll off, the chat stays in place while new content arrives, which can be useful if you're reading earlier messages during a long response.
+
+The same section has the **Show tabs** toggle for the optional tab bar.
 
 ## Default Models
 
@@ -85,8 +83,8 @@ You can set default AI models for different task types:
 
 To change your default models:
 
-1. Go to **Account Settings**
-2. Open the **Models** section
-3. Use the dropdowns to select your preferred model for each task type
+1. Go to **Settings → Preferences**
+2. Open the **Default models** section
+3. Use the dropdowns to select your preferred model for each task type (or **Auto** to let the router choose)
 
-Individual conversations can override these defaults: setting a model on a specific conversation takes precedence over your account-level default. See [Models](../models/) for details on available models and what they're suited for.
+Individual conversations can override these defaults: setting a model on a specific conversation takes precedence over your account-level default. See [Choosing a Model](../conversations/choosing-a-model.en.md) for details on available models and what they're suited for.

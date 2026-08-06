@@ -22,11 +22,11 @@ Not all models are built for the same purpose:
 
 In the model selector, you'll see small badges on each model indicating its special capabilities:
 
-- **Search:** The model can look up current information on the web.
-- **Reasoning:** The model supports extended thinking for complex problems.
-- **Tools:** The model can use Magus tools (memory, web search, scheduling, etc.).
+- **search:** The model can look up current information on the web.
+- **reason:** The model supports extended thinking for complex problems.
+- **Modality chips** (like `image` or `→image`): what the model can read and produce beyond plain text.
 
-Not all models have all capabilities. If a feature is grayed out after switching models, it may not be supported by that model.
+Each entry also shows the model's approximate cost per request and its context window size. Not all models have all capabilities; if something doesn't work after switching models, it may not be supported by that model.
 
 ## Switching models in a conversation
 
@@ -44,7 +44,7 @@ Magus supports three separate default models:
 - **Image model:** Used when you switch to Image Generation mode.
 - **Video model:** Used when you switch to Video Generation mode.
 
-To update your defaults, go to **Settings** and look for the Model preferences section. Changes apply to all new conversations going forward. Existing conversations keep whichever model they were using.
+To update your defaults, go to **Settings → Preferences** and use the **Default models** section. Changes apply to all new conversations going forward. Existing conversations keep whichever model they were using.
 
 ## Using your own models
 

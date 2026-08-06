@@ -37,11 +37,11 @@ Eigene Agenten ersparen dir, denselben Kontext jedes Mal neu erklären zu müsse
 
 ## Wo du Agenten findest
 
-Besuche [deine Agenten-Seite](/agents), um alle von dir erstellten Agenten zu sehen, Beispiele zu durchstöbern und neue zu erstellen. Von dort aus kannst du auch festlegen, welcher Agent in einer Unterhaltung verwendet wird.
+Wechsle in den Modus **Agents** in der linken Leiste (oder besuche [/agents](/agents)), um alle von dir erstellten Agenten zu sehen und neue zu erstellen. Ein Klick auf einen Agenten öffnet seine Konfigurationsseite.
 
-## Einer Unterhaltung einen Agenten zuweisen
+## Mit einem Agenten chatten
 
-Beim Erstellen einer neuen Unterhaltung oder über das Einstellungs-Panel der Unterhaltung kannst du auswählen, welcher Agent verwendet werden soll. Die Unterhaltung nutzt dann die Anweisungen, Tools und Integrationen dieses Agenten für jede Nachricht.
+Klicke auf der Seite eines Agenten auf **Chat starten**, um eine neue Unterhaltung mit diesem Agenten zu öffnen. Die Unterhaltung nutzt dann die Anweisungen, Tools und Integrationen dieses Agenten für jede Nachricht. In einem Workspace kann ein Admin ausserdem einen Standard-Agenten festlegen, den neue Unterhaltungen verwenden.
 
 ## Agenten mit @ erwähnen
 

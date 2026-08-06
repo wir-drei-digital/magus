@@ -27,10 +27,10 @@ Magus auto-selects the right strategy, or you can choose one explicitly.
 
 **Setting up a web source:**
 
-1. Go to **Connected Sources** and add a new source. Select **Web** as the provider.
+1. Open **Knowledge** (Settings → File sync) and choose **Connect a source**. Select **Website** as the provider.
 2. Enter the seed URL (an OpenAPI spec URL, a docs site root, or any web page).
 3. Optionally set the strategy, authentication (bearer token or basic auth), and boundary rules (allowed domains, path prefixes, max depth).
-4. Create a collection from the source and trigger a full sync.
+4. Finish the wizard to create a collection from the source and start the first sync.
 
 Magus syncs web sources on a configurable schedule (default: hourly). During incremental sync, new pages are ingested, removed pages are soft-deleted, and changed pages are re-chunked and re-embedded. Content hashes (SHA-256) ensure only genuinely changed content triggers re-processing.
 
@@ -62,7 +62,7 @@ Go to **Agents** and create a new agent (or edit an existing one). The agent nee
 
 ### Step 2: Add a data source integration
 
-In the agent's settings, go to **Integrations** and add one:
+On the agent's page, go to the **Integrations** section and click **+ Connect new**:
 
 #### For Log Source:
 

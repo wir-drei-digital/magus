@@ -22,7 +22,7 @@ Jeder Thread hat seinen eigenen Agenten-Prozess. Das bedeutet:
 
 ### Von einer Nachricht
 
-Fahre mit der Maus über eine Nachricht in der Unterhaltung und klicke auf das Thread-Symbol (Pfeil). Damit erstellst du einen neuen Thread, der von dieser Nachricht abzweigt.
+Fahre mit der Maus über eine Nachricht in der Unterhaltung und klicke auf das Thread-Symbol (Sprechblasen). Damit erstellst du einen neuen Thread, der von dieser Nachricht abzweigt.
 
 Wenn bereits ein Thread für diese Nachricht existiert, öffnet ein Klick auf das Symbol den vorhandenen Thread, anstatt einen neuen zu erstellen.
 
@@ -54,17 +54,17 @@ Schliesse das Panel mit dem X-Button. Der Thread bleibt bestehen; du kannst ihn 
 
 ### Mobil
 
-Auf Mobilgeräten übernimmt der Thread den gesamten Bildschirm mit einem Zurück-Button, um zur übergeordneten Unterhaltung zurückzukehren.
+Auf Mobilgeräten übernimmt der Thread die gesamte Breite. Eine Umschaltleiste oben lässt dich zwischen Thread und übergeordneter Unterhaltung wechseln.
 
 ## Threads finden
 
 ### In Nachrichten
 
-Nachrichten mit Threads zeigen einen Antwort-Zähler unter sich an (z.B. "3 Antworten"). Klicke darauf, um den Thread zu öffnen.
+Bei Nachrichten mit einem Thread bleibt das Thread-Symbol hervorgehoben und zeigt einen kleinen Antwort-Zähler. Klicke darauf, um den Thread zu öffnen.
 
 ### In der Seitenleiste
 
-Threads erscheinen verschachtelt unter ihrer übergeordneten Unterhaltung in der Seitenleiste. Klicke auf einen Thread, um zur übergeordneten Unterhaltung zu navigieren und das Thread-Panel zu öffnen. Threads sind nach Erstellungsdatum sortiert und nicht verschiebbar.
+Threads erscheinen verschachtelt unter ihrer übergeordneten Unterhaltung in der Seitenleiste. Klicke auf einen Thread, um zur übergeordneten Unterhaltung zu navigieren und das Thread-Panel zu öffnen. Threads lassen sich nicht in Ordner ziehen.
 
 ## Thread-Verhalten
 

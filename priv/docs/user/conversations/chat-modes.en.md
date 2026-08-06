@@ -6,7 +6,7 @@ order: 2
 
 # Chat Modes
 
-Magus offers several chat modes, each designed for a different kind of task. You can switch modes at any time using the mode selector in the chat input area.
+Magus offers several chat modes, each designed for a different kind of task. You can switch modes at any time using the toggles in the chat input area.
 
 ## Chat
 
@@ -30,6 +30,6 @@ Video Generation mode works like Image Generation, but produces short video clip
 
 ## Switching modes
 
-Click the mode selector in the chat input area (it shows the name of the current mode). A menu will appear with all available modes. Click the one you want to switch immediately.
+The chat input area has an image toggle and a video toggle. Click one to switch the conversation into that generation mode; click it again to return to normal chat. On mobile, the same options live in the **+** menu of the composer.
 
 Switching modes mid-conversation is fine. The AI will use the new mode for your next message and all subsequent messages in that conversation.

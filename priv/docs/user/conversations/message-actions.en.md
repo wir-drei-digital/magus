@@ -14,9 +14,7 @@ Click the **copy** icon to copy the full text of a message to your clipboard. Th
 
 ## Retry a message
 
-The **retry** button regenerates the AI's response to your message. Use this if the response wasn't quite what you were looking for, or if you just want to see an alternative answer. The previous response is replaced with the new one.
-
-On your own messages, retry re-sends the message with the same content.
+The **retry** button appears on your own messages. It re-sends the message with the same content, so the AI generates a fresh response. Use this if the response wasn't quite what you were looking for, or if you just want to see an alternative answer. The earlier exchange stays in the conversation history.
 
 ## Hide from context
 
@@ -28,13 +26,13 @@ Hidden messages are shown with a visual indicator so you know they're excluded. 
 
 ## Create a prompt from a message
 
-The **save as prompt** button (wand or bookmark icon) lets you turn a message into a reusable prompt in your library. This is handy when you've written a particularly effective instruction or question and want to use it again in future conversations.
+The **create prompt** button (sparkles icon) lets you turn a message into a reusable prompt in your library. This is handy when you've written a particularly effective instruction or question and want to use it again in future conversations.
 
-Clicking it opens a dialog where you can name the prompt and optionally edit it before saving. The saved prompt will appear in your Prompts library.
+Clicking it opens a dialog with the message text pre-filled, where you can name the prompt and optionally edit it before saving. The saved prompt will appear in your Library.
 
 ## Start a thread
 
-The **thread** button (reply arrow icon) creates a new thread branching from that message. The thread inherits the full conversation context up to that point, then runs independently.
+The **thread** button (speech bubbles icon) creates a new thread branching from that message. The thread inherits the full conversation context up to that point, then runs independently.
 
 If a thread already exists for that message, clicking the button opens the existing thread instead.
 

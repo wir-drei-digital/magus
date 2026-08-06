@@ -8,59 +8,55 @@ order: 3
 
 Magus ist in einige Hauptbereiche gegliedert. Hier ist ein kurzer Rundgang, damit du weisst, wo alles zu finden ist.
 
-## Obere Kopfzeile
+## Modus-Leiste
 
-Die Kopfzeile zieht sich quer über den oberen Bildschirmrand und enthält:
-
-- **Logo / Startseiten-Link**: Klicke, um zur Hauptansicht mit den Unterhaltungen zurückzukehren.
-- **Navigations-Links**: Springe zur Prompts-Bibliothek, zu Agenten und anderen Hauptbereichen.
-- **Benachrichtigungsglocke**: Zeigt Hinweise und Aktivitäts-Updates.
-- **Ressourcen-Menü**: Schnellzugriff auf Dateien, Nutzungsstatistiken und Kontoeinstellungen.
-
-## Workbench-Modi
-
-Eine schmale Leiste am linken Rand enthält Symbole für die Hauptmodi der Workbench:
+Eine schmale Leiste am linken Rand enthält das Magus-Logo und ein Symbol für jeden Workbench-Modus:
 
 - **Chat**: Unterhaltungen und der Nachrichten-Composer.
 - **Brain**: Knowledge Brains und Seiten.
+- **Files**: der Datei-Browser. Eine Drive-artige Übersicht aller hochgeladenen oder generierten Dateien. Siehe **Dateien & Speicher** für den vollständigen Rundgang.
+- **Library**: deine Prompts und Skills.
 - **Agents**: deine eigenen Agenten.
-- **Prompts**: die Prompt-Bibliothek.
-- **Files**: der Datei-Browser. Klicke auf das Symbol (oder rufe `/files` auf), um eine Drive-artige Übersicht aller hochgeladenen oder generierten Dateien zu öffnen. Siehe **Dateien & Speicher** für den vollständigen Rundgang.
 
-In welchem Modus du auch bist, die Seitenleiste rechts daneben zeigt den passenden Navigator für diesen Modus.
+Am unteren Ende der Leiste findest du deine Nutzungsanzeige, die Benachrichtigungsglocke, ein Hilfe-Menü (Dokumentation, FAQ, Support) und deinen Avatar. Das Avatar-Menü enthält **Geplante Jobs**, **Einstellungen**, die Theme-Auswahl und die Abmeldung.
 
-## Linke Seitenleiste
+## Navigationsbereich
 
-Im Chat-Modus ist die Seitenleiste dein Navigations-Hub für Unterhaltungen. Sie enthält:
+Neben der Modus-Leiste liegt der Navigationsbereich. Er zeigt immer den Workspace-Umschalter und einen **Suche**-Eintrag (auch per **Cmd/Ctrl+K** erreichbar), dazu den Navigator des aktuellen Modus.
 
-- **Neue Unterhaltung-Button**: Starte jederzeit eine neue Unterhaltung.
-- **Unterhaltungsliste**: Alle deine letzten Unterhaltungen, nach Aktivität sortiert. Klicke auf eine Unterhaltung, um sie zu öffnen.
-- **Ordner**: Fasse verwandte Unterhaltungen zusammen. Ziehe Unterhaltungen in Ordner, um alles übersichtlich zu halten.
-- **Favoriten**: Unterhaltungen, die du mit einem Stern markiert hast, erscheinen oben in der Liste für schnellen Zugriff.
+Im Chat-Modus enthält er:
+
+- **Neuer Chat**: Starte jederzeit eine neue Unterhaltung.
+- **Favoriten**: Unterhaltungen, die du mit einem Stern markiert hast, erscheinen in einem eigenen Abschnitt.
+- **Ordner**: Fasse verwandte Unterhaltungen zusammen. Ziehe Unterhaltungen auf Ordner, um alles übersichtlich zu halten.
+- **Unterhaltungsliste**: Deine letzten Unterhaltungen, nach Datum gruppiert. Klicke auf eine Unterhaltung, um sie zu öffnen.
 - **Threads**: Threads werden verschachtelt unter der übergeordneten Unterhaltung angezeigt. Klicke auf einen Thread, um ihn zu öffnen.
-
-Du kannst die Seitenleiste einklappen, um dem Chat-Bereich mehr Platz zu geben.
+- **Verlauf anzeigen**: Öffnet den vollständigen Unterhaltungsverlauf und den Papierkorb.
 
 ## Chat-Bereich
 
 In der Mitte des Bildschirms finden deine Unterhaltungen statt.
 
-- **Nachrichtenverlauf**: Alle Nachrichten der Unterhaltung, mit vollständiger Markdown-Unterstützung dargestellt, einschliesslich Code-Blöcke, Tabellen und Bilder.
+- **Kopfzeile**: Der Titel der Unterhaltung (klicke ihn zum Umbenennen), der Favoriten-Stern, der **Tools**-Button und ein Menü mit Aktionen zum Umbenennen, Teilen und Archivieren.
+- **Nachrichtenverlauf**: Alle Nachrichten, mit vollständiger Markdown-Unterstützung dargestellt, einschliesslich Code-Blöcke, Tabellen und Bilder.
 - **Streaming-Antworten**: KI-Antworten erscheinen in Echtzeit, während sie generiert werden.
 - **Tool-Aktivität**: Wenn die KI Tools verwendet (z.B. Websuche), siehst du Fortschrittskarten direkt zwischen den Nachrichten.
-- **Chat-Eingabe**: Das Textfeld unten. Gib deine Nachricht ein und drücke **Enter** zum Senden, oder **Shift+Enter** für einen Zeilenumbruch. Der Eingabebereich enthält ausserdem den Modell-Selektor, den Modus-Selektor und den Anhang-Button.
+- **Composer**: Das Textfeld unten. Gib deine Nachricht ein und drücke **Enter** zum Senden, oder **Shift+Enter** für einen Zeilenumbruch. Die Zeile unter dem Text enthält das **+**-Menü (Dateien anhängen, Prompts einfügen, Slash-Befehle), die Umschalter für Bild- und Videogenerierung, den Modell-Selektor und die Kontextfenster-Anzeige.
 
-## Rechtes Panel
+## Tools-Panel
 
-Das rechte Panel gleitet neben dem Chat-Bereich herein und enthält mehrere Tabs:
+Der **Tools**-Button in der Kopfzeile der Unterhaltung öffnet ein Panel mit mehreren Tabs:
 
-- **Library**: Durchstöbere und aktiviere Prompts aus deiner persönlichen Sammlung oder der öffentlichen Bibliothek.
-- **Drafts**: Gespeicherte Entwürfe, die du geschrieben, aber noch nicht gesendet hast.
+- **Prompts**: Durchstöbere und aktiviere Prompts aus deiner Bibliothek.
+- **Brains**: Öffne Brain-Seiten neben dem Chat.
+- **Drafts**: Dokumente, die die KI in dieser Unterhaltung geschrieben hat.
+- **Tasks**: Die Aufgabenliste der Unterhaltung.
 - **Files**: Dateien, die der aktuellen Unterhaltung angehängt sind.
-- **Settings**: Unterhaltungsspezifische Einstellungen, einschliesslich des aktiven System-Prompts, Sampling-Einstellungen (Temperatur, maximale Token-Anzahl) und der Auswahl eines eigenen Agenten.
+- **Members**: Teilnehmende einer geteilten Unterhaltung.
+- **Settings**: Unterhaltungsspezifische Einstellungen wie ein eigener System-Prompt und Sampling-Werte.
 
-Öffne das Panel, indem du auf die Icons am rechten Rand des Chat-Bereichs klickst. Schliesse es mit einem erneuten Klick auf das aktive Icon.
+Einige Elemente (Threads, Drafts, Brain-Seiten, PDFs) öffnen sich in einem Begleit-Panel neben dem Chat, sodass du beides gleichzeitig siehst.
 
 ## Tab-Leiste (optional)
 
-Die Workbench kann eine horizontale Tab-Leiste oberhalb des Hauptbereichs einblenden, mit der du zwischen geöffneten Unterhaltungen, Dateien und anderen Elementen wechselst. Die Tab-Leiste ist **standardmässig deaktiviert**; du kannst sie unter **Einstellungen → Präferenzen → Layout → Tabs anzeigen** aktivieren.
+Die Workbench kann eine horizontale Tab-Leiste oberhalb des Hauptbereichs einblenden, mit der du zwischen geöffneten Unterhaltungen und Seiten wechselst. Die Tab-Leiste ist **standardmässig deaktiviert**; du kannst sie unter **Einstellungen → Präferenzen → Oberfläche → Tabs anzeigen** aktivieren.

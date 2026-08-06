@@ -27,10 +27,10 @@ Magus wählt automatisch die passende Strategie, oder du kannst eine explizit fe
 
 **Web-Quelle einrichten:**
 
-1. Gehe zu **Verbundene Quellen** und fuege eine neue Quelle hinzu. Wähle **Web** als Anbieter.
+1. Öffne **Wissen** (Einstellungen → Dateisynchronisierung) und wähle **Quelle verbinden**. Wähle **Website** als Anbieter.
 2. Gib die Ausgangs-URL ein (eine OpenAPI-Spezifikations-URL, das Root einer Dokumentationsseite oder eine beliebige Webseite).
 3. Lege optional Strategie, Authentifizierung (Bearer-Token oder Basic Auth) und Grenzregeln (erlaubte Domains, Pfadpräfixe, maximale Tiefe) fest.
-4. Erstelle eine Sammlung aus der Quelle und löse eine vollständige Synchronisierung aus.
+4. Schliesse den Assistenten ab, um eine Sammlung aus der Quelle zu erstellen und die erste Synchronisierung zu starten.
 
 Magus synchronisiert Web-Quellen nach einem konfigurierbaren Zeitplan (Standard: stuendlich). Während der inkrementellen Synchronisierung werden neue Seiten aufgenommen, entfernte Seiten soft-gelöscht und geänderte Seiten erneut in Chunks aufgeteilt und eingebettet. Inhalts-Hashes (SHA-256) stellen sicher, dass nur tatsächlich geänderter Inhalt eine Neuverarbeitung auslöst.
 
@@ -62,7 +62,7 @@ Gehe zu **Agenten** und erstelle einen neuen Agenten (oder bearbeite einen vorha
 
 ### Schritt 2: Datenquellen-Integration hinzufuegen
 
-Gehe in den Einstellungen des Agenten zu **Integrationen** und fuege eine hinzu:
+Gehe auf der Seite des Agenten zum Bereich **Integrations** und klicke auf **+ Neu verbinden**:
 
 #### für Log-Quelle:
 

@@ -12,63 +12,58 @@ Ein Workspace ist eine gemeinsame Umgebung für ein Team. Er gibt allen eine gem
 
 ## Einen Workspace erstellen
 
-1. Klicke auf deinen Kontonamen oder Avatar in der Seitenleiste, um das Konto-Menü zu öffnen.
+1. Klicke auf den Workspace-Umschalter oben in der Seitenleiste.
 2. Wähle **Neuer Workspace**.
 3. Gib einen **Namen** für den Workspace ein (z. B. "Design-Team" oder "Engineering").
-4. Wähle einen **URL-Slug**: Das ist die kurze Kennung, die in der URL des Workspaces verwendet wird (z. B. `design-team`). Slugs dürfen nur Kleinbuchstaben, Zahlen und Bindestriche enthalten.
+4. Passe bei Bedarf den **URL-Slug** an: Das ist die kurze Kennung, die in der URL des Workspaces verwendet wird (z. B. `design-team`). Er wird automatisch aus dem Namen abgeleitet und darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten.
 5. Klicke auf **Workspace erstellen**.
 
-Du bist der Owner des neuen Workspaces.
+Du bist der Admin des neuen Workspaces.
 
 ## Teammitglieder einladen
 
-1. Gehe zur **Einstellungen**-Seite des Workspaces.
-2. Wähle den Tab **Mitglieder**.
+1. Öffne den Workspace-Umschalter und wähle **Workspace-Einstellungen**.
+2. Gehe zum Bereich **Mitglieder**.
 3. Gib die E-Mail-Adresse der Person ein, die du einladen möchtest.
-4. Wähle ihre Rolle (siehe unten).
-5. Klicke auf **Einladen**.
+4. Klicke auf **Einladen**.
 
 Eingeladene Mitglieder erhalten eine E-Mail. Haben sie bereits ein Magus-Konto, können sie die Einladung sofort annehmen und beitreten. Neue Nutzer werden zuerst aufgefordert, ein Konto zu erstellen.
 
 ## Mitglieder-Rollen
 
-| Rolle | Kann chatten | Unterhaltungen erstellen | Mitglieder verwalten | Workspace-Einstellungen |
-|-------|-------------|--------------------------|----------------------|-------------------------|
-| Owner | Ja | Ja | Ja | Ja |
-| Editor | Ja | Ja | Nein | Nein |
-| Member | Ja | Nein | Nein | Nein |
-| Observer | Nur lesen | Nein | Nein | Nein |
+Es gibt zwei Rollen in einem Workspace:
 
-**Owner** hat volle Kontrolle über den Workspace, einschließlich Abrechnung, Einstellungen und Mitgliederverwaltung. Es kann mehrere Owner geben.
+**Admin** hat volle Kontrolle über den Workspace: Einstellungen, Mitgliederverwaltung und implizite Owner-Rechte auf jede geteilte Ressource im Workspace. Der Admin kann die Inhaberschaft an ein anderes Mitglied übertragen.
 
-**Editor** kann neue Unterhaltungen erstellen und an allen Team-Unterhaltungen teilnehmen.
+**Member** hat Standardzugriff: Sie können an geteilten Unterhaltungen teilnehmen, eigene erstellen und Ressourcen mit dem Team teilen.
 
-**Member** kann an Team-Unterhaltungen teilnehmen, aber keine neuen erstellen.
-
-**Observer** kann Team-Unterhaltungen lesen, aber keine Nachrichten senden.
+(Nur-Lesen-Beteiligung gibt es auf Unterhaltungsebene: siehe die Observer-Rolle unter [Multiplayer](./multiplayer.de.md).)
 
 ## Team-Unterhaltungen vs. persönliche Unterhaltungen
 
 Innerhalb eines Workspaces gibt es zwei Arten von Unterhaltungen:
 
-**Team-Unterhaltungen** sind für alle Workspace-Mitglieder sichtbar (entsprechend ihren Rollen). Sie erscheinen in der gemeinsamen Seitenleiste. Nutze diese für Diskussionen, die das gesamte Team sehen soll.
+**Geteilte Unterhaltungen** sind für alle Workspace-Mitglieder sichtbar. Sie erscheinen im Bereich **Shared** der Seitenleiste. Nutze diese für Diskussionen, die das gesamte Team sehen soll.
 
 **Persönliche Unterhaltungen** sind nur für dich sichtbar. Andere Workspace-Mitglieder können sie nicht sehen. Nutze diese für individuelle Arbeit, die du von der gemeinsamen Team-Aktivität getrennt halten möchtest.
 
-Wenn du eine neue Unterhaltung erstellst, kannst du wählen, ob sie zum Workspace (Team) oder zu dir persönlich gehört.
+Neue Unterhaltungen starten persönlich. Um eine mit dem Team zu teilen, fahre in der Seitenleiste mit der Maus darüber und klicke auf den Teilen-Umschalter (**Mit Team teilen**); derselbe Umschalter macht sie wieder privat.
 
 ## Workspace-Einstellungen
 
-Rufe die Workspace-Einstellungen über **Einstellungen** im Workspace-Menü auf. Von dort kannst du:
+Öffne den Workspace-Umschalter und wähle **Workspace-Einstellungen**. Von dort kannst du:
 
-- Den Workspace **umbenennen** oder den URL-Slug ändern.
-- **Mitglieder verwalten**: neue Mitglieder einladen, Rollen ändern oder Mitglieder entfernen.
+- Den Workspace **umbenennen** und ihn aktiv oder inaktiv schalten.
+- Einen **Standard-Agenten** für den Workspace festlegen.
+- **Mitglieder verwalten**: neue Mitglieder einladen, Einladungen erneut senden oder Mitglieder entfernen.
 - **Inhaberschaft übertragen** an ein anderes Mitglied.
-- **Den Workspace löschen**: Das entfernt dauerhaft alle Team-Unterhaltungen und kann nicht rückgängig gemacht werden.
+- **Den Workspace löschen**: Das entfernt dauerhaft den Workspace mit allen Unterhaltungen, Dateien, Prompts und Agenten. Zur Bestätigung tippst du den Workspace-Namen ein. Das kann nicht rückgängig gemacht werden.
+
+Der URL-Slug wird beim Erstellen des Workspaces festgelegt und bleibt danach fix.
 
 ## Zwischen Workspaces wechseln
 
-Wenn du mehreren Workspaces angehörst, kannst du mit dem Workspace-Selektor oben in der Seitenleiste zwischen ihnen wechseln. Jeder Workspace zeigt seine eigene Sammlung von Team-Unterhaltungen und Mitgliedern.
+Wenn du mehreren Workspaces angehörst, kannst du mit dem Workspace-Umschalter oben in der Seitenleiste zwischen ihnen (und deinem persönlichen Bereich) wechseln. Jeder Workspace zeigt seine eigene Sammlung von Unterhaltungen und Mitgliedern.
 
 ## Memory-Isolation über Workspaces hinweg
 
