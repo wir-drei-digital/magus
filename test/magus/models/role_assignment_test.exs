@@ -1,6 +1,14 @@
 defmodule Magus.Models.RoleAssignmentTest do
   use Magus.DataCase, async: true
 
+  # Committed rows leak into the shared test DB (see the leaked chat_default
+  # assignment from 2026-06-27); count/empty assertions need a clean slate.
+  # Transaction-local: rolled back, committed rows survive for other tests.
+  setup do
+    Magus.DataCase.clear_catalog!()
+    :ok
+  end
+
   defp create_model! do
     Magus.Chat.Model
     |> Ash.Changeset.for_create(:create, %{

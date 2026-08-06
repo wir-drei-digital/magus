@@ -2,6 +2,9 @@ defmodule Magus.Models.RolesExplainTest do
   use Magus.DataCase, async: false
 
   setup do
+    # Empty-catalog baseline: leaked committed rows (a stray chat_default
+    # assignment) otherwise flip the :none expectations. Transaction-local.
+    Magus.DataCase.clear_catalog!()
     original = Application.get_env(:magus, :agents, [])
     on_exit(fn -> Application.put_env(:magus, :agents, original) end)
     :ok

@@ -197,7 +197,10 @@ defmodule Magus.Agents.IntegrationTest do
       assert react_signal.type == "ai.react.query"
       assert react_signal.data[:model] == chat_model.key
       assert react_signal.data[:max_iterations] == 4
-      assert react_signal.data[:llm_opts] == %{temperature: 0.6}
+      # The override is preserved; provider allow-list routing is re-merged on
+      # top by design (a runtime llm_opts override must not drop it), so this
+      # asserts the threaded key rather than exact equality.
+      assert react_signal.data[:llm_opts][:temperature] == 0.6
     end
 
     test "halts signal for image_generation mode (media bypass)", %{

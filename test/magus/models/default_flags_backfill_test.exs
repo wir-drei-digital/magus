@@ -9,6 +9,9 @@ defmodule Magus.Models.DefaultFlagsBackfillTest do
   # back as temporary columns for the duration of each test, mirroring the DB
   # shape the data migration runs against.
   setup do
+    # Empty-catalog baseline: a leaked committed chat_default assignment
+    # otherwise satisfies/blocks the backfill expectations. Transaction-local.
+    Magus.DataCase.clear_catalog!()
     add_flag_columns()
     on_exit(&drop_flag_columns/0)
     :ok
