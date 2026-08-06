@@ -1924,7 +1924,7 @@ export type MessageUsageResourceSchema = {
   actionName: string | null;
   providerGenerationId: string | null;
   reconciledAt: UtcDateTimeUsec | null;
-  reconciliationStatus: "not_required" | "pending" | "reconciled" | "unavailable";
+  reconciliationStatus: "not_required" | "pending" | "reconciled" | "reconciled_uncharged" | "unavailable";
   userId: UUID | null;
   messageId: UUID | null;
   conversationId: UUID | null;
@@ -1965,7 +1965,7 @@ export type MessageUsageAttributesOnlySchema = {
   actionName: string | null;
   providerGenerationId: string | null;
   reconciledAt: UtcDateTimeUsec | null;
-  reconciliationStatus: "not_required" | "pending" | "reconciled" | "unavailable";
+  reconciliationStatus: "not_required" | "pending" | "reconciled" | "reconciled_uncharged" | "unavailable";
   userId: UUID | null;
   messageId: UUID | null;
   conversationId: UUID | null;
@@ -6901,9 +6901,9 @@ export type MessageUsageFilterInput = {
   };
 
   reconciliationStatus?: {
-    eq?: "not_required" | "pending" | "reconciled" | "unavailable";
-    notEq?: "not_required" | "pending" | "reconciled" | "unavailable";
-    in?: Array<"not_required" | "pending" | "reconciled" | "unavailable">;
+    eq?: "not_required" | "pending" | "reconciled" | "reconciled_uncharged" | "unavailable";
+    notEq?: "not_required" | "pending" | "reconciled" | "reconciled_uncharged" | "unavailable";
+    in?: Array<"not_required" | "pending" | "reconciled" | "reconciled_uncharged" | "unavailable">;
   };
 
   userId?: {

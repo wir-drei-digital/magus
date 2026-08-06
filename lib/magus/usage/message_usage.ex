@@ -151,6 +151,27 @@ defmodule Magus.Usage.MessageUsage do
       change set_attribute(:reconciliation_status, :unavailable)
     end
 
+    # Tokens were reconciled but the usage charge failed (magus-abt): the row
+    # carries authoritative figures, the money is still owed. The daily sweep
+    # re-attempts the charge and flips the row to :reconciled on success.
+    update :mark_reconciled_uncharged do
+      accept []
+      change set_attribute(:reconciliation_status, :reconciled_uncharged)
+    end
+
+    update :mark_reconciliation_charged do
+      accept []
+      change set_attribute(:reconciliation_status, :reconciled)
+    end
+
+    # Re-queue a given-up row for another reconciliation pass (magus-abt):
+    # OpenRouter generation stats sometimes materialize long after the 12-poll
+    # window. Written by the daily sweep via authorize?: false.
+    update :retry_reconciliation do
+      accept []
+      change set_attribute(:reconciliation_status, :pending)
+    end
+
     action :usage_log, :map do
       description "Paged, filterable log of the caller's billable usage rows (settings Usage page)."
 
@@ -296,9 +317,19 @@ defmodule Magus.Usage.MessageUsage do
     #   :not_required - usage arrived with the response (the normal case)
     #   :pending      - recorded empty; reconciliation enqueued, not yet applied
     #   :reconciled   - was empty, then filled from the generation endpoint
-    #   :unavailable  - was empty and OpenRouter never returned stats (gave up)
+    #   :unavailable  - was empty and OpenRouter never returned stats (gave up;
+    #                    the daily sweep re-attempts for 30 days)
+    #   :reconciled_uncharged - tokens reconciled but the usage charge failed;
+    #                    the daily sweep re-attempts the charge
     attribute :reconciliation_status, :atom do
-      constraints one_of: [:not_required, :pending, :reconciled, :unavailable]
+      constraints one_of: [
+                    :not_required,
+                    :pending,
+                    :reconciled,
+                    :unavailable,
+                    :reconciled_uncharged
+                  ]
+
       default :not_required
       allow_nil? false
       public? true

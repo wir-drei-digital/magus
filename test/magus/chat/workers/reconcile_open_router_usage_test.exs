@@ -18,6 +18,21 @@ defmodule Magus.Chat.Workers.ReconcileOpenRouterUsageTest do
     :ok
   end
 
+  # The post-reconciliation charge accrues to the period accumulator, which
+  # needs an active subscription; without one the row is (correctly) flagged
+  # :reconciled_uncharged for the daily sweep instead of :reconciled.
+  defp ensure_active_subscription(user) do
+    plan = generate(usage_plan())
+
+    {:ok, _} =
+      Magus.Usage.create_user_subscription(
+        %{user_id: user.id, usage_plan_id: plan.id, status: :active},
+        authorize?: false
+      )
+
+    :ok
+  end
+
   defp zero_usage_row(user, gen_id) do
     {:ok, usage} =
       MessageUsage
@@ -42,6 +57,7 @@ defmodule Magus.Chat.Workers.ReconcileOpenRouterUsageTest do
 
   test "reconciles a zero-token row with native tokens + cost from the generation endpoint" do
     user = generate(user())
+    :ok = ensure_active_subscription(user)
     usage = zero_usage_row(user, "gen-abc")
 
     Req.Test.stub(@stub, fn conn ->

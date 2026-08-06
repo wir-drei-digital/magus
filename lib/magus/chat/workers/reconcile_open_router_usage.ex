@@ -169,12 +169,15 @@ defmodule Magus.Chat.Workers.ReconcileOpenRouterUsage do
             :ok
 
           {:error, reason} ->
-            # TODO(magus-abt): make this recoverable rather than log-only — the
-            # tokens are reconciled but the usage charge was lost.
+            # Recoverable (magus-abt): flag the row so the daily sweep
+            # re-attempts the charge with the same idempotent meter identifier.
             Logger.warning(
               "ReconcileOpenRouterUsage: usage #{usage.id} reconciled but usage charge " <>
-                "(#{Decimal.to_string(total_cost)} USD) failed: #{inspect(reason)}; not collected"
+                "(#{Decimal.to_string(total_cost)} USD) failed: #{inspect(reason)}; " <>
+                "flagged for the daily charge sweep"
             )
+
+            Ash.update(usage, %{}, action: :mark_reconciled_uncharged, authorize?: false)
         end
 
         :ok

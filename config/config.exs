@@ -149,7 +149,8 @@ config :magus, Oban,
        {"*/15 * * * *", Magus.SuperBrain.Workers.BackfillScheduler},
        {"30 3 * * *", Magus.SuperBrain.Workers.NightlyBuildSuperScheduler},
        {"0 4 * * *", Magus.SuperBrain.Workers.SuperGraphMaintenance},
-       {"15 3 * * *", Magus.Accounts.Workers.DeleteExpiredTestAccounts}
+       {"15 3 * * *", Magus.Accounts.Workers.DeleteExpiredTestAccounts},
+       {"45 4 * * *", Magus.Chat.Workers.SweepUsageReconciliation}
      ]}
   ]
 
