@@ -47,4 +47,30 @@ defmodule Magus.Providers.Routing do
   end
 
   def build_provider_routing(_model), do: nil
+
+  @doc """
+  Key-based variant for call sites without a loaded `%Model{}` (background
+  LLM calls: title generation, extraction, summaries). Looks up the catalog
+  row so per-model denies apply; an unregistered `openrouter:` key still gets
+  allow-list-only routing. Returns `nil` for non-OpenRouter keys.
+  """
+  def build_provider_routing_for_key("openrouter:" <> _ = key) do
+    case fetch_model_by_key(key) do
+      %{} = model -> build_provider_routing(model)
+      nil -> build_provider_routing(%{api_provider: :openrouter, denied_providers: []})
+    end
+  end
+
+  def build_provider_routing_for_key(_key), do: nil
+
+  defp fetch_model_by_key(key) do
+    require Ash.Query
+
+    case Magus.Chat.Model
+         |> Ash.Query.filter(key == ^key)
+         |> Ash.read_one(authorize?: false) do
+      {:ok, %{} = model} -> model
+      _ -> nil
+    end
+  end
 end

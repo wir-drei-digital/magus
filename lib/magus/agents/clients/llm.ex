@@ -20,6 +20,8 @@ defmodule Magus.Agents.Clients.LLM do
 
   @behaviour Magus.Agents.Clients.LLMBehaviour
 
+  require Logger
+
   @doc """
   Returns the configured LLM client module.
 
@@ -94,9 +96,39 @@ defmodule Magus.Agents.Clients.LLM do
   @spec provider_options(term(), keyword()) :: {term(), keyword()}
   def provider_options(model, opts) when is_binary(model) do
     {actor_id, opts} = Keyword.pop(opts, :credential_actor_id)
+    opts = put_new_provider_routing(model, opts)
     {resolved_model, provider_opts} = Magus.Models.RequestOptions.resolve(model, actor_id)
     {resolved_model, Keyword.merge(provider_opts, opts)}
   end
 
   def provider_options(model, opts), do: {model, Keyword.delete(opts, :credential_actor_id)}
+
+  # Every wrapped call gets the admin allow-list routing (magus-bcez):
+  # background LLM calls (titles, extraction, summaries) previously hit
+  # OpenRouter with no provider object at all. Preflight-computed routing in
+  # the opts wins (put_new); a fully-denied model skips with a log here since
+  # background calls have no user turn to attach an error to.
+  defp put_new_provider_routing("openrouter:" <> _ = key, opts) do
+    if Keyword.has_key?(opts, :openrouter_provider) do
+      opts
+    else
+      case Magus.Providers.Routing.build_provider_routing_for_key(key) do
+        %{} = routing ->
+          Keyword.put(opts, :openrouter_provider, routing)
+
+        {:error, :no_allowed_providers} ->
+          Logger.warning(
+            "OpenRouter routing: model #{inspect(key)} has no allowed providers; " <>
+              "background call continuing unrouted"
+          )
+
+          opts
+
+        nil ->
+          opts
+      end
+    end
+  end
+
+  defp put_new_provider_routing(_key, opts), do: opts
 end

@@ -43,4 +43,111 @@ defmodule Magus.Providers.RoutingAllowListTest do
     model = %{api_provider: :openrouter, denied_providers: ["anthropic"]}
     assert Routing.build_provider_routing(model) == {:error, :no_allowed_providers}
   end
+
+  describe "build_provider_routing_for_key/1 (background LLM calls)" do
+    test "non-openrouter key returns nil" do
+      assert Routing.build_provider_routing_for_key("xai:grok-test") == nil
+      assert Routing.build_provider_routing_for_key("u_someslug:claude-x") == nil
+    end
+
+    test "an unregistered openrouter key gets allow-list-only routing" do
+      allow("anthropic")
+
+      assert %{"only" => ["anthropic"], "data_collection" => "deny"} =
+               Routing.build_provider_routing_for_key("openrouter:vendor/not-in-catalog")
+    end
+
+    test "a catalog key applies its per-model denies" do
+      allow("anthropic")
+      allow("mistral")
+
+      model =
+        Ash.create!(
+          Magus.Chat.Model,
+          %{
+            name: "Routed",
+            key: "openrouter:test/routed-#{System.unique_integer([:positive])}",
+            provider: "test",
+            api_provider: :openrouter,
+            denied_providers: ["mistral"]
+          },
+          action: :create,
+          authorize?: false
+        )
+
+      assert %{"only" => ["anthropic"], "data_collection" => "deny"} =
+               Routing.build_provider_routing_for_key(model.key)
+    end
+
+    test "a catalog key whose denies empty the list returns the error" do
+      allow("anthropic")
+
+      model =
+        Ash.create!(
+          Magus.Chat.Model,
+          %{
+            name: "Denied",
+            key: "openrouter:test/denied-#{System.unique_integer([:positive])}",
+            provider: "test",
+            api_provider: :openrouter,
+            denied_providers: ["anthropic"]
+          },
+          action: :create,
+          authorize?: false
+        )
+
+      assert Routing.build_provider_routing_for_key(model.key) ==
+               {:error, :no_allowed_providers}
+    end
+  end
+
+  describe "Clients.LLM.provider_options/2 routing injection" do
+    test "an openrouter key gains :openrouter_provider in opts" do
+      allow("anthropic")
+
+      {_model, opts} =
+        Magus.Agents.Clients.LLM.provider_options("openrouter:vendor/bg-model", [])
+
+      assert %{"only" => ["anthropic"], "data_collection" => "deny"} =
+               opts[:openrouter_provider]
+    end
+
+    test "preflight-computed routing in opts wins over the seam" do
+      allow("anthropic")
+      preset = %{"only" => ["from-preflight"], "data_collection" => "deny"}
+
+      {_model, opts} =
+        Magus.Agents.Clients.LLM.provider_options("openrouter:vendor/bg-model",
+          openrouter_provider: preset
+        )
+
+      assert opts[:openrouter_provider] == preset
+    end
+
+    test "non-openrouter keys are untouched" do
+      {_model, opts} = Magus.Agents.Clients.LLM.provider_options("xai:grok-test", [])
+      refute Keyword.has_key?(opts, :openrouter_provider)
+    end
+
+    test "a fully-denied model continues unrouted (skip-with-log)" do
+      allow("anthropic")
+
+      model =
+        Ash.create!(
+          Magus.Chat.Model,
+          %{
+            name: "BG Denied",
+            key: "openrouter:test/bg-denied-#{System.unique_integer([:positive])}",
+            provider: "test",
+            api_provider: :openrouter,
+            denied_providers: ["anthropic"]
+          },
+          action: :create,
+          authorize?: false
+        )
+
+      {_model, opts} = Magus.Agents.Clients.LLM.provider_options(model.key, [])
+      refute Keyword.has_key?(opts, :openrouter_provider)
+    end
+  end
 end
