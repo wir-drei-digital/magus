@@ -94,7 +94,100 @@ defmodule Magus.Agents.Persistence.UsageRecorder do
     # Get model info - either from model struct or by looking up model_key
     {model_id, model_name, model_for_cost} = resolve_model(model, model_key)
 
-    # Need at least a model_name to record
+    cond do
+      is_nil(model_name) ->
+        Logger.debug("Skipping usage recording: no model info available")
+        {:ok, :skipped}
+
+      already_recorded?(message_id, usage_type, action_name) ->
+        # Usage idempotency (magus-z6yx): message_id is DETERMINISTIC per
+        # (request, iteration) via response_id_for_turn, so a recovery re-run
+        # replays the same identity. A duplicate would insert a fresh row id,
+        # defeating the meter's row-id dedup and double-deducting the period
+        # accumulator. Keep the original row and its charge; drop the replay.
+        Logger.info(
+          "Skipping duplicate usage recording for message #{message_id} " <>
+            "(#{usage_type}#{if action_name, do: "/#{action_name}", else: ""})"
+        )
+
+        {:ok, :duplicate}
+
+      true ->
+        do_record(
+          %{
+            user_id: user_id,
+            message_id: message_id,
+            conversation_id: conversation_id,
+            model_id: model_id,
+            model_name: model_name,
+            model_for_cost: model_for_cost,
+            usage: usage,
+            finish_reason: finish_reason,
+            usage_type: usage_type,
+            billable: billable,
+            action_name: action_name,
+            provider: provider,
+            provider_generation_id: provider_generation_id,
+            needs_reconciliation: needs_reconciliation
+          },
+          opts
+        )
+    end
+  rescue
+    e ->
+      Logger.warning("Failed to record usage: #{Exception.message(e)}")
+      {:error, e}
+  end
+
+  # A usage row for this (message, usage_type, action_name) already exists.
+  # Only attributed rows dedupe: message_id nil (system operations) stays
+  # append-only. Replays are sequential by construction (one agent instance
+  # per conversation, recovery runs after the original attempt is settled),
+  # so check-then-insert needs no unique index.
+  defp already_recorded?(nil, _usage_type, _action_name), do: false
+
+  defp already_recorded?(message_id, usage_type, action_name) do
+    require Ash.Query
+
+    Magus.Usage.MessageUsage
+    |> Ash.Query.filter(message_id == ^message_id and usage_type == ^usage_type)
+    |> filter_action_name(action_name)
+    |> Ash.Query.limit(1)
+    |> Ash.read_one(authorize?: false)
+    |> case do
+      {:ok, %{}} -> true
+      _ -> false
+    end
+  end
+
+  defp filter_action_name(query, nil) do
+    require Ash.Query
+    Ash.Query.filter(query, is_nil(action_name))
+  end
+
+  defp filter_action_name(query, action_name) do
+    require Ash.Query
+    Ash.Query.filter(query, action_name == ^action_name)
+  end
+
+  defp do_record(params, _opts) do
+    %{
+      user_id: user_id,
+      message_id: message_id,
+      conversation_id: conversation_id,
+      model_id: model_id,
+      model_name: model_name,
+      model_for_cost: model_for_cost,
+      usage: usage,
+      finish_reason: finish_reason,
+      usage_type: usage_type,
+      billable: billable,
+      action_name: action_name,
+      provider: provider,
+      provider_generation_id: provider_generation_id,
+      needs_reconciliation: needs_reconciliation
+    } = params
+
     if model_name do
       provider_cost = extract_provider_cost(usage)
 
