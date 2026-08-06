@@ -13,11 +13,12 @@ defmodule Magus.Knowledge.TokenManager do
   Concurrency: refreshes persist last-write-wins rather than holding a DB lock
   across the refresh HTTP call. Google and kDrive do not rotate refresh
   tokens, so concurrent refreshes are benign there. Microsoft DOES rotate:
-  two concurrent OneDrive refreshes can race, and if the provider invalidates
-  the old refresh token on use the loser sees invalid_grant and flags reauth
-  even though a valid token was just persisted. Acceptable-rare today
-  (collections of one source rarely refresh in the same instant); serialize
-  per-source (advisory lock) before raising sync concurrency.
+  two concurrent OneDrive refreshes can race, and the loser sees
+  invalid_grant even though the winner just persisted a valid token. The
+  loser recovers by re-reading the source and adopting the winner's newer
+  persisted token (one retry) before flagging reauth; only an unchanged
+  token is a real dead grant. Consider per-source serialization (advisory
+  lock) if sync concurrency per source ever rises materially.
   """
 
   require Logger
@@ -77,7 +78,7 @@ defmodule Magus.Knowledge.TokenManager do
         persist(source, new_auth)
 
       {:error, :reauth_required} = err ->
-        err
+        retry_with_persisted_token(source, refresh_token, err)
 
       {:error, reason} ->
         # Transient (network / 5xx / missing config): let the sync proceed and
@@ -87,6 +88,44 @@ defmodule Magus.Knowledge.TokenManager do
         )
 
         {:ok, source}
+    end
+  end
+
+  # Rotating providers (Microsoft) invalidate the old refresh token on use, so
+  # an invalid_grant may just mean a concurrent refresh by another collection
+  # of the same source WON and persisted a newer token right before ours
+  # failed. Re-read the source: if a different refresh token is persisted, use
+  # the winner's state (retrying the refresh only if its access token is
+  # already expiring again). Only an unchanged token is a real dead grant.
+  defp retry_with_persisted_token(source, used_token, err) do
+    case Knowledge.get_source(source.id, authorize?: false) do
+      {:ok, %{auth_config: %{"refresh_token" => latest} = auth} = fresh}
+      when is_binary(latest) and latest != used_token ->
+        Logger.info(
+          "TokenManager: refresh race on #{source.id}; a newer persisted token exists, recovering"
+        )
+
+        if expiring_soon?(auth["expires_at"]) do
+          case OAuth.refresh_token(fresh.provider, latest) do
+            {:ok, new_auth} ->
+              persist(fresh, new_auth)
+
+            {:error, :reauth_required} = err2 ->
+              err2
+
+            {:error, reason} ->
+              Logger.warning(
+                "TokenManager: transient refresh failure for #{source.id}: #{inspect(reason)}"
+              )
+
+              {:ok, fresh}
+          end
+        else
+          {:ok, fresh}
+        end
+
+      _ ->
+        err
     end
   end
 

@@ -132,6 +132,120 @@ defmodule Magus.Knowledge.TokenManagerTest do
     assert {:error, :reauth_required} = TokenManager.ensure_fresh(source)
   end
 
+  describe "refresh-rotation race (a concurrent winner persisted a newer token)" do
+    test "adopts the winner's still-fresh token without another refresh call", %{bypass: bypass} do
+      user = generate(user())
+
+      source =
+        gdrive_source(user, %{
+          "access_token" => "loser-at",
+          "refresh_token" => "loser-rt",
+          "expires_at" => expired_iso()
+        })
+
+      # Simulate the winner: a concurrent refresh already persisted a rotated
+      # token with a fresh expiry. Our in-memory `source` is now stale.
+      {:ok, _} =
+        Knowledge.update_source_auth_config(
+          source,
+          %{
+            auth_config: %{
+              "access_token" => "winner-at",
+              "refresh_token" => "winner-rt",
+              "expires_at" => future_iso()
+            }
+          },
+          authorize?: false
+        )
+
+      # Exactly ONE token call: the loser's failed attempt. Recovery must use
+      # the winner's persisted access token, not refresh again.
+      Bypass.expect_once(bypass, "POST", "/token", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(400, Jason.encode!(%{"error" => "invalid_grant"}))
+      end)
+
+      assert {:ok, fresh} = TokenManager.ensure_fresh(source)
+      assert fresh.auth_config["access_token"] == "winner-at"
+      assert fresh.auth_config["refresh_token"] == "winner-rt"
+    end
+
+    test "retries the refresh with the winner's token when that one is expiring too", %{
+      bypass: bypass
+    } do
+      user = generate(user())
+
+      source =
+        gdrive_source(user, %{
+          "access_token" => "loser-at",
+          "refresh_token" => "loser-rt",
+          "expires_at" => expired_iso()
+        })
+
+      {:ok, _} =
+        Knowledge.update_source_auth_config(
+          source,
+          %{
+            auth_config: %{
+              "access_token" => "winner-at",
+              "refresh_token" => "winner-rt",
+              "expires_at" => expired_iso()
+            }
+          },
+          authorize?: false
+        )
+
+      # First call (loser-rt) fails invalid_grant; retry (winner-rt) succeeds.
+      Bypass.expect(bypass, "POST", "/token", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        params = URI.decode_query(body)
+
+        case params["refresh_token"] do
+          "loser-rt" ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/json")
+            |> Plug.Conn.resp(400, Jason.encode!(%{"error" => "invalid_grant"}))
+
+          "winner-rt" ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/json")
+            |> Plug.Conn.resp(
+              200,
+              Jason.encode!(%{
+                "access_token" => "recovered-at",
+                "refresh_token" => "recovered-rt",
+                "expires_in" => 3600
+              })
+            )
+        end
+      end)
+
+      assert {:ok, fresh} = TokenManager.ensure_fresh(source)
+      assert fresh.auth_config["access_token"] == "recovered-at"
+      assert fresh.auth_config["refresh_token"] == "recovered-rt"
+    end
+
+    test "an unchanged persisted token is a real dead grant", %{bypass: bypass} do
+      user = generate(user())
+
+      source =
+        gdrive_source(user, %{
+          "access_token" => "old",
+          "refresh_token" => "dead",
+          "expires_at" => expired_iso()
+        })
+
+      Bypass.expect_once(bypass, "POST", "/token", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(400, Jason.encode!(%{"error" => "invalid_grant"}))
+      end)
+
+      assert {:error, :reauth_required} = TokenManager.ensure_fresh(source)
+    end
+  end
+
   test "non-refresh providers pass through untouched" do
     user = generate(user())
 
