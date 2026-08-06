@@ -41,12 +41,18 @@ defmodule Magus.Knowledge.Connectors.Nextcloud do
     # Normalize base_url — strip trailing slash
     base_url = String.trim_trailing(base_url, "/")
 
-    {:ok,
-     %__MODULE__{
-       base_url: base_url,
-       username: username,
-       password: password
-     }}
+    case Magus.Knowledge.TransportPolicy.validate_base_url(base_url) do
+      :ok ->
+        {:ok,
+         %__MODULE__{
+           base_url: base_url,
+           username: username,
+           password: password
+         }}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   def connect(_auth_config) do

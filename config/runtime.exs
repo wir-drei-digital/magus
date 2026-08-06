@@ -58,6 +58,14 @@ end
 # initialise it here from env vars to keep prod boot working without
 # stomping the dev/test defaults.
 if config_env() == :prod do
+  # Self-hosted opt-out for the strict knowledge-endpoint transport policy
+  # (https-only + no private/reserved hosts for WebDAV/Nextcloud base URLs).
+  # Set to true when syncing a LAN NAS over plain http.
+  config :magus,
+         :knowledge_transport,
+         allow_insecure:
+           System.get_env("MAGUS_ALLOW_INSECURE_KNOWLEDGE_TRANSPORT", "false") in ~w(true 1 yes)
+
   # Super Brain master kill switch (see Magus.SuperBrain.enabled?/0). Off
   # unless SUPER_BRAIN_ENABLED is explicitly truthy, so it can be toggled in
   # prod via env without a redeploy.

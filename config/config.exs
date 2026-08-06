@@ -335,6 +335,12 @@ config :magus,
 # a paid or trialing subscription. Never consulted on the resolution hot path.
 config :magus, :provider_gate, Magus.Models.ProviderGate.Open
 
+# Transport policy for user-supplied knowledge endpoints (WebDAV/Nextcloud):
+# strict by default (https only, no private/reserved hosts). Self-hosted
+# deployments syncing a LAN NAS opt out here or via
+# MAGUS_ALLOW_INSECURE_KNOWLEDGE_TRANSPORT=true (see runtime.exs).
+config :magus, :knowledge_transport, allow_insecure: false
+
 # Chat domain configuration
 config :magus, Magus.Chat, unfiled_conversations_limit: 20
 

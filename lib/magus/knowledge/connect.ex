@@ -167,5 +167,12 @@ defmodule Magus.Knowledge.Connect do
 
   defp friendly_error(message) when is_binary(message), do: message
   defp friendly_error(:not_supported), do: "This provider does not support browsing folders."
+
+  defp friendly_error(:https_required),
+    do: "This deployment only allows https:// endpoints for connected drives."
+
+  defp friendly_error(:blocked_host),
+    do: "This host is not reachable from this deployment (private or reserved address)."
+
   defp friendly_error(reason), do: "Could not connect: #{inspect(reason)}"
 end

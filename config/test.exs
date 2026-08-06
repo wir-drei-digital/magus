@@ -102,6 +102,10 @@ config :magus, :google_token_url, "https://oauth2.googleapis.com/token"
 # Overridden per-test to a Bypass endpoint; unset in prod so the real URL is used.
 config :magus, :onedrive_token_url, "https://login.microsoftonline.com/common/oauth2/v2.0/token"
 
+# Bypass servers run on http://localhost, which the strict transport policy
+# rejects; strict-mode tests flip this per-test.
+config :magus, :knowledge_transport, allow_insecure: true
+
 # Overridden per-test to a Bypass endpoint; unset in prod so the real URL is used.
 config :magus, :onedrive_api_base_url, "https://graph.microsoft.com/v1.0"
 

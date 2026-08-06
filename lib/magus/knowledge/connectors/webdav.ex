@@ -50,18 +50,18 @@ defmodule Magus.Knowledge.Connectors.Webdav do
       when is_binary(base_url) and base_url != "" and
              is_binary(username) and username != "" and
              is_binary(password) and password != "" do
-    case parse_base_url(base_url) do
-      {:ok, origin, root_path} ->
-        {:ok,
-         %__MODULE__{
-           origin: origin,
-           root_path: root_path,
-           username: username,
-           password: password
-         }}
-
-      :error ->
-        {:error, :invalid_base_url}
+    with {:ok, origin, root_path} <- parse_base_url(base_url),
+         :ok <- Magus.Knowledge.TransportPolicy.validate_base_url(base_url) do
+      {:ok,
+       %__MODULE__{
+         origin: origin,
+         root_path: root_path,
+         username: username,
+         password: password
+       }}
+    else
+      :error -> {:error, :invalid_base_url}
+      {:error, reason} -> {:error, reason}
     end
   end
 

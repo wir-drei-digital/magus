@@ -121,3 +121,7 @@ config :magus, Magus.Graph,
 if System.get_env("DISABLE_LIVE_DEBUGGER") == "1" do
   config :live_debugger, disabled?: true
 end
+
+# Local Nextcloud/WebDAV instances run over plain http; keep the strict
+# transport policy for prod only.
+config :magus, :knowledge_transport, allow_insecure: true
