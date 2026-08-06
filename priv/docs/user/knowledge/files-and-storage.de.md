@@ -1,7 +1,7 @@
 ---
 title: Dateien & Speicher
 description: Dateien hochladen, verwalten und mit deinen Agenten teilen
-order: 4
+order: 5
 ---
 
 # Dateien & Speicher

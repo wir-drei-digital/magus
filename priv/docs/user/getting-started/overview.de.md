@@ -22,7 +22,7 @@ Magus unterstützt mehrere KI-Modelle verschiedener Anbieter. Du kannst für ver
 
 ## Deinen Workflow erweitern
 
-**Threads** ermöglichen es dir, von jeder Nachricht abzuzweigen, um ein Nebenthema zu erkunden, ohne die Hauptunterhaltung zu unterbrechen. Der Thread übernimmt den Kontext bis zum Abzweigungspunkt und läuft dann unabhängig weiter. Das ist nützlich, um tief in ein Unterthema einzutauchen und dabei die Hauptunterhaltung fokussiert zu halten. Siehe [Threads](../features/threads.de.md) für Details.
+**Threads** ermöglichen es dir, von jeder Nachricht abzuzweigen, um ein Nebenthema zu erkunden, ohne die Hauptunterhaltung zu unterbrechen. Der Thread übernimmt den Kontext bis zum Abzweigungspunkt und läuft dann unabhängig weiter. Das ist nützlich, um tief in ein Unterthema einzutauchen und dabei die Hauptunterhaltung fokussiert zu halten. Siehe [Threads](../conversations/threads.de.md) für Details.
 
 **Datenquellen** verbinden externe Datenstreams wie Anwendungslogs und RSS-Feeds mit deinen Agenten. Dein Agent kann aufgenommene Daten durchsuchen, auf Fehler überwachen und dich benachrichtigen, wenn etwas Aufmerksamkeit erfordert. Siehe [Datenquellen](../knowledge/data-sources.de.md) für Details.
 

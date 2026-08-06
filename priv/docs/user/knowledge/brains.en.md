@@ -1,196 +1,96 @@
 ---
 title: Knowledge Brain
 description: A collaborative research workspace where you and your AI build understanding together
-order: 5
+order: 6
 ---
 
 # Knowledge Brain
 
-A Knowledge Brain is a shared workspace for you and your AI to research, write, and organize ideas around a topic. Think of it as a personal wiki that you build together. Unlike memory, which stores facts the AI recalls automatically, a Brain is a place you actively build together. You capture sources, write notes, and ask questions, with the AI as a thinking partner at every step.
+A Knowledge Brain is a shared workspace for you and your AI to research, write, and organize ideas around a topic. Think of it as a personal wiki that you build together. Unlike memory, which stores facts the AI recalls automatically, a Brain is a place you actively build. You write notes, collect sources, and ask questions, with the AI as a thinking partner at every step.
 
-Each Brain has its own pages, and each page is a rich text document you can edit directly or let the AI contribute to.
+Each Brain contains pages, and every page is a markdown document. What you write in the editor is stored as plain, portable markdown, and the AI reads and edits exactly the same text you do. No hidden format, no lock-in.
 
 ## Getting Started
 
 ### Creating a Brain
 
-Open the **Brains** tab in the left sidebar. Click **New Brain** and give it a name. Usually the topic or project you are researching.
-
-You can create as many brains as you like. Keep them focused on a single topic so the AI has clear context when the pane is open.
+Switch to **Brain** mode in the sidebar and click **New brain**. Give it a name, usually the topic or project you are researching. You can create as many brains as you like. Keeping each one focused on a single topic gives the AI clear context.
 
 ### Creating Pages
 
-Inside a Brain, click **New Page** to create a page. Pages are the main unit of organization. You might have one page per subtopic, one per source review, or one for overall notes. Whatever fits how you think.
+Hover over a brain in the sidebar and click the plus button to create a page. Pages can nest as deep as you like: hover over any page and click the plus to add a sub-page beneath it. Click the title in the page header to rename a page. If you leave a page untitled, Magus names it for you once it has some content.
 
-### Opening the Brain Pane
+### Two Places to Work
 
-Click any Brain page from the sidebar to open it as a side pane next to your conversation. The pane stays open while you chat, and the AI automatically gets the current page as context.
+- **Brain view**: click a page in the sidebar to open it full-size. Click **Open chat** in the page header to dock a conversation right next to the page.
+- **In a chat**: open the **Brains** panel in the right rail and pick a page. It opens as a side pane next to your conversation.
 
-## The Brain Pane
+Either way, the AI automatically sees the open page, so you can talk about it without copying anything. When others have the same page open, their avatars appear in the header.
 
-The Brain pane opens to the right of your conversation. At the top you see the page title. Below is the editor, and at the bottom are four tabs: **Outline**, **Sources**, **Related**, and **Activity**.
+## The Editor
 
-### Editing in the Pane
+Pages open in a rich text editor. Type `/` to insert a block: headings, bullet and numbered lists, quotes, code blocks, tables, images, dividers, and collapsible toggle sections. Type `[ ]` at the start of a line for a checklist item, and `#tag` anywhere to tag the page. The AI can additionally write callout boxes for highlighted notes.
 
-The editor is a full rich text environment built on TipTap. You can type directly, paste content, or let the AI write for you.
-
-**Available block types:**
-
-- Paragraphs
-- Headings (H1, H2, H3)
-- Bullet lists and numbered lists
-- Code blocks
-- Block quotes
-- Dividers
-
-**Rich block types** go beyond plain text:
-
-- **Source blocks**: a fetched URL with extracted title, type, and content
-- **File blocks**: an attached file from your Files library
-- **Message blocks**: a saved message from a conversation
-- **Callout blocks**: highlighted notes or warnings
-- **Image blocks**: inline images
+- Select text to get a formatting bubble, plus **Ask** and **Refine** (see below).
+- Drag the handle at the left edge of a block to reorder it.
+- Drop or paste images and files straight into the page, or click **Add file** to insert something from your file library.
 
 ### Linking Pages
 
-Type `[[` anywhere in the editor to link to another page in the same Brain. As you type the page name, a suggestion list appears. Select a page to insert a link. These links help you navigate related content and show up in the **Related** tab.
+Type `[[` anywhere to link to another page in the same brain. A suggestion list appears as you type the name; pick a page to insert a `[[Page Name]]` link. Links are clickable, and the **Related** tab shows every page that links back to the one you are reading.
 
-### Bottom Tabs
+### The Tabs Under the Page
 
-- **Outline**: a structured view of the headings on the current page, useful for long pages
-- **Sources**: all source blocks on the current page at a glance
-- **Related**: pages in this Brain that are linked to or from the current page
-- **Activity**: a log of recent changes to the page, including contributions from the AI
+At the bottom of every page you find:
 
-## Working with Sources
+- **Tasks**: a task board for tasks that live on this page
+- **Outline**: the headings on the page; click one to jump there
+- **Sources**: web sources referenced on this page, with links to the originals
+- **Related**: pages that link to this one
+- **Activity**: the page's full edit history (see Version History)
+- **Guide**: the organization rules that apply to this page (see The Guide)
 
-Sources are URLs you want the AI (and yourself) to work from. When you add a source, Magus fetches the page and extracts its content. The result appears as a source block on the page with the title, URL, and source type.
+## Working with the AI
 
-### Adding a Source
+With a page open next to a conversation, the AI is a full collaborator:
 
-Click **Add Source** in the toolbar or paste a URL into the editor and select **Add as Source**. Magus fetches and extracts the content in the background. Once ready, the block shows the page title and a snippet of the extracted text.
+- **Ask about a selection**: highlight text in the editor and click **Ask** to send it to the chat as context for your next question.
+- **Refine a selection**: click **Refine**, type an instruction like "make this more concise", and the AI reworks that passage.
+- **Let it write**: share your thoughts in the chat and ask for a page. The AI writes well-structured markdown with headings, lists, links, and more.
+- **Let it edit**: the AI can append to pages, make precise text edits, create sub-pages, rename and move pages, and undo its own last edit if you ask.
+- **Let it research**: when the AI searches the web while working in a brain, it can save what it finds as sources. Their content is fetched and indexed, so you can ask questions about the material afterwards. The **Sources** tab lists everything referenced on a page.
 
-The AI can read source content when the Brain pane is open, so you can immediately ask questions about the material you just added.
-
-### Sources Added by the AI
-
-When the AI uses a web search or fetch tool during a conversation, it can add the result as a source block directly to the open Brain page. These AI-added sources are attributed in the Activity log.
-
-## Chat Integration
-
-The Brain pane and your conversation work closely together. Several features let you move content between them.
-
-### Saving Messages to the Brain
-
-When the Brain pane is open, hover over a message to reveal its actions. Click the brain icon to append the message to the current page, or grab the grip handle at the end of the action row to drag the message into a specific spot in the editor. The rest of the message stays selectable, so you can still copy text out of it the usual way. Useful for capturing a particularly good AI response, an important question, or a summary you want to keep.
-
-### Saving Tool Results
-
-When the AI runs a tool (like a web search), the tool result card has an **Add Source** option. This creates a source block on the current Brain page from the URL the tool fetched.
-
-### Selecting Text as Chat Context
-
-Highlight any text in the Brain editor and a small popover appears. Click **Ask Chat** to send the selected text to the chat as context for your next message. This lets you drill into a specific section without copying and pasting.
-
-### Brain Context in the AI
-
-When the Brain pane is open, the AI receives the current page content as part of its context for every message. You do not need to copy or explain what is on the page. The AI already sees it. Close the pane if you want to have a conversation without that context.
-
-## AI as a Thinking Partner
-
-Magus treats the AI as a collaborator, not just a tool. When the pane is open, you can ask the AI to:
-
-- Write full pages from your notes. Just share your thoughts in the conversation and the AI will create a well-structured page with headings, lists, code blocks, and more.
-- Append to existing pages. If you share information related to an existing page, the AI adds it to that page rather than creating a duplicate.
-- Edit content with precision. The AI can find and replace specific text on a page without rewriting entire blocks.
-- Add sources from URLs that auto-fetch and extract content.
-- Connect related pages. The AI can link two pages together so they show up in each other's Related tabs.
-- Search across all your brains to find the right place for new information.
-- Route content to the right brain when you have multiple brains (Work, Personal, Research).
-
-Everything the AI adds is attributed in the Activity log so you always know what it contributed and when.
-
-**Best for:** research projects where you want to build understanding incrementally, not just get a one-off answer.
+Your brains also work for you outside the Brain view: in any conversation, the AI automatically pulls in relevant snippets from your pages and sources when they match what you are asking about.
 
 ## Dropping Notes into Conversation
 
-You do not need to open the Brain pane or use special commands to add information to your brain. Just share your notes, facts, or research naturally in the conversation. The AI decides where to put it.
+You do not need to open a page to add knowledge. Just share notes, facts, or findings naturally in any conversation. The AI searches your brains for a page on that topic, appends to it if one exists, or creates a new page with a fitting title, and briefly tells you what it did. If you have several brains (say Work and Personal), it routes content to the right one and asks when it is unsure.
 
-### How It Works
+## The Guide
 
-When you share knowledge in a conversation, the AI:
+Each brain can carry a Guide: the rules for how it should be organized. The AI follows the Guide whenever it writes to or tidies the brain, and the **Guide** tab on every page shows you exactly which rules apply there.
 
-1. Searches across your brains to find pages about the same topic.
-2. If a matching page exists, appends your content there.
-3. If nothing matches, creates a new page with a descriptive title.
-4. Connects the new content to related pages automatically.
-5. Tells you briefly what it did: which brain, which page, created or appended.
+- **Constitution**: brain-wide instructions, for example "every page starts with a one-line summary" or "ask before restructuring". Edit it under **Brain settings** (hover the brain in the sidebar and click the gear), or let the AI propose one as the brain takes shape.
+- **Section guides**: instructions attached to a page that apply to everything beneath it. Ask the AI to set them, for example "in the Meetings section, every page should start with a date".
+- **Types and templates**: the AI can define page types (like "meeting note" or "book summary"), each backed by a template page. Templates live in a **Templates** folder in the sidebar, and you can edit them like any other page to change what new pages of that type look like. Brain settings lists all defined types, and a page's Guide tab shows its type.
 
-### Multiple Brains
-
-If you have several brains (for example, a Work brain and a Personal brain), the AI routes content to the right one based on the topic. If it is unclear which brain to use, it asks you.
-
-### Markdown Support
-
-When the AI writes to your brain, it uses markdown to create properly structured content. Headings become heading blocks, code fences become code blocks, bullet lists become list items with correct nesting, and so on. You get clean, organized pages without manual formatting.
-
-## Real-time Collaboration
-
-Multiple team members can view and edit the same Brain page at the same time.
-
-### Presence
-
-When someone else has the same page open, you see a presence dot or avatar near the top of the pane. The viewer count badge also appears on the Brain entry in the sidebar.
-
-### Live Updates
-
-Changes from other users appear in the editor in real-time. You do not need to refresh. If you and a collaborator are both typing, your edits are merged automatically.
+Guides steer the AI. They never block your own edits.
 
 ## Version History
 
-Every edit to a block is tracked. If the AI or a collaborator makes a change you want to undo, you can restore a previous version.
+Every save creates a version, whether it came from you, the AI, or a teammate. The **Activity** tab lists them all with a short preview and a timestamp. Click a version to see exactly what changed, with additions and removals highlighted. If it is not the latest version, you can click **Restore this version** to bring it back. A restore is itself a new save, so you can always change your mind again.
 
-The **Activity** tab shows a version count next to blocks that have been edited more than once. Version restore is available through the AI: ask the agent to restore a block to a previous state, and it will use the version history to find and apply the right snapshot.
+## Editing at the Same Time
 
-## Page Operations
+You, the AI, and your teammates can all work on a page at once. When someone else saves while you are just reading, the page updates in place. When you are mid-edit, every save is checked against the latest version of the page: if it changed under you, you see a notice instead of anything being silently lost. And since every save lands in the version history, you can always recover any state from the **Activity** tab.
 
-### Splitting a Page
+## Trash
 
-If a page grows too large or starts covering multiple subtopics, the AI can split it. Ask something like "split the section about data sources into its own page" and the agent will move the relevant blocks to a new page while keeping the rest in place.
-
-### Merging Pages
-
-Two pages that cover the same ground can be merged. The AI moves all blocks from the source page into the target, preserving order, then removes the empty source. Ask "merge the Draft Notes page into the main Research page" to trigger this.
-
-### Reorganizing Blocks
-
-You can ask the AI to reorder blocks, change nesting levels, or restructure a page. The agent uses a dedicated tool to move multiple blocks in a single operation.
-
-## Autonomous Agents
-
-Custom agents with Brain access can work on your brains independently, even when you are not in a conversation.
-
-### Granting Access
-
-In your custom agent settings, grant the agent **editor** access to a specific brain. The agent will then include that brain's content in its regular heartbeat sweeps.
-
-### What Autonomous Agents Can Do
-
-During a heartbeat sweep, an agent with brain access can:
-
-- Add new sources it discovers
-- Write summaries of new information
-- Create pages for emerging subtopics
-- Organize and link related content
-
-All autonomous contributions appear in the Activity tab with the agent's name, so you always know what changed and when.
+Click the trash button in the page header (and click again to confirm) to move a page and its sub-pages to the trash. Trashed pages sit in **Trash** at the bottom of the Brain sidebar for 30 days, where a click on **Restore** brings them back, sub-pages included. After 30 days they are deleted permanently.
 
 ## Organizing Your Brains
 
-The AI helps with organization too. When you drop notes into a conversation, it automatically finds the right brain and page, or creates new ones as needed.
-
-Keep each Brain focused on a single topic or project. Use pages within a Brain to break the topic into sections. For example, one page for background research, one for open questions, and one for conclusions.
-
-Use `[[Page Name]]` links liberally to connect related pages. The **Related** tab shows you which pages reference each other, making it easy to navigate even large Brains.
-
-When a project is complete, you can archive or delete the Brain from the Brains tab.
+- Keep each brain focused on one topic or project, and use nested pages to break it into sections.
+- Use `[[Page Name]]` links liberally. The **Related** tab turns them into a navigation web that makes even large brains easy to explore.
+- In **Brain settings** you can change a brain's name, description, icon, and color. For brains in a workspace, a sharing toggle opens them to everyone in that workspace.
+- Let the AI do the housekeeping: ask it to restructure sections, fix stale links after renames, or file loose notes where they belong.

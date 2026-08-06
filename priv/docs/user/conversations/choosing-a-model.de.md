@@ -46,6 +46,14 @@ Magus unterstützt drei separate Standardmodelle:
 
 Um deine Standardmodelle zu ändern, gehe zu **Einstellungen** und suche den Abschnitt für Modelleinstellungen. Änderungen gelten für alle neuen Unterhaltungen ab diesem Zeitpunkt. Bestehende Unterhaltungen behalten das Modell, das sie bisher verwendet haben.
 
+## Eigene Modelle verwenden
+
+Du kannst dein eigenes KI-Anbieter-Konto verbinden und eigene Modelle hinzufügen, die über deinen Schlüssel laufen. Sie erscheinen in der Modellauswahl neben dem Katalog und werden von deinem Anbieter abgerechnet, nicht über dein Magus-Ausgabenlimit. Siehe [Eigene Modelle](../account/custom-models.de.md).
+
+## Wenn ein Modell nicht mehr verfügbar ist
+
+Wenn ein von dir explizit gewähltes Modell nicht mehr nutzbar ist (zum Beispiel ein eigenes Modell, das du gelöscht hast), wechselt Magus nicht stillschweigend zu einem anderen Modell. Die Nachricht wird angehalten und du bekommst einen Hinweis mit dem Button **Zurücksetzen und erneut senden**, der die kaputte Auswahl löscht und deine Nachricht mit deinem Standardmodell erneut sendet.
+
 ## Nutzungskosten
 
 Verschiedene Modelle haben unterschiedliche Anbieterpreise. Leistungsstärkere oder spezialisierte Modelle kosten in der Regel mehr pro Nachricht. Die relativen Kosten eines Modells werden im Modell-Selektor angezeigt, damit du eine fundierte Entscheidung treffen kannst.

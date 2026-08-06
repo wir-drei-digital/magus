@@ -22,7 +22,7 @@ Magus supports multiple AI models from various providers. You can select differe
 
 ## Extending Your Workflow
 
-**Threads** let you branch off from any message to explore a tangent without derailing the main conversation. The thread inherits context up to the branch point and then runs independently. This is useful for diving deep into a subtopic while keeping the main conversation focused. See [Threads](../features/threads.en.md) for details.
+**Threads** let you branch off from any message to explore a tangent without derailing the main conversation. The thread inherits context up to the branch point and then runs independently. This is useful for diving deep into a subtopic while keeping the main conversation focused. See [Threads](../conversations/threads.en.md) for details.
 
 **Data Sources** connect external data streams like application logs and RSS feeds to your agents. Your agent can search ingested data, monitor for errors, and alert you when something needs attention. See [Data Sources](../knowledge/data-sources.en.md) for details.
 

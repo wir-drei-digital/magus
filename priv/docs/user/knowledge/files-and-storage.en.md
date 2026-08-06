@@ -1,7 +1,7 @@
 ---
 title: Files & Storage
 description: Upload, manage, and share files with your agents
-order: 4
+order: 5
 ---
 
 # Files & Storage

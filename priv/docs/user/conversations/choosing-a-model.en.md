@@ -46,6 +46,14 @@ Magus supports three separate default models:
 
 To update your defaults, go to **Settings** and look for the Model preferences section. Changes apply to all new conversations going forward. Existing conversations keep whichever model they were using.
 
+## Using your own models
+
+You can connect your own AI provider account and add custom models that run on your key. They appear in the model picker alongside the catalog and are billed by your provider, not against your Magus spend cap. See [Your Own Models](../account/custom-models.en.md).
+
+## If a model becomes unavailable
+
+If a model you explicitly picked can no longer be used (for example a custom model you deleted), Magus does not silently switch to another model. The message is held and you get a notice with a **Reset to default and retry** button, which clears the broken selection and re-sends your message with your default model.
+
 ## Usage costs
 
 Different models have different provider costs. More powerful or specialized models typically cost more per message. A model's relative cost is shown in the model selector so you can make an informed choice.

@@ -1,7 +1,7 @@
 ---
 title: Memory
 description: Wie der Agenten-Memory funktioniert und wie du verwaltest, was deine Agenten sich merken
-order: 3
+order: 4
 ---
 
 # Memory
@@ -93,3 +93,7 @@ Um eine Memory zu entfernen, findest du sie im Memory-Tab und klickst auf **Lös
 Wenn du alle Memories eines Agenten löschen möchtest, nutze die Option **Alle löschen** im Memory-Tab. Dies entfernt nur Memories im Agenten-Geltungsbereich. Memories im Benutzer- und Unterhaltungs-Geltungsbereich sind davon nicht betroffen.
 
 Wird ein Workspace gelöscht, werden alle Benutzer-, Agenten- und Unterhaltungs-Memories, die in diesem Workspace gelebt haben, mit ihm gelöscht. Deine Memories aus dem persönlichen Pool und aus deinen anderen Workspaces bleiben unberührt.
+
+## Memory ausschalten
+
+Wenn du Unterhaltungen lieber ohne automatisches Memory führst, gehe zu **Einstellungen** > **Memory** und schalte das globale Memory aus. Die KI speichert dann keine neuen Memories und ruft auch keine bestehenden ab. Deine gespeicherten Memories bleiben erhalten und sind wieder da, sobald du es erneut einschaltest.

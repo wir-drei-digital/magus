@@ -1,7 +1,7 @@
 ---
 title: Memory
 description: How agent memory works and how to manage what your agents remember
-order: 3
+order: 4
 ---
 
 # Memory
@@ -93,3 +93,7 @@ To remove a memory, find it in the Memory tab and click **Delete**. You can also
 If you want to clear all memories for an agent, use the **Clear All** option in the Memory tab. This only removes memories scoped to that agent. User-scoped and conversation-scoped memories are not affected.
 
 If a workspace is deleted, all user, agent, and conversation memories that lived inside that workspace are deleted with it. Your personal-bucket memories and memories in your other workspaces are untouched.
+
+## Turning Memory Off
+
+If you prefer conversations without automatic memory, go to **Settings** > **Memory** and switch global memory off. The AI then neither saves new memories nor recalls existing ones. Your stored memories are kept and come back when you switch it on again.
