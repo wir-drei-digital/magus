@@ -86,8 +86,7 @@ defmodule MagusWeb.LiveUserAuth do
 
   # Restores the Gettext locale for child `live_render` LiveViews. They mount in
   # their own process and would otherwise fall back to the default locale on
-  # connect; the parent's resolved locale is propagated via the session by
-  # MagusWeb.Workbench.Live.DetailView.
+  # connect; the parent's resolved locale is propagated via the session.
   def on_mount(:restore_locale, _params, session, socket) do
     case session do
       %{"locale" => locale} when is_binary(locale) ->

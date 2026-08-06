@@ -68,8 +68,8 @@ defmodule Magus.Usage.Account do
       description "Plan feature flags for the composer (image/video generation, upload cap)."
 
       run fn _input, context ->
-        # Mirrors MagusWeb.ChatLive.Helpers.compute_usage_state: gate the
-        # image/video mode toggles client-side (the backend still enforces).
+        # Gate the image/video mode toggles client-side (the backend still
+        # enforces the limits on generation).
         user_id = context.actor && Map.get(context.actor, :id)
         limits = Magus.Usage.Calculator.get_effective_limits(user_id)
 

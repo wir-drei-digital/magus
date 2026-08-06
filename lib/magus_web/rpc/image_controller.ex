@@ -20,7 +20,7 @@ defmodule MagusWeb.Rpc.ImageController do
 
   @accepted_types ~w(image/jpeg image/png image/gif image/webp)
 
-  # Style suffixes mirror MagusWeb.ProfileImageGeneratorComponent.
+  # Style suffixes for AI profile image generation prompts.
   @style_suffixes %{
     "none" => "",
     "photo" => ", photorealistic style, hyper-detailed, natural lighting, realistic textures",

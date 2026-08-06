@@ -281,15 +281,11 @@ defmodule MagusWeb.CoreRouter do
       scope "/", MagusWeb do
         pipe_through :browser
 
-        # The authenticated workbench (classic LiveView) is retired: the SPA now
-        # owns /chat, /brain, /agents, /files, /settings, /jobs, /search,
-        # /history, /workspaces, and /prompts via the root catch-all. The classic
-        # modules remain under lib/magus_web/legacy/ for reference. The public
-        # entry points below (catalogs, invite + share links) are NOT the
-        # workbench and stay routed.
-
-        # /prompts and /prompts/:id are now owned by the SPA (the root catch-all);
-        # the classic PromptsLive/PromptDetailLive stay in lib/ for reference.
+        # The authenticated workbench (classic LiveView) is retired and its
+        # modules are deleted: the SPA owns /chat, /brain, /agents, /files,
+        # /settings, /jobs, /search, /history, /workspaces, and /prompts via
+        # the root catch-all. The public entry points below (catalogs, invite +
+        # share links) are NOT the workbench and stay routed.
 
         # Public models routes
         ash_authentication_live_session :public_models,

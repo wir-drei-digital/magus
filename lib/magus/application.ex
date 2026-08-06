@@ -11,12 +11,6 @@ defmodule Magus.Application do
     # Logger.log macro is compiled in Jido.Action.Util (cond_log), not Telemetry
     Logger.put_module_level(Jido.Action.Util, :warning)
 
-    # Backing ETS table for one-shot chat actions captured from URL params.
-    MagusWeb.Workbench.Chat.PendingChatAction.init()
-
-    # Backing ETS table for one-shot `?highlight=` message ids (deep link).
-    MagusWeb.Workbench.Chat.PendingMessageHighlight.init()
-
     # Register custom LLM providers
     ReqLLM.Providers.register(Magus.Agents.Providers.PublicAI)
     ReqLLM.Providers.register(Magus.Agents.Providers.OpenRouterWithCitations)

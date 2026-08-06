@@ -89,9 +89,7 @@ defmodule MagusWeb.ChatLive.UI.ChatComponents do
     """
   end
 
-  # Inlined from the retired `MagusWeb.ChatLive` LiveView (Phase C5).
-  # `lib/magus_web/workbench/chat/components/message/status_indicators.ex`
-  # has its own gettext-aware copy used by message-level indicators; this
+  # Inlined from the retired `MagusWeb.ChatLive` LiveView (Phase C5). This
   # plain-string variant is used only by `thinking_indicator/1` above.
   defp thinking_status_text(:thinking), do: "Thinking"
   defp thinking_status_text(:reasoning), do: "Reasoning"

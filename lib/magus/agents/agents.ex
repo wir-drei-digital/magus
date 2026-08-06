@@ -9,8 +9,7 @@ defmodule Magus.Agents do
 
   typescript_rpc do
     resource Magus.Agents.CustomAgent do
-      # @mention autocomplete in the SPA composer (mirrors
-      # MagusWeb.Workbench.Chat.Helpers.load_available_agents/1).
+      # @mention autocomplete in the SPA composer.
       rpc_action :my_agents, :my_agents
       rpc_action :merged_slash_commands, :merged_slash_commands
 

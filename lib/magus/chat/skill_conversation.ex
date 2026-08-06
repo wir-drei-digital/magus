@@ -1,9 +1,8 @@
 defmodule Magus.Chat.SkillConversation do
   @moduledoc """
   Creates a conversation seeded with a skill's context + tools and sends its
-  start message. Backs the classic `?skill=<name>&topic=<t>` deeplink
-  (see `MagusWeb.Workbench.Chat.UrlActions.start_skill_conversation/3`) so the
-  SvelteKit landing can start the same skill-seeded chat.
+  start message. Backs the `?skill=<name>&topic=<t>` deeplink so the
+  SvelteKit landing can start a skill-seeded chat.
   """
   alias Magus.Agents.Skills
 

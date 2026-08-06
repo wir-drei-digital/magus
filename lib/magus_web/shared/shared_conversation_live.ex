@@ -22,8 +22,6 @@ defmodule MagusWeb.SharedConversationLive do
   import MagusWeb.ChatLive.Components.Message.Helpers,
     only: [to_markdown: 3, get_referenced_citations: 2]
 
-  import MagusWeb.ChatLive.Helpers, only: [has_displayable_content?: 2]
-
   alias MagusWeb.Layouts
 
   on_mount {MagusWeb.LiveUserAuth, :live_user_optional}
@@ -314,5 +312,19 @@ defmodule MagusWeb.SharedConversationLive do
           "msg-type-bubble"
         end
     end
+  end
+
+  # Inlined from the retired classic `MagusWeb.ChatLive.Helpers`: a message is
+  # displayable when it has non-empty text, attachments, or reasoning.
+  defp has_displayable_content?(message, loaded_attachments) do
+    text = Map.get(message, :text, "")
+    reasoning = Map.get(message, :reasoning_summary, [])
+    attachments = loaded_attachments || Map.get(message, :attachments, [])
+
+    has_text = is_binary(text) and String.trim(text) != ""
+    has_attachments = is_list(attachments) and attachments != []
+    has_reasoning = is_list(reasoning) and reasoning != []
+
+    has_text or has_attachments or has_reasoning
   end
 end

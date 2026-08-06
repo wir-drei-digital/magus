@@ -4,8 +4,8 @@ defmodule Magus.Workbench.TabSession.Changes.OpenTab do
   primary resource. Sets active_tab_id to the resulting tab's id.
 
   Accepts an optional `:label` argument that is stored on the tab; if not
-  provided, the tab has a nil label and the UI resolves it via
-  `MagusWeb.Workbench.Tab.LabelResolver`.
+  provided, the tab has a nil label and the UI resolves a display label
+  itself.
   """
   use Ash.Resource.Change
 
