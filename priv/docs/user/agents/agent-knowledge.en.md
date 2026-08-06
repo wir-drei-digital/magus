@@ -6,7 +6,7 @@ order: 6
 
 # Agent Knowledge & Privacy
 
-You have fine-grained control over what your agent can see and remember. This page covers the privacy controls that govern memory access, how to connect collections, and how to add memories directly to an agent.
+You have fine-grained control over what your agent can see and remember. This page covers the privacy controls that govern memory access, how to connect collections, and how to manage an agent's own memories.
 
 ## Privacy controls
 
@@ -49,20 +49,14 @@ Collections are managed from the [Connected Sources](/settings/knowledge) page. 
 
 ## Agent-scoped memories
 
-You can add memories directly to an agent. These are facts, observations, or preferences the agent should always keep in mind, regardless of what has been discussed in any conversation.
+Agents build their own memories: facts, observations, or preferences they should keep in mind regardless of what has been discussed in any single conversation. To give an agent a memory, just tell it in chat. For example:
 
-### Adding a memory
-
-1. In the agent editor, open the **Memory** section.
-2. Click **Add memory**.
-3. Write the memory as a plain statement. For example:
-   - "The user prefers responses in bullet points."
-   - "This agent is used by the engineering team at Acme Corp."
-   - "Always recommend reviewing the security checklist before deployment."
-4. Click **Save**.
+- "Remember that I prefer responses in bullet points."
+- "Remember that this agent is used by the engineering team at Acme Corp."
+- "Always recommend reviewing the security checklist before deployment."
 
 ### Editing or removing a memory
 
-Memories are listed in the **Memory** section of the agent editor. Click on any memory to edit it, or click the delete icon to remove it.
+Memories are listed in the **Memory** section of the agent editor. Click on any memory to edit its summary and kind, or delete it. Deleting a memory is permanent.
 
-Agent-scoped memories persist across all conversations that use the agent. They are always included in the agent's context, so keep them concise and relevant. A long list of memories can increase token usage on every message.
+Agent-scoped memories persist across all conversations that use the agent. Keep them concise and relevant: the agent loads the most fitting ones into its context, and a long list can increase token usage.

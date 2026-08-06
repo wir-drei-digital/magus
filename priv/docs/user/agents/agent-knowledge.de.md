@@ -6,7 +6,7 @@ order: 6
 
 # Agenten-Wissen & Datenschutz
 
-Du hast feinkörnige Kontrolle darüber, was dein Agent sehen und sich merken kann. Diese Seite erklärt die Datenschutz-Steuerungen für den Speicherzugriff, wie du Sammlungen verbindest und wie du dem Agenten direkt Erinnerungen hinzufügst.
+Du hast feinkörnige Kontrolle darüber, was dein Agent sehen und sich merken kann. Diese Seite erklärt die Datenschutz-Steuerungen für den Speicherzugriff, wie du Sammlungen verbindest und wie du die eigenen Erinnerungen eines Agenten verwaltest.
 
 ## Datenschutz-Steuerungen
 
@@ -49,20 +49,14 @@ Sammlungen werden von der Seite [Verbundene Quellen](/settings/knowledge) aus ve
 
 ## Agentenspezifische Erinnerungen
 
-Du kannst dem Agenten direkt Erinnerungen hinzufügen. Das sind Fakten, Beobachtungen oder Präferenzen, die der Agent immer im Kopf behalten soll, unabhängig davon, was in einer Unterhaltung besprochen wurde.
+Agenten bauen ihre eigenen Erinnerungen auf: Fakten, Beobachtungen oder Präferenzen, die sie im Kopf behalten sollen, unabhängig davon, was in einer einzelnen Unterhaltung besprochen wurde. Um einem Agenten eine Erinnerung mitzugeben, sag es ihm einfach im Chat. Zum Beispiel:
 
-### Eine Erinnerung hinzufügen
-
-1. Öffne im Agenten-Editor den Bereich **Memory**.
-2. Klicke auf **Erinnerung hinzufügen**.
-3. Schreibe die Erinnerung als einfache Aussage. Zum Beispiel:
-   - "Der Nutzer bevorzugt Antworten in Stichpunkten."
-   - "Dieser Agent wird vom Engineering-Team bei Acme Corp verwendet."
-   - "Empfehle immer, die Sicherheits-Checkliste vor dem Deployment zu überprüfen."
-4. Klicke auf **Speichern**.
+- "Merke dir, dass ich Antworten in Stichpunkten bevorzuge."
+- "Merke dir, dass dieser Agent vom Engineering-Team bei Acme Corp verwendet wird."
+- "Empfehle immer, die Sicherheits-Checkliste vor dem Deployment zu überprüfen."
 
 ### Eine Erinnerung bearbeiten oder entfernen
 
-Erinnerungen werden im Bereich **Memory** des Agenten-Editors aufgelistet. Klicke auf eine Erinnerung, um sie zu bearbeiten, oder klicke auf das Löschen-Symbol, um sie zu entfernen.
+Erinnerungen werden im Bereich **Memory** des Agenten-Editors aufgelistet. Klicke auf eine Erinnerung, um Zusammenfassung und Art zu bearbeiten, oder lösche sie. Das Löschen einer Erinnerung ist endgültig.
 
-Agentenspezifische Erinnerungen bleiben über alle Unterhaltungen hinweg bestehen, die den Agenten verwenden. Sie sind immer im Kontext des Agenten enthalten, daher solltest du sie kurz und relevant halten. Eine lange Liste von Erinnerungen kann den Token-Verbrauch bei jeder Nachricht erhöhen.
+Agentenspezifische Erinnerungen bleiben über alle Unterhaltungen hinweg bestehen, die den Agenten verwenden. Halte sie kurz und relevant: Der Agent lädt die passendsten in seinen Kontext, und eine lange Liste kann den Token-Verbrauch erhöhen.
