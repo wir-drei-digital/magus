@@ -310,6 +310,71 @@ defmodule Magus.Knowledge.ConnectTest do
     end
   end
 
+  describe "owner gate on credential-using wizard actions (magus-3uee)" do
+    # A workspace member can READ a workspace source, but the wizard actions
+    # run with the OWNER's stored credentials: browsing the owner's drive or
+    # syncing arbitrary folders with it stays owner-only.
+    setup do
+      owner = generate(user())
+      member = generate(user())
+      ws = generate(workspace(actor: owner))
+      workspace_member(user_id: member.id, workspace_id: ws.id)
+
+      {:ok, source} =
+        Knowledge.create_source(
+          %{
+            name: "WS Drive",
+            provider: :nextcloud,
+            auth_config: @nextcloud,
+            workspace_id: ws.id
+          },
+          actor: owner
+        )
+
+      {:ok, source} = Knowledge.update_source_status(source, %{status: :active}, actor: owner)
+
+      %{owner: owner, member: member, source: source}
+    end
+
+    test "a workspace member can read the source but not browse its folders", %{
+      member: member,
+      source: source
+    } do
+      # Read passes (workspace membership)...
+      assert {:ok, _} = Knowledge.get_source(source.id, actor: member)
+
+      # ...but the credential-using browse is rejected before any connection.
+      assert {:error, error} =
+               KnowledgeSource
+               |> Ash.ActionInput.for_action(
+                 :source_folders,
+                 %{source_id: source.id},
+                 actor: member
+               )
+               |> Ash.run_action()
+
+      assert Exception.message(error) =~ "owner"
+    end
+
+    test "a workspace member cannot create collections on the owner's source", %{
+      member: member,
+      source: source
+    } do
+      folders = [%{"id" => "/dav/x", "name" => "X", "path" => "/X"}]
+
+      assert {:error, error} =
+               KnowledgeSource
+               |> Ash.ActionInput.for_action(
+                 :create_source_collections,
+                 %{source_id: source.id, folders: folders},
+                 actor: member
+               )
+               |> Ash.run_action()
+
+      assert Exception.message(error) =~ "owner"
+    end
+  end
+
   describe "reconnect_or_create/3" do
     test "updates the existing source for the provider instead of creating a duplicate" do
       user = generate(user())

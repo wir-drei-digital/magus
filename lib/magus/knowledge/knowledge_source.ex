@@ -97,6 +97,7 @@ defmodule Magus.Knowledge.KnowledgeSource do
       run fn input, context ->
         with {:ok, source} <-
                Magus.Knowledge.get_source(input.arguments.source_id, actor: context.actor),
+             :ok <- require_owner(source, context.actor),
              {:ok, folders} <-
                Magus.Knowledge.Connect.list_folders(source, input.arguments[:parent_id]) do
           {:ok, Enum.map(folders, &folder_node/1)}
@@ -111,7 +112,8 @@ defmodule Magus.Knowledge.KnowledgeSource do
 
       run fn input, context ->
         with {:ok, source} <-
-               Magus.Knowledge.get_source(input.arguments.source_id, actor: context.actor) do
+               Magus.Knowledge.get_source(input.arguments.source_id, actor: context.actor),
+             :ok <- require_owner(source, context.actor) do
           {:ok, %{created: sync_folders(source, input.arguments.folders, context.actor)}}
         end
       end
@@ -222,6 +224,13 @@ defmodule Magus.Knowledge.KnowledgeSource do
 
     has_many :collections, Magus.Knowledge.KnowledgeCollection
   end
+
+  # The wizard actions run with the OWNER's stored credentials, so they are
+  # owner-only regardless of workspace membership (magus-3uee): a member who
+  # can read the source row must not be able to browse the owner's whole drive
+  # or sync arbitrary folders with it. Members still search synced content.
+  defp require_owner(%{user_id: owner_id}, %{id: actor_id}) when owner_id == actor_id, do: :ok
+  defp require_owner(_source, _actor), do: {:error, "Only the source owner can do this."}
 
   defp source_summary(source) do
     %{
