@@ -77,23 +77,12 @@ defmodule MagusWeb.LiveViewCase do
 
   @doc """
   Log in the user with a specific workspace persisted as their
-  `current_workspace_id`. The workbench reads from the user record,
-  not the Plug session, so tests must persist the selection.
+  `current_workspace_id`. Views read the selection from the user record,
+  not the Plug session, so tests must persist it.
   """
   def log_in_user_with_workspace(conn, user, workspace) do
     {:ok, user} = Magus.Accounts.select_workspace(user, workspace.id, actor: user)
     log_in_user(conn, user)
-  end
-
-  @doc """
-  Enable the desktop tab bar for a user (sets `ui_preferences["tabs_enabled"] = true`).
-  WorkbenchLive reads this at mount, so tests that exercise tab-bar UI must set
-  it before calling `log_in_user/2`.
-  """
-  def enable_tabs(user) do
-    prefs = Map.put(user.ui_preferences || %{}, "tabs_enabled", true)
-    {:ok, user} = Magus.Accounts.update_ui_preferences(user, prefs, actor: user)
-    user
   end
 
   @doc """

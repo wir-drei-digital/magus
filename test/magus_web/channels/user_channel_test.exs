@@ -150,15 +150,20 @@ defmodule MagusWeb.UserChannelTest do
       {:ok, user: user}
     end
 
-    # Locks the producer → bridge contract: the workbench usage signal is the
-    # same one the classic shell consumes; the SPA gets a data-less hint.
+    # Locks the producer to bridge contract: the SPA gets a data-less hint.
     test "forwards workbench usage_changed as a usage.changed push", %{user: user} do
       :ok = MagusWeb.Workbench.Signals.broadcast_usage_changed(user.id)
       assert_push "usage.changed", %{}
     end
 
     test "ignores other workbench_user signals on the same topic", %{user: user} do
-      :ok = MagusWeb.Workbench.Signals.broadcast_favorites_changed(user.id)
+      :ok =
+        Phoenix.PubSub.broadcast(
+          Magus.PubSub,
+          MagusWeb.Workbench.Signals.workbench_user_topic(user.id),
+          {:workbench_user, :something_else}
+        )
+
       refute_push "usage.changed", %{}
     end
 
