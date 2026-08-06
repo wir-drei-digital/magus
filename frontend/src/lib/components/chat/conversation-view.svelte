@@ -13,10 +13,11 @@
 	} from '$lib/ash/api';
 	import { SvelteMap } from 'svelte/reactivity';
 	import type { ConversationStore } from '$lib/chat/conversation-store.svelte';
-	import { isBrokenSelection, precedingUserText, resetTarget } from '$lib/chat/broken-selection';
+	import { isBrokenSelection, precedingUserMessage, resetTarget } from '$lib/chat/broken-selection';
 	import { floorBoundaryMessageId, floorDividerLabel } from '$lib/chat/context-window';
 	import { buildChatStream, toolViewFromLive } from '$lib/chat/events';
 	import { session } from '$lib/stores/session.svelte';
+	import { toast } from '$lib/stores/toast.svelte';
 	import { readThreads, writeThreads } from '$lib/chat/threads-cache';
 	import { workbench } from '$lib/stores/workbench.svelte';
 	import PromptFormDialog from '$lib/components/shell/prompt-form-dialog.svelte';
@@ -260,26 +261,33 @@
 
 	// Broken-selection remediation (Task 1 hard-stop event): clear the scoped
 	// selection (user default vs conversation pin) with a null-clearing RPC, then
-	// re-send the blocked user text. The blocked turn produced no agent response,
-	// so a fresh send never double-persists.
+	// re-send the blocked user message (text AND attachments). The blocked turn
+	// produced no agent response, so a fresh send never double-persists.
 	async function resetBrokenSelection(messageId: string) {
 		const event = store.messages.find((message) => message.id === messageId);
 		if (!event || !isBrokenSelection(event.toolCallData)) return;
 
-		const text = precedingUserText(store.messages, messageId);
-		if (!text) return;
+		const blocked = precedingUserMessage(store.messages, messageId);
+		if (!blocked?.text) return;
 
 		if (resetTarget(event.toolCallData) === 'user') {
 			const userId = session.user?.id;
 			if (!userId) return;
 			const result = await selectDefaultModel(userId, null);
-			if (!result.success) return;
+			if (!result.success) {
+				toast('Could not reset your default model. Try again or pick another model.');
+				return;
+			}
 		} else {
 			const result = await setConversationModel(store.conversationId, null);
-			if (!result.success) return;
+			if (!result.success) {
+				toast('Could not reset the conversation model. Try again or pick another model.');
+				return;
+			}
 		}
 
-		await store.send(text);
+		const resources = (blocked.attachments ?? []).map((id) => ({ type: 'file' as const, id }));
+		await store.send(blocked.text, resources);
 	}
 
 	// The degraded-connection banner waits out a grace period: every

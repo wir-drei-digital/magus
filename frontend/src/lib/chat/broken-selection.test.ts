@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	isBrokenSelection,
-	precedingUserText,
+	precedingUserMessage,
 	resetTarget,
 	type BrokenSelectionPayload
 } from './broken-selection';
@@ -53,19 +53,21 @@ describe('resetTarget', () => {
 	});
 });
 
-describe('precedingUserText', () => {
+describe('precedingUserMessage', () => {
 	type Row = {
 		id: string;
 		source: 'user' | 'agent';
 		messageType: 'message' | 'event';
 		text: string;
+		attachments?: string[] | null;
 	};
 
-	const user = (id: string, text: string): Row => ({
+	const user = (id: string, text: string, attachments: string[] | null = null): Row => ({
 		id,
 		source: 'user',
 		messageType: 'message',
-		text
+		text,
+		attachments
 	});
 	const event = (id: string): Row => ({
 		id,
@@ -74,9 +76,14 @@ describe('precedingUserText', () => {
 		text: 'The model you selected is no longer available.'
 	});
 
-	it('returns the nearest prior user message text before the event', () => {
+	it('returns the nearest prior user message before the event', () => {
 		const messages = [user('u1', 'first'), user('u2', 'blocked ask'), event('e1')];
-		expect(precedingUserText(messages, 'e1')).toBe('blocked ask');
+		expect(precedingUserMessage(messages, 'e1')?.text).toBe('blocked ask');
+	});
+
+	it('carries the blocked message attachments so the retry can re-send them', () => {
+		const messages = [user('u1', 'with file', ['file-1', 'file-2']), event('e1')];
+		expect(precedingUserMessage(messages, 'e1')?.attachments).toEqual(['file-1', 'file-2']);
 	});
 
 	it('skips the event row itself and any non-user rows when scanning back', () => {
@@ -85,19 +92,19 @@ describe('precedingUserText', () => {
 			{ id: 'a1', source: 'agent' as const, messageType: 'message' as const, text: 'reply' },
 			event('e1')
 		];
-		expect(precedingUserText(messages, 'e1')).toBe('the ask');
+		expect(precedingUserMessage(messages, 'e1')?.text).toBe('the ask');
 	});
 
 	it('returns null when the event id is unknown', () => {
-		expect(precedingUserText([user('u1', 'x'), event('e1')], 'missing')).toBeNull();
+		expect(precedingUserMessage([user('u1', 'x'), event('e1')], 'missing')).toBeNull();
 	});
 
 	it('returns null when there is no prior user message', () => {
-		expect(precedingUserText([event('e1')], 'e1')).toBeNull();
+		expect(precedingUserMessage([event('e1')], 'e1')).toBeNull();
 	});
 
 	it('ignores user messages that come after the event', () => {
 		const messages = [event('e1'), user('u2', 'later')];
-		expect(precedingUserText(messages, 'e1')).toBeNull();
+		expect(precedingUserMessage(messages, 'e1')).toBeNull();
 	});
 });

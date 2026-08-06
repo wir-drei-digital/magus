@@ -11,6 +11,7 @@
 		confirmAction
 	} from '$lib/components/crud';
 	import { CONTROL_CLASS } from '$lib/components/crud/styles';
+	import { toast } from '$lib/stores/toast.svelte';
 	import {
 		createOwnedModel,
 		createOwnedProvider,
@@ -142,6 +143,8 @@
 	// Ensures the create-provider detour is auto-opened at most once, so canceling
 	// it does not immediately reopen the dialog on the next reactive tick.
 	let templatePromptedCreate = false;
+	// Same idea for the multi-provider "pick a provider" toast.
+	let templatePromptedPick = false;
 
 	onMount(() => {
 		pendingTemplate = parseTemplateParam(
@@ -151,8 +154,11 @@
 	});
 
 	// Runs after every provider list change (initial load and after a create): the
-	// moment an owned provider exists, consume the pending template into a prefilled
-	// add-model dialog and strip the param so a refresh does not re-trigger it.
+	// moment exactly ONE owned provider exists, consume the pending template into a
+	// prefilled add-model dialog and strip the param so a refresh does not
+	// re-trigger it. With several providers the target is ambiguous, so the
+	// template stays pending (and in the URL) until the user picks a provider via
+	// its own "Add model" button, which consumes it.
 	$effect(() => {
 		if (templateConsumed || !pendingTemplate || loading) return;
 		if (providers.length === 0) {
@@ -164,12 +170,26 @@
 			}
 			return;
 		}
+		if (providers.length > 1) {
+			if (!templatePromptedPick) {
+				templatePromptedPick = true;
+				toast('Pick a provider and use its "Add model" button to place the cloned model.');
+			}
+			return;
+		}
+		void openAddModel(providers[0], consumePendingTemplate() ?? undefined);
+	});
+
+	// Hand the pending clone template to its consumer exactly once, stripping the
+	// URL param at that moment.
+	function consumePendingTemplate(): ModelTemplate | null {
+		if (templateConsumed || !pendingTemplate) return null;
 		const template = pendingTemplate;
 		templateConsumed = true;
 		pendingTemplate = null;
 		stripTemplateParam();
-		void openAddModel(providers[0], template);
-	});
+		return template;
+	}
 
 	function stripTemplateParam() {
 		const url = new URL(window.location.href);
@@ -383,6 +403,9 @@
 	}
 
 	async function openAddModel(provider: ProviderEntry, template?: ModelTemplate) {
+		// A pending clone template (multi-provider case: the auto-open was skipped
+		// as ambiguous) is consumed by whichever provider the user picks.
+		template ??= consumePendingTemplate() ?? undefined;
 		modelProvider = provider;
 		// Prefill from a clone/template when present; otherwise start blank. Costs and
 		// context are omitted from the template when unknown, so they stay empty.

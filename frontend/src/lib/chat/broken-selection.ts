@@ -49,26 +49,28 @@ type ThreadRow = {
 	source: 'user' | 'agent';
 	messageType: 'message' | 'event' | 'job_trigger' | 'draft_event';
 	text: string;
+	attachments?: string[] | null;
 };
 
 /**
- * The text to re-send: the nearest prior regular user message before the
+ * The message to re-send: the nearest prior regular user message before the
  * broken-selection event. The payload carries no text, and the blocked message
  * is always the most recent user turn preceding the event (the agent never
  * replied), so we scan backwards from the event for the first user `:message`.
- * Returns null when the event id is unknown or no such user message exists.
+ * Returns the whole row (the retry must carry its attachments too, not just
+ * the text). Null when the event id is unknown or no such user message exists.
  */
-export function precedingUserText<Row extends ThreadRow>(
+export function precedingUserMessage<Row extends ThreadRow>(
 	messages: Row[],
 	eventId: string
-): string | null {
+): Row | null {
 	const eventIndex = messages.findIndex((message) => message.id === eventId);
 	if (eventIndex < 0) return null;
 
 	for (let index = eventIndex - 1; index >= 0; index--) {
 		const message = messages[index];
 		if (message.source === 'user' && message.messageType === 'message') {
-			return message.text;
+			return message;
 		}
 	}
 	return null;
