@@ -369,5 +369,7 @@ For per-agent autonomous wake-ups. The HeartbeatScheduler enqueues runs on the s
 | [Plan & Tasks](./11-plan-tasks.md) | Collaborative task management between users and agents |
 | [Onboarding](./12-onboarding.md) | Feature discovery and progressive disclosure for new users |
 | [Web Knowledge Connector](./13-web-knowledge-connector.md) | Web crawling and content ingestion into the RAG pipeline |
-| [Knowledge Brain](./14-knowledge-brain.md) | Collaborative page/block editor with semantic search, real-time presence, and agent tool access |
+| [Knowledge Brain](./14-knowledge-brain.md) | Markdown knowledge base: pages, wikilinks/backlinks, versioning, guides, semantic search, and agent tool access |
 | [Super Brain](./15-super-brain.md) | Background-built knowledge graph fusing brain pages, memories, files, and drafts into a per-actor super graph for hybrid VectorRAG + GraphRAG retrieval |
+| [Knowledge Sources](./16-knowledge-sources.md) | Cloud drive and external-service sync into the RAG pipeline (Google Drive, OneDrive, Dropbox, kDrive, Nextcloud, WebDAV, Notion, web) |
+| [User Models (BYOK)](./17-user-models.md) | User-owned providers and models, resolution/fallback behavior, and the OpenRouter provider allow-list |

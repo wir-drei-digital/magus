@@ -36,6 +36,33 @@ defmodule Magus.Release do
   end
 
   @doc """
+  Promote the user with the given email to admin.
+
+  There is no automatic first-user-admin yet, so a fresh install promotes its
+  operator with this. From a release, run it on the live node:
+
+      bin/magus rpc 'Magus.Release.promote_admin("you@example.com")'
+
+  In dev: `mix run -e 'Magus.Release.promote_admin("you@example.com")'`.
+  """
+  def promote_admin(email) when is_binary(email) do
+    case Magus.Accounts.get_by_email(email, authorize?: false) do
+      {:ok, user} ->
+        user
+        |> Ash.Changeset.for_update(:update_profile, %{}, authorize?: false)
+        |> Ash.Changeset.force_change_attribute(:is_admin, true)
+        |> Ash.update!(authorize?: false)
+
+        Logger.info("Promoted #{email} to admin")
+        :ok
+
+      _ ->
+        Logger.error("No user found for #{email}; register the account first")
+        {:error, :not_found}
+    end
+  end
+
+  @doc """
   Production-safe wrapper around the billing edition's Stripe provisioning
   (`mix magus.stripe.*`, unavailable in a release since Mix isn't shipped).
 

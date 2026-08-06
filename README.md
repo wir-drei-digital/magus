@@ -1,20 +1,23 @@
 # ◬ Magus
 
-An open-source, self-hostable AI chat platform built with Elixir, Phoenix LiveView, and the Ash Framework. Agentic tool execution, a prompt library, multiple AI providers, persistent memory, a cross-resource knowledge graph, and configurable usage governance.
+An open-source, self-hostable AI chat platform built with Elixir, Phoenix, and the Ash Framework, with a SvelteKit workbench UI. Agentic tool execution, a prompt library, multiple AI providers, bring-your-own-key model management, persistent memory, a cross-resource knowledge graph, and configurable usage governance.
 
 ## Features
 
-- **Multi-Model Chat** - Support for multiple AI providers (OpenRouter, xAI, etc.) with text, image, and video generation
+- **Multi-Model Chat** - Multiple AI providers (OpenRouter, xAI, etc.) with text, image, and video generation
+- **Bring Your Own Key** - Users connect their own provider accounts and add custom models alongside the admin catalog; keys are encrypted, write-only, and released only to their owner
+- **Provider Routing & Privacy** - Admin allow-list controls which OpenRouter compute providers may serve requests; data collection is denied on every routed call, including background jobs
 - **Auto Router** - Per-message model selection based on intent classification and usage policy
 - **Agentic Tool Execution** - AI can use tools like web search, memory persistence, scheduled jobs, and semantic document search
-- **Custom Agents** - User-defined AI personas with @mentions, tool scoping, secrets, and multi-agent orchestration
-- **Prompt Library** - Create, share, and discover reusable system prompts with semantic search
-- **Skills System** - Specialized instruction sets the AI can load for specific tasks
-- **Real-time Streaming** - Live streaming of AI responses via Phoenix PubSub and LiveView
-- **Persistent Memory** - Three-scope memory system (local, user, agent) with automatic extraction and semantic search
+- **Custom Agents** - User-defined AI personas with @mentions, tool scoping, secrets, autonomous heartbeat runs, and multi-agent orchestration
+- **Knowledge Brain** - Markdown knowledge base with `[[wikilinks]]`, backlinks, page versioning, and AI guides; pages can be opened alongside a conversation as companions
+- **Knowledge Sources** - Sync Google Drive, OneDrive, Dropbox, Infomaniak kDrive, Nextcloud, generic WebDAV, Notion, and web crawls into the RAG pipeline
+- **Prompt Library & Skills** - Reusable system prompts with semantic search, plus skills the AI loads on demand or users trigger as `/slash` commands (with content-bound approvals)
+- **MCP Client** - Connect external MCP servers (including per-user OAuth) and expose their tools to conversations
+- **Persistent Memory** - Three-scope memory system (local, user, agent) with automatic extraction, semantic search, and user-facing settings
 - **Multiplayer Conversations** - Share conversations with others via invite links
 - **File Management** - Upload documents for semantic search (RAG) with pgvector
-- **Integrations** - External service connections (Telegram, webhooks, data sources, knowledge/RAG connectors)
+- **Integrations** - External service connections (Telegram, webhooks, data sources)
 - **Collaborative Tasks** - Shared task lists between users and AI agents with real-time updates
 - **Usage Governance** - Configurable spend caps, storage and upload limits, usage policies, and per-message cost accounting
 
@@ -25,7 +28,7 @@ An open-source, self-hostable AI chat platform built with Elixir, Phoenix LiveVi
 - **AI Agents**: [Jido](https://hexdocs.pm/jido) for agent lifecycle, state management, and tools; [ReqLLM](https://hexdocs.pm/req_llm) for LLM streaming
 - **Background Jobs**: [Oban](https://hexdocs.pm/oban) with AshOban integration
 - **Auth**: AshAuthentication (password + magic link)
-- **Frontend**: Tailwind CSS 4.x, DaisyUI, esbuild
+- **Frontend**: SvelteKit workbench (`frontend/`, typed RPC via AshTypescript) with Tailwind CSS 4.x; LiveView for admin and auth pages
 - **Vector Search**: pgvector for semantic similarity
 - **Markdown**: MDEx for rendering
 
@@ -58,8 +61,14 @@ mix setup
 set -a && source .env && set +a && mix phx.server
 ```
 
-Visit [`localhost:4000`](http://localhost:4000). The first registered user
-becomes the admin; add a provider API key in the admin UI and import models.
+Visit [`localhost:4000`](http://localhost:4000), register an account, then
+promote it to admin:
+
+```bash
+mix run -e 'Magus.Release.promote_admin("you@example.com")'
+```
+
+In the admin UI, add a provider API key and import models.
 
 ### Docker
 
@@ -124,15 +133,21 @@ The application is organized into Ash Framework domains:
 |--------|---------|
 | **Accounts** | User authentication, settings, model selection |
 | **Chat** | Conversations, messages, models, routing slots, usage tracking |
+| **Models** | Providers (admin + user-owned BYOK), model resolution, OpenRouter provider allow-list |
 | **Library** | Prompt library with tags, favorites, examples |
 | **Files** | File storage and semantic chunks for RAG |
 | **Memory** | Persistent memory with local/user/agent scopes and semantic search |
 | **Agents** | Custom agents, agent runs, inbox events, activity logs, autonomy, secrets |
+| **Brain** | Markdown knowledge base: pages, wikilinks/backlinks, versions, guides, semantic search |
+| **Workspaces** | Shared workspaces with per-resource access grants (viewer/editor/owner) |
 | **Plan** | Collaborative task management between users and agents |
-| **Integrations** | External services (Telegram, webhooks, data sources, knowledge connectors) |
-| **Knowledge** | Document sync and RAG pipeline from external sources |
+| **Integrations** | External services (Telegram, webhooks, data sources, MCP servers) |
+| **Knowledge** | Document sync and RAG pipeline from external sources (drives, Notion, web) |
+| **Sandbox** | Sandboxed code execution with output streaming |
 | **Usage** | Usage governance: spend caps, storage/upload limits, policy enforcement, cost accounting |
 | **FeatureUsage** | Onboarding and feature discovery tracking |
+
+The [system docs](docs/system/00-overview.md) describe each subsystem in depth.
 
 ## Evaluation (Benchmarks)
 

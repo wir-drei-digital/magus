@@ -49,8 +49,35 @@ needs a mounted volume and is single-node), a Swoosh mail adapter (email),
 `SANDBOX_PROVIDER` + credentials (code execution), and per-integration keys.
 See `.env.example` for the full list.
 
+**Knowledge sources (cloud drives):** Google Drive, OneDrive, Dropbox, and
+Notion sync require registering an OAuth app with each provider and setting its
+client id/secret. kDrive (API token) and Nextcloud/WebDAV (basic auth) need no
+registration. Setup steps per provider are in the
+[knowledge sources doc](system/16-knowledge-sources.md#operator-setup-oauth-apps).
+
+By default, user-supplied WebDAV/Nextcloud endpoints must be `https://` and must
+not point at private network ranges. If your deployment syncs a LAN NAS, opt out
+with `MAGUS_ALLOW_INSECURE_KNOWLEDGE_TRANSPORT=true`.
+
 Never commit secrets, and never reuse the development defaults in production. See
 [SECURITY.md](../SECURITY.md).
+
+## First run
+
+Register your account, then promote it to admin on the running release:
+
+```bash
+bin/magus rpc 'Magus.Release.promote_admin("you@example.com")'
+```
+
+In the admin UI (`/admin`):
+
+1. Add an LLM provider key and import models.
+2. Optionally review **OpenRouter routing**: only allowed compute providers may
+   serve requests (US/EU/CH providers are seeded as allowed; sync fetches the
+   current provider list). Every routed request also sends
+   `data_collection: deny`. Individual models can additionally deny specific
+   providers in the model form.
 
 ## Building and running a release
 
