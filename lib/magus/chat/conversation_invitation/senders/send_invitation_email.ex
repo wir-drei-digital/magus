@@ -28,7 +28,7 @@ defmodule Magus.Chat.ConversationInvitation.Senders.SendInvitationEmail do
     # User-controlled values are HTML-escaped before interpolation into the raw
     # HTML body below, so a crafted display name or conversation title cannot
     # inject markup (stored-XSS guard).
-    invite_url = esc(url(~p"/chat/invite/#{invitation.token}"))
+    invite_url = esc(Magus.Endpoint.url() <> ~p"/chat/invite/#{invitation.token}")
     conversation_title = esc(conversation.title || gettext("Untitled conversation"))
     inviter_name = esc(display_name(invited_by))
 

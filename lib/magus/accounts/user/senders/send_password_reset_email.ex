@@ -8,7 +8,7 @@ defmodule Magus.Accounts.User.Senders.SendPasswordResetEmail do
 
   @impl true
   def send(user, token, _) do
-    action_url = url(~p"/password-reset/#{token}")
+    action_url = Magus.Endpoint.url() <> ~p"/password-reset/#{token}"
     Magus.Mail.send_password_recovery(user, action_url)
     :ok
   end

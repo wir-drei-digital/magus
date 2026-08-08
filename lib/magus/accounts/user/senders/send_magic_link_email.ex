@@ -8,7 +8,7 @@ defmodule Magus.Accounts.User.Senders.SendMagicLinkEmail do
 
   @impl true
   def send(user_or_email, token, _) do
-    action_url = url(~p"/magic_link/#{token}")
+    action_url = Magus.Endpoint.url() <> ~p"/magic_link/#{token}"
     Magus.Mail.send_magic_link(user_or_email, action_url)
     :ok
   end

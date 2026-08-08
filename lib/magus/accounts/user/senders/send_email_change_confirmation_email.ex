@@ -6,7 +6,7 @@ defmodule Magus.Accounts.User.Senders.SendEmailChangeConfirmationEmail do
   use MagusWeb, :verified_routes
 
   def send(user, new_email, token) do
-    action_url = url(~p"/settings/confirm-email/#{token}")
+    action_url = Magus.Endpoint.url() <> ~p"/settings/confirm-email/#{token}"
     Magus.Mail.send_mail_verification_to(new_email, user, action_url)
   end
 end

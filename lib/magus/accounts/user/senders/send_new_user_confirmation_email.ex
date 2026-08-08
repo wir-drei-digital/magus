@@ -8,7 +8,7 @@ defmodule Magus.Accounts.User.Senders.SendNewUserConfirmationEmail do
 
   @impl true
   def send(user, token, _) do
-    action_url = url(~p"/confirm_new_user/#{token}")
+    action_url = Magus.Endpoint.url() <> ~p"/confirm_new_user/#{token}"
     Magus.Mail.send_mail_verification(user, action_url)
     :ok
   end
