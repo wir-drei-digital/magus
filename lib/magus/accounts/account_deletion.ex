@@ -256,6 +256,17 @@ defmodule Magus.Accounts.AccountDeletion do
     # path (cleans up files + sandbox sprites).
     destroy_via_action(Magus.Chat.Conversation, :delete_full_conversation, user.id)
 
+    # Safety net for files. The Ash :destroy pass in
+    # cleanup_external_resources/1 is best-effort (it rescues so an S3 hiccup
+    # can't fail the delete), but files.user_id is NO ACTION, so any row it
+    # left behind would block the User delete with a raw FK error and the
+    # account would survive. Normally a no-op. When it isn't, we lose the S3
+    # cleanup for those files (already logged) and keep the deletion: the same
+    # trade-off cleanup_external_resources/1 documents. Must run before
+    # custom_agents and folders (files.uploaded_via_agent_id and
+    # files.folder_id are NO ACTION too).
+    delete_owned_via_ecto(Magus.Files.File, user.id)
+
     # Owned models/providers (BYOK). Runs after conversations so the user's
     # messages and their message_usage rows are already gone; any usage rows
     # still pointing at an owned model get their model_id nilled below.

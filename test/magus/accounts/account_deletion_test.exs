@@ -193,6 +193,27 @@ defmodule Magus.Accounts.AccountDeletionTest do
       assert :ok = AccountDeletion.execute(user)
     end
 
+    test "deletes user whose attachments were moved to trash" do
+      user = generate(user())
+      file = generate(file(user_id: user.id))
+
+      # Files are soft-deleted: `Magus.Files.File` carries
+      # `base_filter expr(is_nil(deleted_at))`, so a trashed attachment is
+      # invisible to the Ash cleanup pass while its NO ACTION files.user_id
+      # still blocks the User delete.
+      {:ok, _trashed} =
+        file
+        |> Ash.Changeset.for_update(:soft_delete, %{}, authorize?: false)
+        |> Ash.update()
+
+      assert :ok = AccountDeletion.execute(user)
+
+      assert %{rows: [[0]]} =
+               Magus.Repo.query!("SELECT count(*) FROM files WHERE user_id = $1", [
+                 Ecto.UUID.dump!(user.id)
+               ])
+    end
+
     test "deletes user with an owned skill" do
       user = generate(user())
 
