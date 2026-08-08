@@ -4,10 +4,13 @@ defmodule Magus.SuperBrain.Cleanup do
 
   The Super Brain stores per-user state in two places:
 
-    * Postgres: `SuperGraph`, `Episode`, and `ExtractionBudget` rows. None
-      of these resources declare a foreign key to `users` (the writes
-      happen as `:ai_agent` actors), so removing a user otherwise orphans
-      this metadata.
+    * Postgres: `SuperGraph`, `Episode`, and `ExtractionBudget` rows.
+      `SuperGraph` and `ExtractionBudget` declare no foreign key to `users`
+      (the writes happen as `:ai_agent` actors), so removing a user otherwise
+      orphans that metadata. `Episode.source_user_id` DOES have a NO ACTION
+      FK, so `AccountDeletion` clears it inside its own transaction too —
+      this pass is best-effort and must not be the only thing standing
+      between a user and their deletion.
 
     * FalkorDB: four personal graphs per user: `memories:user:<uid>`,
       `files:user:<uid>`, `drafts:user:<uid>`, and `super:user:<uid>`.
@@ -43,12 +46,24 @@ defmodule Magus.SuperBrain.Cleanup do
 
   defp drop_personal_graphs(user_id) do
     for graph <- personal_graph_names(user_id) do
-      case Magus.Graph.drop(graph) do
-        {:ok, _} ->
-          :ok
+      # Anything other than a clean {:ok, _} is logged and skipped, including
+      # raises: an unconfigured or unreachable FalkorDB must never propagate
+      # out of purge_user/1 and abort the caller's account deletion.
+      try do
+        case Magus.Graph.drop(graph) do
+          {:ok, _} ->
+            :ok
 
-        {:error, reason} ->
-          Logger.warning("SuperBrain.Cleanup: drop graph #{graph} failed: #{inspect(reason)}")
+          other ->
+            Logger.warning("SuperBrain.Cleanup: drop graph #{graph} failed: #{inspect(other)}")
+
+            :ok
+        end
+      rescue
+        e ->
+          Logger.warning(
+            "SuperBrain.Cleanup: drop graph #{graph} crashed: #{Exception.message(e)}"
+          )
 
           :ok
       end

@@ -245,6 +245,7 @@ defmodule Magus.Accounts.AccountDeletion do
     destroy_owned(Magus.Drafts.Draft, user.id)
     destroy_owned(Magus.Library.PromptFavorite, user.id)
     destroy_owned(Magus.Library.Prompt, user.id)
+    destroy_owned(Magus.Skills.Skill, user.id)
     destroy_owned(Magus.Memory.Memory, user.id)
     destroy_owned(Magus.Brain.BrainResource, user.id)
 
@@ -428,27 +429,40 @@ defmodule Magus.Accounts.AccountDeletion do
     {"integration_output_messages", "user_id"},
     {"knowledge_sources", "user_id"},
     {"notifications", "user_id"},
+    {"organization_members", "user_id"},
     {"pane_states", "user_id"},
     {"plan_task_pane_states", "user_id"},
     {"sessions", "created_by_id"},
+    # Also cleared by SuperBrain.Cleanup.purge_user/1 outside the transaction,
+    # but that pass is best-effort while this FK is NO ACTION — a FalkorDB
+    # hiccup there must not leave the account undeletable.
+    {"super_brain_episodes", "source_user_id"},
     {"user_integrations", "user_id"},
+    {"user_profiles", "user_id"},
     {"user_subscriptions", "user_id"},
     {"user_usage_overrides", "user_id"}
+  ]
+
+  # `<table>_versions.version_source_id` FKs are ON DELETE NO ACTION, so version
+  # rows for a source row we are about to delete must go first. Format:
+  # {versions_table, source_table, source_user_column}.
+  @version_rows_to_purge [
+    {"user_subscriptions_versions", "user_subscriptions", "user_id"},
+    {"organization_members_versions", "organization_members", "user_id"}
   ]
 
   defp delete_auxiliary_user_rows(user_id) do
     uid = user_id_uuid_binary(user_id)
 
-    # user_subscriptions_versions.version_source_id has ON DELETE NO ACTION
-    # back to user_subscriptions, so version rows tied to this user's
-    # subscriptions must be cleared before we can delete the rows themselves.
-    # Audit history is lost for these specific subscriptions, but they are
-    # gone too — this is a hard delete, not a soft one.
-    Magus.Repo.query!(
-      "DELETE FROM user_subscriptions_versions WHERE version_source_id IN " <>
-        "(SELECT id FROM user_subscriptions WHERE user_id = $1)",
-      [uid]
-    )
+    # Audit history is lost for these specific source rows, but they are gone
+    # too — this is a hard delete, not a soft one.
+    for {versions_table, source_table, source_column} <- @version_rows_to_purge do
+      Magus.Repo.query!(
+        "DELETE FROM #{versions_table} WHERE version_source_id IN " <>
+          "(SELECT id FROM #{source_table} WHERE #{source_column} = $1)",
+        [uid]
+      )
+    end
 
     for {table, column} <- @auxiliary_user_tables do
       Magus.Repo.query!("DELETE FROM #{table} WHERE #{column} = $1", [uid])
@@ -530,21 +544,27 @@ defmodule Magus.Accounts.AccountDeletion do
     Magus.Repo.delete!(user)
   end
 
-  @paper_trail_tables ~w(
-    prompts_versions
-    drafts_versions
-    brain_blocks_versions
-    user_subscriptions_versions
-    workspaces_versions
-    workspace_members_versions
-  )
+  # Paper-trail version tables that carry a NO ACTION reference to `users`.
+  # Most name the actor column `user_id`; organizations_versions snapshots the
+  # versioned `owner_id` attribute instead. Format: {table, column}.
+  @paper_trail_tables [
+    {"prompts_versions", "user_id"},
+    {"drafts_versions", "user_id"},
+    {"brain_blocks_versions", "user_id"},
+    {"brain_pages_versions", "user_id"},
+    {"organization_members_versions", "user_id"},
+    {"organizations_versions", "owner_id"},
+    {"user_subscriptions_versions", "user_id"},
+    {"workspaces_versions", "user_id"},
+    {"workspace_members_versions", "user_id"}
+  ]
 
   defp nullify_paper_trail_actor(user_id) do
     uid = user_id_uuid_binary(user_id)
 
-    for table <- @paper_trail_tables do
+    for {table, column} <- @paper_trail_tables do
       Magus.Repo.query!(
-        "UPDATE #{table} SET user_id = NULL WHERE user_id = $1",
+        "UPDATE #{table} SET #{column} = NULL WHERE #{column} = $1",
         [uid]
       )
     end

@@ -193,6 +193,85 @@ defmodule Magus.Accounts.AccountDeletionTest do
       assert :ok = AccountDeletion.execute(user)
     end
 
+    test "deletes user with an owned skill" do
+      user = generate(user())
+
+      {:ok, _skill} =
+        Magus.Skills.Skill
+        |> Ash.Changeset.for_create(
+          :create,
+          %{name: "probe-skill", description: "d", body: "b"},
+          actor: user,
+          authorize?: false
+        )
+        |> Ash.create()
+
+      assert :ok = AccountDeletion.execute(user)
+
+      assert Magus.Skills.Skill
+             |> Ash.Query.filter(user_id == ^user.id)
+             |> Ash.count!(authorize?: false) == 0
+    end
+
+    test "deletes user with a memory profile" do
+      user = generate(user())
+
+      {:ok, _profile} =
+        Magus.Memory.UserProfile
+        |> Ash.Changeset.for_create(
+          :create,
+          %{user_id: user.id, document: "profile text"},
+          authorize?: false
+        )
+        |> Ash.create()
+
+      assert :ok = AccountDeletion.execute(user)
+
+      assert Magus.Memory.UserProfile
+             |> Ash.Query.filter(user_id == ^user.id)
+             |> Ash.count!(authorize?: false) == 0
+    end
+
+    test "deletes user with brain page paper-trail versions" do
+      user = generate(user())
+      brain = generate(brain(user_id: user.id))
+
+      # A page body write stamps a brain_pages_versions row with the actor.
+      _page = brain_page(brain_id: brain.id, user_id: user.id, content: "some text")
+
+      assert :ok = AccountDeletion.execute(user)
+    end
+
+    test "deletes user who is a member of someone else's organization" do
+      owner = generate(user())
+      member = generate(user())
+
+      {:ok, org} =
+        Magus.Organizations.Organization
+        |> Ash.Changeset.for_create(
+          :create,
+          %{name: "Acme", slug: "acme-#{System.unique_integer([:positive])}"},
+          actor: owner,
+          authorize?: false
+        )
+        |> Ash.create()
+
+      {:ok, _member_row} =
+        Magus.Organizations.OrganizationMember
+        |> Ash.Changeset.for_create(
+          :create_member,
+          %{
+            organization_id: org.id,
+            user_id: member.id,
+            invite_email: to_string(member.email)
+          },
+          authorize?: false
+        )
+        |> Ash.create()
+
+      assert :ok = AccountDeletion.execute(member)
+    end
+
     test "preserves message_usage rows with NULL user_id" do
       user = generate(user())
       {:ok, conv} = Magus.Chat.create_conversation(%{title: "C"}, actor: user)
@@ -266,6 +345,88 @@ defmodule Magus.Accounts.AccountDeletionTest do
         |> Ash.read_one(authorize?: false)
 
       assert {:ok, %{text: "from member", created_by_id: nil}} = reloaded
+    end
+  end
+
+  describe "FK coverage" do
+    # Every ON DELETE NO ACTION foreign key into `users` must be cleared by
+    # AccountDeletion before it deletes the User row, or the delete blows up
+    # with an Ecto.ConstraintError and the account survives. New tables are
+    # easy to add and impossible to notice, so assert the full set here: if
+    # this fails, handle the new column in AccountDeletion (destroy the owned
+    # rows, list it in @auxiliary_user_tables, or nullify it in
+    # @paper_trail_tables) and then add it below.
+    @handled [
+      # cleaned up as owned content, or via @auxiliary_user_tables
+      {"agent_activity_logs", "user_id"},
+      {"agent_inbox_events", "user_id"},
+      {"conversations", "user_id"},
+      {"conversation_share_links", "created_by_id"},
+      {"curation_inbox_items", "user_id"},
+      {"curation_interest_profiles", "user_id"},
+      {"curation_sources", "user_id"},
+      {"custom_agents", "user_id"},
+      {"drafts", "user_id"},
+      {"feature_usage_events", "user_id"},
+      {"files", "user_id"},
+      {"ingestion_entries", "user_id"},
+      {"integration_audit_logs", "user_id"},
+      {"integration_input_messages", "user_id"},
+      {"integration_output_messages", "user_id"},
+      {"knowledge_sources", "user_id"},
+      {"messages", "created_by_id"},
+      {"notifications", "user_id"},
+      {"organization_members", "user_id"},
+      {"pane_states", "user_id"},
+      {"plan_task_pane_states", "user_id"},
+      {"prompts", "user_id"},
+      {"resource_accesses", "granted_by_id"},
+      {"sessions", "created_by_id"},
+      {"skills", "user_id"},
+      {"super_brain_episodes", "source_user_id"},
+      {"user_integrations", "user_id"},
+      {"user_profiles", "user_id"},
+      {"user_subscriptions", "user_id"},
+      {"user_usage_overrides", "user_id"},
+      {"workspace_members", "user_id"},
+      # nullified via @paper_trail_tables
+      {"brain_blocks_versions", "user_id"},
+      {"brain_pages_versions", "user_id"},
+      {"drafts_versions", "user_id"},
+      {"organization_members_versions", "user_id"},
+      {"organizations_versions", "owner_id"},
+      {"prompts_versions", "user_id"},
+      {"user_subscriptions_versions", "user_id"},
+      {"workspace_members_versions", "user_id"},
+      {"workspaces_versions", "user_id"}
+    ]
+
+    # Owning an organization still blocks deletion with a raw FK error. Whether
+    # that should transfer, archive, or refuse in preflight is an open product
+    # decision, tracked rather than silently cascaded: an org carries other
+    # members, billing (user_subscriptions.sponsor_org_id) and workspaces.
+    @known_unhandled [{"organizations", "owner_id"}]
+
+    test "AccountDeletion covers every NO ACTION foreign key into users" do
+      %{rows: rows} =
+        Magus.Repo.query!("""
+        SELECT c.conrelid::regclass::text, a.attname
+        FROM pg_constraint c
+        JOIN unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord) ON true
+        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.attnum
+        WHERE c.contype = 'f'
+          AND c.confrelid = 'users'::regclass
+          AND c.confdeltype = 'a'
+        """)
+
+      actual = rows |> Enum.map(fn [table, column] -> {table, column} end) |> MapSet.new()
+      accounted_for = MapSet.new(@handled ++ @known_unhandled)
+
+      assert MapSet.difference(actual, accounted_for) |> MapSet.to_list() == [],
+             "new NO ACTION FK into users — handle it in AccountDeletion, then list it here"
+
+      assert MapSet.difference(accounted_for, actual) |> MapSet.to_list() == [],
+             "listed FK no longer exists — drop it from this test (and from AccountDeletion)"
     end
   end
 
