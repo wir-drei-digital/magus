@@ -51,14 +51,21 @@ defmodule Magus.Generators do
   @doc """
   Generates a valid user with unique email.
 
+  `:is_admin` is applied after creation via `Ash.Seed.update!/2`, since
+  `:register_with_password` deliberately does not accept the flag. Without
+  that step the option would be silently dropped and every "admin sees X"
+  test would pass vacuously against a plain user.
+
   ## Examples
 
       user = generate(user())
+      admin = generate(user(is_admin: true))
   """
   def user(opts \\ []) do
     unique_id = "#{System.unique_integer([:positive, :monotonic])}-#{:rand.uniform(1_000_000)}"
     password = Keyword.get(opts, :password, "Password123!")
     email = Keyword.get(opts, :email, "user-#{unique_id}@test.com")
+    is_admin = Keyword.get(opts, :is_admin, false)
 
     changeset_generator(
       Accounts.User,
@@ -73,7 +80,10 @@ defmodule Magus.Generators do
         accepted_terms: Keyword.get(opts, :accepted_terms, true),
         accepted_age_requirement: Keyword.get(opts, :accepted_age_requirement, true)
       },
-      authorize?: false
+      authorize?: false,
+      after_action: fn user ->
+        if is_admin, do: Ash.Seed.update!(user, %{is_admin: true}), else: user
+      end
     )
   end
 

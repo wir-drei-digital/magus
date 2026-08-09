@@ -190,6 +190,27 @@ defmodule Magus.Chat.MessageUsageLogTest do
       assert run_usage_log(user, %{range: "7d", workspace: "all"}).total_count == 2
     end
 
+    test "an admin's own usage log excludes other users' rows" do
+      other = generate(user())
+      admin = generate(user(is_admin: true))
+      model = generate(model(name: "Alpha"))
+      other_conv = generate(conversation(actor: other))
+      admin_conv = generate(conversation(actor: admin))
+
+      create_usage_record(other, model, conversation_id: other_conv.id, billable: true)
+      create_usage_record(admin, model, conversation_id: admin_conv.id, billable: true)
+
+      payload = run_usage_log(admin, %{range: "30d"})
+
+      # The personal Usage page is per-account, not an admin console: being a
+      # global admin must not turn it into every user's usage (each row links
+      # straight to the conversation and message it billed).
+      assert payload.total_count == 1
+      assert payload.summary.count == 1
+      assert [row] = payload.rows
+      assert row.conversation_id == admin_conv.id
+    end
+
     test "is forbidden without an actor" do
       assert_raise Ash.Error.Forbidden, fn ->
         Magus.Usage.MessageUsage

@@ -187,9 +187,14 @@ defmodule Magus.Usage.MessageUsage do
   end
 
   policies do
+    # Strictly self-scoped. There is deliberately no admin escape hatch: this
+    # is the resource behind the per-account Settings > Usage page, whose rows
+    # each link to the conversation and message they billed, so a global-admin
+    # bypass turns one user's personal usage page into every user's chat
+    # history. The admin console reads usage through `Magus.Usage.AdminStats`,
+    # which goes straight to Ecto and never relies on this policy.
     policy action_type(:read) do
       authorize_if expr(user_id == ^actor(:id))
-      authorize_if Magus.Checks.IsAdmin
     end
 
     # The log payload re-reads MessageUsage with `actor:`, so the read policy
