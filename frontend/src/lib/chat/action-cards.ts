@@ -48,10 +48,16 @@ function nonEmptyString(value: unknown): string | null {
 	return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
+// A reserved-invalid (RFC 2606) sentinel origin used only to resolve
+// candidate internal paths and check the result never left it. Never a real
+// host, so it can never collide with an attacker-controlled target.
+const SENTINEL_ORIGIN = 'http://internal.invalid';
+
 /**
  * Classifies a `navigate` payload. Anything that is not an in-app path or an
- * http(s) URL is refused: `//host` is protocol-relative and would leave the
- * origin, and `javascript:`/`data:` are script-execution vectors.
+ * http(s) URL is refused: `javascript:`/`data:` are script-execution vectors,
+ * and anything that would leave the app's origin (`//host`, and less obvious
+ * variants below) is refused too.
  */
 function classifyNavigate(
 	payload: unknown
@@ -60,7 +66,23 @@ function classifyNavigate(
 	if (!raw) return null;
 
 	if (raw.startsWith('/')) {
-		return raw.startsWith('//') ? null : { kind: 'internal', path: raw };
+		let resolved: URL;
+		try {
+			resolved = new URL(raw, SENTINEL_ORIGIN);
+		} catch {
+			return null;
+		}
+		// A string-prefix check on "//" is not enough: the URL parser
+		// normalizes backslashes to "/" for special schemes (http/https) and
+		// strips raw tab/newline characters before parsing, so inputs like
+		// "/\evil.com" or "/\t/evil.com" become network-path references that
+		// resolve to a different host even though they don't start with two
+		// literal slashes. Resolving against a sentinel base and checking the
+		// origin catches all of those uniformly. Percent-encoded sequences
+		// (e.g. "/%09/evil.com") are never decoded during parsing, so they
+		// stay ordinary same-origin path segments and are not rejected here.
+		if (resolved.origin !== SENTINEL_ORIGIN) return null;
+		return { kind: 'internal', path: resolved.pathname + resolved.search + resolved.hash };
 	}
 
 	let parsed: URL;
@@ -132,16 +154,28 @@ export function actionCardsView(metadata: unknown): ActionCardsView {
 	return { layout: block.layout === 'grid' ? 'grid' : 'list', cards };
 }
 
-// Mirrors ActionCardExtractor's ~r/\n?```action_cards\s*\n(.*?)\n```/s.
-const COMPLETE_BLOCK = /\n?```action_cards[^\n]*\n[\s\S]*?\n```/g;
+// Mirrors ActionCardExtractor's ~r/\n?```action_cards\s*\n(.*?)\n```/s exactly:
+// only whitespace may follow the tag before the newline, so a prefix-superset
+// tag like "```action_cards_backup" does not match either side.
+const COMPLETE_BLOCK = /\n?```action_cards\s*\n[\s\S]*?\n```/g;
 
 // An opening fence that has not closed yet, including one whose language tag is
 // still being typed ("```a" … "```action_cards"). Requiring at least the "a" is
 // what keeps unrelated blocks intact: a CLOSING ``` never carries a language
 // tag, so it can never match here. The cost is that a bare "```" flickers for
 // one frame before the tag arrives, which is the safe direction to err.
+//
+// The trailing (?![A-Za-z0-9_]) is a boundary check, not a change to that "a"
+// floor: without it, a *closed*, differently-tagged fence whose tag merely
+// starts with "action_cards" (e.g. "action_cards_backup") gets swallowed all
+// the way to end-of-string too, since nothing here previously distinguished
+// "still typing action_cards" from "this is a longer, unrelated identifier".
+// The lookahead fails (blocking the match) whenever the next character would
+// continue the identifier past what "action_cards" spells out, so growing-but-
+// unterminated tags keep matching (nothing follows, or a non-word char does)
+// while complete unrelated tags are left for the browser to render as-is.
 const OPEN_FENCE =
-	/\n?```a(?:c(?:t(?:i(?:o(?:n(?:_(?:c(?:a(?:r(?:d(?:s)?)?)?)?)?)?)?)?)?)?)?[\s\S]*$/;
+	/\n?```a(?:c(?:t(?:i(?:o(?:n(?:_(?:c(?:a(?:r(?:d(?:s)?)?)?)?)?)?)?)?)?)?)?(?![A-Za-z0-9_])[\s\S]*$/;
 
 /**
  * Hides the action-cards block from message text.

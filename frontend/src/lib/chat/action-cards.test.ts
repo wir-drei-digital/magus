@@ -108,6 +108,22 @@ describe('actionCardsView navigate classification', () => {
 		expect(nav('')).toMatchObject({ kind: 'inert' });
 		expect(nav(42)).toMatchObject({ kind: 'inert' });
 	});
+
+	it('rejects leading-slash paths that resolve off-origin via backslash or control-character normalization', () => {
+		// The URL parser normalizes backslashes to "/" for special schemes and
+		// strips raw tab/newline before parsing, so these all resolve to a
+		// different host despite starting with a single "/" — a naive
+		// string-prefix check on "//" misses every one of them.
+		expect(nav('/\\evil.com')).toMatchObject({ kind: 'inert' });
+		expect(nav('/\\/evil.com')).toMatchObject({ kind: 'inert' });
+		expect(nav('/\t/evil.com')).toMatchObject({ kind: 'inert' });
+	});
+
+	it('keeps percent-encoded sequences as ordinary same-origin path segments', () => {
+		// Percent-encoding is never decoded during URL parsing, so an encoded
+		// control character is just literal path text, not a host escape.
+		expect(nav('/%09/evil.com')).toMatchObject({ kind: 'link_internal', path: '/%09/evil.com' });
+	});
 });
 
 describe('stripActionCardsBlock', () => {
@@ -133,6 +149,14 @@ describe('stripActionCardsBlock', () => {
 
 	it('leaves unrelated code fences alone', () => {
 		const text = 'See:\n```json\n{"a":1}\n```';
+		expect(stripActionCardsBlock(text)).toBe(text);
+	});
+
+	it('leaves a prefix-superset tag alone, matching the Elixir extractor', () => {
+		// ActionCardExtractor's regex requires only whitespace between the tag
+		// and the newline, so "```action_cards_backup" is a different, unknown
+		// fence to it — the block must survive untouched, not get hidden.
+		const text = 'See:\n```action_cards_backup\n{"x":1}\n```\nDone.';
 		expect(stripActionCardsBlock(text)).toBe(text);
 	});
 });
