@@ -64,9 +64,19 @@ defmodule Magus.Agents.Plugins.Support.PreflightHardstopTest do
   end
 
   setup do
-    # Deliberately do NOT clear the catalog: the seeded chat_default role must
-    # exist so a degraded `by: :key` selection resolves to a fallback WITH a key
-    # (the payload's `fallback_key`). In production the catalog is never empty.
+    # A degraded selection must resolve to a fallback model that HAS a key (the
+    # payload's `fallback_key`), which means a `chat_default` role assignment
+    # has to exist. Seed one explicitly rather than relying on catalog rows
+    # left in the shared test database by other runs: on a fresh database (CI,
+    # or the magus_cloud wrapper, whose catalog lives in its own repo) there is
+    # no ambient default and `fallback_key` comes back nil.
+    fallback = generate(model(name: "Fallback", key: "openrouter:test/fallback"))
+
+    {:ok, _} =
+      Magus.Models.assign_role(%{role: "chat_default", model_id: fallback.id},
+        authorize?: false
+      )
+
     owner = generate(user())
     :ok = ensure_active_subscription(owner)
 
