@@ -150,10 +150,14 @@
 	// `bodyText` is the message as the user sees it, so every consumer that
 	// means "the visible message" reads it, not `message.text`: copy, create
 	// prompt, and citation extraction. Only genuinely-raw uses (retrying a
-	// user's own message, event-severity detection, the user bubble) keep
-	// `message.text`.
+	// user's own message, event-severity detection) keep `message.text`.
+	//
+	// User messages are never stripped. Action cards only ever come from the
+	// agent, and the user bubble renders `message.text` directly — stripping
+	// would make copy and create-prompt silently disagree with what is on
+	// screen for anyone who typed an ```action-prefixed fence themselves.
 	const cardsView = $derived(actionCardsView(message.metadata));
-	const bodyText = $derived(stripActionCardsBlock(message.text));
+	const bodyText = $derived(isUser ? message.text : stripActionCardsBlock(message.text));
 
 	// Only the citations the model actually referenced via [N] (falls back to
 	// all when none were referenced) — parity with get_referenced_citations.
