@@ -87,6 +87,9 @@
 	{/snippet}
 
 	{#if store}
+		<!-- The {#if} narrows `store`, but that narrowing does not reach into the
+		     deferred action-card callbacks below; capture the non-null value. -->
+		{@const activeStore = store}
 		<div
 			class="wb-scroll min-h-0 flex-1 overflow-y-auto px-4 py-3"
 			bind:this={scroller}
@@ -111,7 +114,11 @@
 				<div class="space-y-3">
 					{#each buildChatStream(store.messages, store.liveTools) as item (item.key)}
 						{#if item.kind === 'message'}
-							<MessageItem message={item.message} />
+							<MessageItem
+								message={item.message}
+								onActionCardSend={(text) => void activeStore.send(text)}
+								onActionCardPrefill={(text) => activeStore.requestInsertText(text)}
+							/>
 						{:else}
 							<ToolCard view={toolViewFromLive(item.tool)} />
 						{/if}
