@@ -28,6 +28,7 @@
 		ZapOff
 	} from '@lucide/svelte';
 	import type { ChatMessage, CompanionSpec, DisplayAttachment } from '$lib/ash/api';
+	import { actionCardsView, stripActionCardsBlock } from '$lib/chat/action-cards';
 	import { isBrokenSelection } from '$lib/chat/broken-selection';
 	import { toolViewFromPersisted } from '$lib/chat/events';
 	import { eventVisual } from '$lib/chat/event-style';
@@ -41,6 +42,7 @@
 	import { referencedCitations } from '$lib/chat/markdown';
 	import { formatFileSize } from '$lib/files/format';
 	import { messageTime } from '$lib/time';
+	import ActionCards from './action-cards.svelte';
 	import Markdown from './markdown.svelte';
 	import ToolCard from './tool-card.svelte';
 
@@ -55,6 +57,8 @@
 		onRetry,
 		onResetBrokenSelection,
 		onCreatePrompt,
+		onActionCardSend,
+		onActionCardPrefill,
 		onOpenCompanion,
 		conversationId
 	}: {
@@ -75,6 +79,10 @@
 		onResetBrokenSelection?: (messageId: string) => void;
 		/** Opens the prompt creation dialog prefilled with this text. */
 		onCreatePrompt?: (text: string) => void;
+		/** Sends an action card's payload as a new user message. */
+		onActionCardSend?: (text: string) => void;
+		/** Inserts an action card's payload into the composer at the caret. */
+		onActionCardPrefill?: (text: string) => void;
 		/** Opens a companion from a tool card's action button (View Draft, etc.). */
 		onOpenCompanion?: (spec: CompanionSpec) => void;
 		/** The conversation id, for the service-pane companion spec. */
@@ -132,6 +140,15 @@
 	// Only the citations the model actually referenced via [N] (falls back to
 	// all when none were referenced) — parity with get_referenced_citations.
 	const sources = $derived(referencedCitations(message.text, message.citations));
+
+	// Parsed action-cards block (Task 1's pure view model) plus the text with
+	// that block hidden. Unconditional, not just while streaming: the server's
+	// ActionCardExtractor only strips the fenced block when at least one card
+	// passes validation, so a block with no valid cards survives into the
+	// persisted text too. Stripping unconditionally is a no-op on already-clean
+	// text and keeps raw JSON from flashing back once streaming ends.
+	const cardsView = $derived(actionCardsView(message.metadata));
+	const bodyText = $derived(stripActionCardsBlock(message.text));
 
 	// Typed system-event styling (ported from events.ex detect_event_style).
 	const eventVis = $derived(eventVisual(message.text));
@@ -488,7 +505,7 @@
 				</details>
 			{/if}
 			<Markdown
-				text={message.text}
+				text={bodyText}
 				citations={message.citations}
 				streaming={message.status === 'streaming'}
 			/>
@@ -496,6 +513,9 @@
 				<span class="mt-1 inline-block size-2 animate-pulse rounded-full bg-foreground/40"></span>
 			{:else if message.status === 'error'}
 				<p class="mt-1 text-xs text-destructive">This response failed.</p>
+			{/if}
+			{#if onActionCardSend && onActionCardPrefill}
+				<ActionCards view={cardsView} onSend={onActionCardSend} onPrefill={onActionCardPrefill} />
 			{/if}
 			{#if sources.length > 0}
 				<div class="mt-3 border-t border-input pt-3" data-testid="message-citations">

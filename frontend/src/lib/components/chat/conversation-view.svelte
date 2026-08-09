@@ -421,6 +421,8 @@
 								onOpenPdf={onCompanionRequest ? openPdfAttachment : undefined}
 								onToggleDisabled={(id) => void store.toggleDisabled(id)}
 								onRetry={(text) => void store.send(text)}
+								onActionCardSend={(text) => void store.send(text)}
+								onActionCardPrefill={(text) => store.requestInsertText(text)}
 								onResetBrokenSelection={(id) => void resetBrokenSelection(id)}
 								onCreatePrompt={createPromptFrom}
 								onOpenCompanion={onCompanionRequest}
