@@ -176,4 +176,26 @@ defmodule Magus.Agents.Support.ActionCardExtractorTest do
       assert action_cards["cards"] |> hd() |> Map.get("title") == "Works"
     end
   end
+
+  describe "shared fixtures with the SPA stripper" do
+    # These exact strings are asserted in
+    # frontend/src/lib/chat/action-cards.test.ts. The SPA mirrors this regex to
+    # hide the block mid-stream, so the two must agree. If you change the fence
+    # format here, change it there in the same commit.
+    test "complete block is stripped, surrounding prose kept" do
+      text =
+        "Here are options.\n```action_cards\n{\"cards\":[{\"title\":\"A\",\"action\":{\"type\":\"send_message\",\"payload\":\"a\"}}]}\n```\nTrailing."
+
+      {clean, cards} = Magus.Agents.Support.ActionCardExtractor.extract(text)
+      assert clean == "Here are options.\nTrailing."
+      assert cards != nil
+    end
+
+    test "an unrelated fenced block is left alone" do
+      text = "See:\n```json\n{\"a\":1}\n```"
+      {clean, cards} = Magus.Agents.Support.ActionCardExtractor.extract(text)
+      assert clean == text
+      assert cards == nil
+    end
+  end
 end
