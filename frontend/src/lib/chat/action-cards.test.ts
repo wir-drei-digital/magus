@@ -64,10 +64,41 @@ describe('actionCardsView', () => {
 		expect(actionCardsView(meta([card({ title: '' }), 'nope']))).toBeNull();
 	});
 
-	it('truncates to five cards', () => {
-		const view = actionCardsView(meta(Array.from({ length: 9 }, () => card())));
+	it('truncates to five cards after dropping invalid ones, not before', () => {
+		// Leading invalid cards must not consume truncation slots: the server's
+		// `valid_card?` never inspects `payload`, so payload-less cards do get
+		// persisted and land here. Slicing before filtering would let five of
+		// them mask every valid card behind them and render nothing at all.
+		const view = actionCardsView(
+			meta([
+				...Array.from({ length: 5 }, () => card({ action: { type: 'send_message' } })),
+				...Array.from({ length: 9 }, (_, i) => card({ title: `Valid ${i}` }))
+			])
+		);
+
 		expect(view?.cards).toHaveLength(5);
+		expect(view?.cards.map((c) => c.title)).toEqual([
+			'Valid 0',
+			'Valid 1',
+			'Valid 2',
+			'Valid 3',
+			'Valid 4'
+		]);
 		expect(view?.cards.at(-1)?.label).toBe('E');
+	});
+
+	it('scans at most a bounded prefix of a huge card array', () => {
+		// A hallucinated 100k-element array must not cost 100k URL parses, so
+		// only the first 50 entries are inspected at all. Anything valid past
+		// that prefix is intentionally unreachable.
+		const view = actionCardsView(
+			meta([
+				...Array.from({ length: 60 }, () => card({ title: '' })),
+				...Array.from({ length: 5 }, () => card({ title: 'Never reached' }))
+			])
+		);
+
+		expect(view).toBeNull();
 	});
 
 	it('treats a missing description as null', () => {
@@ -107,6 +138,36 @@ describe('actionCardsView navigate classification', () => {
 		expect(nav('chat/abc')).toMatchObject({ kind: 'inert' });
 		expect(nav('')).toMatchObject({ kind: 'inert' });
 		expect(nav(42)).toMatchObject({ kind: 'inert' });
+
+		// Network-path references smuggled past the origin check: a single-dot
+		// (or dot-dot) segment resolves entirely inside the sentinel origin, so
+		// `resolved.origin` is clean, yet the SERIALIZED path still begins with
+		// "//" — which the browser reads as protocol-relative and follows
+		// off-origin in the same tab. Only re-resolving the emitted string
+		// catches these.
+		expect(nav('/.//evil.com')).toMatchObject({ kind: 'inert' });
+		expect(nav('/..//evil.com')).toMatchObject({ kind: 'inert' });
+		expect(nav('/././/evil.com')).toMatchObject({ kind: 'inert' });
+		expect(nav('/.\\/evil.com')).toMatchObject({ kind: 'inert' });
+		expect(nav('/.\t//evil.com')).toMatchObject({ kind: 'inert' });
+		expect(nav('/x/../..//evil.com')).toMatchObject({ kind: 'inert' });
+		expect(nav('/.//evil.com/login?next=1#x')).toMatchObject({ kind: 'inert' });
+	});
+
+	it('still accepts ordinary in-app paths after the network-path recheck', () => {
+		// The recheck must not cost any legitimate target: only a path whose
+		// SERIALIZED form starts with "//" is refused, and an interior "//" (or
+		// a percent-encoded control character) is an ordinary same-origin
+		// segment that stays exactly as the parser normalized it.
+		expect(nav('/chat/abc')).toMatchObject({ kind: 'link_internal', path: '/chat/abc' });
+		expect(nav('/chat/abc?a=1#b')).toMatchObject({
+			kind: 'link_internal',
+			path: '/chat/abc?a=1#b'
+		});
+		expect(nav('/%09/evil.com')).toMatchObject({ kind: 'link_internal', path: '/%09/evil.com' });
+		expect(nav('/x/.//evil.com')).toMatchObject({ kind: 'link_internal', path: '/x//evil.com' });
+		expect(nav('/brain/page/1')).toMatchObject({ kind: 'link_internal', path: '/brain/page/1' });
+		expect(nav('/')).toMatchObject({ kind: 'link_internal', path: '/' });
 	});
 
 	it('rejects leading-slash paths that resolve off-origin via backslash or control-character normalization', () => {
@@ -117,6 +178,49 @@ describe('actionCardsView navigate classification', () => {
 		expect(nav('/\\evil.com')).toMatchObject({ kind: 'inert' });
 		expect(nav('/\\/evil.com')).toMatchObject({ kind: 'inert' });
 		expect(nav('/\t/evil.com')).toMatchObject({ kind: 'inert' });
+	});
+
+	it('never emits an href that a browser would resolve off-origin', () => {
+		// A generated sweep rather than a fixed list, because the hand-picked
+		// cases have twice now missed a whole class (first backslash/control
+		// normalization, then dot-segment network-path references). The oracle
+		// is what a browser actually does with href={path} on a real origin,
+		// which is the only property that matters.
+		const app = 'https://app.example';
+		const dots = ['.', '..', '%2e', '%2E', '%2e%2e', '%2E%2E', '.%2e', '%2e.'];
+		const seps = ['/', '\\', '/\t', '/\n', '/\r', '\t/', '//', '/./', '/%2e/'];
+		const tails = [
+			'evil.com',
+			'evil.com/x?a=1#b',
+			'evil.com:8080',
+			'user@evil.com',
+			'',
+			'/evil.com'
+		];
+
+		const payloads: string[] = [];
+		for (const dot of dots) {
+			for (const sep of seps) {
+				for (const tail of tails) {
+					payloads.push(`/${dot}${sep}/${tail}`);
+					payloads.push(`/${dot}${sep}${tail}`);
+					payloads.push(`/x/${dot}/${dot}${sep}/${tail}`);
+					payloads.push(`/${dot}${sep}/${dot}${sep}/${tail}`);
+				}
+			}
+		}
+
+		const escaped = payloads.filter((payload) => {
+			const card = nav(payload);
+			if (card?.kind !== 'link_internal') return false;
+			try {
+				return new URL(card.path, app).origin !== app;
+			} catch {
+				return true;
+			}
+		});
+
+		expect(escaped).toEqual([]);
 	});
 
 	it('keeps percent-encoded sequences as ordinary same-origin path segments', () => {
@@ -158,5 +262,14 @@ describe('stripActionCardsBlock', () => {
 		// fence to it — the block must survive untouched, not get hidden.
 		const text = 'See:\n```action_cards_backup\n{"x":1}\n```\nDone.';
 		expect(stripActionCardsBlock(text)).toBe(text);
+
+		// Mirrors the Elixir twin's stronger fixture: a superset-tagged block
+		// whose JSON *would* parse into a valid card. On that side it is the
+		// only form that distinguishes "the tag didn't match" from "it matched
+		// but the JSON was unusable"; asserting the same string here keeps the
+		// two suites checking one shared fixture rather than two lookalikes.
+		const withValidCard =
+			'See:\n```action_cards_backup\n{"cards":[{"title":"A","action":{"type":"send_message","payload":"a"}}]}\n```\nDone.';
+		expect(stripActionCardsBlock(withValidCard)).toBe(withValidCard);
 	});
 });

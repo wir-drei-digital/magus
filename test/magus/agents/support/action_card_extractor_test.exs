@@ -197,5 +197,32 @@ defmodule Magus.Agents.Support.ActionCardExtractorTest do
       assert clean == text
       assert cards == nil
     end
+
+    test "a prefix-superset tag is left alone" do
+      # This is the case the SPA's (?![A-Za-z0-9_]) tag boundary exists for.
+      # Without a mirrored assertion here, loosening THIS regex (\s* -> [^\n]*)
+      # to match "```action_cards_backup" would leave both suites green.
+      text = "See:\n```action_cards_backup\n{\"x\":1}\n```"
+      {clean, cards} = Magus.Agents.Support.ActionCardExtractor.extract(text)
+      assert clean == text
+      assert cards == nil
+
+      # ...but that payload alone does NOT pin the regex: `{"x":1}` has no
+      # "cards" key, so `extract/1` returns the original text via the
+      # `action_cards == nil` branch whether or not the fence matched. Only a
+      # block carrying a VALID card distinguishes "the tag didn't match" from
+      # "the tag matched but the JSON was unusable" — verified by temporarily
+      # loosening the regex, which turns exactly this assertion red.
+      valid_json =
+        "{\"cards\":[{\"title\":\"A\",\"action\":{\"type\":\"send_message\",\"payload\":\"a\"}}]}"
+
+      superset = "See:\n```action_cards_backup\n" <> valid_json <> "\n```"
+      assert {^superset, nil} = Magus.Agents.Support.ActionCardExtractor.extract(superset)
+
+      # The SPA twin asserts the same fence with trailing prose after it, since
+      # its OPEN_FENCE pass would otherwise swallow everything to end-of-string.
+      with_trailer = superset <> "\nDone."
+      assert {^with_trailer, nil} = Magus.Agents.Support.ActionCardExtractor.extract(with_trailer)
+    end
   end
 end

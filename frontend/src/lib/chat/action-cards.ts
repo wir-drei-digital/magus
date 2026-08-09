@@ -37,6 +37,10 @@ export type ActionCardsView = { layout: 'list' | 'grid'; cards: CardView[] } | n
 
 const MAX_CARDS = 5;
 
+/** Hard ceiling on how many raw entries are even inspected, so an absurdly
+ *  long model-authored array cannot cost an unbounded number of URL parses. */
+const MAX_SCANNED_CARDS = 50;
+
 /** A/B/C… labels, matching what the system prompt promises the model. */
 const labelFor = (index: number) => String.fromCharCode(65 + index);
 
@@ -82,7 +86,20 @@ function classifyNavigate(
 		// (e.g. "/%09/evil.com") are never decoded during parsing, so they
 		// stay ordinary same-origin path segments and are not rejected here.
 		if (resolved.origin !== SENTINEL_ORIGIN) return null;
-		return { kind: 'internal', path: resolved.pathname + resolved.search + resolved.hash };
+
+		const path = resolved.pathname + resolved.search + resolved.hash;
+		// The origin check above passes for "/.//evil.com" because a single-dot
+		// segment resolves in-origin while serializing to a network-path reference.
+		// Re-resolving the emitted string is the only check that catches that.
+		let recheck: URL;
+		try {
+			recheck = new URL(path, SENTINEL_ORIGIN);
+		} catch {
+			return null;
+		}
+		if (recheck.origin !== SENTINEL_ORIGIN) return null;
+		if (recheck.pathname + recheck.search + recheck.hash !== path) return null;
+		return { kind: 'internal', path };
 	}
 
 	let parsed: URL;
@@ -143,9 +160,17 @@ export function actionCardsView(metadata: unknown): ActionCardsView {
 	if (!Array.isArray(block.cards)) return null;
 
 	const cards = block.cards
-		.slice(0, MAX_CARDS)
+		// Cheap upper bound BEFORE the map: the array is model-authored, and each
+		// navigate card costs a URL parse, so a hallucinated 100k-element array
+		// must not turn into 100k parses. Well above MAX_CARDS so it never
+		// interacts with the real truncation below.
+		.slice(0, MAX_SCANNED_CARDS)
 		.map((raw, index) => toCardView(raw, index))
 		.filter((card): card is CardView => card !== null)
+		// Truncate AFTER filtering: slicing first would let leading malformed
+		// cards mask valid ones behind them (the Elixir `valid_card?` never
+		// inspects `payload`, so payload-less cards do reach this path).
+		.slice(0, MAX_CARDS)
 		// Re-label after filtering so labels stay contiguous (A, B, C).
 		.map((card, index) => ({ ...card, label: labelFor(index) }));
 

@@ -122,7 +122,10 @@
 
 	async function copyText() {
 		try {
-			await navigator.clipboard.writeText(message.text);
+			// `bodyText`, not `message.text`: the user copies what they can see.
+			// A block whose cards all fail validation survives server-side
+			// stripping, so the raw text can still carry the JSON.
+			await navigator.clipboard.writeText(bodyText);
 			copied = true;
 			if (copiedTimer) clearTimeout(copiedTimer);
 			copiedTimer = setTimeout(() => (copied = false), 1500);
@@ -137,18 +140,26 @@
 
 	const settled = $derived(message.status === 'complete' || message.status === 'error');
 
-	// Only the citations the model actually referenced via [N] (falls back to
-	// all when none were referenced) — parity with get_referenced_citations.
-	const sources = $derived(referencedCitations(message.text, message.citations));
-
 	// Parsed action-cards block (Task 1's pure view model) plus the text with
 	// that block hidden. Unconditional, not just while streaming: the server's
 	// ActionCardExtractor only strips the fenced block when at least one card
 	// passes validation, so a block with no valid cards survives into the
 	// persisted text too. Stripping unconditionally is a no-op on already-clean
 	// text and keeps raw JSON from flashing back once streaming ends.
+	//
+	// `bodyText` is the message as the user sees it, so every consumer that
+	// means "the visible message" reads it, not `message.text`: copy, create
+	// prompt, and citation extraction. Only genuinely-raw uses (retrying a
+	// user's own message, event-severity detection, the user bubble) keep
+	// `message.text`.
 	const cardsView = $derived(actionCardsView(message.metadata));
 	const bodyText = $derived(stripActionCardsBlock(message.text));
+
+	// Only the citations the model actually referenced via [N] (falls back to
+	// all when none were referenced) — parity with get_referenced_citations.
+	// Reads `bodyText` so a "[1]" sitting inside an unstripped action-cards
+	// JSON payload cannot forge a reference the prose never made.
+	const sources = $derived(referencedCitations(bodyText, message.citations));
 
 	// Typed system-event styling (ported from events.ex detect_event_style).
 	const eventVis = $derived(eventVisual(message.text));
@@ -251,7 +262,7 @@
 				<RefreshCw class="size-3.5" />
 			</button>
 		{/if}
-		{#if message.text.trim() !== ''}
+		{#if bodyText.trim() !== ''}
 			<button
 				type="button"
 				class="rounded-md px-1.5 py-1 transition-colors hover:bg-accent {copied
@@ -264,13 +275,13 @@
 				{#if copied}<Check class="size-3.5" />{:else}<ClipboardCopy class="size-3.5" />{/if}
 			</button>
 		{/if}
-		{#if onCreatePrompt && settled && message.text.trim() !== ''}
+		{#if onCreatePrompt && settled && bodyText.trim() !== ''}
 			<button
 				type="button"
 				class="rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 				title="Create prompt from message"
 				data-testid="message-create-prompt"
-				onclick={() => onCreatePrompt(message.text)}
+				onclick={() => onCreatePrompt(bodyText)}
 			>
 				<Sparkles class="size-3.5" />
 			</button>
