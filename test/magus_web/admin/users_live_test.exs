@@ -106,6 +106,28 @@ defmodule MagusWeb.Admin.UsersLiveTest do
     assert row_ids(render_async(view)) == [heavy.id, admin.id]
   end
 
+  test "filter select offers confirmed and unconfirmed options", %{conn: conn, tag: tag} do
+    {:ok, _view, html} = live(conn, ~p"/admin/users?q=#{tag}")
+
+    assert html =~ ~s(value="confirmed")
+    assert html =~ ~s(value="unconfirmed")
+  end
+
+  test "confirmed filter narrows to users with a confirmed_at", %{
+    conn: conn,
+    admin: admin,
+    tag: tag
+  } do
+    confirmed = confirmed_user_fixture(email: "#{tag}-confirmed@test.com")
+
+    {:ok, view, _html} = live(conn, ~p"/admin/users?q=#{tag}&filter=confirmed")
+    assert row_ids(render_async(view)) == [confirmed.id]
+
+    # admin is unconfirmed by default, so it falls under the inverse filter.
+    {:ok, view, _html} = live(conn, ~p"/admin/users?q=#{tag}&filter=unconfirmed")
+    assert row_ids(render_async(view)) == [admin.id]
+  end
+
   test "non-admin user cannot access", %{conn: _conn} do
     non_admin = generate(user())
 

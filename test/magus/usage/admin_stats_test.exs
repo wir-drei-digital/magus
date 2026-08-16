@@ -246,6 +246,23 @@ defmodule Magus.Usage.AdminStatsTest do
                AdminStats.list_users(search: tag, filter: "demo", page: 2, per_page: 20)
     end
 
+    test "filters confirmed and unconfirmed accounts" do
+      tag = unique_tag()
+      confirmed = confirmed_user_fixture(email: "#{tag}-confirmed@test.com")
+      unconfirmed = tagged_user(tag, "unconfirmed")
+
+      assert %{users: [%{id: id, confirmed_at: confirmed_at}], total_count: 1} =
+               AdminStats.list_users(search: tag, filter: "confirmed")
+
+      assert id == confirmed.id
+      assert %DateTime{} = confirmed_at
+
+      assert %{users: [%{id: id, confirmed_at: nil}], total_count: 1} =
+               AdminStats.list_users(search: tag, filter: "unconfirmed")
+
+      assert id == unconfirmed.id
+    end
+
     test "includes the personal plan name" do
       user = generate(user())
       plan = generate(usage_plan())

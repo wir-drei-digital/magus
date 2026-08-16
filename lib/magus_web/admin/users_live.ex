@@ -16,7 +16,7 @@ defmodule MagusWeb.Admin.UsersLive do
   alias Phoenix.LiveView.AsyncResult
 
   @per_page 20
-  @filters ~w(all admins non_admins demo)
+  @filters ~w(all admins non_admins demo confirmed unconfirmed)
   @default_sort "inserted_at"
   @default_dir "desc"
 
@@ -186,6 +186,10 @@ defmodule MagusWeb.Admin.UsersLive do
                   Non-Admins
                 </option>
                 <option value="demo" selected={@list.filter == "demo"}>Demo Accounts</option>
+                <option value="confirmed" selected={@list.filter == "confirmed"}>Confirmed</option>
+                <option value="unconfirmed" selected={@list.filter == "unconfirmed"}>
+                  Unconfirmed
+                </option>
               </select>
             </form>
           </div>
@@ -204,6 +208,7 @@ defmodule MagusWeb.Admin.UsersLive do
                   <.sort_header label="Messages" field="message_count" list={@list} align="right" />
                   <.sort_header label="Cost" field="total_cost" list={@list} align="right" />
                   <.sort_header label="Last Active" field="last_active" list={@list} />
+                  <th class="text-center">Confirmed</th>
                   <th class="text-center">Admin</th>
                 </tr>
               </thead>
@@ -211,20 +216,20 @@ defmodule MagusWeb.Admin.UsersLive do
                 <.async_result :let={page_data} assign={@page_data}>
                   <:loading>
                     <tr>
-                      <td colspan="8" class="text-center py-12">
+                      <td colspan="9" class="text-center py-12">
                         <span class="loading loading-spinner"></span>
                       </td>
                     </tr>
                   </:loading>
                   <:failed>
                     <tr>
-                      <td colspan="8" class="text-center py-8 text-error">
+                      <td colspan="9" class="text-center py-8 text-error">
                         Failed to load users.
                       </td>
                     </tr>
                   </:failed>
                   <tr :if={page_data.users == []}>
-                    <td colspan="8" class="text-center py-8 text-base-content/50">
+                    <td colspan="9" class="text-center py-8 text-base-content/50">
                       No users found
                     </td>
                   </tr>
@@ -268,6 +273,15 @@ defmodule MagusWeb.Admin.UsersLive do
                     </td>
                     <td class="text-base-content/70 text-sm">
                       {format_last_active(user.last_active)}
+                    </td>
+                    <td class="text-center">
+                      <%= if user.confirmed_at do %>
+                        <span class="badge badge-success badge-sm" title={user.confirmed_at}>
+                          Confirmed
+                        </span>
+                      <% else %>
+                        <span class="text-base-content/30">-</span>
+                      <% end %>
                     </td>
                     <td class="text-center">
                       <%= if user.is_admin do %>

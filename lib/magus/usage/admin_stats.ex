@@ -227,8 +227,8 @@ defmodule Magus.Usage.AdminStats do
   on any of `user_sorts/0` — aggregates sort in SQL, so ordering by cost or
   activity is correct across pages, not just within one.
 
-  Options: `:search`, `:filter` ("admins" | "non_admins" | "demo"),
-  `:sort`, `:dir` ("asc" | "desc"), `:page`, `:per_page`.
+  Options: `:search`, `:filter` ("admins" | "non_admins" | "demo" | "confirmed" |
+  "unconfirmed"), `:sort`, `:dir` ("asc" | "desc"), `:page`, `:per_page`.
 
   Returns `%{users: [map], total_count: n}`.
   """
@@ -264,6 +264,7 @@ defmodule Magus.Usage.AdminStats do
         display_name: u.display_name,
         is_admin: u.is_admin,
         test_account: u.test_account,
+        confirmed_at: u.confirmed_at,
         inserted_at: u.inserted_at,
         message_count: coalesce(mu.message_count, 0),
         total_cost: coalesce(mu.total_cost, 0),
@@ -294,6 +295,8 @@ defmodule Magus.Usage.AdminStats do
       "admins" -> where(query, [u], u.is_admin == true)
       "non_admins" -> where(query, [u], u.is_admin == false)
       "demo" -> where(query, [u], u.test_account == true)
+      "confirmed" -> where(query, [u], not is_nil(u.confirmed_at))
+      "unconfirmed" -> where(query, [u], is_nil(u.confirmed_at))
       _ -> query
     end
   end
