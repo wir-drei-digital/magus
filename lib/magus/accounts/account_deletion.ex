@@ -8,6 +8,13 @@ defmodule Magus.Accounts.AccountDeletion do
   hook failure (`{:error, :lifecycle_aborted}`) aborts the flow with no
   DB writes, so the user can retry; the inverse failure mode (account
   deleted, billing still active) would be much worse.
+
+  `cleanup_external_resources/1` (files + S3, conversation hard-delete,
+  Super Brain graph purge) ALSO runs before the deletion transaction, for
+  the same reason as the billing hook: those are external-system network
+  calls that must not hold a Postgres transaction open. This matters for
+  `execute/2`'s `:require_unconfirmed` option — see its docs — because it
+  means that work is not protected by the transaction's rollback.
   """
   require Ash.Query
   require Logger
@@ -18,13 +25,18 @@ defmodule Magus.Accounts.AccountDeletion do
 
   defmodule PreconditionFailed do
     @moduledoc """
-    Raised inside the account-deletion transaction when a conditional
+    Raised inside the account-deletion transaction when the conditional
     final-row delete (see `execute/2`'s `:require_unconfirmed` option)
-    matches zero rows — the precondition it was guarding (e.g. the user
-    still being unconfirmed) no longer holds. Raising here, INSIDE
-    `Repo.transaction/1`, is what rolls back every other write the
-    transaction made; `execute/2` rescues it AFTER the rollback and maps
-    it to `{:error, :precondition_failed}`.
+    matches zero rows — the precondition it was guarding (the user still
+    being unconfirmed) no longer holds. Raising here, INSIDE
+    `Repo.transaction/1`, rolls back every write THAT TRANSACTION made:
+    owned-content destroys (`delete_user_owned_content/1`), auxiliary-table
+    cleanup, and the row delete itself. It does NOT undo
+    `cleanup_external_resources/1`'s pre-transaction work (files/S3,
+    conversations, Super Brain graphs) — that already ran and cannot be
+    rolled back from here; see that function's callers for what actually
+    guards it. `execute/2` rescues this exception AFTER the rollback and
+    maps it to `{:error, :precondition_failed}`.
     """
     defexception message: "delete precondition failed"
   end
@@ -167,25 +179,70 @@ defmodule Magus.Accounts.AccountDeletion do
 
   ## Options
 
-    * `:require_unconfirmed` - when `true`, the final User-row delete is
-      conditional on `confirmed_at IS NULL`, checked at the row inside the
-      same transaction as the rest of the cleanup. Used by
-      `Magus.Accounts.UnconfirmedRetention` to close the race between the
-      reaper deciding to delete and the user confirming their email: if the
-      condition matches zero rows, the whole transaction rolls back and
-      this returns `{:error, :precondition_failed}`. Defaults to `false`
-      (existing unconditional hard delete).
+    * `:require_unconfirmed` - used by `Magus.Accounts.UnconfirmedRetention`
+      for the unconfirmed-account reaper. Defaults to `false` (existing
+      unconditional hard delete, no pre-check, no conditional final
+      delete). When `true`, this function checks `confirmed_at IS NULL`
+      TWICE:
+
+      1. A fresh DB read immediately before `cleanup_external_resources/1`
+         runs. If the user has confirmed since being handed to this
+         function, returns `{:error, :precondition_failed}` without
+         destroying anything — this is what actually protects files,
+         conversations, and Super Brain graphs, since none of that is
+         inside a transaction.
+      2. The final User-row DELETE, inside the same transaction as the
+         rest of the cleanup, is ALSO conditional on `confirmed_at IS
+         NULL`. Zero rows matched raises `PreconditionFailed`, rolling
+         back everything that transaction did, and this returns
+         `{:error, :precondition_failed}`.
+
+      IMPORTANT: check 2 (and the transaction it lives in) protects only
+      what happens INSIDE the transaction — the User row and everything
+      `delete_user_owned_content/1` destroys. It does NOT protect
+      `cleanup_external_resources/1`'s pre-transaction work (files/S3,
+      conversations, Super Brain graphs); that already ran by the time
+      check 2 could catch anything. Check 1 narrows the race to the gap
+      between itself and `cleanup_external_resources/1` running (typically
+      sub-millisecond), but does not close it. The actual guarantee that a
+      reap candidate never loses real content is
+      `Magus.Accounts.UnconfirmedRetention`'s content-ownership skip: a
+      user who owns a file, conversation, or brain resource is never
+      handed to this function with `require_unconfirmed: true` at all.
   """
   @spec execute(User.t(), keyword()) ::
           :ok
           | {:error, :sole_admin_workspaces, [Workspace.t()]}
           | {:error, :lifecycle_aborted | :precondition_failed | term()}
   def execute(%User{} = user, opts \\ []) do
+    require_unconfirmed? = Keyword.get(opts, :require_unconfirmed, false)
+
     with {:ok, _summary} <- preflight(user),
-         :ok <- Magus.Usage.AccountLifecycle.on_deletion(user.id) do
+         :ok <- Magus.Usage.AccountLifecycle.on_deletion(user.id),
+         :ok <- check_still_unconfirmed(user, require_unconfirmed?) do
       cleanup_external_resources(user)
       delete_in_transaction(user, opts)
     end
+  end
+
+  # See execute/2's docs. This is the FIRST of the two require_unconfirmed?
+  # checks, and the one that actually protects cleanup_external_resources/1
+  # (files/S3, conversations, Super Brain graphs): those run right after
+  # this, outside any transaction, so nothing rolls them back. A fresh read
+  # here narrows — but, being a plain read followed by later writes rather
+  # than one atomic statement, does not close — the race between the
+  # reaper deciding to reap and the user confirming.
+  defp check_still_unconfirmed(_user, false), do: :ok
+
+  defp check_still_unconfirmed(user, true) do
+    import Ecto.Query
+
+    still_unconfirmed? =
+      Magus.Repo.exists?(
+        from(u in "users", where: u.id == type(^user.id, :binary_id) and is_nil(u.confirmed_at))
+      )
+
+    if still_unconfirmed?, do: :ok, else: {:error, :precondition_failed}
   end
 
   # Best-effort cleanup of S3 / sandbox / other external systems for resources
@@ -604,15 +661,21 @@ defmodule Magus.Accounts.AccountDeletion do
     do_delete_user_row(user, require_unconfirmed?)
   end
 
-  # The unconfirmed-account reaper's entire race-safety mechanism: the
+  # ONE layer of the unconfirmed-account reaper's race protection — see
+  # execute/2's docs for the full picture. This alone does NOT protect
+  # files, conversations, or Super Brain graphs: those are destroyed by
+  # cleanup_external_resources/1 before this transaction even opens, so a
+  # rollback triggered here can't touch them. What this DOES guarantee: the
   # final row delete is conditional on `confirmed_at IS NULL`, checked at
   # the row and evaluated atomically by Postgres. If the user confirmed
-  # their email between the reaper reading the row and this statement
+  # their email between execute/2's fresh pre-check and this statement
   # running, the WHERE clause matches zero rows and we raise — which rolls
-  # back this whole transaction, including every cleanup step above, so
-  # the freshly confirmed account survives intact. Do not weaken this to a
-  # separate SELECT-then-DELETE; the guarantee depends on the condition
-  # living in the DELETE itself.
+  # back this transaction's own writes (delete_user_owned_content/1's
+  # destroys, the auxiliary-table cleanup above), so the freshly confirmed
+  # account and its Ash-managed owned content (drafts, prompts, memories,
+  # brain pages, etc.) survive intact. Do not weaken this to a separate
+  # SELECT-then-DELETE; the guarantee depends on the condition living in
+  # the DELETE itself.
   defp do_delete_user_row(user, true = _require_unconfirmed?) do
     import Ecto.Query
 
