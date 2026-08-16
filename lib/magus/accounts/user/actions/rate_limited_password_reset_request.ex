@@ -16,14 +16,14 @@ defmodule Magus.Accounts.User.Actions.RateLimitedPasswordResetRequest do
   def run(input, _opts, context) do
     email = Ash.ActionInput.get_argument(input, :email)
 
-    user =
+    lookup =
       Magus.Accounts.User
       |> Ash.Query.for_read(:get_by_email, %{email: email})
-      |> Ash.read_one!(authorize?: false)
+      |> Ash.read_one(authorize?: false)
 
     key = email |> to_string() |> String.downcase()
 
-    with %{} <- user,
+    with {:ok, %{} = _user} <- lookup,
          :ok <- AuthRateLimiter.check(:password_reset, key),
          :ok <- AuthRateLimiter.check(:password_reset_global, :global) do
       AshAuthentication.Strategy.Password.RequestPasswordReset.run(
@@ -33,10 +33,13 @@ defmodule Magus.Accounts.User.Actions.RateLimitedPasswordResetRequest do
       )
     else
       # unknown address: mimic the library's silent success
-      nil -> :ok
-      # over limit: also silent — the library reset UI swallows errors
-      # anyway (spec: "silent by design"), and silence leaks nothing
-      {:error, :rate_limited} -> :ok
+      {:ok, nil} -> :ok
+      # over limit, or a transient lookup failure (e.g. DB blip) — also
+      # silent. The library's own RequestPasswordReset soft-fails the same
+      # way (logs and returns :ok) rather than raising, so a lookup error
+      # here must not crash the request either; and silence leaks nothing
+      # either way (spec: "silent by design").
+      {:error, _} -> :ok
     end
   end
 end

@@ -196,6 +196,27 @@ defmodule MagusWeb.OnboardingLive.RegisterLiveTest do
     end
   end
 
+  describe "rate limiting (signup-abuse hardening)" do
+    setup do
+      original = Application.get_env(:magus, :auth_rate_limits)
+      on_exit(fn -> Application.put_env(:magus, :auth_rate_limits, original) end)
+      :ok
+    end
+
+    test "the AuthRateLimit plug's redirect flash is visible on /register", %{conn: conn} do
+      Application.put_env(:magus, :auth_rate_limits, enabled: true, register: {0, :hour})
+
+      conn = post(conn, ~p"/auth/user/password/register", %{"user" => %{}})
+      assert redirected_to(conn) == "/register"
+
+      # Follow the redirect like a browser would (recycle carries the flash
+      # forward via the session cookie) and mount RegisterLive for real.
+      {:ok, _view, html} = conn |> recycle() |> live(~p"/register")
+
+      assert html =~ "Too many attempts"
+    end
+  end
+
   # Paid plans are only selectable in the commercial billing edition
   # (Magus.Usage.billing_edition?/0). Toggle it on, with cleanup, for the tests
   # that exercise the paid-plan path; OSS (the default) normalizes them to free.
