@@ -21,6 +21,7 @@ defmodule Magus.Agents.Plugins.Support.ErrorMessages do
     * `:request_failed` — LLM or worker failure (timeout, HTTP errors, etc.)
     * `:busy` — agent is already processing a request
     * `:broken_model_selection` — explicit model selection no longer resolves (passes through the detail)
+    * `:confirmation_required` — acting user's email is unconfirmed and the confirmation gate is enabled
     * anything else — generic fallback
   """
   @spec format_user_friendly_error(atom(), term()) :: String.t()

@@ -48,30 +48,53 @@ defmodule Magus.Agents.Plugins.Support.MediaBypass do
     # Hard-stop (phase 2b-2b): a broken EXPLICIT media selection blocks the turn
     # before any generation call, on the same error/event rails as the text
     # path. `handle_broken_selection` already emits idle + response_complete.
-    if Resolution.degraded?(resolution) do
-      conversation = load_conversation_for_scope(conversation_id)
+    cond do
+      Resolution.degraded?(resolution) ->
+        conversation = load_conversation_for_scope(conversation_id)
 
-      Preflight.handle_broken_selection(
-        conversation_id,
-        message_id,
-        resolution,
-        Preflight.broken_selection_scope(resolution, conversation, mode)
-      )
+        Preflight.handle_broken_selection(
+          conversation_id,
+          message_id,
+          resolution,
+          Preflight.broken_selection_scope(resolution, conversation, mode)
+        )
 
-      Preflight.settle_blocked_run(data, "broken model selection")
-      {:ok, {:override, Jido.Actions.Control.Noop}}
+        Preflight.settle_blocked_run(data, "broken model selection")
+        {:ok, {:override, Jido.Actions.Control.Noop}}
+
+      confirmation_blocked?(agent, message_id) ->
+        Preflight.handle_confirmation_required(conversation_id, message_id)
+        Preflight.settle_blocked_run(data, "email confirmation required")
+        {:ok, {:override, Jido.Actions.Control.Noop}}
+
+      true ->
+        dispatch_after_limit_check(
+          agent,
+          mode,
+          conversation_id,
+          state,
+          data,
+          model,
+          model_keys,
+          user,
+          message_id
+        )
+    end
+  end
+
+  # Signup-abuse hardening: gate media generation on the ACTING member's email
+  # confirmation (the sender of the triggering message, owner fallback for
+  # autonomous turns) — same subject rule Preflight's chat-path gate uses
+  # (Helpers.acting_user_id/2). Deliberately a DIFFERENT subject than the
+  # spend-gate `user` above, which stays scoped to state[:user_id] (the
+  # agent/conversation owner) — pre-existing scope, untouched here.
+  defp confirmation_blocked?(agent, message_id) do
+    if Preflight.confirmation_required?() do
+      acting_user_id = Helpers.acting_user_id(agent, message_id)
+      acting_user = Preflight.load_user_for_limits(acting_user_id)
+      is_nil(acting_user.confirmed_at)
     else
-      dispatch_after_limit_check(
-        agent,
-        mode,
-        conversation_id,
-        state,
-        data,
-        model,
-        model_keys,
-        user,
-        message_id
-      )
+      false
     end
   end
 

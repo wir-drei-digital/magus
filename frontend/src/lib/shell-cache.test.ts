@@ -29,7 +29,7 @@ describe('shell cache', () => {
 
 	it('returns null for missing or corrupt entries', () => {
 		expect(readShellCache('absent')).toBeNull();
-		localStorage.setItem('magus:next:cache:v1:bad', '{not json');
+		localStorage.setItem('magus:next:cache:v2:bad', '{not json');
 		expect(readShellCache('bad')).toBeNull();
 	});
 

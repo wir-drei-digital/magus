@@ -18,7 +18,7 @@
 	}
 </script>
 
-{#if session.user && !session.user.emailConfirmed}
+{#if session.user && session.user.emailConfirmed === false}
 	<div
 		class="border-b bg-warning/10 px-4 py-1.5 text-center text-xs text-warning"
 		role="status"

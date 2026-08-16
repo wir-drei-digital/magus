@@ -6,7 +6,7 @@
  * lands. Cleared on sign-out/expiry. Bump VERSION on shape changes — stale
  * entries are simply ignored.
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const PREFIX = 'magus:next:cache:';
 
 function storage(): Storage | null {

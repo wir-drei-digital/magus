@@ -454,16 +454,24 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
     ErrorMessages.create_error_event(conversation_id, :limit_exceeded, error)
   end
 
+  @doc false
   # Signup-abuse hardening: whether agent turns require a confirmed email.
-  # Off by default; the cloud edition enables in prod.
-  defp confirmation_required? do
+  # Off by default; the cloud edition enables in prod. Public so MediaBypass
+  # can gate media generation on the same config key.
+  def confirmation_required? do
     Application.get_env(:magus, :require_confirmed_email_for_agent_use, false)
   end
 
-  # Mirrors handle_limit_exceeded/3's persistence + broadcast shape exactly:
-  # only the error type (hence message) differs. No ai.react.query signal is
-  # ever built on this path — the caller overrides with Noop instead.
-  defp handle_confirmation_required(conversation_id, message_id) do
+  @doc """
+  Broadcast confirmation-required error and persist an event message.
+
+  Mirrors `handle_limit_exceeded/3`'s persistence + broadcast shape exactly:
+  only the error type (hence message) differs. No `ai.react.query` signal is
+  ever built on this path — the caller overrides with Noop instead. Public so
+  `MediaBypass` can reuse it for the media-generation gate (same subject
+  rule — the acting member, not the conversation owner — different call site).
+  """
+  def handle_confirmation_required(conversation_id, message_id) do
     error_message = ErrorMessages.format_user_friendly_error(:confirmation_required, nil)
 
     Logger.info("Email confirmation required for conversation #{conversation_id}")
@@ -627,9 +635,14 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
         user
 
       _ ->
+        # `confirmed_at: nil` fails the confirmation gate closed: an actor
+        # that can't be loaded (deleted, or a recovery replay racing a reap)
+        # is treated as unconfirmed rather than crashing the dot-access read
+        # in the gate below.
         %{
           id: user_id,
-          timezone: "Etc/UTC"
+          timezone: "Etc/UTC",
+          confirmed_at: nil
         }
     end
   end
