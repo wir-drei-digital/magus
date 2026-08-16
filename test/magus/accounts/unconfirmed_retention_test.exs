@@ -11,9 +11,12 @@ defmodule Magus.Accounts.UnconfirmedRetentionTest do
   layers: `AccountDeletion.execute/2`'s fresh pre-cleanup `confirmed_at`
   check, and the conditional final-row DELETE inside its transaction (see
   `Magus.Accounts.AccountDeletion.PreconditionFailed`). A conversation
-  holding only the user's own message (e.g. the confirmation gate's own
-  blocked first turn) does NOT count as owned content — see
-  `owns_conversations?/1` in `Magus.Accounts.UnconfirmedRetention`.
+  holding only the user's own message, OR the confirmation gate's own
+  block notice (persisted by
+  `Magus.Agents.Plugins.Support.ErrorMessages.create_error_event/3` —
+  role `:agent`, status `:complete`, but message_type `:event`), does
+  NOT count as owned content — see `owns_conversations?/1` in
+  `Magus.Accounts.UnconfirmedRetention`.
   """
   use Magus.DataCase, async: false
 
@@ -58,12 +61,14 @@ defmodule Magus.Accounts.UnconfirmedRetentionTest do
     Repo.exists?(from(u in "users", where: u.id == type(^user_id, :binary_id)))
   end
 
-  # A complete agent reply (role :agent, status :complete — the schema
-  # default for :status, untouched by :upsert_response). This is the
-  # refinement `owns_conversations?/1` gates on: without one, a conversation
-  # holds only the user's own (possibly gate-blocked) message and does not
-  # count as owned content. Runs authorize?: false and skips response_to_id
-  # (nullable) since these tests don't need a real user message to respond to.
+  # A genuine complete agent REPLY: role :agent, status :complete (the
+  # schema default for :status, untouched by :upsert_response), AND
+  # message_type :message (also the schema default, untouched by
+  # :upsert_response — contrast with the gate's block notice, which is
+  # message_type :event; see add_gate_block_notice!/1 below). All three
+  # attributes together are what `owns_conversations?/1` gates on. Runs
+  # authorize?: false and skips response_to_id (nullable) since these
+  # tests don't need a real user message to respond to.
   defp add_complete_agent_message!(conversation_id) do
     Magus.Chat.Message
     |> Ash.Changeset.for_create(
@@ -77,6 +82,22 @@ defmodule Magus.Accounts.UnconfirmedRetentionTest do
       authorize?: false
     )
     |> Ash.create!(authorize?: false)
+  end
+
+  # Drives the REAL path, not a fabrication: this is the exact function the
+  # confirmation gate calls when it blocks a turn
+  # (Magus.Agents.Plugins.Support.Preflight.handle_confirmation_required/2
+  # and Magus.Agents.Plugins.Support.MediaBypass call this with
+  # error_type: :confirmation_required, error: nil on the unconfirmed-user
+  # path). It persists a role :agent, status :complete, message_type
+  # :event message — matching a genuine reply on role and status alone,
+  # which is exactly the bug this regression test guards against.
+  defp add_gate_block_notice!(conversation_id) do
+    Magus.Agents.Plugins.Support.ErrorMessages.create_error_event(
+      conversation_id,
+      :confirmation_required,
+      nil
+    )
   end
 
   defp create_organization!(owner) do
@@ -168,17 +189,24 @@ defmodule Magus.Accounts.UnconfirmedRetentionTest do
     assert {:ok, _} = Ash.get(Magus.Chat.Conversation, conv.id, authorize?: false)
   end
 
-  test "user owning a conversation with only their own (gate-blocked) message is still reaped" do
-    # Mirrors the confirmation gate's own flow: the SPA creates the
-    # conversation before the first message is sent, then blocks the turn
-    # (no agent reply is ever persisted). A conversation holding only that
-    # blocked user message is not real content worth protecting — treating
-    # it as such would make the reaper's primary target population (bots
-    # that attempted chat and got blocked) permanently unreapable. See
-    # owns_conversations?/1 in lib/magus/accounts/unconfirmed_retention.ex.
+  test "user owning a conversation with only their own message and the gate's real block notice is still reaped" do
+    # Drives the REAL confirmation-gate path end to end, not a fabrication:
+    # the SPA creates the conversation before the first message is sent,
+    # the user's message lands, and the gate blocks the turn by calling
+    # add_gate_block_notice!/1's underlying function (the exact call
+    # Magus.Agents.Plugins.Support.Preflight.handle_confirmation_required/2
+    # makes). That notice is role :agent, status :complete — matching a
+    # genuine reply on those two attributes alone — but message_type
+    # :event, not :message. Regression coverage for the bug where
+    # owns_conversations?/1 counted role+status alone and treated the
+    # gate's own block notice as protected content, making its primary
+    # target population (bots that attempted chat and got blocked)
+    # permanently unreapable. See owns_conversations?/1 in
+    # lib/magus/accounts/unconfirmed_retention.ex.
     user = unconfirmed_user_fixture() |> age!(30)
     conv = generate(conversation(actor: user))
     _user_msg = generate(message(actor: user, conversation_id: conv.id))
+    add_gate_block_notice!(conv.id)
 
     assert :deleted == UnconfirmedRetention.reap(user)
     refute user_exists?(user.id)

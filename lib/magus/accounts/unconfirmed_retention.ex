@@ -5,9 +5,11 @@ defmodule Magus.Accounts.UnconfirmedRetention do
   users with no owned structure or content: org owners, sole-admin
   workspace holders (magus-xjc3 tracks proper teardown for both), and
   anyone owning a file, brain resource, or a conversation with a
-  complete agent reply are all skipped with a warning. All internal
-  lookups run authorize?: false: there is no actor in the Oban context
-  and user-facing policies would hide exactly the rows we check.
+  complete agent REPLY (message_type `:message`, not an `:event` block
+  notice — see `owns_conversations?/1`) are all skipped with a warning.
+  All internal lookups run authorize?: false: there is no actor in the
+  Oban context and user-facing policies would hide exactly the rows we
+  check.
 
   ## What actually protects data here
 
@@ -20,7 +22,7 @@ defmodule Magus.Accounts.UnconfirmedRetention do
   losing real content, neither of which is "the transaction rolls back":
 
     1. `owns_content?/1` below: a user who owns a file, brain resource, or
-       a conversation containing at least one COMPLETE agent message is
+       a conversation containing at least one COMPLETE agent REPLY is
        never handed to `AccountDeletion.execute/2` with
        `require_unconfirmed: true` in the first place. Conversation
        ownership is deliberately narrower than "owns a conversation row":
@@ -30,9 +32,16 @@ defmodule Magus.Accounts.UnconfirmedRetention do
        holding only their own blocked user message. Treating that alone
        as protected content would make the reaper's primary target
        population — bots that attempted chat and got blocked —
-       permanently unreapable. A conversation with a real agent reply
-       (role `:agent`, status `:complete`) is real content and still
-       blocks the reap.
+       permanently unreapable. Naively checking role `:agent` +
+       status `:complete` is NOT enough to distinguish a real reply from
+       this: the gate's own block notice
+       (`Magus.Agents.Plugins.Support.ErrorMessages.create_error_event/3`)
+       is ALSO role `:agent` + status `:complete` — it just carries
+       `message_type: :event` instead of the `:message` a genuine reply
+       gets. `owns_conversations?/1` filters on all three attributes for
+       exactly this reason. A conversation with a real agent reply
+       (role `:agent`, message_type `:message`, status `:complete`) is
+       real content and still blocks the reap.
     2. `AccountDeletion.execute/2`'s fresh `confirmed_at` re-check,
        performed immediately before `cleanup_external_resources/1` runs.
        This narrows the race to the gap between that read and the
@@ -198,10 +207,21 @@ defmodule Magus.Accounts.UnconfirmedRetention do
     # population (bots that attempted chat) permanently unreapable. A
     # conversation with a real agent reply is real content and still
     # blocks the reap.
+    #
+    # message_type == :message is load-bearing, not incidental: the gate's
+    # OWN block notice is itself a role: :agent, status: :complete message
+    # (Magus.Agents.Plugins.Support.ErrorMessages.create_error_event/3, via
+    # Message's :create_event action) — but with message_type: :event, not
+    # :message. Without this extra condition, the very notice that tells
+    # the user "confirm your email to chat" would count as the "real agent
+    # reply" that protects the conversation, defeating this whole
+    # refinement for exactly the population it targets. Genuine agent
+    # replies (Message's :upsert_response action) default message_type to
+    # :message (the attribute's schema default) and are unaffected.
     Magus.Chat.Conversation
     |> Ash.Query.filter(
       user_id == ^user.id and is_nil(deleted_at) and
-        exists(messages, role == :agent and status == :complete)
+        exists(messages, role == :agent and message_type == :message and status == :complete)
     )
     |> Ash.exists?(authorize?: false)
   end
