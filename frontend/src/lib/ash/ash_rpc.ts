@@ -264,6 +264,46 @@ export async function requestEmailChange<Fields extends RequestEmailChangeFields
 }
 
 
+export type ResendConfirmationFields = UnifiedFieldSelection<UserResourceSchema>[];
+
+export type InferResendConfirmationResult<
+  Fields extends ResendConfirmationFields | undefined,
+> = InferResult<UserResourceSchema, Fields>;
+
+export type ResendConfirmationResult<Fields extends ResendConfirmationFields | undefined = undefined> = | { success: true; data: InferResendConfirmationResult<Fields>; }
+| { success: false; errors: AshRpcError[]; }
+
+;
+
+/**
+ * Update an existing User
+ *
+ * @ashActionType :update
+ */
+export async function resendConfirmation<Fields extends ResendConfirmationFields | undefined = undefined>(
+  config: {
+  tenant?: string;
+  identity: UUID;
+  fields?: Fields;
+  headers?: Record<string, string>;
+  fetchOptions?: RequestInit;
+  customFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+): Promise<ResendConfirmationResult<Fields extends undefined ? [] : Fields>> {
+  const payload = {
+    action: "resend_confirmation",
+    ...(config.tenant !== undefined && { tenant: config.tenant }),
+    identity: config.identity,
+    ...(config.fields !== undefined && { fields: config.fields })
+  };
+
+  return executeActionRpcRequest<ResendConfirmationResult<Fields extends undefined ? [] : Fields>>(
+    payload,
+    config
+  );
+}
+
+
 export type SelectDefaultImageModelInput = {
   selectedImageModelId?: UUID | null;
 };

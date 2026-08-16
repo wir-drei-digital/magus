@@ -74,6 +74,8 @@ export type CurrentUser = {
 	globalMemoryEnabled: boolean;
 	/** Whether the distilled living-summary profile is enabled (requires memory on). */
 	profileEnabled: boolean;
+	/** Whether the user has clicked their confirmation link. Drives the confirmation banner. */
+	emailConfirmed: boolean;
 };
 
 const CURRENT_USER_FIELDS: rpc.CurrentUserFields = [
@@ -85,11 +87,23 @@ const CURRENT_USER_FIELDS: rpc.CurrentUserFields = [
 	'uiPreferences',
 	'avatarUrl',
 	'globalMemoryEnabled',
-	'profileEnabled'
+	'profileEnabled',
+	'emailConfirmed'
 ];
 
 export function currentUser(): Promise<RpcResult<CurrentUser>> {
 	return run((opts) => rpc.currentUser({ fields: CURRENT_USER_FIELDS, ...opts }));
+}
+
+/** Re-sends the confirmation email. Silent no-op server-side if already confirmed. */
+export function resendConfirmation(userId: string): Promise<RpcResult<CurrentUser>> {
+	return run((opts) =>
+		rpc.resendConfirmation({
+			identity: userId,
+			fields: CURRENT_USER_FIELDS,
+			...opts
+		})
+	);
 }
 
 export function updateUiPreferences(

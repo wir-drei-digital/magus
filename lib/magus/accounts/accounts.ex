@@ -11,6 +11,7 @@ defmodule Magus.Accounts do
       rpc_action :current_user, :current_user
       rpc_action :update_ui_preferences, :update_ui_preferences
       rpc_action :select_workspace, :select_workspace
+      rpc_action :resend_confirmation, :resend_confirmation
 
       # Settings — profile
       rpc_action :update_user_settings, :update_settings

@@ -1000,7 +1000,7 @@ msgstr "Deine E-Mail-Adresse wurde bestätigt"
 msgid "Your password has successfully been reset"
 msgstr "Dein Passwort wurde erfolgreich zurückgesetzt"
 
-#: lib/magus/agents/plugins/support/error_messages.ex:92
+#: lib/magus/agents/plugins/support/error_messages.ex:98
 #, elixir-autogen, elixir-format
 msgid "An unexpected error occurred. Please try again."
 msgstr "Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut."
@@ -1369,3 +1369,8 @@ msgstr "Captcha-Überprüfung fehlgeschlagen. Bitte versuche es erneut."
 #, elixir-autogen, elixir-format
 msgid "Verification is temporarily unavailable. Please try again."
 msgstr "Die Überprüfung ist vorübergehend nicht verfügbar. Bitte versuche es erneut."
+
+#: lib/magus/agents/plugins/support/error_messages.ex:92
+#, elixir-autogen, elixir-format
+msgid "Please confirm your email address to start chatting. Check your inbox for the confirmation link."
+msgstr "Bitte bestätige deine E-Mail-Adresse, um mit dem Chatten zu beginnen. Schau in dein Postfach für den Bestätigungslink."

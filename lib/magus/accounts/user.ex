@@ -88,6 +88,9 @@ defmodule Magus.Accounts.User do
 
   typescript do
     type_name "User"
+
+    # Elixir-style `?` calculation names are invalid TypeScript identifiers.
+    field_names email_confirmed?: "emailConfirmed"
   end
 
   actions do
@@ -472,6 +475,13 @@ defmodule Magus.Accounts.User do
         |> Ash.Changeset.change_attribute(:email, pending)
         |> Ash.Changeset.change_attribute(:pending_email, nil)
       end
+    end
+
+    update :resend_confirmation do
+      description "Re-send the confirmation email. Silent no-op when already confirmed."
+      accept []
+      require_atomic? false
+      change Magus.Accounts.User.Changes.ResendConfirmationEmail
     end
 
     read :get_by_subject do
@@ -893,6 +903,10 @@ defmodule Magus.Accounts.User do
       authorize_if expr(id == ^actor(:id))
     end
 
+    policy action(:resend_confirmation) do
+      authorize_if expr(id == ^actor(:id))
+    end
+
     policy action(:select_model) do
       authorize_if expr(id == ^actor(:id))
     end
@@ -1179,6 +1193,12 @@ defmodule Magus.Accounts.User do
     # the boolean, never the hash; lets the settings UI choose between the
     # "change password" and "set password" flows.
     calculate :has_password, :boolean, expr(not is_nil(hashed_password)) do
+      public? true
+    end
+
+    # Drives the SPA's confirmation banner (`currentUser.emailConfirmed`) and
+    # the agent-use confirmation gate (`Preflight.build_react_signal/3`).
+    calculate :email_confirmed?, :boolean, expr(not is_nil(confirmed_at)) do
       public? true
     end
 

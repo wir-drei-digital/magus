@@ -127,19 +127,31 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
       user = load_user_for_limits(acting_user_id)
       workspace = resolve_workspace(conversation, conversation_id)
 
-      build_react_signal_after_gates(
-        user,
-        mode,
-        model,
-        workspace,
-        conversation_id,
-        message_id,
-        state,
-        data,
-        conversation,
-        model_keys,
-        text
-      )
+      # Signup-abuse hardening: gate agent turns on the acting user's email
+      # confirmation, ahead of the spend gate below. Off by default. Checked
+      # against the SAME acting user as the spend gate (not the conversation
+      # owner), so a shared conversation blocks on an unconfirmed member even
+      # when the owner is confirmed. Resumes (`build_resume_react_signal/2`)
+      # deliberately skip this check — see the spec.
+      if confirmation_required?() and is_nil(user.confirmed_at) do
+        handle_confirmation_required(conversation_id, message_id)
+        settle_blocked_run(data, "email confirmation required")
+        {:ok, {:override, Jido.Actions.Control.Noop}}
+      else
+        build_react_signal_after_gates(
+          user,
+          mode,
+          model,
+          workspace,
+          conversation_id,
+          message_id,
+          state,
+          data,
+          conversation,
+          model_keys,
+          text
+        )
+      end
     end
   end
 
@@ -440,6 +452,27 @@ defmodule Magus.Agents.Plugins.Support.Preflight do
     Signals.response_complete(conversation_id, %{})
 
     ErrorMessages.create_error_event(conversation_id, :limit_exceeded, error)
+  end
+
+  # Signup-abuse hardening: whether agent turns require a confirmed email.
+  # Off by default; the cloud edition enables in prod.
+  defp confirmation_required? do
+    Application.get_env(:magus, :require_confirmed_email_for_agent_use, false)
+  end
+
+  # Mirrors handle_limit_exceeded/3's persistence + broadcast shape exactly:
+  # only the error type (hence message) differs. No ai.react.query signal is
+  # ever built on this path — the caller overrides with Noop instead.
+  defp handle_confirmation_required(conversation_id, message_id) do
+    error_message = ErrorMessages.format_user_friendly_error(:confirmation_required, nil)
+
+    Logger.info("Email confirmation required for conversation #{conversation_id}")
+
+    Signals.error(conversation_id, message_id, :confirmation_required, error_message)
+    Signals.state_change(conversation_id, :idle)
+    Signals.response_complete(conversation_id, %{})
+
+    ErrorMessages.create_error_event(conversation_id, :confirmation_required, nil)
   end
 
   @doc """

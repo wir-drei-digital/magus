@@ -355,6 +355,13 @@ config :magus, :auth_rate_limits,
   password_reset_global: {100, :hour},
   resend_confirmation: {3, :hour}
 
+# Gate agent turns on email confirmation (signup-abuse spec). Off by default;
+# the cloud edition enables in prod. When enabled, an unconfirmed acting user
+# (the sender of the triggering message, owner fallback for autonomous turns)
+# is blocked in Preflight before any LLM call — see
+# Magus.Agents.Plugins.Support.Preflight.build_react_signal/3.
+config :magus, :require_confirmed_email_for_agent_use, false
+
 # Captcha (Cloudflare Turnstile via phoenix_turnstile) on registration and
 # magic-link request (signup-abuse spec). Disabled unless BOTH site_key and
 # secret_key are set — see Magus.Captcha. `impl` is swapped for a Mox mock in

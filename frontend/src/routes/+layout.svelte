@@ -12,6 +12,7 @@
 	import TabBar from '$lib/components/shell/tab-bar.svelte';
 	import ConfirmDialog from '$lib/components/shell/confirm-dialog.svelte';
 	import ToastHost from '$lib/components/shell/toast-host.svelte';
+	import EmailConfirmationBanner from '$lib/components/shell/email-confirmation-banner.svelte';
 	import SearchOverlay from '$lib/components/shell/search-overlay.svelte';
 	import { searchOverlay } from '$lib/stores/search-overlay.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -123,6 +124,7 @@
 			{/if}
 
 			<div class="flex min-h-0 min-w-0 flex-1 flex-col">
+				<EmailConfirmationBanner />
 				{#if workbench.tabsEnabled}
 					<TabBar />
 				{/if}

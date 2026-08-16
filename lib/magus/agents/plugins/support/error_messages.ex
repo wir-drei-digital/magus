@@ -88,6 +88,12 @@ defmodule Magus.Agents.Plugins.Support.ErrorMessages do
     gettext("The assistant is still processing your previous request. Please wait a moment.")
   end
 
+  def format_user_friendly_error(:confirmation_required, _error) do
+    gettext(
+      "Please confirm your email address to start chatting. Check your inbox for the confirmation link."
+    )
+  end
+
   def format_user_friendly_error(_error_type, _error) do
     gettext("An unexpected error occurred. Please try again.")
   end

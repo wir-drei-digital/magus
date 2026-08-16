@@ -88,6 +88,27 @@ defmodule Magus.Generators do
   end
 
   @doc """
+  Generates a user in the default unconfirmed state.
+
+  `register_with_password` has `require_interaction? true` on the
+  `:confirm_new_user` add-on, so a freshly registered user already has
+  `confirmed_at: nil` until they click the emailed link — this is just an
+  explicit alias for that default, for tests gating on confirmation status.
+  """
+  def unconfirmed_user_fixture(opts \\ []), do: generate(user(opts))
+
+  @doc """
+  Generates a user and seeds `confirmed_at` directly, bypassing the
+  confirmation-link flow (not needed for gate/resend tests).
+  """
+  def confirmed_user_fixture(opts \\ []) do
+    opts
+    |> user()
+    |> generate()
+    |> Ash.Seed.update!(%{confirmed_at: DateTime.utc_now()})
+  end
+
+  @doc """
   Generates a valid API token. Pass `:actor` to set the owner.
 
   Returns `{token, plaintext}` because plaintext is only available

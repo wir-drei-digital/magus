@@ -13,7 +13,7 @@ export type UtcDateTimeUsec = string;
 // User Schema
 export type UserResourceSchema = {
   __type: "Resource";
-  __primitiveFields: "id" | "email" | "displayName" | "currentWorkspaceId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "imageGenerationSettings" | "videoGenerationSettings" | "isAdmin" | "language" | "avatarPath" | "pendingEmail" | "uiPreferences" | "timezone" | "lastTimezoneChangeAt" | "selectedPlanKey" | "globalMemoryEnabled" | "profileEnabled" | "contextStrategy" | "name" | "acceptedTerms" | "acceptedAgeRequirement" | "hasPassword" | "avatarUrl";
+  __primitiveFields: "id" | "email" | "displayName" | "currentWorkspaceId" | "selectedModelId" | "selectedImageModelId" | "selectedVideoModelId" | "imageGenerationSettings" | "videoGenerationSettings" | "isAdmin" | "language" | "avatarPath" | "pendingEmail" | "uiPreferences" | "timezone" | "lastTimezoneChangeAt" | "selectedPlanKey" | "globalMemoryEnabled" | "profileEnabled" | "contextStrategy" | "name" | "acceptedTerms" | "acceptedAgeRequirement" | "hasPassword" | "emailConfirmed" | "avatarUrl";
   id: UUID;
   email: string;
   displayName: string | null;
@@ -38,6 +38,7 @@ export type UserResourceSchema = {
   acceptedTerms: boolean;
   acceptedAgeRequirement: boolean;
   hasPassword: boolean | null;
+  emailConfirmed: boolean | null;
   avatarUrl: string | null;
 };
 
@@ -2298,6 +2299,12 @@ export type UserFilterInput = {
   };
 
   hasPassword?: {
+    eq?: boolean;
+    notEq?: boolean;
+    isNil?: boolean;
+  };
+
+  emailConfirmed?: {
     eq?: boolean;
     notEq?: boolean;
     isNil?: boolean;
@@ -7340,7 +7347,7 @@ export type WorkspaceMemberFilterInput = {
 };
 
 
-export const userFilterFields = ["id", "email", "displayName", "currentWorkspaceId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "imageGenerationSettings", "videoGenerationSettings", "isAdmin", "language", "avatarPath", "pendingEmail", "uiPreferences", "timezone", "lastTimezoneChangeAt", "selectedPlanKey", "globalMemoryEnabled", "profileEnabled", "contextStrategy", "name", "acceptedTerms", "acceptedAgeRequirement", "hasPassword", "avatarUrl"] as const;
+export const userFilterFields = ["id", "email", "displayName", "currentWorkspaceId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "imageGenerationSettings", "videoGenerationSettings", "isAdmin", "language", "avatarPath", "pendingEmail", "uiPreferences", "timezone", "lastTimezoneChangeAt", "selectedPlanKey", "globalMemoryEnabled", "profileEnabled", "contextStrategy", "name", "acceptedTerms", "acceptedAgeRequirement", "hasPassword", "emailConfirmed", "avatarUrl"] as const;
 export type UserFilterField = (typeof userFilterFields)[number];
 
 export const agentActivityLogFilterFields = ["id", "agentId", "userId", "activityType", "summary", "eventId", "runId", "taskId", "conversationId", "details", "modelUsed", "tokensUsed", "estimatedCostUsd", "durationMs", "insertedAt"] as const;
@@ -7509,7 +7516,7 @@ export const workspaceMemberFilterFields = ["id", "role", "status", "isActive", 
 export type WorkspaceMemberFilterField = (typeof workspaceMemberFilterFields)[number];
 
 
-export const userSortFields = ["id", "email", "displayName", "currentWorkspaceId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "imageGenerationSettings", "videoGenerationSettings", "isAdmin", "language", "avatarPath", "pendingEmail", "uiPreferences", "timezone", "lastTimezoneChangeAt", "selectedPlanKey", "globalMemoryEnabled", "profileEnabled", "contextStrategy", "name", "acceptedTerms", "acceptedAgeRequirement", "hasPassword", "avatarUrl"] as const;
+export const userSortFields = ["id", "email", "displayName", "currentWorkspaceId", "selectedModelId", "selectedImageModelId", "selectedVideoModelId", "imageGenerationSettings", "videoGenerationSettings", "isAdmin", "language", "avatarPath", "pendingEmail", "uiPreferences", "timezone", "lastTimezoneChangeAt", "selectedPlanKey", "globalMemoryEnabled", "profileEnabled", "contextStrategy", "name", "acceptedTerms", "acceptedAgeRequirement", "hasPassword", "emailConfirmed", "avatarUrl"] as const;
 export type UserSortField = (typeof userSortFields)[number];
 
 export const agentActivityLogSortFields = ["id", "agentId", "userId", "activityType", "summary", "eventId", "runId", "taskId", "conversationId", "details", "modelUsed", "tokensUsed", "estimatedCostUsd", "durationMs", "insertedAt"] as const;
