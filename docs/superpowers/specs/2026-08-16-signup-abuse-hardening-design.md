@@ -76,11 +76,14 @@ LiveViews, and the captcha `remoteip` parameter.
   trusting `x-forwarded-for` unconditionally would let attackers pick their
   own rate-limit key. No proxy-IP rewriting exists in the endpoint today,
   and prod runs behind Fly's edge, so `magus-cloud` sets `"fly-client-ip"`.
-- LiveView: the `/live` socket currently has `connect_info: [session: ...]`
-  only. Add `:peer_data` and `:x_headers` in `MagusWeb.Endpoint` (and the
-  cloud endpoint mirrors it), and `ClientIP.from_socket/1` applies the same
-  header-vs-peer logic from `get_connect_info/2`. LiveViews capture the IP
-  once in `mount` (inside `connected?/1`) and keep it in an assign.
+- LiveView: `connect_info` cannot deliver the Fly header (`:x_headers` only
+  passes `x-`-prefixed names, and `fly-client-ip` is not one), and
+  `:peer_data` would only yield the proxy address. Instead, a
+  `MagusWeb.Plugs.CaptureClientIP` plug in the `:browser` pipeline resolves
+  the IP on the initial HTTP request and stores it in the session;
+  LiveViews read it from the session in `mount` and keep it in an assign.
+  The value is the IP at page load rather than at event time, which is fine
+  for rate-limit keying. No endpoint `connect_info` changes needed.
 
 ## A. Captcha (Cloudflare Turnstile)
 
@@ -167,8 +170,11 @@ flash, halt; no user is created. No-op when captcha is disabled.
   plug does the enforcement; the LiveView only hosts the widget.
 - `SignInLive` (magic-link form): add the widget inside the magic-link form;
   `handle_event("request_magic_link", ...)` calls `Captcha.verify/2` (with
-  the IP captured at mount) before invoking `:request_magic_link`, and on
-  failure shows an error flash and pushes the widget-reset event.
+  the IP captured at mount) before invoking `:request_magic_link`. The
+  widget-reset event is pushed on **every** non-success outcome, not just
+  captcha failure: a valid token followed by a rate-limit error from the
+  action wrapper is also consumed (tokens are single-use), and without a
+  reset the retry would fail on a stale token.
 
 ## B. Auth rate limiting
 
@@ -198,15 +204,22 @@ unchanged. Fixed window (not sliding) is accurate enough here and is what
 the existing code approximates anyway; the burst-at-boundary weakness is
 acceptable for these limits.
 
-**`Magus.Accounts.AuthRateLimiter`** (new, own ETS table): exposes
-`check(scope, key) :: :ok | {:error, :rate_limited}` with limits from
-config:
+Because the window bucket is part of the key, expired buckets accumulate:
+every distinct (key, bucket) pair an attacker touches is a row. So the
+table lifecycle is explicit: each owning GenServer creates its named public
+table and runs a periodic sweep (5 min) deleting rows whose bucket is past,
+the same shape as `Integrations.RateLimiter`'s existing cleanup timer.
+
+**`Magus.Accounts.AuthRateLimiter`** (new GenServer, own ETS table,
+supervised in `Magus.Application` alongside `Integrations.RateLimiter`):
+exposes `check(scope, key) :: :ok | {:error, :rate_limited}` with limits
+from config:
 
 ```elixir
 config :magus, :auth_rate_limits,
   enabled: false,
   register: {5, :hour},              # per IP
-  sign_in: {10, :minute},            # per IP
+  sign_in: {20, :minute},            # per IP; see double-count note below
   magic_link: {3, :hour},            # per email
   magic_link_global: {100, :hour},   # per node
   password_reset: {3, :hour},        # per email
@@ -231,14 +244,29 @@ attempts, because `SignInLive` runs `:sign_in_with_password` via
 **before** calling `Form.submit/2`, showing a flash on limit. The plug stays
 as the backstop for direct scripted POSTs that bypass LiveView entirely.
 Both layers share one scope, so attempts through either path consume the
-same budget.
+same budget. Known double-count: a *successful* UI sign-in consumes two
+units (the LiveView check plus the triggered POST hitting the plug); failed
+attempts, the case that matters, consume one. Distinguishing "the POST that
+LiveView itself triggered" from a scripted POST would need a signed
+one-shot marker, which is not worth it; the limit is sized ({20, :minute})
+so ten successful logins per minute per IP still fit (relevant for NATed
+offices).
 
 **Action-level enforcement**: `:request_magic_link` and
 `:request_password_reset_token` currently `run` the library implementations
 directly. Each gets a small wrapper implementation
 (`Magus.Accounts.User.Actions.RateLimited{MagicLinkRequest,PasswordResetRequest}`)
 that checks the per-email scope and the global scope, then delegates to the
-library module unchanged.
+library module unchanged. One asymmetry: the **magic-link** wrapper consumes
+the global budget on every request, because the library sends mail for
+unknown addresses too (`registration_enabled?`). The **reset** wrapper must
+NOT: the library sends nothing for unknown addresses, so consuming the
+global budget up front would let an attacker exhaust it with arbitrary
+nonexistent emails and deny resets to real users. The reset wrapper
+therefore performs its own `get_by_email` lookup first; unknown address
+means return `:ok` silently without touching the global counter (identical
+external response, and the library does the same lookup anyway), known
+address means consume per-email + global, then delegate.
 
 **Honest UX limits of the wrappers**: our own `SignInLive` magic-link
 handler currently ignores the `Ash.run_action/2` result and always reports
@@ -270,18 +298,23 @@ non-committal. Documented here so nobody expects a reset-side error flash.
 `true`).
 
 Enforcement in the agent pre-flight
-(`Magus.Agents.Plugins.Support.Preflight`), in **both** turn paths:
+(`Magus.Agents.Plugins.Support.Preflight`), in `build_react_signal/3` (new
+turns), alongside the existing spend-gate block. The subject is the
+**acting member** already computed there (`Helpers.acting_user_id/2`, the
+triggering member with owner fallback, per magus-k3at), NOT the
+conversation owner: in a shared conversation an unconfirmed member must not
+ride on a confirmed owner's status, and the spend gate already uses exactly
+this subject.
 
-- `build_react_signal/3` (new turns), alongside the existing spend-gate
-  block. The subject is the **acting member** already computed there
-  (`Helpers.acting_user_id/2`, the triggering member with owner fallback,
-  per magus-k3at), NOT the conversation owner: in a shared conversation an
-  unconfirmed member must not ride on a confirmed owner's status, and the
-  spend gate already uses exactly this subject.
-- `build_resume_react_signal/2` (mid-turn recovery/resume), which is a
-  separate path that skips the new-turn gates and issues its own LLM signal;
-  without the check there, an unconfirmed user's interrupted turn would
-  resume past the gate.
+The resume path (`build_resume_react_signal/2`) deliberately gets **no**
+gate: resume signals carry no acting-user identity (only reason and task
+counts, see `SubAgent.Resumer`), so a resume-path check could only test the
+state owner, which is the wrong subject in shared conversations. And it is
+unnecessary: an unconfirmed member's turn is blocked at `build_react_signal`
+before any work starts, so there is never a gated user's turn in flight to
+resume. A turn that is resumable already passed the gate at initiation;
+letting it finish after a mid-turn config flip is the correct behaviour
+anyway.
 
 When enabled and the subject's `confirmed_at` is `nil`, the turn is blocked
 via the existing machinery (`settle_blocked_run/2` plus a persisted event
@@ -300,7 +333,11 @@ the agent pipeline) and already owns blocked-turn semantics.
   verified: accepts an explicitly built changeset outside the
   monitored-field flow) and invokes the existing
   `SendNewUserConfirmationEmail` sender. Rate-limited per email
-  (`:resend_confirmation` scope).
+  (`:resend_confirmation` scope). **Guarded to unconfirmed users only**
+  (validation: `confirmed_at` is nil, otherwise a no-op success): without
+  the guard, an already-confirmed user could mint a fresh confirmation
+  token and re-run `:confirm`, whose change chain includes
+  `SendWelcomeEmail`.
 - Workbench banner for `email_confirmed? == false`: "Confirm your email to
   start chatting" plus the resend button. Signed-in browsing, settings, and
   reading existing content stay available; only agent turns are blocked.
@@ -323,6 +360,9 @@ trigger :reap_unconfirmed do
   action :reap_if_unconfirmed  # update action, receives the loaded user
   read_action :read_for_reaping
   worker_read_action :read_for_reaping
+  # Time-dependent filter: the matching set changes between batches, which
+  # is exactly the case ash_oban documents for :full_read over keyset.
+  stream_with :full_read
   # 1-day floor keeps fresh signups from generating hourly job churn; the
   # configured TTL (>= 1 day) is re-checked in the action.
   where expr(is_nil(confirmed_at) and inserted_at < ago(1, :day))
@@ -331,12 +371,22 @@ trigger :reap_unconfirmed do
 end
 ```
 
+The action follows the `:trigger_memory_consolidation` shape exactly:
+`accept []`, `transaction? false`, `require_atomic? false`, with the work
+in an `after_action` hook. The transaction opt-out matters, not just the
+shape: `AccountDeletion.execute/1` runs external cleanup (billing lifecycle
+hook) *before* opening its own repo transaction, and wrapping the whole
+action in Ash's default update transaction would pull that external call
+and the nested delete inside an outer transaction.
+
 Config: `config :magus, :unconfirmed_account_ttl_days, nil`. `nil` disables
-reaping (core default; self-hosters opt in), `magus-cloud` sets `7`. The
-minimum supported value is 1 day (the `where` floor). No warning emails.
-Note the scheduler still enqueues no-op jobs for day-old unconfirmed rows
-when the TTL is `nil`; the population is small and the action exits
-immediately, which we accept for config simplicity.
+reaping (core default; self-hosters opt in), `magus-cloud` sets `7`.
+Validated at boot in `runtime.exs`: `nil` or an integer `>= 1` (the `where`
+floor makes smaller values silently behave as 1 day, so they are rejected
+loudly instead). No warning emails. Note the scheduler still enqueues no-op
+jobs for day-old unconfirmed rows when the TTL is `nil`; the population is
+small and the action exits immediately, which we accept for config
+simplicity.
 
 `:reap_if_unconfirmed` re-checks everything at execution time rather than
 trusting the trigger filter: TTL configured, `confirmed_at` still `nil`,
@@ -348,21 +398,27 @@ which runs the billing lifecycle hook before the transaction.
 **Ownership guards** (the `create_org` signup flag means an unconfirmed user
 can own real structure):
 
-- *Sole-admin workspaces*: `AccountDeletion` refuses to delete a sole admin.
-  If every workspace the user solely administers has no other active member,
-  the reaper deletes those workspaces first, then the account. Any such
-  workspace with other active members: skip the user, log a warning, never
-  orphan a shared structure.
-- *Owned organizations*: `organizations.owner_id` is a non-null FK to users
-  that `AccountDeletion` does **not** clean up (it removes
+- *Owned organizations*: **skip, always.** `organizations.owner_id` is a
+  non-null FK to users that `AccountDeletion` does not clean up (it removes
   `organization_members` rows only), so an owned org would abort the user
-  delete at the FK. Same rule as workspaces: if the user is the only active
-  member of an org they own, the reaper deletes the organization (and its
-  shared workspace) before the account, going through the organization's
-  own teardown so billing hooks run; if the org has other active members,
-  skip and warn. The skip-and-warn cases should be rare enough that a log
-  line is the right observability; if the logs show volume, that is a
-  product problem, not a reaper problem.
+  delete at the FK. Critically, no hard-delete path for organizations
+  exists to delegate to: `Organization` exposes only the soft-delete
+  `:archive` (stamps `archived_at`, deactivates workspaces, removes
+  members; the row and its `owner_id` remain). Archiving first then
+  deleting also breaks ordering: archive deactivates the memberships that
+  workspace deletion requires its actor to hold. Building organization
+  hard-delete teardown for this edge case is out of scope; v1 reaps
+  nothing that owns an organization, logs a warning, and a beads follow-up
+  tracks org teardown. If the logs show volume, unconfirmed org creation
+  is a product problem, not a reaper problem.
+- *Sole-admin workspaces* (workspaces can exist outside orgs):
+  `AccountDeletion` refuses to delete a sole admin. If every workspace the
+  user solely administers has no other active member, the reaper deletes
+  those workspaces first via the existing `WorkspaceDeletion` path **with
+  the user as actor while their membership is still active** (the deletion
+  path requires an active admin actor), then deletes the account. Any such
+  workspace with other active members: skip and warn, never orphan a
+  shared structure.
 
 ## Config summary
 
@@ -375,9 +431,9 @@ can own real structure):
 | `:unconfirmed_account_ttl_days` | `nil` (off) | `7` |
 
 All runtime-configurable via `runtime.exs` env vars. `magus-cloud` changes
-are limited to `runtime.exs` entries, Fly secrets, the endpoint
-`connect_info` mirror, and the `MAGUS_CORE_REF` bump; the wrapper's
-mirrored-config note in `config/config.exs` gains the new keys.
+are limited to `runtime.exs` entries, Fly secrets, and the
+`MAGUS_CORE_REF` bump; the wrapper's mirrored-config note in
+`config/config.exs` gains the new keys.
 
 ## Testing
 
@@ -393,17 +449,19 @@ mirrored-config note in `config/config.exs` gains the new keys.
   socket events and direct POSTs still cap at the configured limit.
 - Action wrappers: per-email and global scopes both enforced; under the
   limit, behavior is identical to the library implementations; magic-link
-  LiveView surfaces the limit flash; reset stays silent by design.
-- Preflight gate: unconfirmed acting member blocked (new-turn AND resume
-  paths) with a persisted event message and no LLM call; confirmed member
-  in a shared conversation with an unconfirmed owner is NOT blocked (and
-  vice versa: unconfirmed member with confirmed owner IS blocked); gate off
-  unchanged.
+  LiveView surfaces the limit flash; reset stays silent by design; reset
+  requests for nonexistent addresses do NOT consume the global budget.
+- Preflight gate: unconfirmed acting member blocked on new turns with a
+  persisted event message and no LLM call; confirmed member in a shared
+  conversation with an unconfirmed owner is NOT blocked (and vice versa:
+  unconfirmed member with confirmed owner IS blocked); resume path
+  unaffected; gate off unchanged.
 - `:resend_confirmation`: sends via the existing sender; self-only policy;
-  rate-limited.
-- Reaper: past-TTL unconfirmed user deleted (with solo workspace and solo
-  owned org variants); confirmed or recent users untouched; TTL `nil`
-  no-ops; shared workspace/org cases skip and log.
+  rate-limited; no-op for already-confirmed users (no welcome-email
+  replay).
+- Reaper: past-TTL unconfirmed user deleted (plain and solo-workspace
+  variants); confirmed or recent users untouched; TTL `nil` no-ops; org
+  owners and shared workspaces skip and log; TTL `0` rejected at boot.
 - LiveView: widget renders only when enabled; magic-link submit without a
   valid token is rejected and the widget reset event is pushed.
 
@@ -422,6 +480,28 @@ Everything defaults off, so the existing suite (7116 tests) runs unchanged.
    to confirm via the gate banner before deletion starts.
 
 ## Review log
+
+Round 2 (Codex, 2026-08-16): 9 of 14 round-1 folds confirmed resolved. New
+findings folded: `FixedWindow`/`AuthRateLimiter` ETS lifecycle (owned named
+table, supervised, periodic expired-bucket sweep); org teardown claim was
+wrong (no `Organization` destroy action exists; v1 now skips org owners
+outright with a follow-up for real teardown, and workspace deletion is
+ordered before any deactivation with the user as still-active actor);
+reaper action declared `transaction? false` / `require_atomic? false`
+(external billing hook must not run inside an Ash update transaction);
+resume-path gate REMOVED rather than fixed (resume signals carry no acting
+user; nothing gated can be in flight to resume); reset wrapper no longer
+consumes the global budget for nonexistent addresses (global-cap DoS);
+LiveView client IP moved from `connect_info` (`:x_headers` cannot carry
+`fly-client-ip`) to a session-capture plug; `stream_with :full_read` on
+the time-dependent trigger; widget reset extended to wrapper errors;
+resend guarded to unconfirmed users (welcome-email replay); TTL boot
+validation (`nil` or `>= 1`); sign-in limit raised to {20, :minute} with
+the successful-login double-count documented. Round-2 finding 14 (CSP
+`script-src 'self'`) was checked and is a misread: `core_pipelines`
+calls `put_secure_browser_headers` with no arguments, so the Phoenix
+default applies (no `script-src`), as round 1 correctly found; the spec
+text stands.
 
 Round 1 (Codex, 2026-08-16): 7 claims checked (5 confirmed, claim 3 refined:
 `:admin_create_test_user` is a third create path, admin-only and
