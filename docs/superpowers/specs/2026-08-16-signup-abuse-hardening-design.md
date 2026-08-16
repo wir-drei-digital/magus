@@ -68,19 +68,24 @@ green and imposes no third-party accounts on OSS users.
 LiveViews, and the captcha `remoteip` parameter.
 
 - HTTP: reads `config :magus, :client_ip_header` (default `nil` meaning use
-  `conn.remote_ip`). When set, takes the **first** value of the named header,
-  parses it with `:inet.parse_address/1`, and falls back to `conn.remote_ip`
-  on absence or malformed input (mirroring `Plug.RewriteOn` semantics).
-  Returns an `:inet.ip_address()` tuple; callers needing a string use
-  `:inet.ntoa/1`. The header is only trusted when explicitly configured;
+  `conn.remote_ip`). When set, takes the **first** value of the named
+  header, converts the binary with `String.to_charlist/1` and parses via
+  `:inet.parse_address/1` (which takes charlists, not binaries; same as
+  `Plug.RewriteOn`), falling back to `conn.remote_ip` on absence or
+  malformed input. Returns an `:inet.ip_address()` tuple; callers needing a
+  string (the Turnstile `remoteip` form field, session storage) use
+  `to_string(:inet.ntoa(ip))`, since `:inet.ntoa/1` returns a charlist.
+  The header is only trusted when explicitly configured;
   trusting `x-forwarded-for` unconditionally would let attackers pick their
   own rate-limit key. No proxy-IP rewriting exists in the endpoint today,
   and prod runs behind Fly's edge, so `magus-cloud` sets `"fly-client-ip"`.
 - LiveView: `connect_info` cannot deliver the Fly header (`:x_headers` only
   passes `x-`-prefixed names, and `fly-client-ip` is not one), and
   `:peer_data` would only yield the proxy address. Instead, a
-  `MagusWeb.Plugs.CaptureClientIP` plug in the `:browser` pipeline resolves
-  the IP on the initial HTTP request and stores it in the session;
+  `MagusWeb.Plugs.CaptureClientIP` plug in the `:browser` pipeline,
+  **placed after `:fetch_session`** (`put_session/3` raises on an
+  unfetched session), resolves the IP on the initial HTTP request and
+  stores it in the session;
   LiveViews read it from the session in `mount` and keep it in an assign.
   The value is the IP at page load rather than at event time, which is fine
   for rate-limit keying. No endpoint `connect_info` changes needed.
@@ -207,8 +212,12 @@ acceptable for these limits.
 Because the window bucket is part of the key, expired buckets accumulate:
 every distinct (key, bucket) pair an attacker touches is a row. So the
 table lifecycle is explicit: each owning GenServer creates its named public
-table and runs a periodic sweep (5 min) deleting rows whose bucket is past,
-the same shape as `Integrations.RateLimiter`'s existing cleanup timer.
+table and runs a periodic sweep (5 min) deleting expired rows, the same
+shape as `Integrations.RateLimiter`'s existing cleanup timer. One table
+mixes minute and hour windows, so a bare bucket index cannot tell the
+sweeper what "expired" means; the key is
+`{scope, key, window_ms, bucket_index}`, and a row is expired when
+`(bucket_index + 1) * window_ms <= now`.
 
 **`Magus.Accounts.AuthRateLimiter`** (new GenServer, own ETS table,
 supervised in `Magus.Application` alongside `Integrations.RateLimiter`):
@@ -371,13 +380,38 @@ trigger :reap_unconfirmed do
 end
 ```
 
-The action follows the `:trigger_memory_consolidation` shape exactly:
+The action follows the `:trigger_memory_consolidation` shape:
 `accept []`, `transaction? false`, `require_atomic? false`, with the work
 in an `after_action` hook. The transaction opt-out matters, not just the
 shape: `AccountDeletion.execute/1` runs external cleanup (billing lifecycle
 hook) *before* opening its own repo transaction, and wrapping the whole
 action in Ash's default update transaction would pull that external call
 and the nested delete inside an outer transaction.
+
+**The reap race and the claim step.** `transaction? false` also means no
+work transaction and no `FOR UPDATE` lock, so between the worker reading
+`confirmed_at == nil` and the delete, the user could click their
+confirmation link; deleting a just-confirmed account is unacceptable. The
+reaper therefore starts with an atomic claim:
+
+1. New attribute `reap_claimed_at :: utc_datetime_usec` (internal, not
+   public). The worker's first step is a filtered atomic update: set
+   `reap_claimed_at = now()` where `confirmed_at IS NULL AND
+   reap_claimed_at IS NULL` (single UPDATE, the filter is the
+   compare-and-swap). No row claimed means the user confirmed since
+   scheduling: job exits as a no-op.
+2. The `:confirm` action gains a validation rejecting confirmation when
+   `reap_claimed_at` is set ("this confirmation link has expired"), so a
+   click landing after the claim cannot race the delete. With a 7-day TTL,
+   only clicks in the final seconds ever see this.
+3. Ownership checks (orgs, workspaces) run after the claim. Residual race:
+   an org created in the milliseconds between the ownership check and the
+   delete aborts the delete transaction at the `owner_id` FK, the whole
+   delete rolls back, the job errors, and the retry skips the user via the
+   ownership guard. Accepted: the failure mode is a rolled-back delete and
+   a log line, not data loss. (The pre-transaction billing hook may have
+   run by then; for reap targets that is the no-op/free-plan path, and the
+   hook is idempotent by design.)
 
 Config: `config :magus, :unconfirmed_account_ttl_days, nil`. `nil` disables
 reaping (core default; self-hosters opt in), `magus-cloud` sets `7`.
@@ -413,12 +447,23 @@ can own real structure):
   is a product problem, not a reaper problem.
 - *Sole-admin workspaces* (workspaces can exist outside orgs):
   `AccountDeletion` refuses to delete a sole admin. If every workspace the
-  user solely administers has no other active member, the reaper deletes
-  those workspaces first via the existing `WorkspaceDeletion` path **with
-  the user as actor while their membership is still active** (the deletion
-  path requires an active admin actor), then deletes the account. Any such
-  workspace with other active members: skip and warn, never orphan a
-  shared structure.
+  user solely administers has no other active member, those workspaces are
+  deleted via the existing `WorkspaceDeletion` path **with the user as
+  actor while their membership is still active** (the deletion path
+  requires an active admin actor). Ordering matters: `AccountDeletion`
+  guarantees the billing lifecycle hook runs before any destructive write
+  and that hook failure leaves the DB untouched; deleting workspaces
+  before calling it would break that guarantee (hook fails, user survives,
+  workspaces are gone). So `AccountDeletion.execute/2` gains an
+  `after_lifecycle_hook` callback option, and the reaper passes the
+  solo-workspace teardown there: hook first, then workspace teardown, then
+  the delete transaction. Any such workspace with other active members:
+  skip and warn, never orphan a shared structure.
+- All of the reaper's ownership and membership lookups run with
+  `authorize?: false`: there is no human actor in the Oban context, and
+  the user-facing policies (e.g. organization reads require an active
+  member actor) would silently hide exactly the rows the guards must see.
+  This matches how `AccountDeletion`'s own preflight already queries.
 
 ## Config summary
 
@@ -461,7 +506,10 @@ are limited to `runtime.exs` entries, Fly secrets, and the
   replay).
 - Reaper: past-TTL unconfirmed user deleted (plain and solo-workspace
   variants); confirmed or recent users untouched; TTL `nil` no-ops; org
-  owners and shared workspaces skip and log; TTL `0` rejected at boot.
+  owners and shared workspaces skip and log; TTL `0` rejected at boot;
+  claim race (user confirmed between scheduling and claim means no-op;
+  `:confirm` after claim is rejected); lifecycle-hook failure leaves
+  workspaces intact (`after_lifecycle_hook` ordering).
 - LiveView: widget renders only when enabled; magic-link submit without a
   valid token is rejected and the widget reset event is pushed.
 
@@ -470,7 +518,7 @@ Everything defaults off, so the existing suite (7116 tests) runs unchanged.
 ## Rollout
 
 1. Land in core, bump `MAGUS_CORE_REF` in `magus-cloud`, mirror the new
-   config keys and endpoint `connect_info`.
+   config keys.
 2. Set Fly secrets, flip the cloud config flags (captcha + rate limits +
    gate first).
 3. Watch: registration conversion (captcha too aggressive?), rate-limit
@@ -480,6 +528,20 @@ Everything defaults off, so the existing suite (7116 tests) runs unchanged.
    to confirm via the gate banner before deletion starts.
 
 ## Review log
+
+Round 3 (Codex, 2026-08-16): all round-2 folds confirmed; CSP pushback
+accepted (round-2 #14 cited nonexistent file paths; Phoenix default CSP has
+no `script-src`). New findings folded: charlist/binary conversions
+specified for `:inet.parse_address/1` and `:inet.ntoa/1`;
+`CaptureClientIP` explicitly ordered after `:fetch_session`; obsolete
+`connect_info` rollout mention removed; fixed-window keys now carry
+`window_ms` so the sweeper can compute expiry across mixed windows; reap
+race closed with an atomic `reap_claimed_at` claim plus a `:confirm`
+validation (residual org-creation race documented as a benign FK
+rollback); workspace teardown moved behind the billing lifecycle hook via
+a new `AccountDeletion.execute/2` `after_lifecycle_hook` option; reaper
+ownership lookups specified as `authorize?: false` (no human actor in the
+Oban context).
 
 Round 2 (Codex, 2026-08-16): 9 of 14 round-1 folds confirmed resolved. New
 findings folded: `FixedWindow`/`AuthRateLimiter` ETS lifecycle (owned named
