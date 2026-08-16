@@ -59,4 +59,28 @@ defmodule Magus.CaptchaTest do
     Application.put_env(:magus, :captcha, site_key: "sk", secret_key: nil)
     assert_raise RuntimeError, ~r/half-configured/, &Magus.Captcha.validate_config!/0
   end
+
+  test "empty-string keys count as unset: disabled, not half-configured" do
+    Application.put_env(:magus, :captcha, site_key: "", secret_key: "")
+    assert :ok == Magus.Captcha.validate_config!()
+    refute Magus.Captcha.enabled?()
+  end
+
+  test "one empty key and one set key is half-configuration: validate_config! raises" do
+    Application.put_env(:magus, :captcha, site_key: "", secret_key: "sec")
+    assert_raise RuntimeError, ~r/half-configured/, &Magus.Captcha.validate_config!/0
+  end
+
+  test "an empty-string secret with a real site key does not enable captcha" do
+    Application.put_env(:magus, :captcha,
+      impl: Magus.CaptchaImplMock,
+      site_key: "sk",
+      secret_key: ""
+    )
+
+    refute Magus.Captcha.enabled?()
+    # Disabled means verify/2 short-circuits to :ok without calling the impl,
+    # even with an empty secret — never a silent Cloudflare test-key fallback.
+    assert :ok == Magus.Captcha.verify(%{}, nil)
+  end
 end

@@ -240,6 +240,11 @@ defmodule MagusWeb.OnboardingLive.RegisterLiveTest do
       {:ok, _view, html} = live(conn, ~p"/register")
 
       assert html =~ "cf-turnstile"
+      # The widget must render OUR configured site key, not phoenix_turnstile's
+      # own default (Cloudflare's always-pass TEST key) — proves the coupling
+      # to Magus.Captcha.site_key/0 is wired, not accidentally relying on the
+      # boot-time copy into :phoenix_turnstile app env.
+      assert html =~ ~s(data-sitekey="sk")
     end
   end
 

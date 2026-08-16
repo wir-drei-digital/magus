@@ -215,8 +215,16 @@ defmodule MagusWeb.OnboardingLive.SignInLive do
            |> Ash.run_action(authorize?: false) do
       {:noreply, socket |> assign(:magic_link_sent, true) |> assign(:magic_link_email, email)}
     else
-      {:error, reason}
-      when reason in [:missing_token, :invalid_token, :verification_unavailable] ->
+      {:error, :verification_unavailable} ->
+        {:noreply,
+         socket
+         |> put_flash(
+           :error,
+           gettext("Verification is temporarily unavailable. Please try again.")
+         )
+         |> Turnstile.refresh()}
+
+      {:error, reason} when reason in [:missing_token, :invalid_token] ->
         {:noreply,
          socket
          |> put_flash(:error, gettext("Captcha verification failed. Please try again."))

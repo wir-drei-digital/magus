@@ -222,6 +222,11 @@ defmodule MagusWeb.OnboardingLive.SignInLiveTest do
       {:ok, _view, html} = live(conn, ~p"/sign-in")
 
       assert html =~ "cf-turnstile"
+      # The widget must render OUR configured site key, not phoenix_turnstile's
+      # own default (Cloudflare's always-pass TEST key) — proves the coupling
+      # to Magus.Captcha.site_key/0 is wired, not accidentally relying on the
+      # boot-time copy into :phoenix_turnstile app env.
+      assert html =~ ~s(data-sitekey="sk")
     end
 
     test "magic-link request without a token shows a captcha error and does not send", %{
@@ -255,6 +260,26 @@ defmodule MagusWeb.OnboardingLive.SignInLiveTest do
         |> render_submit(%{"email" => "user@example.com", "cf-turnstile-response" => "tok"})
 
       assert html =~ "Check your email for a sign-in link!"
+    end
+
+    test "magic-link request whose verification is unavailable shows the distinct flash", %{
+      conn: conn
+    } do
+      enable_captcha!()
+
+      expect(Magus.CaptchaImplMock, :verify, fn %{"cf-turnstile-response" => "tok"}, _ip ->
+        {:error, :timeout}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/sign-in")
+
+      html =
+        view
+        |> element("form[phx-submit='request_magic_link']")
+        |> render_submit(%{"email" => "user@example.com", "cf-turnstile-response" => "tok"})
+
+      assert html =~ "temporarily unavailable"
+      refute html =~ "Check your email for a sign-in link!"
     end
   end
 end

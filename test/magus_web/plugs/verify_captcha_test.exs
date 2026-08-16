@@ -29,8 +29,8 @@ defmodule MagusWeb.Plugs.VerifyCaptchaTest do
 
   defp flash_error(conn), do: Phoenix.Flash.get(conn.assigns.flash, :error) || ""
 
-  defp register_params(email) do
-    %{
+  defp register_params(email, token \\ nil) do
+    base = %{
       "user" => %{
         "name" => "Test User",
         "email" => email,
@@ -40,6 +40,11 @@ defmodule MagusWeb.Plugs.VerifyCaptchaTest do
         "accepted_age_requirement" => "true"
       }
     }
+
+    # The Turnstile widget's response token is a sibling form field, not
+    # namespaced under "user[...]" — mirrors how MagusWeb.CaptchaComponents
+    # renders it (outside the `user[...]` input group).
+    if token, do: Map.put(base, "cf-turnstile-response", token), else: base
   end
 
   describe "captcha enabled" do
@@ -76,6 +81,52 @@ defmodule MagusWeb.Plugs.VerifyCaptchaTest do
       conn = post(conn, ~p"/auth/user/password/sign_in", %{"user" => %{}})
 
       refute flash_error(conn) =~ "Captcha"
+    end
+
+    test "a valid token passes the plug and reaches the auth controller", %{conn: conn} do
+      enable!()
+      email = "captcha-valid-#{System.unique_integer([:positive])}@example.com"
+
+      expect(Magus.CaptchaImplMock, :verify, fn %{"cf-turnstile-response" => "tok"}, _ip ->
+        {:ok, %{"success" => true}}
+      end)
+
+      conn = post(conn, ~p"/auth/user/password/register", register_params(email, "tok"))
+
+      refute flash_error(conn) =~ "Captcha"
+      assert user_exists?(email)
+    end
+
+    test "cloudflare rejection (success: false) denies with the generic captcha flash", %{
+      conn: conn
+    } do
+      enable!()
+      email = "captcha-rejected-#{System.unique_integer([:positive])}@example.com"
+
+      expect(Magus.CaptchaImplMock, :verify, fn _params, _ip ->
+        {:error, %{"success" => false}}
+      end)
+
+      conn = post(conn, ~p"/auth/user/password/register", register_params(email, "bad-tok"))
+
+      assert redirected_to(conn) == "/register"
+      assert flash_error(conn) =~ "Captcha verification failed"
+      refute user_exists?(email)
+    end
+
+    test "a transport failure denies with the distinct verification-unavailable flash", %{
+      conn: conn
+    } do
+      enable!()
+      email = "captcha-timeout-#{System.unique_integer([:positive])}@example.com"
+
+      expect(Magus.CaptchaImplMock, :verify, fn _params, _ip -> {:error, :timeout} end)
+
+      conn = post(conn, ~p"/auth/user/password/register", register_params(email, "tok"))
+
+      assert redirected_to(conn) == "/register"
+      assert flash_error(conn) =~ "temporarily unavailable"
+      refute user_exists?(email)
     end
   end
 

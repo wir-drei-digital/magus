@@ -51,6 +51,13 @@
       window.dispatchEvent(new Event('mermaid:loaded'));
     </script>
     <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
+    <%!-- Cloudflare Turnstile's own script must load (and execute) before
+    app.js's LiveSocket mounts the Turnstile hook, or `mounted()` references
+    a `window.turnstile` that doesn't exist yet. Both tags are `defer`, so the
+    browser runs them in document order regardless of fetch timing — this one
+    has to come first. Gated on Magus.Captcha.enabled?() so the CF script
+    (and its network request) is never loaded when captcha is off. --%>
+    <Turnstile.script :if={Magus.Captcha.enabled?()} />
     <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
     </script>
     <script>

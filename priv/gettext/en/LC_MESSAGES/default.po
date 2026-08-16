@@ -1353,17 +1353,18 @@ msgstr ""
 msgid "Too many attempts. Please try again later."
 msgstr ""
 
-#: lib/magus_web/onboarding/sign_in_live.ex:228
+#: lib/magus_web/onboarding/sign_in_live.ex:236
 #, elixir-autogen, elixir-format
 msgid "Too many requests. Please try again later."
 msgstr ""
 
-#: lib/magus_web/onboarding/sign_in_live.ex:222
+#: lib/magus_web/onboarding/sign_in_live.ex:230
 #: lib/magus_web/plugs/verify_captcha.ex:46
 #, elixir-autogen, elixir-format
 msgid "Captcha verification failed. Please try again."
 msgstr ""
 
+#: lib/magus_web/onboarding/sign_in_live.ex:223
 #: lib/magus_web/plugs/verify_captcha.ex:42
 #, elixir-autogen, elixir-format
 msgid "Verification is temporarily unavailable. Please try again."
