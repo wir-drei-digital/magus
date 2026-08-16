@@ -142,4 +142,53 @@ defmodule MagusWeb.OnboardingLive.SignInLiveTest do
       assert html =~ "Check your email for a sign-in link!"
     end
   end
+
+  describe "rate limiting (signup-abuse hardening)" do
+    setup do
+      original = Application.get_env(:magus, :auth_rate_limits)
+      on_exit(fn -> Application.put_env(:magus, :auth_rate_limits, original) end)
+      :ok
+    end
+
+    test "password sign-in over the limit shows a flash and does not submit", %{conn: conn} do
+      Application.put_env(:magus, :auth_rate_limits, enabled: true, sign_in: {0, :minute})
+
+      # Valid credentials for an existing user: if the sign-in action ran, this
+      # would succeed and flip trigger_action to true. It must not run.
+      email = unique_email()
+      password = "ValidPassword123!"
+      generate(user(email: email, password: password))
+
+      {:ok, view, _html} = live(conn, ~p"/sign-in")
+
+      html =
+        view
+        |> form("#password-sign-in-form",
+          user: %{
+            email: email,
+            password: password
+          }
+        )
+        |> render_submit()
+
+      assert html =~ "Too many attempts"
+      refute html =~ "phx-trigger-action"
+    end
+
+    test "magic-link request over the limit shows an error flash instead of success", %{
+      conn: conn
+    } do
+      Application.put_env(:magus, :auth_rate_limits, enabled: true, magic_link: {0, :hour})
+
+      {:ok, view, _html} = live(conn, ~p"/sign-in")
+
+      html =
+        view
+        |> element("form[phx-submit='request_magic_link']")
+        |> render_submit(%{email: "user@example.com"})
+
+      assert html =~ "Too many requests"
+      refute html =~ "Check your email for a sign-in link!"
+    end
+  end
 end

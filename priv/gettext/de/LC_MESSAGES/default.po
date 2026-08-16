@@ -109,8 +109,8 @@ msgid "Could not join conversation. You may already be a member."
 msgstr "Konnte der Unterhaltung nicht beitreten. Du bist möglicherweise bereits Mitglied."
 
 #: lib/magus_web/onboarding/register_live.ex:117
-#: lib/magus_web/onboarding/sign_in_live.ex:77
-#: lib/magus_web/onboarding/sign_in_live.ex:150
+#: lib/magus_web/onboarding/sign_in_live.ex:79
+#: lib/magus_web/onboarding/sign_in_live.ex:152
 #, elixir-autogen, elixir-format
 msgid "Email"
 msgstr "E-Mail"
@@ -257,7 +257,7 @@ msgid "Owner"
 msgstr "Inhaber"
 
 #: lib/magus_web/onboarding/register_live.ex:128
-#: lib/magus_web/onboarding/sign_in_live.ex:86
+#: lib/magus_web/onboarding/sign_in_live.ex:88
 #, elixir-autogen, elixir-format
 msgid "Password"
 msgstr "Passwort"
@@ -474,7 +474,7 @@ msgid "Dashboard"
 msgstr "Dashboard"
 
 #: lib/magus_web/components/layouts.ex:312
-#: lib/magus_web/onboarding/sign_in_live.ex:123
+#: lib/magus_web/onboarding/sign_in_live.ex:125
 #, elixir-autogen, elixir-format
 msgid "Sign in"
 msgstr "Anmelden"
@@ -673,7 +673,7 @@ msgstr "gerade eben"
 
 #: lib/magus_web/onboarding/create_organization_live.ex:104
 #: lib/magus_web/onboarding/register_live.ex:219
-#: lib/magus_web/onboarding/sign_in_live.ex:127
+#: lib/magus_web/onboarding/sign_in_live.ex:129
 #, elixir-autogen, elixir-format
 msgid "or"
 msgstr "oder"
@@ -870,7 +870,7 @@ msgstr "AGBs"
 msgid "Impressum"
 msgstr "Impressum"
 
-#: lib/magus_web/onboarding/sign_in_live.ex:143
+#: lib/magus_web/onboarding/sign_in_live.ex:145
 #, elixir-autogen, elixir-format
 msgid "Check your email for a sign-in link!"
 msgstr "Überprüfe deine E-Mails auf einen Anmeldelink!"
@@ -897,12 +897,12 @@ msgstr "Ich akzeptiere die"
 msgid "I confirm that I am at least 16 years old"
 msgstr "Ich bestätige, dass ich mindestens 16 Jahre alt bin"
 
-#: lib/magus_web/onboarding/sign_in_live.ex:193
+#: lib/magus_web/onboarding/sign_in_live.ex:202
 #, elixir-autogen, elixir-format
 msgid "Invalid email or password"
 msgstr "Ungültige E-Mail oder Passwort"
 
-#: lib/magus_web/onboarding/sign_in_live.ex:119
+#: lib/magus_web/onboarding/sign_in_live.ex:121
 #, elixir-autogen, elixir-format
 msgid "Remember me for 30 days"
 msgstr "30 Tage angemeldet bleiben"
@@ -945,17 +945,17 @@ msgstr "Bitte fülle deine Daten aus, um loszulegen."
 msgid "Profile completed successfully!"
 msgstr "Profil erfolgreich vervollständigt!"
 
-#: lib/magus_web/onboarding/sign_in_live.ex:94
+#: lib/magus_web/onboarding/sign_in_live.ex:96
 #, elixir-autogen, elixir-format
 msgid "Forgot your password?"
 msgstr "Passwort vergessen?"
 
-#: lib/magus_web/onboarding/sign_in_live.ex:103
+#: lib/magus_web/onboarding/sign_in_live.ex:105
 #, elixir-autogen, elixir-format
 msgid "Need an account?"
 msgstr "Noch kein Konto?"
 
-#: lib/magus_web/onboarding/sign_in_live.ex:158
+#: lib/magus_web/onboarding/sign_in_live.ex:160
 #, elixir-autogen, elixir-format
 msgid "Request magic link"
 msgstr "Magic Link anfordern"
@@ -1346,3 +1346,14 @@ msgstr "Konfiguration"
 #, elixir-autogen, elixir-format
 msgid "Create an organization to invite teammates (optional)"
 msgstr "Erstelle eine Organisation, um Teammitglieder einzuladen (optional)"
+
+#: lib/magus_web/onboarding/sign_in_live.ex:184
+#: lib/magus_web/plugs/auth_rate_limit.ex:48
+#, elixir-autogen, elixir-format
+msgid "Too many attempts. Please try again later."
+msgstr "Zu viele Versuche. Bitte versuche es später erneut."
+
+#: lib/magus_web/onboarding/sign_in_live.ex:223
+#, elixir-autogen, elixir-format
+msgid "Too many requests. Please try again later."
+msgstr "Zu viele Anfragen. Bitte versuche es später erneut."

@@ -120,6 +120,7 @@ defmodule MagusWeb.CoreRouter do
         plug :accepts, ["html"]
         plug :fetch_session
         plug :fetch_live_flash
+        plug MagusWeb.Plugs.CaptureClientIP
         plug :put_root_layout, html: {MagusWeb.Layouts, :root}
         plug :protect_from_forgery
         plug :put_secure_browser_headers
@@ -128,6 +129,14 @@ defmodule MagusWeb.CoreRouter do
         plug :capture_invite_token
         plug MagusWeb.Plugs.SetLocale
         plug MagusWeb.Plugs.NextUiSwitch
+      end
+
+      # IP rate limits + (Task 3) captcha verification on the unauthenticated
+      # auth POST endpoints (signup-abuse spec). Layered onto `:browser` for
+      # the auth_routes scope only, not the whole browser surface.
+      pipeline :auth_abuse_guards do
+        plug MagusWeb.Plugs.AuthRateLimit
+        # plug MagusWeb.Plugs.VerifyCaptcha  # added in Task 3
       end
 
       # AshTypescript RPC for the SvelteKit workbench (frontend/). Same-origin,
@@ -351,7 +360,7 @@ defmodule MagusWeb.CoreRouter do
       end
 
       scope "/", MagusWeb do
-        pipe_through :browser
+        pipe_through [:browser, :auth_abuse_guards]
 
         # Vanity redirect for the magus CLI installer
         get "/install.sh", Content.InstallScriptController, :show

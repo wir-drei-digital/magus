@@ -770,8 +770,9 @@ defmodule Magus.Accounts.User do
         allow_nil? false
       end
 
-      # creates a reset token and invokes the relevant senders
-      run {AshAuthentication.Strategy.Password.RequestPasswordReset, action: :get_by_email}
+      # creates a reset token and invokes the relevant senders, gated by
+      # per-email + global rate limits (signup-abuse spec, Task 2)
+      run Magus.Accounts.User.Actions.RateLimitedPasswordResetRequest
     end
 
     read :get_by_email do
@@ -858,7 +859,8 @@ defmodule Magus.Accounts.User do
         allow_nil? false
       end
 
-      run AshAuthentication.Strategy.MagicLink.Request
+      # gated by per-email + global rate limits (signup-abuse spec, Task 2)
+      run Magus.Accounts.User.Actions.RateLimitedMagicLinkRequest
     end
   end
 

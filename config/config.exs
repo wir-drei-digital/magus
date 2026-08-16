@@ -355,6 +355,12 @@ config :magus, :auth_rate_limits,
   password_reset_global: {100, :hour},
   resend_confirmation: {3, :hour}
 
+# Trusted proxy header carrying the real client IP (e.g. "fly-client-ip" in
+# the cloud edition, set behind Fly's proxy). `nil` means trust only
+# `conn.remote_ip` — never trust an unconfigured header, or a client can pick
+# its own rate-limit key. See MagusWeb.ClientIP.
+config :magus, :client_ip_header, nil
+
 # Chat domain configuration
 config :magus, Magus.Chat, unfiled_conversations_limit: 20
 
