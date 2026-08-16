@@ -64,34 +64,39 @@ defmodule Magus.Integrations.RateLimiter do
   @doc """
   Get the current rate limit status for a user/provider/operation.
 
-  Returns `{current_count, limit, window_ms_remaining}`.
+  Returns `{current_count, limit, window_ms_remaining}`, reading the
+  current FixedWindow bucket (see `check/3`) for this key.
   """
   @spec status(String.t(), atom(), atom()) ::
           {non_neg_integer(), pos_integer(), non_neg_integer()}
   def status(user_id, provider_key, operation) do
-    key = {user_id, provider_key, operation}
     {limit, window} = get_limit(provider_key, operation)
     window_ms = window_to_ms(window)
-    now = System.monotonic_time(:millisecond)
+    now = System.system_time(:millisecond)
+    bucket = div(now, window_ms)
+    ets_key = {provider_key, {user_id, operation}, window_ms, bucket}
+    remaining = window_ms - rem(now, window_ms)
 
-    case :ets.lookup(:integration_rate_limits, key) do
-      [{^key, count, window_start}] when now - window_start < window_ms ->
-        remaining = window_ms - (now - window_start)
-        {count, limit, remaining}
-
-      _ ->
-        {0, limit, window_ms}
+    case :ets.lookup(:integration_rate_limits, ets_key) do
+      [{^ets_key, count}] -> {count, limit, remaining}
+      [] -> {0, limit, remaining}
     end
   end
 
   @doc """
   Reset rate limits for a specific user/provider/operation.
   Useful for testing or admin overrides.
+
+  Deletes all FixedWindow buckets (any window size, any bucket index) for
+  this user/provider/operation key.
   """
   @spec reset(String.t(), atom(), atom()) :: :ok
   def reset(user_id, provider_key, operation) do
-    key = {user_id, provider_key, operation}
-    :ets.delete(:integration_rate_limits, key)
+    :ets.match_delete(
+      :integration_rate_limits,
+      {{provider_key, {user_id, operation}, :_, :_}, :_}
+    )
+
     :ok
   end
 
@@ -124,7 +129,6 @@ defmodule Magus.Integrations.RateLimiter do
   defp window_to_ms(:second), do: 1_000
   defp window_to_ms(:minute), do: 60_000
   defp window_to_ms(:hour), do: 3_600_000
-  defp window_to_ms(:day), do: 86_400_000
 
   defp schedule_cleanup do
     # Clean up expired entries every 5 minutes
