@@ -96,6 +96,7 @@ defmodule Magus.Application do
         # Integrations infrastructure
         Magus.Integrations.Vault,
         Magus.Integrations.RateLimiter,
+        Magus.Accounts.AuthRateLimiter,
         # MCP client process registry + dynamic supervisor
         Magus.MCP.Supervisor,
         # MCP registry discovery cache (browse the public server catalog)

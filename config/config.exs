@@ -342,6 +342,19 @@ config :magus, :provider_gate, Magus.Models.ProviderGate.Open
 # MAGUS_ALLOW_INSECURE_KNOWLEDGE_TRANSPORT=true (see runtime.exs).
 config :magus, :knowledge_transport, allow_insecure: false
 
+# Auth endpoint rate limits (signup-abuse spec). Off by default; the cloud
+# edition enables in prod. Sign-in note: a successful UI sign-in consumes
+# 2 units (LiveView check + triggered POST), failed attempts consume 1.
+config :magus, :auth_rate_limits,
+  enabled: false,
+  register: {5, :hour},
+  sign_in: {20, :minute},
+  magic_link: {3, :hour},
+  magic_link_global: {100, :hour},
+  password_reset: {3, :hour},
+  password_reset_global: {100, :hour},
+  resend_confirmation: {3, :hour}
+
 # Chat domain configuration
 config :magus, Magus.Chat, unfiled_conversations_limit: 20
 

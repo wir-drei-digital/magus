@@ -8,6 +8,8 @@ defmodule Magus.Integrations.RateLimiter do
 
   use GenServer
 
+  alias Magus.RateLimiting.FixedWindow
+
   @default_limits %{
     google_calendar: %{
       list_events: {100, :hour},
@@ -48,24 +50,15 @@ defmodule Magus.Integrations.RateLimiter do
   """
   @spec check(String.t(), atom(), atom()) :: :ok | {:error, :rate_limited}
   def check(user_id, provider_key, operation) do
-    key = {user_id, provider_key, operation}
     {limit, window} = get_limit(provider_key, operation)
     window_ms = window_to_ms(window)
-    now = System.monotonic_time(:millisecond)
 
-    case :ets.lookup(:integration_rate_limits, key) do
-      [{^key, count, window_start}] when now - window_start < window_ms ->
-        if count >= limit do
-          {:error, :rate_limited}
-        else
-          :ets.insert(:integration_rate_limits, {key, count + 1, window_start})
-          :ok
-        end
-
-      _ ->
-        :ets.insert(:integration_rate_limits, {key, 1, now})
-        :ok
-    end
+    FixedWindow.check(
+      :integration_rate_limits,
+      provider_key,
+      {user_id, operation},
+      {limit, window_ms}
+    )
   end
 
   @doc """
@@ -108,14 +101,14 @@ defmodule Magus.Integrations.RateLimiter do
   def init(_opts) do
     # Public access required since check/3 writes directly to ETS for performance.
     # Rate limiting is not security-critical - modifying limits doesn't expose sensitive data.
-    :ets.new(:integration_rate_limits, [:named_table, :public, :set])
+    :ets.new(:integration_rate_limits, [:named_table, :public, :set, write_concurrency: true])
     schedule_cleanup()
     {:ok, %{}}
   end
 
   @impl GenServer
   def handle_info(:cleanup, state) do
-    cleanup_expired_entries()
+    FixedWindow.sweep(:integration_rate_limits)
     schedule_cleanup()
     {:noreply, state}
   end
@@ -136,22 +129,5 @@ defmodule Magus.Integrations.RateLimiter do
   defp schedule_cleanup do
     # Clean up expired entries every 5 minutes
     Process.send_after(self(), :cleanup, 5 * 60 * 1000)
-  end
-
-  defp cleanup_expired_entries do
-    now = System.monotonic_time(:millisecond)
-    max_window = window_to_ms(:day)
-
-    :ets.foldl(
-      fn {key, _count, window_start}, acc ->
-        if now - window_start > max_window do
-          :ets.delete(:integration_rate_limits, key)
-        end
-
-        acc
-      end,
-      :ok,
-      :integration_rate_limits
-    )
   end
 end
