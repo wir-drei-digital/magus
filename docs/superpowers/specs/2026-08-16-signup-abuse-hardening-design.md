@@ -103,7 +103,15 @@ on the transport that creates the user:
 | Path | Token travels via | Verified in |
 |---|---|---|
 | Password register | form POST to `/auth/user/password/register` | HTTP plug |
-| Magic-link request | LiveView event payload | `SignInLive.handle_event/3` |
+| Magic-link request (UI) | LiveView event payload | `SignInLive.handle_event/3` |
+| Magic-link request (HTTP) | POST to `/auth/user/magic_link/request` | HTTP plug |
+
+The third row exists because `auth_routes` generates a controller endpoint
+for every strategy phase: the magic-link strategy declares
+`{"/user/magic_link/request", :request}` with method POST, so a scripted
+POST reaches `:request_magic_link` without ever loading `SignInLive`. A
+captcha checked only in the LiveView would be bypassable there; the plug
+covers both POST routes.
 
 Turnstile drops its token into a hidden `cf-turnstile-response` input inside
 the enclosing form, so both paths get the token with no extra plumbing
@@ -194,12 +202,17 @@ pipeline's `put_secure_browser_headers` CSP sets only `base-uri` and
 and no CSP change is required.
 
 **`MagusWeb.Plugs.VerifyCaptcha`** (new): mounted so it runs only for
-`POST /auth/user/password/register` (a dedicated pipeline wrapping the auth
-scope, matching on method + path; the rest of `/auth` is untouched). Passes
-`conn.params` and the `ClientIP` output to `Magus.Captcha.verify/2` (the
-library reads `"cf-turnstile-response"` from the params map itself). On
-failure: 302 redirect to `/register` with a
-flash, halt; no user is created. No-op when captcha is disabled.
+`POST /auth/user/password/register` and
+`POST /auth/user/magic_link/request` (a dedicated pipeline wrapping the
+auth scope, matching on method + path; the rest of `/auth` is untouched).
+Passes `conn.params` and the `ClientIP` output to `Magus.Captcha.verify/2`
+(the library reads `"cf-turnstile-response"` from the params map itself).
+On failure: 302 redirect with a flash (to `/register` for the register
+route, `/sign-in` for the magic-link route), halt; no user is created and
+no mail is sent. No-op when captcha is disabled. The UI's magic-link
+submits travel over the LiveView socket, not this route, which is why
+`SignInLive.handle_event/3` verifies separately; both checks call the same
+`Magus.Captcha.verify/2`.
 
 ### LiveView changes
 
@@ -383,6 +396,17 @@ the agent pipeline) and already owns blocked-turn semantics.
   start chatting" plus the resend button. Signed-in browsing, settings, and
   reading existing content stay available; only agent turns are blocked.
 
+**Admin visibility** (`MagusWeb.Admin.UsersLive` + `AdminStats`):
+
+- The users table gets a "Confirmed" column (badge: confirmed with the
+  `confirmed_at` date on hover / unconfirmed).
+- The existing filter select (URL-state, currently
+  `all | admins | non_admins | demo`) gains `confirmed` and `unconfirmed`
+  options, wired through `AdminStats.list_users/1` as a
+  `confirmed_at IS [NOT] NULL` clause so filtering and pagination stay in
+  SQL like the current filters.
+- `UserDetailLive` already renders `confirmed_at`; unchanged.
+
 ### The reaper
 
 AshOban trigger on `User`, mirroring the existing `:consolidate_memories`
@@ -420,35 +444,33 @@ hook) *before* opening its own repo transaction, and wrapping the whole
 action in Ash's default update transaction would pull that external call
 and the nested delete inside an outer transaction.
 
-**The reap race and the claim lease.** `transaction? false` also means no
+**The reap race, solved at the row.** `transaction? false` also means no
 work transaction and no `FOR UPDATE` lock, so between the worker reading
 `confirmed_at == nil` and the delete, the user could click their
-confirmation link; deleting a just-confirmed account is unacceptable. The
-claim must be a CAS **on both sides**, and it must be releasable:
+confirmation link; deleting a just-confirmed account is unacceptable. An
+earlier revision closed this with a claim-lease attribute plus CAS filters
+on both the claim and the confirm write; review of that design surfaced
+release/leakage edge cases, and since the reap targets are inert bot
+accounts, the simple mechanism is also the correct one:
 
-1. New attribute `reap_claimed_at :: utc_datetime_usec` (internal, not
-   public). After the ownership skip-checks pass, the worker claims via a
-   filtered atomic update: set `reap_claimed_at = now()` where
-   `confirmed_at IS NULL AND (reap_claimed_at IS NULL OR reap_claimed_at <
-   now() - lease)` with a 15-minute lease. Zero rows claimed means the
-   user confirmed (or another claim is live): exit as a no-op.
-2. The `:confirm` guard is NOT a pre-write validation: AshAuthentication
-   loads the user before writing, so a validation would check a stale
-   read and pass. The guard is a **database-level update filter on the
-   confirm write itself** (`Ash.Changeset.filter/2`-style, matching
-   `confirmed_at IS NULL`-era semantics: the UPDATE carries
-   `WHERE reap_claimed_at IS NULL OR reap_claimed_at < now() - lease`).
-   A confirm racing a fresh claim matches zero rows and surfaces as
-   "this confirmation link has expired"; a confirm racing a *stale*
-   claim (crashed worker) succeeds. Both interleavings of claim-vs-confirm
-   are then correct, whichever UPDATE commits first.
-3. **Release on every non-deleted outcome**: if `AccountDeletion` refuses
-   (preflight), the lifecycle hook aborts, or the delete transaction
-   fails, the worker clears `reap_claimed_at` in a rescue/after so the
-   user can confirm again and later runs can re-evaluate. If the worker
-   crashes before releasing, the lease expiry (point 1 and 2) restores
-   both confirmability and reclaimability after 15 minutes; no janitor
-   process needed.
+`AccountDeletion.execute/2` gains one option,
+`require: [confirmed_at: nil]`, which makes the **final user-row DELETE
+conditional**: `DELETE FROM users WHERE id = $1 AND confirmed_at IS NULL`,
+executed inside the same repo transaction as all the FK cleanup. Zero rows
+deleted raises and rolls the whole transaction back; the job logs a no-op.
+Row-level locking makes this race-free without any new state:
+
+- Confirm commits first (or is in flight holding the row lock): the
+  conditional DELETE matches zero rows, everything rolls back, the user
+  keeps their freshly confirmed account.
+- The delete transaction wins the row: the user's confirm UPDATE finds no
+  row and surfaces as an invalid/expired link, which is accurate — the
+  account is gone, per the TTL they ignored for 7 days.
+
+No new attribute, no lease, no release bookkeeping, and the `:confirm`
+action is untouched. The pre-transaction billing hook may have already run
+when a rollback happens; for reap targets that is the free-plan no-op
+path, and the hook is idempotent by design.
 
 Config: `config :magus, :unconfirmed_account_ttl_days, nil`. `nil` disables
 reaping (core default; self-hosters opt in), `magus-cloud` sets `7`.
@@ -491,9 +513,9 @@ The skip means such rows are never reaped in v1; a beads follow-up tracks
 proper structure teardown. With the agent-use gate on, unconfirmed users
 are largely inert, so the skipped population should be near zero; if the
 logs show volume, unconfirmed structure creation is a product problem,
-not a reaper problem. `AccountDeletion.execute/1` is used **unchanged**,
-and its sole-admin preflight refusal doubles as the definitive
-last-moment guard behind the advisory skip-checks. All of the reaper's
+not a reaper problem. `AccountDeletion` is unchanged except for the
+`require:` option above, and its sole-admin preflight refusal doubles as
+the definitive last-moment guard behind the advisory skip-checks. All of the reaper's
 ownership and membership lookups run with `authorize?: false`: there is
 no human actor in the Oban context, and the user-facing policies (e.g.
 organization reads require an active member actor) would silently hide
@@ -539,13 +561,19 @@ are limited to `runtime.exs` entries, Fly secrets, and the
 - `:resend_confirmation`: sends via the existing sender; self-only policy;
   rate-limited; no-op for already-confirmed users (no welcome-email
   replay).
+- Admin users list: confirmed column renders; `confirmed` / `unconfirmed`
+  filter options return the right rows and page in SQL; existing filters
+  unaffected.
+- Captcha on the HTTP magic-link route: a tokenless
+  `POST /auth/user/magic_link/request` sends no mail and redirects to
+  `/sign-in`; with captcha disabled the route behaves as today.
 - Reaper: past-TTL unconfirmed user with no owned structure deleted;
   confirmed or recent users untouched; TTL `nil` no-ops; org owners and
   sole-admin workspace holders skip and log; TTL `0` rejected at boot.
-- Claim lease: confirm-vs-claim CAS in both orders (fresh claim rejects
-  confirm at the UPDATE filter; committed confirm defeats the claim);
-  stale lease is confirmable AND reclaimable; claim released on preflight
-  refusal / hook abort / delete failure.
+- Conditional delete: user confirmed between scheduling and delete means
+  the whole delete transaction rolls back (assert the user and their data
+  survive intact); delete winning the race surfaces the confirm attempt
+  as an invalid link, not a crash.
 - LiveView: widget renders only when enabled; magic-link submit without a
   valid token is rejected and the widget reset event is pushed.
 
@@ -573,12 +601,26 @@ than design risks:
    hidden-input name~~ — resolved by adopting `phoenix_turnstile` v1.2.0,
    whose source implements the siteverify contract and reads
    `"cf-turnstile-response"` (verified 2026-08-16).
-2. The exact Ash 3 API for attaching a database-level filter to the
-   confirm UPDATE (the CAS in the claim-lease design); the capability
-   exists (optimistic-lock-style filtered updates), the call shape should
-   be confirmed against the installed Ash version.
+2. ~~The exact Ash 3 API for attaching a database-level filter to the
+   confirm UPDATE~~ — obsolete: the claim-lease design was replaced by a
+   conditional DELETE inside `AccountDeletion`'s own transaction (plain
+   SQL/Ecto, no Ash filter API involved) and `:confirm` is untouched.
 
 ## Review log
+
+User review (2026-08-16): three changes. (1) Captcha coverage extended to
+the `auth_routes`-generated `POST /auth/user/magic_link/request` endpoint —
+code inspection confirmed the magic-link strategy declares a `:request`
+POST route, so the LiveView-only check was bypassable by scripted POSTs;
+the `VerifyCaptcha` plug now covers both POST routes. (2) Admin users list
+gains a Confirmed column and `confirmed`/`unconfirmed` filter options via
+`AdminStats.list_users/1`. (3) Reaper simplified per the observation that
+reap targets are inert bot accounts: the claim-lease design (attribute +
+two CAS filters + release bookkeeping) was replaced by a single
+conditional `DELETE ... WHERE confirmed_at IS NULL` inside
+`AccountDeletion`'s existing delete transaction
+(`require: [confirmed_at: nil]` option); row-level locking closes the
+confirm-vs-delete race with no new state, and `:confirm` stays untouched.
 
 Library check (2026-08-16, post-review): hex.pm searched for existing
 Turnstile integrations before building one. `phoenix_turnstile` v1.2.0
