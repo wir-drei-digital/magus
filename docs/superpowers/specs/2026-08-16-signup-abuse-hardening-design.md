@@ -112,61 +112,93 @@ the enclosing form, so both paths get the token with no extra plumbing
 against `dom_patch.js`). Tokens are single-use; after a failed submit the
 widget must be reset.
 
+### Library: `phoenix_turnstile` instead of a hand-rolled adapter
+
+The widget/hook/verify layer is not built here; the
+[`phoenix_turnstile`](https://hex.pm/packages/phoenix_turnstile) dependency
+(MIT, ~55k downloads, `phoenix_live_view ~> 1.0`, deps only castore +
+jason, verified against its source at v1.2.0) provides:
+
+- `Turnstile.widget/1` — the widget component, already `phx-update="ignore"`
+  with a `phx-hook`, exactly the shape this spec previously described by
+  hand; `Turnstile.script/1` for the API script tag; the JS hook ships as
+  the `phoenix-turnstile` npm package (registered in `app.js`).
+- `Turnstile.verify/2` — server-side siteverify over `:httpc` with proper
+  peer verification (castore), accepting the params map (reads
+  `"cf-turnstile-response"`, which also settles that open question) and an
+  optional remote IP as a tuple, charlist, or string.
+- `Turnstile.refresh/2` — `push_event`-based widget reset, covering the
+  single-use-token reset requirement on failed submits.
+- `Turnstile.Behaviour` — ready-made mocking seam for Mox, which the test
+  suite already uses.
+
+**One hazard the wrapper must neutralize**: the library's `site_key/0` and
+`secret_key/0` **default to Cloudflare's always-pass test keys** when
+unconfigured. Deployed with a missing secret, every verification would
+silently succeed. So `Magus.Captcha.enabled?/0` is decided by OUR config
+(`:magus, :captcha`), never by the library's; the library config is set
+from ours at runtime only when both keys are present, and the existing
+boot validation (raise on half-configuration) is what stands between a
+missing Fly secret and a silently open signup.
+
 ### Components
 
-**`Magus.Captcha`** (new, `lib/magus/captcha.ex`): public API and behaviour.
+**`Magus.Captcha`** (new, `lib/magus/captcha.ex`): thin wrapper — public
+API, enabled-gating, and error classification.
 
 ```elixir
-@callback verify(token :: String.t() | nil, remote_ip :: :inet.ip_address() | nil) ::
+@callback verify(params :: map(), remote_ip :: :inet.ip_address() | nil) ::
             :ok | {:error, :missing_token | :invalid_token | :verification_unavailable}
 
-def enabled?()   # true iff site_key and secret_key are both configured
+def enabled?()   # true iff OUR site_key and secret_key are both configured
 def site_key()
-def verify(token, remote_ip)  # delegates to the configured adapter; :ok when disabled
+def verify(params, remote_ip)  # :ok when disabled; else classify Turnstile.verify/2
 ```
 
 Config:
 
 ```elixir
 config :magus, :captcha,
-  adapter: Magus.Captcha.Turnstile,
+  impl: Turnstile,   # swapped for a Mox mock of Turnstile.Behaviour in tests
   site_key: nil,     # from TURNSTILE_SITE_KEY in runtime.exs
   secret_key: nil    # from TURNSTILE_SECRET_KEY in runtime.exs
 ```
 
 **Partial configuration is a boot error**: `runtime.exs` raises when exactly
 one of the two keys is set. A silently half-configured captcha would fail
-open in production, which is worse than failing loudly at deploy time.
+open in production, which is worse than failing loudly at deploy time (and
+doubly important given the library's always-pass default keys). When both
+keys are present, `runtime.exs` also sets `:phoenix_turnstile`'s
+`site_key`/`secret_key` from the same values.
 
-**`Magus.Captcha.Turnstile`** (new): POSTs `secret`, `response`, and
-`remoteip` (via `:inet.ntoa/1`) to
-`https://challenges.cloudflare.com/turnstile/v0/siteverify` via `Req`, 5s
-timeout. `success: true` maps to `:ok`. Network failure or non-200 maps to
-`{:error, :verification_unavailable}`. (Exact request/response field names
-are Cloudflare's published contract; re-check at implementation time, they
-are external to this repo.)
+`verify/2` returns `:ok` when disabled; when enabled it delegates to
+`Turnstile.verify/2` (passing the raw params map, from which the library
+reads `"cf-turnstile-response"`) and classifies the result: `success: true`
+maps to `:ok`, a Cloudflare error body to `{:error, :invalid_token}`, and
+an `:httpc` transport error or non-200 to
+`{:error, :verification_unavailable}`.
 
 **Fail closed.** `:verification_unavailable` rejects the submit with a
 "please try again" flash. Signup is not latency-critical, and failing open
-hands a bypass to anyone who can induce a timeout. Tests swap the adapter for
-a stub via the `:adapter` config key.
+hands a bypass to anyone who can induce a timeout. Tests swap `Turnstile`
+for a Mox mock of `Turnstile.Behaviour` via the `:impl` config key.
 
 **`MagusWeb.CaptchaComponents.captcha/1`** (new function component):
-renders nothing when `Captcha.enabled?()` is false. When enabled, renders a
-container with `phx-update="ignore"` (LiveView patching would destroy the
-widget) and a colocated hook that injects the Turnstile script
-(`https://challenges.cloudflare.com/turnstile/v0/api.js`), calls
-`turnstile.render()` with the site key, and exposes a reset handler the
-LiveViews can trigger via `push_event` after a failed submit. The browser
+renders nothing when `Captcha.enabled?()` is false; when enabled, renders
+`Turnstile.script/1` + `Turnstile.widget/1` (the library component already
+handles `phx-update="ignore"` and the hook; the hook itself is imported
+from the `phoenix-turnstile` npm package in `app.js`). Widget reset after
+a failed submit is the library's `Turnstile.refresh/2`. The browser
 pipeline's `put_secure_browser_headers` CSP sets only `base-uri` and
 `frame-ancestors` (no `script-src`), so the Turnstile script is not blocked
 and no CSP change is required.
 
 **`MagusWeb.Plugs.VerifyCaptcha`** (new): mounted so it runs only for
 `POST /auth/user/password/register` (a dedicated pipeline wrapping the auth
-scope, matching on method + path; the rest of `/auth` is untouched). Reads
-`cf-turnstile-response` from `conn.params`, calls `Magus.Captcha.verify/2`
-with `ClientIP` output. On failure: 302 redirect to `/register` with a
+scope, matching on method + path; the rest of `/auth` is untouched). Passes
+`conn.params` and the `ClientIP` output to `Magus.Captcha.verify/2` (the
+library reads `"cf-turnstile-response"` from the params map itself). On
+failure: 302 redirect to `/register` with a
 flash, halt; no user is created. No-op when captcha is disabled.
 
 ### LiveView changes
@@ -485,7 +517,7 @@ are limited to `runtime.exs` entries, Fly secrets, and the
 
 ## Testing
 
-- `Magus.Captcha`: disabled means `:ok`; stub adapter pass/fail/unavailable;
+- `Magus.Captcha`: disabled means `:ok`; Mox mock pass/fail/unavailable;
   fail-closed on `:verification_unavailable`; boot error on half-config.
 - `VerifyCaptcha` plug: tokenless POST to the register path creates no user
   and redirects with flash; other `/auth` paths untouched; no-op when
@@ -537,15 +569,31 @@ Everything codebase-internal was verified across the four review rounds
 (see Review log). Two externals remain, both implementation details rather
 than design risks:
 
-1. Turnstile siteverify request/response field names and the exact
-   hidden-input name (`cf-turnstile-response`) against Cloudflare's
-   current docs.
+1. ~~Turnstile siteverify request/response field names and the exact
+   hidden-input name~~ — resolved by adopting `phoenix_turnstile` v1.2.0,
+   whose source implements the siteverify contract and reads
+   `"cf-turnstile-response"` (verified 2026-08-16).
 2. The exact Ash 3 API for attaching a database-level filter to the
    confirm UPDATE (the CAS in the claim-lease design); the capability
    exists (optimistic-lock-style filtered updates), the call shape should
    be confirmed against the installed Ash version.
 
 ## Review log
+
+Library check (2026-08-16, post-review): hex.pm searched for existing
+Turnstile integrations before building one. `phoenix_turnstile` v1.2.0
+(jsonmaur, MIT, ~55k downloads, `phoenix_live_view ~> 1.0`, deps castore +
+jason only) adopted after source verification: it provides the widget
+component (already `phx-update="ignore"` + hook), the siteverify call
+(`:httpc` with castore peer verification), the refresh push-event for
+single-use-token reset, and a `Turnstile.Behaviour` Mox seam — replacing
+the previously specced hand-rolled `Magus.Captcha.Turnstile` adapter,
+custom component, and colocated hook. `Magus.Captcha` remains as a thin
+enabled-gating/classification wrapper; notably the library defaults to
+Cloudflare's always-pass test keys when unconfigured, so enablement is
+decided exclusively by our config and the half-config boot error stays.
+Alternatives rejected: `ex_turnstile` 0.1.0 (verification only, 290
+downloads), `omni_captcha` 0.0.4 (602 downloads, pre-1.0).
 
 Round 4 (Codex, 2026-08-16, final): five blockers, all in the reaper's
 workspace-teardown machinery; resolved by simplification rather than more
