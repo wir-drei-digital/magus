@@ -184,7 +184,7 @@ async function openOverview(page: Page) {
 	page.on('pageerror', (error) => {
 		if (/Maximum call stack size exceeded/.test(error.message)) editorCrash = true;
 	});
-	await page.goto(`/next/brain/overview`);
+	await page.goto(`/brain/overview`);
 
 	const loaded = await page
 		.getByTestId('overview-worker-card')
