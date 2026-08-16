@@ -127,6 +127,9 @@ config :magus, Oban,
     agent_run_retention: 1,
     # Daily retention pruning for AgentActivityLog (90-day window)
     agent_activity_log_retention: 1,
+    # Hourly unconfirmed-account reaper (signup-abuse spec). Off unless
+    # :unconfirmed_account_ttl_days is configured; low volume by design.
+    unconfirmed_reap: 1,
     brain_name_page: [limit: 2],
     # Brain chunk embedding generation (page chunks + source chunks).
     brain_embedding: [limit: 5],
@@ -373,6 +376,12 @@ config :magus, :captcha, impl: Turnstile, site_key: nil, secret_key: nil
 # `conn.remote_ip` — never trust an unconfigured header, or a client can pick
 # its own rate-limit key. See MagusWeb.ClientIP.
 config :magus, :client_ip_header, nil
+
+# Unconfirmed-account reaper (signup-abuse spec). `nil` disables reaping
+# (core default; self-hosters opt in); the cloud edition sets this to 7.
+# Validated at boot: nil or an integer >= 1 — see
+# Magus.Accounts.UnconfirmedRetention.validate_config!/0.
+config :magus, :unconfirmed_account_ttl_days, nil
 
 # Chat domain configuration
 config :magus, Magus.Chat, unfiled_conversations_limit: 20

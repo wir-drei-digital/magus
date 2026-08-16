@@ -16,6 +16,19 @@ defmodule Magus.Accounts.AccountDeletion do
   alias Magus.Workspaces.Workspace
   alias Magus.Workspaces.WorkspaceMember
 
+  defmodule PreconditionFailed do
+    @moduledoc """
+    Raised inside the account-deletion transaction when a conditional
+    final-row delete (see `execute/2`'s `:require_unconfirmed` option)
+    matches zero rows — the precondition it was guarding (e.g. the user
+    still being unconfirmed) no longer holds. Raising here, INSIDE
+    `Repo.transaction/1`, is what rolls back every other write the
+    transaction made; `execute/2` rescues it AFTER the rollback and maps
+    it to `{:error, :precondition_failed}`.
+    """
+    defexception message: "delete precondition failed"
+  end
+
   @type summary :: %{
           active_subscription: %{plan: String.t(), current_period_end: DateTime.t() | nil} | nil,
           multiplayer_membership_count: non_neg_integer(),
@@ -30,16 +43,27 @@ defmodule Magus.Accounts.AccountDeletion do
   @spec preflight(User.t()) ::
           {:ok, summary()} | {:error, :sole_admin_workspaces, [Workspace.t()]}
   def preflight(%User{} = user) do
-    case sole_admin_workspaces(user.id) do
+    case sole_admin_workspace_ids(user) do
       [] -> {:ok, build_summary(user)}
-      workspaces -> {:error, :sole_admin_workspaces, workspaces}
+      ws_ids -> {:error, :sole_admin_workspaces, load_workspaces(ws_ids)}
     end
   end
 
-  defp sole_admin_workspaces(user_id) do
+  @doc """
+  Workspace ids for which `user` is currently the sole active admin.
+
+  Shared by `preflight/1` (which resolves these ids into full `Workspace`
+  records for the UI) and `Magus.Accounts.UnconfirmedRetention` (which only
+  needs to know whether the set is empty, to decide whether to skip the
+  reap). Runs `authorize?: false`: both callers may run with no human actor
+  (Oban context) or need to see the row regardless of workspace-membership
+  policies.
+  """
+  @spec sole_admin_workspace_ids(User.t()) :: [Ash.UUID.t()]
+  def sole_admin_workspace_ids(%User{} = user) do
     admin_ws_ids =
       WorkspaceMember
-      |> Ash.Query.filter(user_id == ^user_id and is_active == true and role == :admin)
+      |> Ash.Query.filter(user_id == ^user.id and is_active == true and role == :admin)
       |> Ash.read!(authorize?: false)
       |> Enum.map(& &1.workspace_id)
 
@@ -48,12 +72,16 @@ defmodule Magus.Accounts.AccountDeletion do
         WorkspaceMember
         |> Ash.Query.filter(
           workspace_id == ^ws_id and is_active == true and role == :admin and
-            user_id != ^user_id
+            user_id != ^user.id
         )
         |> Ash.count!(authorize?: false)
 
       other_admin_count == 0
     end)
+  end
+
+  defp load_workspaces(ws_ids) do
+    ws_ids
     |> Enum.map(fn ws_id ->
       Workspace
       |> Ash.Query.filter(id == ^ws_id)
@@ -136,16 +164,27 @@ defmodule Magus.Accounts.AccountDeletion do
   Beyond the lifecycle hook + the User row + owned content, this also
   anonymizes message_usage rows so aggregate billing / statistics survive
   the user's deletion.
+
+  ## Options
+
+    * `:require_unconfirmed` - when `true`, the final User-row delete is
+      conditional on `confirmed_at IS NULL`, checked at the row inside the
+      same transaction as the rest of the cleanup. Used by
+      `Magus.Accounts.UnconfirmedRetention` to close the race between the
+      reaper deciding to delete and the user confirming their email: if the
+      condition matches zero rows, the whole transaction rolls back and
+      this returns `{:error, :precondition_failed}`. Defaults to `false`
+      (existing unconditional hard delete).
   """
-  @spec execute(User.t()) ::
+  @spec execute(User.t(), keyword()) ::
           :ok
           | {:error, :sole_admin_workspaces, [Workspace.t()]}
-          | {:error, :lifecycle_aborted | term()}
-  def execute(%User{} = user) do
+          | {:error, :lifecycle_aborted | :precondition_failed | term()}
+  def execute(%User{} = user, opts \\ []) do
     with {:ok, _summary} <- preflight(user),
          :ok <- Magus.Usage.AccountLifecycle.on_deletion(user.id) do
       cleanup_external_resources(user)
-      delete_in_transaction(user)
+      delete_in_transaction(user, opts)
     end
   end
 
@@ -214,11 +253,13 @@ defmodule Magus.Accounts.AccountDeletion do
       :ok
   end
 
-  defp delete_in_transaction(user) do
+  defp delete_in_transaction(user, opts) do
+    require_unconfirmed? = Keyword.get(opts, :require_unconfirmed, false)
+
     result =
       Magus.Repo.transaction(fn ->
         delete_user_owned_content(user)
-        delete_user_row(user)
+        delete_user_row(user, require_unconfirmed?)
         :ok
       end)
 
@@ -226,6 +267,12 @@ defmodule Magus.Accounts.AccountDeletion do
       {:ok, :ok} -> :ok
       {:error, reason} -> {:error, reason}
     end
+  rescue
+    # PreconditionFailed is raised INSIDE the Repo.transaction/1 callback
+    # above, so by the time it reaches here the whole transaction (owned
+    # content cleanup included) has already been rolled back by Ecto. This
+    # rescue only maps the exception to an error tuple after the fact.
+    PreconditionFailed -> {:error, :precondition_failed}
   end
 
   defp delete_user_owned_content(user) do
@@ -538,10 +585,14 @@ defmodule Magus.Accounts.AccountDeletion do
     :ok
   end
 
-  defp delete_user_row(user) do
+  defp delete_user_row(user, require_unconfirmed?) do
     # Auxiliary tables that hold user_id with ON DELETE NO ACTION
     # (audit logs, sessions, notifications, integrations, etc.) must
-    # be cleared before the User row can be dropped.
+    # be cleared before the User row can be dropped. This runs regardless
+    # of require_unconfirmed?: even when the final delete below turns out
+    # to be conditional and match zero rows, the whole transaction (this
+    # cleanup included) rolls back together, so there is no risk of
+    # clearing these tables for a user who ends up staying confirmed.
     delete_auxiliary_user_rows(user.id)
 
     # Paper-trail _versions tables hold the actor user_id with
@@ -550,9 +601,40 @@ defmodule Magus.Accounts.AccountDeletion do
     # actor attribution is lost.
     nullify_paper_trail_actor(user.id)
 
-    # User has no :destroy action defined on the Ash resource. Delete
-    # the row directly via Ecto inside the surrounding transaction.
+    do_delete_user_row(user, require_unconfirmed?)
+  end
+
+  # The unconfirmed-account reaper's entire race-safety mechanism: the
+  # final row delete is conditional on `confirmed_at IS NULL`, checked at
+  # the row and evaluated atomically by Postgres. If the user confirmed
+  # their email between the reaper reading the row and this statement
+  # running, the WHERE clause matches zero rows and we raise — which rolls
+  # back this whole transaction, including every cleanup step above, so
+  # the freshly confirmed account survives intact. Do not weaken this to a
+  # separate SELECT-then-DELETE; the guarantee depends on the condition
+  # living in the DELETE itself.
+  defp do_delete_user_row(user, true = _require_unconfirmed?) do
+    import Ecto.Query
+
+    {count, _} =
+      Magus.Repo.delete_all(
+        from(u in "users",
+          where: u.id == type(^user.id, :binary_id) and is_nil(u.confirmed_at)
+        )
+      )
+
+    if count == 0 do
+      raise PreconditionFailed
+    end
+
+    :ok
+  end
+
+  # User has no :destroy action defined on the Ash resource. Delete
+  # the row directly via Ecto inside the surrounding transaction.
+  defp do_delete_user_row(user, _require_unconfirmed?) do
     Magus.Repo.delete!(user)
+    :ok
   end
 
   # Paper-trail version tables that carry a NO ACTION reference to `users`.

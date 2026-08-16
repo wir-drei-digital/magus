@@ -12,6 +12,10 @@ defmodule Magus.Application do
     # Cloudflare's always-pass test keys. See Magus.Captcha.
     Magus.Captcha.validate_config!()
 
+    # Fail boot on an invalid unconfirmed-account TTL (signup-abuse spec) —
+    # see Magus.Accounts.UnconfirmedRetention.
+    Magus.Accounts.UnconfirmedRetention.validate_config!()
+
     # Suppress noisy Jido action execution logs (Noop fires on every passthrough signal)
     # Logger.log macro is compiled in Jido.Action.Util (cond_log), not Telemetry
     Logger.put_module_level(Jido.Action.Util, :warning)

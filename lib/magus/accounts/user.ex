@@ -83,6 +83,27 @@ defmodule Magus.Accounts.User do
         max_scheduler_attempts 1
         max_attempts 2
       end
+
+      # Unconfirmed-account reaper (signup-abuse-hardening spec, section C).
+      # Config-gated off by default via `:unconfirmed_account_ttl_days`; the
+      # `where` filter's `ago(1, :day)` floor is just cheap pre-filtering to
+      # keep fresh signups out of the hourly candidate set. The real TTL
+      # check (and every other guard) happens inside
+      # `Magus.Accounts.UnconfirmedRetention.reap/1`, invoked from
+      # `:reap_if_unconfirmed`'s after_action below.
+      trigger :reap_unconfirmed do
+        action :reap_if_unconfirmed
+        queue :unconfirmed_reap
+        scheduler_cron "0 * * * *"
+        read_action :read_for_reaping
+        worker_read_action :read_for_reaping
+        stream_with :full_read
+        where expr(is_nil(confirmed_at) and inserted_at < ago(1, :day))
+        worker_module_name Magus.Accounts.User.Workers.ReapUnconfirmed
+        scheduler_module_name Magus.Accounts.User.Schedulers.ReapUnconfirmed
+        max_scheduler_attempts 1
+        max_attempts 2
+      end
     end
   end
 
@@ -158,6 +179,33 @@ defmodule Magus.Accounts.User do
 
               {:ok, user}
           end
+        end)
+      end
+    end
+
+    read :read_for_reaping do
+      description "Scheduler read for the unconfirmed-account reaper"
+      pagination keyset?: true, required?: false
+    end
+
+    # AshOban target for the :reap_unconfirmed trigger. Must be an update action
+    # for the same reason as :trigger_memory_consolidation above (AshOban loads
+    # the full record for update/destroy triggers; a generic action would only
+    # receive the primary key). transaction? false matters here beyond just
+    # mirroring that shape: AccountDeletion.execute/2 runs external cleanup
+    # (the billing lifecycle hook) BEFORE opening its own repo transaction, and
+    # wrapping this action in Ash's default update transaction would pull that
+    # external call, plus the nested delete transaction, inside an outer one.
+    update :reap_if_unconfirmed do
+      description "AshOban target: reap this user if still unconfirmed past TTL"
+      accept []
+      transaction? false
+      require_atomic? false
+
+      change fn changeset, _context ->
+        Ash.Changeset.after_action(changeset, fn _changeset, user ->
+          Magus.Accounts.UnconfirmedRetention.reap(user)
+          {:ok, user}
         end)
       end
     end
