@@ -2,6 +2,7 @@ defmodule MagusWeb.OnboardingLive.SignInLiveTest do
   use MagusWeb.LiveViewCase, async: false
 
   import MagusWeb.LiveViewCase
+  import Mox
 
   alias Magus.Usage
 
@@ -189,6 +190,71 @@ defmodule MagusWeb.OnboardingLive.SignInLiveTest do
 
       assert html =~ "Too many requests"
       refute html =~ "Check your email for a sign-in link!"
+    end
+  end
+
+  describe "captcha (signup-abuse hardening)" do
+    setup :verify_on_exit!
+
+    setup do
+      original = Application.get_env(:magus, :captcha)
+      on_exit(fn -> Application.put_env(:magus, :captcha, original) end)
+      :ok
+    end
+
+    defp enable_captcha! do
+      Application.put_env(:magus, :captcha,
+        impl: Magus.CaptchaImplMock,
+        site_key: "sk",
+        secret_key: "sec"
+      )
+    end
+
+    test "widget is absent when captcha is disabled (the default)", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/sign-in")
+
+      refute html =~ "cf-turnstile"
+    end
+
+    test "widget is present when captcha is enabled", %{conn: conn} do
+      enable_captcha!()
+
+      {:ok, _view, html} = live(conn, ~p"/sign-in")
+
+      assert html =~ "cf-turnstile"
+    end
+
+    test "magic-link request without a token shows a captcha error and does not send", %{
+      conn: conn
+    } do
+      enable_captcha!()
+
+      {:ok, view, _html} = live(conn, ~p"/sign-in")
+
+      html =
+        view
+        |> element("form[phx-submit='request_magic_link']")
+        |> render_submit(%{email: "user@example.com"})
+
+      assert html =~ "Captcha verification failed"
+      refute html =~ "Check your email for a sign-in link!"
+    end
+
+    test "magic-link request with a valid token succeeds", %{conn: conn} do
+      enable_captcha!()
+
+      expect(Magus.CaptchaImplMock, :verify, fn %{"cf-turnstile-response" => "tok"}, _ip ->
+        {:ok, %{"success" => true}}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/sign-in")
+
+      html =
+        view
+        |> element("form[phx-submit='request_magic_link']")
+        |> render_submit(%{"email" => "user@example.com", "cf-turnstile-response" => "tok"})
+
+      assert html =~ "Check your email for a sign-in link!"
     end
   end
 end

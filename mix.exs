@@ -82,6 +82,7 @@ defmodule Magus.MixProject do
       {:ash_oban, "~> 0.6"},
       {:ash_authentication_phoenix, "~> 2.0"},
       {:ash_authentication, "~> 4.13"},
+      {:phoenix_turnstile, "~> 1.2"},
       {:ash_postgres, "~> 2.0"},
       {:ash_json_api, "~> 1.0"},
       {:ash_typescript, "~> 0.17"},

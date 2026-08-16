@@ -20,6 +20,7 @@ Mox.defmock(Magus.Test.Mocks.OpenRouterVideoMock,
 Mox.defmock(Magus.SuperBrain.LLMMock, for: Magus.SuperBrain.LLMClient)
 Mox.defmock(Magus.Embeddings.EmbedderMock, for: Magus.Embeddings.Embedder)
 Mox.defmock(Magus.Embeddings.BatchEmbedderMock, for: Magus.Embeddings.BatchEmbedder)
+Mox.defmock(Magus.CaptchaImplMock, for: Turnstile.Behaviour)
 # Start Playwright supervisor for E2E browser tests (only when E2E tests are included).
 # CLI --include flags are not yet in ExUnit.configuration() when test_helper.exs runs,
 # so we check the E2E env var set by the test.e2e mix alias.

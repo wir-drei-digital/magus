@@ -156,6 +156,8 @@ defmodule MagusWeb.OnboardingLive.SignInLive do
                 phx-debounce="blur"
               />
 
+              <MagusWeb.CaptchaComponents.captcha />
+
               <button type="submit" class="btn btn-primary w-full">
                 {gettext("Request magic link")}
               </button>
@@ -205,22 +207,27 @@ defmodule MagusWeb.OnboardingLive.SignInLive do
   end
 
   @impl true
-  def handle_event("request_magic_link", %{"email" => email}, socket) do
-    result =
-      Magus.Accounts.User
-      |> Ash.ActionInput.for_action(:request_magic_link, %{email: email})
-      |> Ash.run_action(authorize?: false)
-
-    case result do
-      :ok ->
+  def handle_event("request_magic_link", %{"email" => email} = params, socket) do
+    with :ok <- Magus.Captcha.verify(params, socket.assigns.client_ip),
+         :ok <-
+           Magus.Accounts.User
+           |> Ash.ActionInput.for_action(:request_magic_link, %{email: email})
+           |> Ash.run_action(authorize?: false) do
+      {:noreply, socket |> assign(:magic_link_sent, true) |> assign(:magic_link_email, email)}
+    else
+      {:error, reason}
+      when reason in [:missing_token, :invalid_token, :verification_unavailable] ->
         {:noreply,
          socket
-         |> assign(:magic_link_sent, true)
-         |> assign(:magic_link_email, email)}
+         |> put_flash(:error, gettext("Captcha verification failed. Please try again."))
+         |> Turnstile.refresh()}
 
       {:error, _} ->
         {:noreply,
-         put_flash(socket, :error, gettext("Too many requests. Please try again later."))}
+         socket
+         |> put_flash(:error, gettext("Too many requests. Please try again later."))
+         # token was consumed by the successful verify; reset for retry
+         |> Turnstile.refresh()}
     end
   end
 

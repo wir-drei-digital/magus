@@ -210,6 +210,8 @@ defmodule MagusWeb.OnboardingLive.RegisterLive do
                 </label>
               </div>
 
+              <MagusWeb.CaptchaComponents.captcha />
+
               <button type="submit" class="btn btn-primary w-full">
                 {if @selected_plan == "free",
                   do: gettext("Create Account"),

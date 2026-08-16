@@ -23,6 +23,11 @@ import "phoenix_html";
 import { Socket } from "phoenix";
 import { LiveSocket } from "phoenix_live_view";
 import { hooks as colocatedHooks } from "phoenix-colocated/magus";
+// phoenix_turnstile ships its JS as a hex package (not an npm package —
+// "phoenix-turnstile" doesn't exist on the npm registry), resolved the same
+// way as the phoenix/phoenix_live_view imports above: via NODE_PATH pointing
+// at deps/ (see the esbuild config in config/config.exs).
+import { TurnstileHook } from "phoenix_turnstile";
 import topbar from "../vendor/topbar";
 import Sortable from "../vendor/sortable";
 window.Sortable = Sortable;
@@ -2101,6 +2106,7 @@ const liveSocket = new LiveSocket("/live", Socket, {
     FilesDropTarget,
     FilesDragSource,
     ConnectionStatus: ConnectionStatusHook,
+    Turnstile: TurnstileHook,
   },
 });
 

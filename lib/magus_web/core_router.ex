@@ -136,7 +136,7 @@ defmodule MagusWeb.CoreRouter do
       # the auth_routes scope only, not the whole browser surface.
       pipeline :auth_abuse_guards do
         plug MagusWeb.Plugs.AuthRateLimit
-        # plug MagusWeb.Plugs.VerifyCaptcha  # added in Task 3
+        plug MagusWeb.Plugs.VerifyCaptcha
       end
 
       # AshTypescript RPC for the SvelteKit workbench (frontend/). Same-origin,

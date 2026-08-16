@@ -217,6 +217,32 @@ defmodule MagusWeb.OnboardingLive.RegisterLiveTest do
     end
   end
 
+  describe "captcha (signup-abuse hardening)" do
+    setup do
+      original = Application.get_env(:magus, :captcha)
+      on_exit(fn -> Application.put_env(:magus, :captcha, original) end)
+      :ok
+    end
+
+    test "widget is absent when captcha is disabled (the default)", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/register")
+
+      refute html =~ "cf-turnstile"
+    end
+
+    test "widget is present when captcha is enabled", %{conn: conn} do
+      Application.put_env(:magus, :captcha,
+        impl: Magus.CaptchaImplMock,
+        site_key: "sk",
+        secret_key: "sec"
+      )
+
+      {:ok, _view, html} = live(conn, ~p"/register")
+
+      assert html =~ "cf-turnstile"
+    end
+  end
+
   # Paid plans are only selectable in the commercial billing edition
   # (Magus.Usage.billing_edition?/0). Toggle it on, with cleanup, for the tests
   # that exercise the paid-plan path; OSS (the default) normalizes them to free.

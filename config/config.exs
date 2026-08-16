@@ -355,6 +355,12 @@ config :magus, :auth_rate_limits,
   password_reset_global: {100, :hour},
   resend_confirmation: {3, :hour}
 
+# Captcha (Cloudflare Turnstile via phoenix_turnstile) on registration and
+# magic-link request (signup-abuse spec). Disabled unless BOTH site_key and
+# secret_key are set — see Magus.Captcha. `impl` is swapped for a Mox mock in
+# tests.
+config :magus, :captcha, impl: Turnstile, site_key: nil, secret_key: nil
+
 # Trusted proxy header carrying the real client IP (e.g. "fly-client-ip" in
 # the cloud edition, set behind Fly's proxy). `nil` means trust only
 # `conn.remote_ip` — never trust an unconfigured header, or a client can pick

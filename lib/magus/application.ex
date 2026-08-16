@@ -7,6 +7,11 @@ defmodule Magus.Application do
 
   @impl true
   def start(_type, _args) do
+    # Fail boot on half-configured captcha (signup-abuse spec) before anything
+    # else starts — a missing secret would otherwise silently fall back to
+    # Cloudflare's always-pass test keys. See Magus.Captcha.
+    Magus.Captcha.validate_config!()
+
     # Suppress noisy Jido action execution logs (Noop fires on every passthrough signal)
     # Logger.log macro is compiled in Jido.Action.Util (cond_log), not Telemetry
     Logger.put_module_level(Jido.Action.Util, :warning)
