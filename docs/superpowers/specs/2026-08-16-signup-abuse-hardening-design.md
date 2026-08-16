@@ -1,7 +1,7 @@
 # Signup Abuse Hardening: Captcha, Auth Rate Limiting, Unconfirmed-Account Retention
 
 Date: 2026-08-16
-Status: draft, review round 1 folded in
+Status: reviewed (4 Codex rounds folded), pending user approval
 Repos: `magus` (all implementation), `magus-cloud` (config + secrets only)
 
 ## Problem
@@ -388,30 +388,35 @@ hook) *before* opening its own repo transaction, and wrapping the whole
 action in Ash's default update transaction would pull that external call
 and the nested delete inside an outer transaction.
 
-**The reap race and the claim step.** `transaction? false` also means no
+**The reap race and the claim lease.** `transaction? false` also means no
 work transaction and no `FOR UPDATE` lock, so between the worker reading
 `confirmed_at == nil` and the delete, the user could click their
 confirmation link; deleting a just-confirmed account is unacceptable. The
-reaper therefore starts with an atomic claim:
+claim must be a CAS **on both sides**, and it must be releasable:
 
 1. New attribute `reap_claimed_at :: utc_datetime_usec` (internal, not
-   public). The worker's first step is a filtered atomic update: set
-   `reap_claimed_at = now()` where `confirmed_at IS NULL AND
-   reap_claimed_at IS NULL` (single UPDATE, the filter is the
-   compare-and-swap). No row claimed means the user confirmed since
-   scheduling: job exits as a no-op.
-2. The `:confirm` action gains a validation rejecting confirmation when
-   `reap_claimed_at` is set ("this confirmation link has expired"), so a
-   click landing after the claim cannot race the delete. With a 7-day TTL,
-   only clicks in the final seconds ever see this.
-3. Ownership checks (orgs, workspaces) run after the claim. Residual race:
-   an org created in the milliseconds between the ownership check and the
-   delete aborts the delete transaction at the `owner_id` FK, the whole
-   delete rolls back, the job errors, and the retry skips the user via the
-   ownership guard. Accepted: the failure mode is a rolled-back delete and
-   a log line, not data loss. (The pre-transaction billing hook may have
-   run by then; for reap targets that is the no-op/free-plan path, and the
-   hook is idempotent by design.)
+   public). After the ownership skip-checks pass, the worker claims via a
+   filtered atomic update: set `reap_claimed_at = now()` where
+   `confirmed_at IS NULL AND (reap_claimed_at IS NULL OR reap_claimed_at <
+   now() - lease)` with a 15-minute lease. Zero rows claimed means the
+   user confirmed (or another claim is live): exit as a no-op.
+2. The `:confirm` guard is NOT a pre-write validation: AshAuthentication
+   loads the user before writing, so a validation would check a stale
+   read and pass. The guard is a **database-level update filter on the
+   confirm write itself** (`Ash.Changeset.filter/2`-style, matching
+   `confirmed_at IS NULL`-era semantics: the UPDATE carries
+   `WHERE reap_claimed_at IS NULL OR reap_claimed_at < now() - lease`).
+   A confirm racing a fresh claim matches zero rows and surfaces as
+   "this confirmation link has expired"; a confirm racing a *stale*
+   claim (crashed worker) succeeds. Both interleavings of claim-vs-confirm
+   are then correct, whichever UPDATE commits first.
+3. **Release on every non-deleted outcome**: if `AccountDeletion` refuses
+   (preflight), the lifecycle hook aborts, or the delete transaction
+   fails, the worker clears `reap_claimed_at` in a rescue/after so the
+   user can confirm again and later runs can re-evaluate. If the worker
+   crashes before releasing, the lease expiry (point 1 and 2) restores
+   both confirmability and reclaimability after 15 minutes; no janitor
+   process needed.
 
 Config: `config :magus, :unconfirmed_account_ttl_days, nil`. `nil` disables
 reaping (core default; self-hosters opt in), `magus-cloud` sets `7`.
@@ -430,40 +435,38 @@ trusting the trigger filter: TTL configured, `confirmed_at` still `nil`,
 which runs the billing lifecycle hook before the transaction.
 
 **Ownership guards** (the `create_org` signup flag means an unconfirmed user
-can own real structure):
+can own real structure): **v1 reaps only users with no owned structure.**
+The reaper skips, with a log warning, any user who:
 
-- *Owned organizations*: **skip, always.** `organizations.owner_id` is a
-  non-null FK to users that `AccountDeletion` does not clean up (it removes
+- *owns an organization*: `organizations.owner_id` is a non-null FK to
+  users that `AccountDeletion` does not clean up (it removes
   `organization_members` rows only), so an owned org would abort the user
-  delete at the FK. Critically, no hard-delete path for organizations
-  exists to delegate to: `Organization` exposes only the soft-delete
-  `:archive` (stamps `archived_at`, deactivates workspaces, removes
-  members; the row and its `owner_id` remain). Archiving first then
-  deleting also breaks ordering: archive deactivates the memberships that
-  workspace deletion requires its actor to hold. Building organization
-  hard-delete teardown for this edge case is out of scope; v1 reaps
-  nothing that owns an organization, logs a warning, and a beads follow-up
-  tracks org teardown. If the logs show volume, unconfirmed org creation
-  is a product problem, not a reaper problem.
-- *Sole-admin workspaces* (workspaces can exist outside orgs):
-  `AccountDeletion` refuses to delete a sole admin. If every workspace the
-  user solely administers has no other active member, those workspaces are
-  deleted via the existing `WorkspaceDeletion` path **with the user as
-  actor while their membership is still active** (the deletion path
-  requires an active admin actor). Ordering matters: `AccountDeletion`
-  guarantees the billing lifecycle hook runs before any destructive write
-  and that hook failure leaves the DB untouched; deleting workspaces
-  before calling it would break that guarantee (hook fails, user survives,
-  workspaces are gone). So `AccountDeletion.execute/2` gains an
-  `after_lifecycle_hook` callback option, and the reaper passes the
-  solo-workspace teardown there: hook first, then workspace teardown, then
-  the delete transaction. Any such workspace with other active members:
-  skip and warn, never orphan a shared structure.
-- All of the reaper's ownership and membership lookups run with
-  `authorize?: false`: there is no human actor in the Oban context, and
-  the user-facing policies (e.g. organization reads require an active
-  member actor) would silently hide exactly the rows the guards must see.
-  This matches how `AccountDeletion`'s own preflight already queries.
+  delete at the FK. No hard-delete path for organizations exists to
+  delegate to: `Organization` exposes only the soft-delete `:archive`, and
+  the archived row keeps its `owner_id`.
+- *is sole admin of any workspace*: this is exactly the condition
+  `AccountDeletion.preflight/1` refuses. Earlier revisions tried to
+  tear such workspaces down inside the reaper; review showed every
+  variant of that either races member activation (an invite accepted
+  between the "no other members" check and the hard delete destroys a
+  now-shared workspace), commits workspace deletion outside the account
+  delete transaction (org-FK abort then leaves a user without their
+  workspaces), or requires restructuring `AccountDeletion`'s
+  hook-before-any-write guarantee. Deleting other people's potential
+  data on a background job is the wrong place to be clever.
+
+The skip means such rows are never reaped in v1; a beads follow-up tracks
+proper structure teardown. With the agent-use gate on, unconfirmed users
+are largely inert, so the skipped population should be near zero; if the
+logs show volume, unconfirmed structure creation is a product problem,
+not a reaper problem. `AccountDeletion.execute/1` is used **unchanged**,
+and its sole-admin preflight refusal doubles as the definitive
+last-moment guard behind the advisory skip-checks. All of the reaper's
+ownership and membership lookups run with `authorize?: false`: there is
+no human actor in the Oban context, and the user-facing policies (e.g.
+organization reads require an active member actor) would silently hide
+exactly the rows the guards must see. This matches how
+`AccountDeletion`'s own preflight already queries.
 
 ## Config summary
 
@@ -504,12 +507,13 @@ are limited to `runtime.exs` entries, Fly secrets, and the
 - `:resend_confirmation`: sends via the existing sender; self-only policy;
   rate-limited; no-op for already-confirmed users (no welcome-email
   replay).
-- Reaper: past-TTL unconfirmed user deleted (plain and solo-workspace
-  variants); confirmed or recent users untouched; TTL `nil` no-ops; org
-  owners and shared workspaces skip and log; TTL `0` rejected at boot;
-  claim race (user confirmed between scheduling and claim means no-op;
-  `:confirm` after claim is rejected); lifecycle-hook failure leaves
-  workspaces intact (`after_lifecycle_hook` ordering).
+- Reaper: past-TTL unconfirmed user with no owned structure deleted;
+  confirmed or recent users untouched; TTL `nil` no-ops; org owners and
+  sole-admin workspace holders skip and log; TTL `0` rejected at boot.
+- Claim lease: confirm-vs-claim CAS in both orders (fresh claim rejects
+  confirm at the UPDATE filter; committed confirm defeats the claim);
+  stale lease is confirmable AND reclaimable; claim released on preflight
+  refusal / hook abort / delete failure.
 - LiveView: widget renders only when enabled; magic-link submit without a
   valid token is rejected and the widget reset event is pushed.
 
@@ -527,7 +531,36 @@ Everything defaults off, so the existing suite (7116 tests) runs unchanged.
    one TTL window, so existing dormant unconfirmed accounts get one chance
    to confirm via the gate banner before deletion starts.
 
+## Remaining external checks at implementation time
+
+Everything codebase-internal was verified across the four review rounds
+(see Review log). Two externals remain, both implementation details rather
+than design risks:
+
+1. Turnstile siteverify request/response field names and the exact
+   hidden-input name (`cf-turnstile-response`) against Cloudflare's
+   current docs.
+2. The exact Ash 3 API for attaching a database-level filter to the
+   confirm UPDATE (the CAS in the claim-lease design); the capability
+   exists (optimistic-lock-style filtered updates), the call shape should
+   be confirmed against the installed Ash version.
+
 ## Review log
+
+Round 4 (Codex, 2026-08-16, final): five blockers, all in the reaper's
+workspace-teardown machinery; resolved by simplification rather than more
+machinery. v1 reaper scope narrowed to users with no owned structure
+(skip org owners AND sole-admin workspace holders), which deletes the
+`after_lifecycle_hook` restructuring, the workspace teardown, and their
+three races (member-activation vs hard-delete, teardown outside the
+delete transaction, preflight-refusal ordering) outright;
+`AccountDeletion.execute/1` is now used unchanged. The confirm guard was
+strengthened from a pre-write validation (checks a stale load, per
+AshAuthentication's read-then-write) to a database-level filter on the
+confirm UPDATE, making claim-vs-confirm a two-sided CAS; the claim
+became a 15-minute lease, released on every non-deleted outcome and
+expiring on worker crash, so no user is ever left permanently
+unconfirmable.
 
 Round 3 (Codex, 2026-08-16): all round-2 folds confirmed; CSP pushback
 accepted (round-2 #14 cited nonexistent file paths; Phoenix default CSP has
