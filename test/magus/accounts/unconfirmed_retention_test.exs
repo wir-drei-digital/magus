@@ -3,13 +3,17 @@ defmodule Magus.Accounts.UnconfirmedRetentionTest do
   Task 5 (signup-abuse-hardening): the unconfirmed-account reaper deletes
   password signups that never confirmed their email past the configured
   TTL, skips users who own structure (organization, sole-admin workspace)
-  or content (files, conversations, brain resources — everything
+  or content (files, brain resources, or a conversation containing at
+  least one complete agent reply — everything
   `AccountDeletion.cleanup_external_resources/1` destroys before its
   transaction opens, and therefore NOT protected by a transaction
   rollback), and is race-safe against a confirm racing the delete via two
   layers: `AccountDeletion.execute/2`'s fresh pre-cleanup `confirmed_at`
   check, and the conditional final-row DELETE inside its transaction (see
-  `Magus.Accounts.AccountDeletion.PreconditionFailed`).
+  `Magus.Accounts.AccountDeletion.PreconditionFailed`). A conversation
+  holding only the user's own message (e.g. the confirmation gate's own
+  blocked first turn) does NOT count as owned content — see
+  `owns_conversations?/1` in `Magus.Accounts.UnconfirmedRetention`.
   """
   use Magus.DataCase, async: false
 
@@ -52,6 +56,27 @@ defmodule Magus.Accounts.UnconfirmedRetentionTest do
 
   defp user_exists?(user_id) do
     Repo.exists?(from(u in "users", where: u.id == type(^user_id, :binary_id)))
+  end
+
+  # A complete agent reply (role :agent, status :complete — the schema
+  # default for :status, untouched by :upsert_response). This is the
+  # refinement `owns_conversations?/1` gates on: without one, a conversation
+  # holds only the user's own (possibly gate-blocked) message and does not
+  # count as owned content. Runs authorize?: false and skips response_to_id
+  # (nullable) since these tests don't need a real user message to respond to.
+  defp add_complete_agent_message!(conversation_id) do
+    Magus.Chat.Message
+    |> Ash.Changeset.for_create(
+      :upsert_response,
+      %{
+        id: Ash.UUIDv7.generate(),
+        text: "agent reply",
+        conversation_id: conversation_id,
+        complete: true
+      },
+      authorize?: false
+    )
+    |> Ash.create!(authorize?: false)
   end
 
   defp create_organization!(owner) do
@@ -133,13 +158,30 @@ defmodule Magus.Accounts.UnconfirmedRetentionTest do
     assert {:ok, _} = Ash.get(Magus.Files.File, file.id, authorize?: false)
   end
 
-  test "user owning a conversation is skipped before any destruction" do
+  test "user owning a conversation with a complete agent reply is skipped before any destruction" do
     user = unconfirmed_user_fixture() |> age!(30)
     conv = generate(conversation(actor: user))
+    add_complete_agent_message!(conv.id)
 
     assert :skipped == UnconfirmedRetention.reap(user)
     assert user_exists?(user.id)
     assert {:ok, _} = Ash.get(Magus.Chat.Conversation, conv.id, authorize?: false)
+  end
+
+  test "user owning a conversation with only their own (gate-blocked) message is still reaped" do
+    # Mirrors the confirmation gate's own flow: the SPA creates the
+    # conversation before the first message is sent, then blocks the turn
+    # (no agent reply is ever persisted). A conversation holding only that
+    # blocked user message is not real content worth protecting — treating
+    # it as such would make the reaper's primary target population (bots
+    # that attempted chat and got blocked) permanently unreapable. See
+    # owns_conversations?/1 in lib/magus/accounts/unconfirmed_retention.ex.
+    user = unconfirmed_user_fixture() |> age!(30)
+    conv = generate(conversation(actor: user))
+    _user_msg = generate(message(actor: user, conversation_id: conv.id))
+
+    assert :deleted == UnconfirmedRetention.reap(user)
+    refute user_exists?(user.id)
   end
 
   test "user owning a brain resource is skipped before any destruction" do
@@ -155,9 +197,14 @@ defmodule Magus.Accounts.UnconfirmedRetentionTest do
     # Mirrors AccountDeletion.cleanup_user_conversation_external_resources/1's
     # own filter (is_nil(deleted_at)): a trashed conversation is not among
     # what that pre-transaction cleanup would destroy, so it must not count
-    # as owned content either.
+    # as owned content either. Gives the conversation a complete agent
+    # reply first — the kind of content that WOULD block the reap per
+    # owns_conversations?/1 if it weren't trashed — so this test actually
+    # exercises the deleted_at exclusion rather than passing trivially
+    # because a bare conversation doesn't count as owned content anyway.
     user = unconfirmed_user_fixture() |> age!(30)
     conv = generate(conversation(actor: user))
+    add_complete_agent_message!(conv.id)
 
     conv
     |> Ash.Changeset.for_update(:soft_delete, %{}, authorize?: false)

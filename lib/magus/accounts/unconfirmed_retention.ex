@@ -4,10 +4,10 @@ defmodule Magus.Accounts.UnconfirmedRetention do
   (spec: signup-abuse-hardening, section C). v1 deliberately reaps ONLY
   users with no owned structure or content: org owners, sole-admin
   workspace holders (magus-xjc3 tracks proper teardown for both), and
-  anyone owning a file, conversation, or brain resource are all skipped
-  with a warning. All internal lookups run authorize?: false: there is no
-  actor in the Oban context and user-facing policies would hide exactly
-  the rows we check.
+  anyone owning a file, brain resource, or a conversation with a
+  complete agent reply are all skipped with a warning. All internal
+  lookups run authorize?: false: there is no actor in the Oban context
+  and user-facing policies would hide exactly the rows we check.
 
   ## What actually protects data here
 
@@ -19,9 +19,20 @@ defmodule Magus.Accounts.UnconfirmedRetention do
   included) can undo it. Two things stand between a reap candidate and
   losing real content, neither of which is "the transaction rolls back":
 
-    1. `owns_content?/1` below: a user who owns a file, conversation, or
-       brain resource is never handed to `AccountDeletion.execute/2` with
-       `require_unconfirmed: true` in the first place.
+    1. `owns_content?/1` below: a user who owns a file, brain resource, or
+       a conversation containing at least one COMPLETE agent message is
+       never handed to `AccountDeletion.execute/2` with
+       `require_unconfirmed: true` in the first place. Conversation
+       ownership is deliberately narrower than "owns a conversation row":
+       the confirmation gate's own SPA flow creates the conversation
+       BEFORE the first message is sent, then blocks the turn, so an
+       unconfirmed user who merely attempted to chat owns a conversation
+       holding only their own blocked user message. Treating that alone
+       as protected content would make the reaper's primary target
+       population — bots that attempted chat and got blocked —
+       permanently unreapable. A conversation with a real agent reply
+       (role `:agent`, status `:complete`) is real content and still
+       blocks the reap.
     2. `AccountDeletion.execute/2`'s fresh `confirmed_at` re-check,
        performed immediately before `cleanup_external_resources/1` runs.
        This narrows the race to the gap between that read and the
@@ -175,10 +186,23 @@ defmodule Magus.Accounts.UnconfirmedRetention do
 
   defp owns_conversations?(user) do
     # Matches AccountDeletion's own cleanup_user_conversation_external_resources/1
-    # filter exactly: only non-soft-deleted conversations are destroyed by
-    # that pre-transaction cleanup pass.
+    # filter (only non-soft-deleted conversations are destroyed by that
+    # pre-transaction cleanup pass), refined by one more condition: the
+    # conversation must hold at least one COMPLETE agent reply (role
+    # :agent, status :complete — see Magus.Chat.Message). The confirmation
+    # gate itself creates the conversation before the first message is
+    # sent, so an unconfirmed user who merely tried to chat (and got
+    # blocked) owns a conversation containing only their own blocked user
+    # message — that is not real content worth protecting, and without
+    # this refinement it would make the reaper's primary target
+    # population (bots that attempted chat) permanently unreapable. A
+    # conversation with a real agent reply is real content and still
+    # blocks the reap.
     Magus.Chat.Conversation
-    |> Ash.Query.filter(user_id == ^user.id and is_nil(deleted_at))
+    |> Ash.Query.filter(
+      user_id == ^user.id and is_nil(deleted_at) and
+        exists(messages, role == :agent and status == :complete)
+    )
     |> Ash.exists?(authorize?: false)
   end
 

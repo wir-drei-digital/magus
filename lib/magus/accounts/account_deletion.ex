@@ -7,7 +7,11 @@ defmodule Magus.Accounts.AccountDeletion do
   default; the billing edition cancels the active subscription there. A
   hook failure (`{:error, :lifecycle_aborted}`) aborts the flow with no
   DB writes, so the user can retry; the inverse failure mode (account
-  deleted, billing still active) would be much worse.
+  deleted, billing still active) would be much worse. When
+  `:require_unconfirmed` is set, the precondition check (see `execute/2`'s
+  docs) runs BEFORE the lifecycle hook too, so a stale/failed precondition
+  never triggers an irreversible Stripe cancel for an account that isn't
+  actually being reaped.
 
   `cleanup_external_resources/1` (files + S3, conversation hard-delete,
   Super Brain graph purge) ALSO runs before the deletion transaction, for
@@ -185,12 +189,15 @@ defmodule Magus.Accounts.AccountDeletion do
       delete). When `true`, this function checks `confirmed_at IS NULL`
       TWICE:
 
-      1. A fresh DB read immediately before `cleanup_external_resources/1`
-         runs. If the user has confirmed since being handed to this
-         function, returns `{:error, :precondition_failed}` without
-         destroying anything — this is what actually protects files,
-         conversations, and Super Brain graphs, since none of that is
-         inside a transaction.
+      1. A fresh DB read that runs FIRST in `execute/2`'s `with` chain —
+         ahead of both the `AccountLifecycle.on_deletion/1` hook
+         (irreversible Stripe cancel in the billing edition) and
+         `cleanup_external_resources/1`. If the user has confirmed since
+         being handed to this function, returns
+         `{:error, :precondition_failed}` without destroying anything or
+         cancelling billing — this is what actually protects files,
+         conversations, Super Brain graphs, and the billing subscription,
+         since none of that is inside a transaction.
       2. The final User-row DELETE, inside the same transaction as the
          rest of the cleanup, is ALSO conditional on `confirmed_at IS
          NULL`. Zero rows matched raises `PreconditionFailed`, rolling
@@ -218,8 +225,8 @@ defmodule Magus.Accounts.AccountDeletion do
     require_unconfirmed? = Keyword.get(opts, :require_unconfirmed, false)
 
     with {:ok, _summary} <- preflight(user),
-         :ok <- Magus.Usage.AccountLifecycle.on_deletion(user.id),
-         :ok <- check_still_unconfirmed(user, require_unconfirmed?) do
+         :ok <- check_still_unconfirmed(user, require_unconfirmed?),
+         :ok <- Magus.Usage.AccountLifecycle.on_deletion(user.id) do
       cleanup_external_resources(user)
       delete_in_transaction(user, opts)
     end
@@ -227,8 +234,12 @@ defmodule Magus.Accounts.AccountDeletion do
 
   # See execute/2's docs. This is the FIRST of the two require_unconfirmed?
   # checks, and the one that actually protects cleanup_external_resources/1
-  # (files/S3, conversations, Super Brain graphs): those run right after
-  # this, outside any transaction, so nothing rolls them back. A fresh read
+  # (files/S3, conversations, Super Brain graphs) AND the
+  # `AccountLifecycle.on_deletion/1` hook (irreversible Stripe cancel in the
+  # billing edition): both run right after this, so nothing rolls either of
+  # them back. This must stay ahead of the lifecycle hook in the `with`
+  # chain above — a precondition failure must never have already cancelled
+  # billing for an account that turns out not to be reaped. A fresh read
   # here narrows — but, being a plain read followed by later writes rather
   # than one atomic statement, does not close — the race between the
   # reaper deciding to reap and the user confirming.

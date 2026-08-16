@@ -7,6 +7,26 @@ defmodule Magus.Accounts.AccountDeletionTest do
 
   alias Magus.Accounts.AccountDeletion
 
+  defmodule LifecycleProbe do
+    @moduledoc """
+    Test double for `Magus.Usage.AccountLifecycle`, wired in via the same
+    `Application.get_env(:magus, Magus.Usage.AccountLifecycle)[:impl]` seam
+    the billing edition uses for its real Stripe-cancelling implementation.
+    Messages the calling process so a test can assert the hook did or did
+    not run.
+    """
+    @behaviour Magus.Usage.AccountLifecycle
+
+    @impl true
+    def on_deletion(user_id) do
+      send(self(), {:lifecycle_on_deletion, user_id})
+      :ok
+    end
+
+    @impl true
+    def on_registration(_user_id), do: :ok
+  end
+
   describe "preflight/1" do
     test "returns counts for a normal user with no workspaces" do
       user = generate(user())
@@ -491,6 +511,35 @@ defmodule Magus.Accounts.AccountDeletionTest do
       on_exit(fn -> Application.delete_env(:magus, :stripe_client) end)
 
       assert :ok = AccountDeletion.execute(user)
+    end
+  end
+
+  describe "execute/2 - require_unconfirmed ordering" do
+    # Regression test: the require_unconfirmed? precondition check must run
+    # BEFORE Magus.Usage.AccountLifecycle.on_deletion/1 (an irreversible
+    # Stripe cancel in the billing edition), not after. Stubs the lifecycle
+    # dispatcher with LifecycleProbe (the same Application-env seam the
+    # billing edition uses to plug in its real impl) so we can observe
+    # whether the hook fired. With the ordering bug (hook before
+    # precondition check), the probe would receive
+    # {:lifecycle_on_deletion, _} even though the user is already confirmed
+    # and the delete gets refused — this test fails on that code and
+    # passes once the precondition check runs first.
+    test "a confirmed user hits the precondition check first — the lifecycle hook never runs" do
+      Application.put_env(:magus, Magus.Usage.AccountLifecycle, impl: LifecycleProbe)
+      on_exit(fn -> Application.delete_env(:magus, Magus.Usage.AccountLifecycle) end)
+
+      user = confirmed_user_fixture()
+
+      assert {:error, :precondition_failed} =
+               AccountDeletion.execute(user, require_unconfirmed: true)
+
+      refute_received {:lifecycle_on_deletion, _}
+
+      assert {:ok, %{}} =
+               Magus.Accounts.User
+               |> Ash.Query.filter(id == ^user.id)
+               |> Ash.read_one(authorize?: false)
     end
   end
 end
