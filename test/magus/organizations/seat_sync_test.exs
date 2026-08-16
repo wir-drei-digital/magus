@@ -33,11 +33,28 @@ defmodule Magus.Organizations.SeatSyncTest do
   end
 
   setup do
+    # Capture and restore the ORIGINAL value rather than deleting the key:
+    # `Application.env` is process-global, not per-test. The core suite has no
+    # base config for this key, so deleting it is harmless there — but the
+    # cloud edition configures a real `impl` (`Magus.Billing.OrgSeatSync`) in
+    # config.exs. `Application.delete_env/2` blanks that back to the built-in
+    # `Noop` default for the REST of the `mix test` run (this override is
+    # never test-scoped), silently no-opping the seam for every test that
+    # runs afterward in the same VM — e.g. the org-billing-activation suite,
+    # which then finds no enqueued job. Restoring the captured original keeps
+    # this test's override properly scoped to itself.
+    original = Application.get_env(:magus, Magus.Organizations.SeatSync)
+
     Application.put_env(:magus, :seat_sync_test_pid, self())
     Application.put_env(:magus, Magus.Organizations.SeatSync, impl: TestSink)
 
     on_exit(fn ->
-      Application.delete_env(:magus, Magus.Organizations.SeatSync)
+      if original do
+        Application.put_env(:magus, Magus.Organizations.SeatSync, original)
+      else
+        Application.delete_env(:magus, Magus.Organizations.SeatSync)
+      end
+
       Application.delete_env(:magus, :seat_sync_test_pid)
     end)
 
