@@ -960,68 +960,68 @@ msgstr ""
 msgid "Request magic link"
 msgstr ""
 
-#: lib/magus_web/workbench/controllers/auth_controller.ex:90
+#: lib/magus_web/workbench/controllers/auth_controller.ex:113
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Incorrect email or password"
 msgstr ""
 
-#: lib/magus_web/workbench/controllers/auth_controller.ex:72
+#: lib/magus_web/workbench/controllers/auth_controller.ex:95
 #, elixir-autogen, elixir-format
 msgid "Unable to confirm your email. The link may have expired or already been used. Please request a new confirmation email."
 msgstr ""
 
-#: lib/magus_web/workbench/controllers/auth_controller.ex:78
+#: lib/magus_web/workbench/controllers/auth_controller.ex:101
 #, elixir-autogen, elixir-format
 msgid "Unable to reset your password. The link may have expired or already been used. Please request a new password reset."
 msgstr ""
 
-#: lib/magus_web/workbench/controllers/auth_controller.ex:84
+#: lib/magus_web/workbench/controllers/auth_controller.ex:107
 #, elixir-autogen, elixir-format
 msgid "Unable to sign in with this magic link. The link may have expired or already been used. Please request a new magic link."
 msgstr ""
 
-#: lib/magus_web/workbench/controllers/auth_controller.ex:19
+#: lib/magus_web/workbench/controllers/auth_controller.ex:42
 #, elixir-autogen, elixir-format
 msgid "You are now signed in"
 msgstr ""
 
-#: lib/magus_web/workbench/controllers/auth_controller.ex:66
+#: lib/magus_web/workbench/controllers/auth_controller.ex:89
 #, elixir-autogen, elixir-format
 msgid "You have already signed in another way, but have not confirmed your account. You can confirm your account using the link we sent to you, or by resetting your password."
 msgstr ""
 
-#: lib/magus_web/workbench/controllers/auth_controller.ex:17
+#: lib/magus_web/workbench/controllers/auth_controller.ex:40
 #, elixir-autogen, elixir-format
 msgid "Your email address has now been confirmed"
 msgstr ""
 
-#: lib/magus_web/workbench/controllers/auth_controller.ex:18
+#: lib/magus_web/workbench/controllers/auth_controller.ex:41
 #, elixir-autogen, elixir-format
 msgid "Your password has successfully been reset"
 msgstr ""
 
-#: lib/magus/agents/plugins/support/error_messages.ex:98
+#: lib/magus/agents/plugins/support/error_messages.ex:99
 #, elixir-autogen, elixir-format
 msgid "An unexpected error occurred. Please try again."
 msgstr ""
 
-#: lib/magus/agents/plugins/support/error_messages.ex:84
+#: lib/magus/agents/plugins/support/error_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "Something went wrong while generating a response. Please try again."
 msgstr ""
 
-#: lib/magus/agents/plugins/support/error_messages.ex:56
-#: lib/magus/agents/plugins/support/error_messages.ex:80
+#: lib/magus/agents/plugins/support/error_messages.ex:57
+#: lib/magus/agents/plugins/support/error_messages.ex:81
 #, elixir-autogen, elixir-format
 msgid "The AI model is temporarily unavailable. Please try again in a moment."
 msgstr ""
 
-#: lib/magus/agents/plugins/support/error_messages.ex:88
+#: lib/magus/agents/plugins/support/error_messages.ex:89
 #, elixir-autogen, elixir-format
 msgid "The assistant is still processing your previous request. Please wait a moment."
 msgstr ""
 
-#: lib/magus/agents/plugins/support/error_messages.ex:51
+#: lib/magus/agents/plugins/support/error_messages.ex:52
 #, elixir-autogen, elixir-format
 msgid "The request timed out. Please try again."
 msgstr ""
@@ -1224,17 +1224,17 @@ msgstr ""
 msgid "Invitation not found. It may have already been used or revoked."
 msgstr ""
 
-#: lib/magus/agents/plugins/support/error_messages.ex:74
+#: lib/magus/agents/plugins/support/error_messages.ex:75
 #, elixir-autogen, elixir-format
 msgid "Rate limit reached. Please wait a moment and try again."
 msgstr ""
 
-#: lib/magus/agents/plugins/support/error_messages.ex:64
+#: lib/magus/agents/plugins/support/error_messages.ex:65
 #, elixir-autogen, elixir-format
 msgid "The content exceeds the selected model's context window. Try a model with a larger context or shorten the input."
 msgstr ""
 
-#: lib/magus/agents/plugins/support/error_messages.ex:68
+#: lib/magus/agents/plugins/support/error_messages.ex:69
 #, elixir-autogen, elixir-format
 msgid "The model rejected the request. Please try again or switch models."
 msgstr ""
@@ -1370,7 +1370,17 @@ msgstr ""
 msgid "Verification is temporarily unavailable. Please try again."
 msgstr ""
 
-#: lib/magus/agents/plugins/support/error_messages.ex:92
+#: lib/magus/agents/plugins/support/error_messages.ex:93
 #, elixir-autogen, elixir-format
 msgid "Please confirm your email address to start chatting. Check your inbox for the confirmation link."
+msgstr ""
+
+#: lib/magus_web/workbench/controllers/auth_controller.ex:17
+#, elixir-autogen, elixir-format
+msgid "A sign-in link is on its way. Check your inbox."
+msgstr ""
+
+#: lib/magus_web/workbench/controllers/auth_controller.ex:20
+#, elixir-autogen, elixir-format
+msgid "If this email address is registered, instructions are on their way to your inbox."
 msgstr ""

@@ -4,6 +4,29 @@ defmodule MagusWeb.AuthController do
 
   require Logger
 
+  # Request-phase activities (magic-link request, password reset request)
+  # return bare :ok from their actions, so the dispatcher lands here with no
+  # user: nothing signed in, an email may have been sent. The generic clause
+  # below dereferences the user for billing-edition checkout routing, which
+  # 500s on nil in the commercial edition (magus-iw4z) — and clearing the
+  # session or claiming "You are now signed in" would be wrong here anyway.
+  def success(conn, activity, nil = _user, _token) do
+    message =
+      case activity do
+        {:magic_link, :request} ->
+          gettext("A sign-in link is on its way. Check your inbox.")
+
+        _ ->
+          gettext(
+            "If this email address is registered, instructions are on their way to your inbox."
+          )
+      end
+
+    conn
+    |> put_flash(:info, message)
+    |> redirect(to: ~p"/sign-in")
+  end
+
   def success(conn, activity, user, _token) do
     invite_token = get_session(conn, :invite_token)
     org_invite_token = get_session(conn, :org_invite_token)
