@@ -433,12 +433,40 @@ defmodule Magus.Accounts.AccountDeletion do
   # Anonymize this user's message_usage records by NULLing the FK so the rows
   # survive for aggregate billing/statistics. The column was made nullable in
   # migration 20260426001319_allow_null_message_usage_user_id.
+  #
+  # message_id and conversation_id must ALSO be pre-NULLed here for rows tied
+  # to conversations this deletion will destroy — even though both FKs are ON
+  # DELETE SET NULL and the cascade would produce the same end state. Postgres
+  # re-checks EVERY FK column of a row whose current version was written by
+  # the current transaction when a cascaded update touches it (the xmin rule
+  # in ri_triggers.c). The user_id update above taints the rows; the later
+  # in-transaction conversation destroy then cascade-deletes messages first
+  # and fires the conversation_id SET NULL second, whose re-check sees
+  # message_id pointing at a just-deleted message (its own SET NULL still
+  # queued) and raises 23503. NULL keys are never re-checked, so pre-NULLing
+  # the references makes the destroy immune to the trigger-ordering race.
   defp nullify_message_usage(user_id) do
     import Ecto.Query
     uid = user_id_uuid_binary(user_id)
 
     from(u in "message_usages", where: u.user_id == ^uid)
     |> Magus.Repo.update_all(set: [user_id: nil])
+
+    from(mu in "message_usages",
+      join: m in "messages",
+      on: m.id == mu.message_id,
+      join: c in "conversations",
+      on: c.id == m.conversation_id,
+      where: c.user_id == ^uid
+    )
+    |> Magus.Repo.update_all(set: [message_id: nil])
+
+    from(mu in "message_usages",
+      join: c in "conversations",
+      on: c.id == mu.conversation_id,
+      where: c.user_id == ^uid
+    )
+    |> Magus.Repo.update_all(set: [conversation_id: nil])
 
     :ok
   end

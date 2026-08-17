@@ -344,6 +344,37 @@ defmodule Magus.Accounts.AccountDeletionTest do
       assert hd(test_rows).user_id == nil
     end
 
+    test "deletes an account whose usage rows reference messages" do
+      user = generate(user())
+      {:ok, conv} = Magus.Chat.create_conversation(%{title: "C"}, actor: user)
+      message = generate(message(actor: user, conversation_id: conv.id))
+
+      {:ok, _usage} =
+        Magus.Usage.MessageUsage
+        |> Ash.Changeset.for_create(
+          :create,
+          %{
+            conversation_id: conv.id,
+            message_id: message.id,
+            user_id: user.id,
+            prompt_tokens: 10,
+            completion_tokens: 5,
+            model_name: "test-model-with-message"
+          },
+          authorize?: false
+        )
+        |> Ash.create(authorize?: false)
+
+      assert :ok = AccountDeletion.execute(user)
+
+      rows = Ash.read!(Magus.Usage.MessageUsage, authorize?: false)
+      test_rows = Enum.filter(rows, fn r -> r.model_name == "test-model-with-message" end)
+
+      assert length(test_rows) == 1
+      assert hd(test_rows).user_id == nil
+      assert hd(test_rows).message_id == nil
+    end
+
     test "anonymizes the user's messages in OTHER users' conversations (instead of deleting)" do
       owner = generate(user())
       member = generate(user())
