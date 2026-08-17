@@ -33,18 +33,39 @@ defmodule Magus.Agents.Strategies.ReactStrategyAttachmentTest do
     :ok
   end
 
-  # Turn duration the mock LLM call enforces via a real sleep. BEAM sleeps
-  # never return early, so this is a reliable *lower bound* on how long the
-  # turn takes wall-clock, however loaded the runner is.
-  @mock_llm_turn_ms 600
-  @idle_timeout_ms 250
+  # Generous on purpose. The span between casting the query and the runtime
+  # task's `attach/2` call is real scheduling work; if the idle timer fires
+  # inside that span, the agent hibernates before the run can hold it open —
+  # observed under synthetic 16-burner starvation with a 250ms window. In
+  # production the idle timeout is minutes, so the cast-to-attach span can
+  # never plausibly cross it; the test window must preserve that ratio on a
+  # starved 2-core CI runner rather than shrink it to the point where the
+  # test manufactures a race production cannot hit.
+  @idle_timeout_ms 1_500
 
   test "an active run holds the agent alive past idle_timeout, then the timer re-arms" do
-    # The turn (600ms) deliberately outlives the idle timeout (250ms). Before
-    # the run-holds-attachment fix, the idle timer was blind to activity and
+    # The turn deliberately outlives the idle timeout. Before the
+    # run-holds-attachment fix, the idle timer was blind to activity and
     # hibernated the agent mid-turn.
+    #
+    # The mock turn is HELD OPEN until this test releases it, instead of a
+    # fixed-duration sleep: a fixed turn length gives the mid-turn state a
+    # fixed observable window, and a starved CI scheduler can miss that
+    # window entirely (the turn completes before the first poll lands),
+    # after which no polling budget helps — the state never comes back.
+    # Holding the turn makes the mid-turn observation deterministic.
+    test_pid = self()
+
     stub(Magus.Test.Mocks.LLMMock, :stream_text, fn _model, _messages, _opts ->
-      Process.sleep(@mock_llm_turn_ms)
+      send(test_pid, {:llm_call_started, self()})
+
+      receive do
+        :finish_turn -> :ok
+      after
+        # Safety valve: a failing test must not hang the suite.
+        30_000 -> :ok
+      end
+
       MockResponses.stream_text_response("done")
     end)
 
@@ -61,15 +82,19 @@ defmodule Magus.Agents.Strategies.ReactStrategyAttachmentTest do
     {:ok, pid} = Jido.Agent.InstanceManager.get(@manager, "mini:attach:1")
     ref = Process.monitor(pid)
 
-    cast_at = System.monotonic_time(:millisecond)
     signal = Jido.Signal.new!("ai.react.query", %{query: "hello", model: "mock:test-model"})
     :ok = Jido.AgentServer.cast(pid, signal)
 
+    # The turn is provably in flight once the mock LLM call reports in, and
+    # it stays in flight until we send :finish_turn.
+    assert_receive {:llm_call_started, llm_pid}, 15_000
+
     # Mid-turn the run's runtime task must be attached (this is what blocks
     # the idle timer) and the turn must not have failed. Poll for this
-    # instead of a fixed sleep: a hardcoded wait races the agent's own
-    # dispatch-to-LLM work under a loaded/slow CI runner and can observe
-    # the state before the attachment lands (a known, load-dependent flake).
+    # rather than asserting immediately: `attach/2` happens in the runtime
+    # task around the LLM call, so its ordering relative to our mailbox
+    # message is not guaranteed — but with the turn held open the state
+    # persists, so the poll converges deterministically.
     #
     # Both conditions must be polled together, not just the status: the
     # parent sets `status: :awaiting_llm` on itself synchronously while
@@ -92,20 +117,18 @@ defmodule Magus.Agents.Strategies.ReactStrategyAttachmentTest do
     assert MapSet.size(server_state.lifecycle.attachments) == 1
     assert strategy_state[:status] == :awaiting_llm
 
-    # The agent must survive the whole turn even though it crosses the idle
-    # timeout. The mock LLM call can't return before @mock_llm_turn_ms has
-    # elapsed since `cast_at` (a real Process.sleep never returns early), so
-    # refuting for whatever's left of that window (minus a safety margin)
-    # stays valid no matter how long the poll above took.
-    elapsed_ms = System.monotonic_time(:millisecond) - cast_at
-    refute_window_ms = max(50, @mock_llm_turn_ms - elapsed_ms - 100)
-    refute_receive {:DOWN, ^ref, :process, ^pid, _reason}, refute_window_ms
+    # The agent must survive past the idle timeout while the turn is still
+    # running — and it IS still running, because we haven't released the
+    # mock. One full idle window plus a fire margin leaves no doubt the
+    # timer had its chance.
+    refute_receive {:DOWN, ^ref, :process, ^pid, _reason}, @idle_timeout_ms + 1_000
 
-    # After the turn completes the attachment drops and the idle timer
-    # re-arms: the agent must still hibernate when genuinely idle. Generous
-    # timeout for slow runners — this only slows the test down if it were
-    # going to fail anyway.
-    assert_receive {:DOWN, ^ref, :process, ^pid, {:shutdown, :idle_timeout}}, 5_000
+    # Release the turn. After it completes the attachment drops and the
+    # idle timer re-arms: the agent must still hibernate when genuinely
+    # idle. Generous timeout for slow runners — a passing run returns as
+    # soon as the DOWN arrives.
+    send(llm_pid, :finish_turn)
+    assert_receive {:DOWN, ^ref, :process, ^pid, {:shutdown, :idle_timeout}}, 15_000
   end
 
   # Polls `fun` (which returns `{:ok, value}` or `:error`) until it succeeds
