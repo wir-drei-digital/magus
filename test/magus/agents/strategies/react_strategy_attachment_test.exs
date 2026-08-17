@@ -22,6 +22,17 @@ defmodule Magus.Agents.Strategies.ReactStrategyAttachmentTest do
   setup :set_mox_global
   setup :verify_on_exit!
 
+  # The turn itself is mocked away from the DB, but the agent's early turn
+  # path can incidentally query (e.g. a cold cache falling back to Postgres).
+  # Without a sandbox owner that checkout dies with :noproc and takes the
+  # agent down mid-test (observed intermittently on CI). Shared mode lets any
+  # process in the agent's tree query safely.
+  setup do
+    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Magus.Repo, shared: true)
+    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+    :ok
+  end
+
   setup do
     original = Application.get_env(:magus, :llm_client)
     Application.put_env(:magus, :llm_client, Magus.Test.Mocks.LLMMock)
