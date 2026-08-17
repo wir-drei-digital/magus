@@ -532,6 +532,21 @@ defmodule Magus.Accounts.User do
       change Magus.Accounts.User.Changes.ResendConfirmationEmail
     end
 
+    update :admin_confirm_email do
+      description """
+      Admin-only manual email confirmation: sets confirmed_at directly and
+      deliberately sends NO email. Neither the confirmation mail (the
+      confirmation add-on only monitors :email changes) nor the welcome mail
+      (SendWelcomeEmail is intentionally not attached) fires — the admin is
+      vouching for the address out of band, e.g. when the confirmation mail
+      never arrived.
+      """
+
+      accept []
+      require_atomic? false
+      change set_attribute(:confirmed_at, &DateTime.utc_now/0)
+    end
+
     read :get_by_subject do
       description "Get a user by the subject claim in a JWT"
       argument :subject, :string, allow_nil?: false
@@ -1033,6 +1048,10 @@ defmodule Magus.Accounts.User do
 
     # Bulk-creating workshop/demo test accounts is an admin-only operation.
     policy action(:admin_create_test_user) do
+      authorize_if Magus.Checks.IsAdmin
+    end
+
+    policy action(:admin_confirm_email) do
       authorize_if Magus.Checks.IsAdmin
     end
   end

@@ -167,19 +167,50 @@ defmodule MagusWeb.Admin.UserDetailLive do
   end
 
   @impl true
-  def handle_event("delete_test_user", _params, socket) do
+  def handle_event("confirm_email", _params, socket) do
+    user = socket.assigns.user
+
+    case Ash.update(
+           Ash.Changeset.for_update(user, :admin_confirm_email, %{},
+             actor: socket.assigns.current_user
+           )
+         ) do
+      {:ok, updated} ->
+        {:noreply,
+         socket
+         |> assign(:user, updated)
+         |> put_flash(:info, "Email confirmed for #{user.email}. No email was sent.")}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Could not confirm email.")}
+    end
+  end
+
+  @impl true
+  def handle_event("delete_user", _params, socket) do
     user = socket.assigns.user
 
     cond do
-      not user.test_account ->
-        {:noreply, put_flash(socket, :error, "Only demo accounts can be deleted here.")}
+      # Re-check the actor in the event, not just at mount (admin rights can
+      # be revoked mid-session; confirm_email gets this for free via the Ash
+      # policy, but AccountDeletion.execute has no actor).
+      not socket.assigns.current_user.is_admin ->
+        {:noreply, put_flash(socket, :error, "You don't have access to this action.")}
+
+      user.is_admin ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Admin accounts can't be deleted here. Remove admin rights first."
+         )}
 
       true ->
         case Magus.Accounts.AccountDeletion.execute(user) do
           :ok ->
             {:noreply,
              socket
-             |> put_flash(:info, "Deleted demo account #{user.email}")
+             |> put_flash(:info, "Deleted account #{user.email}")
              |> push_navigate(to: ~p"/admin/users")}
 
           {:error, :sole_admin_workspaces, _workspaces} ->
@@ -233,9 +264,17 @@ defmodule MagusWeb.Admin.UserDetailLive do
                 <span class="badge badge-primary">Admin</span>
               <% end %>
               <%= if @user.confirmed_at do %>
-                <span class="badge badge-success">Confirmed</span>
+                <span class="badge badge-success" title={@user.confirmed_at}>Confirmed</span>
               <% else %>
                 <span class="badge badge-warning">Unconfirmed</span>
+                <button
+                  type="button"
+                  phx-click="confirm_email"
+                  data-confirm={"Mark #{@user.email} as confirmed? No email will be sent."}
+                  class="btn btn-success btn-xs"
+                >
+                  <.icon name="lucide-mail-check" class="w-3 h-3" /> Confirm email
+                </button>
               <% end %>
             </div>
           </div>
@@ -255,7 +294,7 @@ defmodule MagusWeb.Admin.UserDetailLive do
               </div>
               <button
                 type="button"
-                phx-click="delete_test_user"
+                phx-click="delete_user"
                 data-confirm={"Permanently delete #{@user.email} and all its data? This cannot be undone."}
                 class="btn btn-error btn-sm"
               >
@@ -400,6 +439,33 @@ defmodule MagusWeb.Admin.UserDetailLive do
           user_id={@user.id}
           title="Message Activity"
         />
+
+        <%!-- Danger Zone (demo accounts have their own delete in the demo card) --%>
+        <div
+          :if={not @user.test_account and not @user.is_admin}
+          class="card bg-base-200 border border-error/40"
+        >
+          <div class="card-body">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <h2 class="card-title">
+                  <.icon name="lucide-triangle-alert" class="w-5 h-5 text-error" /> Danger Zone
+                </h2>
+                <p class="text-sm text-base-content/60">
+                  Permanently delete this account and all of its data.
+                </p>
+              </div>
+              <button
+                type="button"
+                phx-click="delete_user"
+                data-confirm={"Permanently delete #{@user.email} and all its data? This cannot be undone."}
+                class="btn btn-error btn-sm"
+              >
+                <.icon name="lucide-trash-2" class="w-4 h-4" /> Delete account
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </Layouts.admin>
     """
