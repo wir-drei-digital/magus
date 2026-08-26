@@ -2195,8 +2195,9 @@ if (process.env.NODE_ENV === "development") {
 }
 
 // Register the service worker so the classic app is installable as a PWA and
-// repeat visits serve cached, content-hashed assets. The worker is a no-op in
-// development (see priv/static/sw.js), so registering everywhere is safe.
+// repeat visits serve cached, content-hashed assets. The worker only caches
+// phx.digest-hashed filenames (see priv/static/sw.js), so it never caches
+// anything in development and registering everywhere is safe.
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch((err) => {
