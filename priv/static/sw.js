@@ -10,16 +10,35 @@
 //   * Navigations (HTML) are never cached. The server-rendered page carries a
 //     CSRF token and a signed, time-limited LiveView session token, so serving
 //     a stale copy would break mount/auth.
-//   * Only /assets/* (esbuild + tailwind output, content-hashed by phx.digest)
-//     is cached, cache-first. That is safe to keep indefinitely because the
-//     filename changes whenever the content does.
+//   * Only files under /assets/ whose name carries a phx.digest content hash
+//     (e.g. app-85b45c444d1ceeb284caa60c25317b09.js) are cached, cache-first.
+//     Those are safe to keep indefinitely because the filename changes
+//     whenever the content does. Undigested paths like /assets/js/app.js —
+//     which is what dev mode and a server that skipped `mix assets.deploy`
+//     serve — are left entirely to the network: caching one of those once
+//     froze the bundle across deploys, so pages kept running pre-deploy JS
+//     (seen as `unknown hook found for "Turnstile"` breaking signup after the
+//     captcha shipped server-side).
 //   * /live, /auth and /api are left entirely to the network.
-//   * In development the worker is a pass-through no-op, so it never serves a
-//     stale bundle or fights phoenix_live_reload. It still registers and still
-//     has a fetch handler, so the install prompt can be tested on localhost.
+//   * activate() only drops this worker's own cache generations
+//     (magus-static-*). Cache storage is origin-wide and shared with the
+//     SvelteKit shell's worker (magus-next-*), so deleting foreign keys here
+//     would wipe that worker's cache on every activation.
+//
+// The digest gate also covers development: dev serves undigested filenames,
+// so nothing is ever cached there — no hostname sniffing needed (v1 guessed
+// dev-ness from `localhost`, which mislabeled LAN/tunnel/deployed dev hosts
+// and let them poison the cache). The fetch handler existing at all is what
+// makes the app installable, so the worker still registers everywhere.
+//
+// CACHE bumped v1 -> v2 so every browser that holds a v1 cache (potentially
+// poisoned with undigested app.js) drops it on activation of this version.
 
-const CACHE = "magus-static-v1";
-const DEV = ["localhost", "127.0.0.1"].includes(self.location.hostname);
+const CACHE = "magus-static-v2";
+
+// phx.digest inserts a 32-char lowercase md5 before the final extension:
+// "app.js" -> "app-85b45c444d1ceeb284caa60c25317b09.js".
+const DIGESTED = /-[a-f0-9]{32}\.[^\/]+$/;
 
 self.addEventListener("install", () => self.skipWaiting());
 
@@ -28,7 +47,9 @@ self.addEventListener("activate", (event) => {
     (async () => {
       const keys = await caches.keys();
       await Promise.all(
-        keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)),
+        keys
+          .filter((key) => key.startsWith("magus-static-") && key !== CACHE)
+          .map((key) => caches.delete(key)),
       );
       await self.clients.claim();
     })(),
@@ -36,10 +57,6 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Pass-through in dev. The handler still exists, which is all Chrome needs to
-  // consider the app installable, but nothing is cached.
-  if (DEV) return;
-
   const { request } = event;
   if (request.method !== "GET") return;
 
@@ -58,8 +75,9 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Content-hashed build output: cache-first (immutable).
-  if (url.pathname.startsWith("/assets/")) {
+  // Content-hashed build output only: cache-first (immutable). Everything
+  // else falls through to the network and normal HTTP caching.
+  if (url.pathname.startsWith("/assets/") && DIGESTED.test(url.pathname)) {
     event.respondWith(cacheFirst(request));
   }
 });

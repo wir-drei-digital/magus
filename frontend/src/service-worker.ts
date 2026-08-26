@@ -43,7 +43,14 @@ sw.addEventListener('activate', (event) => {
 		caches
 			.keys()
 			.then((keys) =>
-				Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))
+				// Only drop our own stale generations. Cache storage is origin-wide
+				// and shared with the classic app's worker (magus-static-*), so an
+				// unscoped filter would wipe its cache on every activation here.
+				Promise.all(
+					keys
+						.filter((key) => key.startsWith('magus-next-') && key !== CACHE)
+						.map((key) => caches.delete(key))
+				)
 			)
 			.then(() => sw.clients.claim())
 	);
