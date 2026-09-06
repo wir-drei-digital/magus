@@ -189,6 +189,8 @@ defmodule Magus.Usage.Account do
         :current_period_end,
         :canceled_at
       ]
+
+      change Magus.Usage.Account.Changes.ResetUsageOnPeriodChange
     end
 
     update :update_payment_status do

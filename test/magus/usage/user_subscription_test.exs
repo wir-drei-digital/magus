@@ -326,6 +326,51 @@ defmodule Magus.Usage.UserSubscriptionTest do
       assert updated.canceled_at != nil
     end
 
+    test "advancing the billing period resets usage exactly once", %{
+      admin: admin,
+      subscription: subscription
+    } do
+      first_start = ~U[2026-08-01 00:00:00.000000Z]
+      next_start = ~U[2026-09-01 00:00:00.000000Z]
+
+      {:ok, subscription} =
+        Usage.update_subscription_from_stripe(
+          subscription,
+          %{current_period_start: first_start},
+          actor: admin
+        )
+
+      {:ok, subscription} = Usage.deduct_usage(subscription.user_id, 250, authorize?: false)
+
+      {:ok, replayed} =
+        Usage.update_subscription_from_stripe(
+          subscription,
+          %{current_period_start: first_start, status: :active},
+          actor: admin
+        )
+
+      assert replayed.period_usage_cents == 250
+
+      {:ok, advanced} =
+        Usage.update_subscription_from_stripe(
+          replayed,
+          %{current_period_start: next_start},
+          actor: admin
+        )
+
+      assert advanced.period_usage_cents == 0
+
+      {:ok, stale} =
+        Usage.update_subscription_from_stripe(
+          advanced,
+          %{current_period_start: first_start},
+          actor: admin
+        )
+
+      assert stale.period_usage_cents == 0
+      assert stale.current_period_start == next_start
+    end
+
     test "non-admin cannot update from stripe", %{subscription: subscription} do
       user = create_actor()
 

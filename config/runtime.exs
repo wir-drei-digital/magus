@@ -39,6 +39,13 @@ if config_env() != :test do
   config :magus,
     stripe_api_key: System.get_env("STRIPE_SECRET_KEY"),
     stripe_webhook_secret: System.get_env("STRIPE_WEBHOOK_SECRET")
+
+  # Optional signup-abuse protection. Magus.Captcha validates the pair at
+  # boot, copies it into phoenix_turnstile, and rejects half-configuration.
+  config :magus, :captcha,
+    impl: Turnstile,
+    site_key: System.get_env("TURNSTILE_SITE_KEY"),
+    secret_key: System.get_env("TURNSTILE_SECRET_KEY")
 end
 
 # Google OAuth configuration (for Google Calendar integration)

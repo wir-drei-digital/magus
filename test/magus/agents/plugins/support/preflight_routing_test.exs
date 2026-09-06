@@ -5,10 +5,10 @@ defmodule Magus.Agents.Plugins.Support.PreflightRoutingTest do
 
   test "merges a provider map under :openrouter_provider" do
     assert Preflight.apply_provider_routing(%{}, %{
-             "only" => ["anthropic"],
-             "data_collection" => "deny"
+             only: ["anthropic"],
+             data_collection: "deny"
            }) ==
-             %{openrouter_provider: %{"only" => ["anthropic"], "data_collection" => "deny"}}
+             %{openrouter_provider: %{only: ["anthropic"], data_collection: "deny"}}
   end
 
   test "nil routing leaves llm_opts untouched" do

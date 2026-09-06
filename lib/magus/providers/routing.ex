@@ -25,7 +25,7 @@ defmodule Magus.Providers.Routing do
           "OpenRouter routing: no providers allowed; routing unrestricted (data_collection: deny)"
         )
 
-        %{"data_collection" => "deny"}
+        %{data_collection: "deny"}
 
       _ ->
         # is_list guard: a select-limited model would carry %Ash.NotLoaded{}
@@ -41,7 +41,7 @@ defmodule Magus.Providers.Routing do
         if only == [] do
           {:error, :no_allowed_providers}
         else
-          %{"only" => only, "data_collection" => "deny"}
+          %{only: only, data_collection: "deny"}
         end
     end
   end

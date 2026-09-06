@@ -24,7 +24,7 @@ defmodule Magus.Providers.RoutingAllowListTest do
 
   test "no providers allowed at all fails open with data_collection deny" do
     model = %{api_provider: :openrouter, denied_providers: []}
-    assert Routing.build_provider_routing(model) == %{"data_collection" => "deny"}
+    assert Routing.build_provider_routing(model) == %{data_collection: "deny"}
   end
 
   test "allowed minus model denies produces only-list" do
@@ -32,7 +32,7 @@ defmodule Magus.Providers.RoutingAllowListTest do
     allow("mistral")
     model = %{api_provider: :openrouter, denied_providers: ["mistral"]}
 
-    assert %{"only" => only, "data_collection" => "deny"} =
+    assert %{only: only, data_collection: "deny"} =
              Routing.build_provider_routing(model)
 
     assert Enum.sort(only) == ["anthropic"]
@@ -53,7 +53,7 @@ defmodule Magus.Providers.RoutingAllowListTest do
     test "an unregistered openrouter key gets allow-list-only routing" do
       allow("anthropic")
 
-      assert %{"only" => ["anthropic"], "data_collection" => "deny"} =
+      assert %{only: ["anthropic"], data_collection: "deny"} =
                Routing.build_provider_routing_for_key("openrouter:vendor/not-in-catalog")
     end
 
@@ -75,7 +75,7 @@ defmodule Magus.Providers.RoutingAllowListTest do
           authorize?: false
         )
 
-      assert %{"only" => ["anthropic"], "data_collection" => "deny"} =
+      assert %{only: ["anthropic"], data_collection: "deny"} =
                Routing.build_provider_routing_for_key(model.key)
     end
 
@@ -108,13 +108,22 @@ defmodule Magus.Providers.RoutingAllowListTest do
       {_model, opts} =
         Magus.Agents.Clients.LLM.provider_options("openrouter:vendor/bg-model", [])
 
-      assert %{"only" => ["anthropic"], "data_collection" => "deny"} =
-               opts[:openrouter_provider]
+      assert %{only: ["anthropic"], data_collection: "deny"} = opts[:openrouter_provider]
+
+      {:ok, req_llm_model} = ReqLLM.model("openrouter:anthropic/claude-3-haiku")
+
+      assert {:ok, _processed_opts} =
+               ReqLLM.Provider.Options.process(
+                 ReqLLM.Providers.OpenRouter,
+                 :chat,
+                 req_llm_model,
+                 opts
+               )
     end
 
     test "preflight-computed routing in opts wins over the seam" do
       allow("anthropic")
-      preset = %{"only" => ["from-preflight"], "data_collection" => "deny"}
+      preset = %{only: ["from-preflight"], data_collection: "deny"}
 
       {_model, opts} =
         Magus.Agents.Clients.LLM.provider_options("openrouter:vendor/bg-model",

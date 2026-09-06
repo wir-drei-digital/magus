@@ -46,7 +46,8 @@ mix magus.doctor
 **Optional** (unlock features when set): `FALKORDB_*` (Super Brain),
 object-storage `AWS_*` (S3/MinIO file storage; defaults to local disk, which
 needs a mounted volume and is single-node), a Swoosh mail adapter (email),
-`SANDBOX_PROVIDER` + credentials (code execution), and per-integration keys.
+`SANDBOX_PROVIDER` + credentials (code execution), `TURNSTILE_SITE_KEY` and
+`TURNSTILE_SECRET_KEY` (registration and magic-link abuse protection), and per-integration keys.
 See `.env.example` for the full list.
 
 **Knowledge sources (cloud drives):** Google Drive, OneDrive, Dropbox, and
