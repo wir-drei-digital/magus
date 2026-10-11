@@ -213,6 +213,38 @@ defmodule Magus.Accounts.AccountDeletionTest do
       assert :ok = AccountDeletion.execute(user)
     end
 
+    test "deletes user with a sized file attached to a conversation" do
+      # Destroying the conversation cascades into the file destroy, whose
+      # storage counter decrement runs inside the outer transaction. Missed
+      # notifications only surface when logged (test logger is :none), so
+      # raise on them instead.
+      previous = Application.get_env(:ash, :missed_notifications)
+      Application.put_env(:ash, :missed_notifications, :raise)
+
+      on_exit(fn ->
+        if previous,
+          do: Application.put_env(:ash, :missed_notifications, previous),
+          else: Application.delete_env(:ash, :missed_notifications)
+      end)
+
+      user = generate(user())
+
+      {:ok, _subscription} =
+        Magus.Usage.create_user_subscription(
+          %{user_id: user.id, usage_plan_id: ensure_free_plan().id, status: :active},
+          authorize?: false
+        )
+
+      {:ok, conv} = Magus.Chat.create_conversation(%{title: "C"}, actor: user)
+      _file = generate(file(user_id: user.id, conversation_id: conv.id, file_size: 4096))
+
+      assert :ok = AccountDeletion.execute(user)
+
+      assert Magus.Accounts.User
+             |> Ash.Query.filter(id == ^user.id)
+             |> Ash.read_one(authorize?: false) == {:ok, nil}
+    end
+
     test "deletes user whose attachments were moved to trash" do
       user = generate(user())
       file = generate(file(user_id: user.id))

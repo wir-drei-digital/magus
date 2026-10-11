@@ -13,6 +13,15 @@ defmodule Magus.Files.StorageTracking do
   """
   require Logger
 
+  # Counters are bumped from file action hooks, usually inside the file's
+  # transaction (and often inside a bulk destroy batch). Without
+  # `return_notifications?`, the nested atomic update drains the caller's
+  # pending notifications from the process dictionary, cannot send them
+  # mid-transaction, and crashes in Ash's missed-notification warning
+  # (`action.name` on an atom). Account and Workspace have no notifiers, so
+  # the notifications returned here are always empty and can be dropped.
+  @counter_opts [authorize?: false, return_notifications?: true]
+
   @doc """
   Record a delta in bytes against user and (optionally) workspace counters.
 
@@ -23,10 +32,10 @@ defmodule Magus.Files.StorageTracking do
 
   def track_delta(%{user_id: user_id, workspace_id: workspace_id}, delta)
       when is_integer(delta) and delta > 0 and not is_nil(user_id) do
-    Magus.Usage.increment_storage_usage(user_id, delta, authorize?: false)
+    Magus.Usage.increment_storage_usage(user_id, delta, @counter_opts)
 
     if workspace_id do
-      Magus.Workspaces.increment_workspace_storage(workspace_id, delta, authorize?: false)
+      Magus.Workspaces.increment_workspace_storage(workspace_id, delta, @counter_opts)
     end
 
     :ok
@@ -35,10 +44,10 @@ defmodule Magus.Files.StorageTracking do
   def track_delta(%{user_id: user_id, workspace_id: workspace_id}, delta)
       when is_integer(delta) and delta < 0 and not is_nil(user_id) do
     amount = abs(delta)
-    Magus.Usage.decrement_storage_usage(user_id, amount, authorize?: false)
+    Magus.Usage.decrement_storage_usage(user_id, amount, @counter_opts)
 
     if workspace_id do
-      Magus.Workspaces.decrement_workspace_storage(workspace_id, amount, authorize?: false)
+      Magus.Workspaces.decrement_workspace_storage(workspace_id, amount, @counter_opts)
     end
 
     :ok
