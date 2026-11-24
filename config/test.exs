@@ -157,16 +157,16 @@ config :magus, activity_log_async: false
 # For full agent integration tests, see test/magus/agents/integration_test.exs
 config :magus, :jido_instance_manager, enabled: false
 
-# PhoenixTest configuration for browser-based E2E tests
-config :phoenix_test,
-  endpoint: MagusWeb.Endpoint,
-  otp_app: :magus,
-  playwright: [
-    browser_pools: [[id: :default_pool, browser: :chromium]],
-    assets_dir: "./assets",
-    timeout: :timer.seconds(10),
-    js_logger: false
-  ]
+# Fluffy configuration for browser-based E2E tests
+config :fluffy, endpoint: MagusWeb.Endpoint, ecto_repos: [Magus.Repo]
+
+config :playwright, :test,
+  browser_name: :chromium,
+  action_timeout: :timer.seconds(10),
+  navigation_timeout: :timer.seconds(10),
+  expect: [timeout: :timer.seconds(10)],
+  trace: :retain_on_failure,
+  screenshot: :only_on_failure
 
 config :magus, Magus.Graph,
   host: System.get_env("FALKORDB_HOST", "127.0.0.1"),

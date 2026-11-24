@@ -1,12 +1,9 @@
 defmodule MagusWeb.PlaywrightCase do
   @moduledoc """
-  Test case for browser-based E2E tests using PhoenixTest.Playwright.
+  Test case for browser-based E2E tests using Fluffy's PhoenixTest facade.
 
   Uses shared Ecto sandbox mode so agent processes (children of InstanceManager)
   can access the test database. Forces `async: false`.
-
-  The sandbox is managed by `PhoenixTest.Playwright.Case` (with `shared: true`
-  when `async: false`), so we do NOT manually start a sandbox owner here.
 
   ## Usage
 
@@ -23,19 +20,26 @@ defmodule MagusWeb.PlaywrightCase do
           |> authenticate(user)
           |> visit(~p"/chat/\#{conversation.id}")
           |> assert_has("body .phx-connected")
-          |> type("#chat-textarea", "Hello!")
-          |> click("button[title='Send message']")
+          |> unwrap(fn page ->
+            page
+            |> Playwright.Page.locator("#chat-textarea")
+            |> Playwright.Locator.press_sequentially!("Hello!")
+          end)
+          |> unwrap(&Playwright.Page.click!(&1, "button[title='Send message']"))
           |> assert_has(".prose", text: "AI response")
         end
       end
   """
 
   use ExUnit.CaseTemplate
+  use Playwright.Test
 
   using do
     quote do
-      use PhoenixTest.Playwright.Case, async: false
+      use Playwright.Test
       use MagusWeb, :verified_routes
+
+      import Fluffy.PhoenixTest
 
       import Magus.Generators
       import Mox
@@ -51,11 +55,12 @@ defmodule MagusWeb.PlaywrightCase do
     end
   end
 
-  setup _tags do
+  setup tags do
+    Magus.DataCase.setup_sandbox(tags)
+
     # Global Mox so agent processes in InstanceManager can access expectations
     Mox.set_mox_global()
 
-    # Sandbox is managed by PhoenixTest.Playwright.Case (shared: true for async: false).
     # We start a test-scoped InstanceManager for agent processing. This works because
     # the global InstanceManager is disabled in config/test.exs (:jido_instance_manager, enabled: false).
 
@@ -82,7 +87,7 @@ defmodule MagusWeb.PlaywrightCase do
       Magus.Test.MockResponses.generate_object_response(%{"operations" => []})
     end)
 
-    :ok
+    %{conn: Fluffy.PhoenixTest.start_session(:playwright)}
   end
 
   @doc """
@@ -92,8 +97,6 @@ defmodule MagusWeb.PlaywrightCase do
   matching what AshAuthentication stores (key: `"user_token"`).
   """
   def authenticate(conn, user) do
-    import PhoenixTest.Playwright
-
     token = user.__metadata__.token
 
     unless is_binary(token) do
@@ -101,11 +104,33 @@ defmodule MagusWeb.PlaywrightCase do
               "Ensure the user was created via the :register_with_password action."
     end
 
-    add_session_cookie(
-      conn,
-      [value: %{"user_token" => token}],
-      MagusWeb.Endpoint.session_options()
-    )
+    put_session_cookie(conn, %{"user_token" => token})
+  end
+
+  @doc """
+  Adds the endpoint's signed session cookie with the given values to a Playwright session.
+  """
+  def put_session_cookie(conn, values) do
+    options = MagusWeb.Endpoint.session_options()
+
+    plug_conn =
+      Phoenix.ConnTest.build_conn()
+      |> Map.put(:secret_key_base, MagusWeb.Endpoint.config(:secret_key_base))
+      |> Plug.Session.call(Plug.Session.init(options))
+      |> Plug.Conn.fetch_session()
+
+    plug_conn =
+      values
+      |> Enum.reduce(plug_conn, fn {key, value}, acc -> Plug.Conn.put_session(acc, key, value) end)
+      |> Plug.Conn.send_resp(200, "")
+
+    cookie = %{
+      name: options[:key],
+      value: plug_conn.resp_cookies[options[:key]].value,
+      url: Fluffy.base_url(conn.session)
+    }
+
+    %{conn | session: Fluffy.add_cookies(conn.session, [cookie])}
   end
 
   @doc """

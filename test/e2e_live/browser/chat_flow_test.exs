@@ -16,8 +16,12 @@ defmodule Magus.LiveE2E.Browser.ChatFlowTest do
       |> visit(~p"/chat/#{conversation.id}")
       |> assert_has("body .phx-connected")
       |> assert_has("#chat-textarea")
-      |> type("#chat-textarea", "Say hello in one short sentence.")
-      |> click("button[title='Send message']")
+      |> unwrap(fn page ->
+        page
+        |> Playwright.Page.locator("#chat-textarea")
+        |> Playwright.Locator.press_sequentially!("Say hello in one short sentence.")
+      end)
+      |> unwrap(&Playwright.Page.click!(&1, "button[title='Send message']"))
       # Wait for real LLM response to appear (longer timeout than mocked tests)
       |> assert_has(".prose", timeout: 60_000)
     end

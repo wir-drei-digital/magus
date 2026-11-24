@@ -307,8 +307,7 @@ defmodule MagusWeb.Admin.UsageLive do
                 phx-hook="StackedBarChart"
                 data-chart-data={Jason.encode!(analytics.billable_chart)}
                 class="w-full h-64"
-              >
-              </canvas>
+              ></canvas>
             </.chart_card>
 
             <.chart_card title="Usage by Action" subtitle="Requests grouped by action type">
@@ -317,8 +316,7 @@ defmodule MagusWeb.Admin.UsageLive do
                 phx-hook="StackedBarChart"
                 data-chart-data={Jason.encode!(analytics.action_chart)}
                 class="w-full h-64"
-              >
-              </canvas>
+              ></canvas>
             </.chart_card>
           </div>
 
@@ -330,8 +328,7 @@ defmodule MagusWeb.Admin.UsageLive do
                 phx-hook="ScatterChart"
                 data-chart-data={Jason.encode!(analytics.model_scatter_chart)}
                 class="w-full h-64"
-              >
-              </canvas>
+              ></canvas>
             </.chart_card>
 
             <.chart_card title="Cost by Action" subtitle="Cost distribution by action type">
@@ -340,8 +337,7 @@ defmodule MagusWeb.Admin.UsageLive do
                 phx-hook="DoughnutChart"
                 data-chart-data={Jason.encode!(analytics.cost_by_action_chart)}
                 class="w-full h-64"
-              >
-              </canvas>
+              ></canvas>
             </.chart_card>
           </div>
 
@@ -357,8 +353,7 @@ defmodule MagusWeb.Admin.UsageLive do
                 data-chart-data={Jason.encode!(analytics.token_histogram)}
                 data-median={analytics.token_histogram.median}
                 class="w-full h-64"
-              >
-              </canvas>
+              ></canvas>
             </.chart_card>
 
             <.chart_card title="Finish Reasons" subtitle="Why generations stopped">
@@ -367,8 +362,7 @@ defmodule MagusWeb.Admin.UsageLive do
                 phx-hook="DoughnutChart"
                 data-chart-data={Jason.encode!(analytics.finish_reason_chart)}
                 class="w-full h-64"
-              >
-              </canvas>
+              ></canvas>
             </.chart_card>
           </div>
 

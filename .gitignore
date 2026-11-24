@@ -22,6 +22,9 @@ erl_crash.dump
 # Temporary files, for example, from tests.
 /tmp/
 
+# Playwright traces and screenshots of failed browser tests.
+/test-results/
+
 # Ignore package tarball (built via "mix hex.build").
 magus-*.tar
 

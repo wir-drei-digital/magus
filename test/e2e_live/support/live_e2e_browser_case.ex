@@ -7,11 +7,14 @@ defmodule Magus.LiveE2EBrowserCase do
   """
 
   use ExUnit.CaseTemplate
+  use Playwright.Test
 
   using do
     quote do
-      use PhoenixTest.Playwright.Case, async: false
+      use Playwright.Test
       use MagusWeb, :verified_routes
+
+      import Fluffy.PhoenixTest
 
       import Magus.Generators
       import Magus.LiveE2ECase
@@ -28,12 +31,14 @@ defmodule Magus.LiveE2EBrowserCase do
     end
   end
 
-  setup _tags do
+  setup tags do
     api_key = System.get_env("OPENROUTER_API_KEY")
 
     unless api_key do
       raise "OPENROUTER_API_KEY not set — skipping live E2E browser tests"
     end
+
+    Magus.DataCase.setup_sandbox(tags)
 
     # Global Mox so background processes can access stubs (for title generation etc.)
     Mox.set_mox_global()
@@ -75,23 +80,17 @@ defmodule Magus.LiveE2EBrowserCase do
     user = Magus.LiveE2ECase.create_live_user()
     Magus.LiveE2ECase.setup_live_subscription(user)
 
-    %{model: model, user: user}
+    %{model: model, user: user, conn: Fluffy.PhoenixTest.start_session(:playwright)}
   end
 
   @doc "Authenticate a Playwright session (same as PlaywrightCase)."
   def authenticate(conn, user) do
-    import PhoenixTest.Playwright
-
     token = user.__metadata__.token
 
     unless is_binary(token) do
       raise "User has no authentication token. Ensure user was created via :register_with_password."
     end
 
-    add_session_cookie(
-      conn,
-      [value: %{"user_token" => token}],
-      MagusWeb.Endpoint.session_options()
-    )
+    MagusWeb.PlaywrightCase.put_session_cookie(conn, %{"user_token" => token})
   end
 end

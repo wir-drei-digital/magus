@@ -138,8 +138,7 @@ defmodule MagusWeb.Admin.Components.ActivityChartComponent do
               phx-hook="StackedBarChart"
               data-chart-data={Jason.encode!(chart.data)}
               class="w-full h-48"
-            >
-            </canvas>
+            ></canvas>
           </.async_result>
         </div>
       </div>
