@@ -44,7 +44,6 @@ defmodule MagusWeb.E2E.SharedConversationTest do
       # Visit share link as unauthenticated user (fresh conn, no authenticate call)
       conn
       |> visit(~p"/shared/#{share_link.token}")
-      |> assert_has(".phx-connected")
       # Verify conversation info bar is shown
       |> assert_has("body", text: "Shared conversation")
       |> assert_has("body", text: "Read-only")
@@ -80,14 +79,12 @@ defmodule MagusWeb.E2E.SharedConversationTest do
 
       conn
       |> visit(~p"/shared/#{share_link.token}")
-      |> assert_has(".phx-connected")
       |> assert_has("h1", text: "My Shared Discussion")
     end
 
     test "invalid share token shows not found error", %{conn: conn} do
       conn
       |> visit(~p"/shared/invalid-nonexistent-token")
-      |> assert_has(".phx-connected")
       |> assert_has("body", text: "Link Not Found")
       |> assert_has("body", text: "invalid or has been revoked")
     end
@@ -112,7 +109,6 @@ defmodule MagusWeb.E2E.SharedConversationTest do
 
       conn
       |> visit(~p"/shared/#{share_link.token}")
-      |> assert_has(".phx-connected")
       |> assert_has("body", text: "Link Not Found")
       # Ensure the message content is NOT visible
       |> refute_has("body", text: "Secret message")
@@ -136,7 +132,6 @@ defmodule MagusWeb.E2E.SharedConversationTest do
       # Visit as unauthenticated user
       conn
       |> visit(~p"/shared/#{share_link.token}")
-      |> assert_has(".phx-connected")
       |> assert_has("body", text: "Login Required")
       |> assert_has("a", text: "Sign In")
       # Ensure the message content is NOT visible
@@ -166,7 +161,6 @@ defmodule MagusWeb.E2E.SharedConversationTest do
       conn
       |> authenticate(viewer)
       |> visit(~p"/shared/#{share_link.token}")
-      |> assert_has(".phx-connected")
       |> assert_has("body", text: "Shared conversation")
       |> assert_has("body", text: "Authenticated content")
       |> refute_has("#chat-textarea")

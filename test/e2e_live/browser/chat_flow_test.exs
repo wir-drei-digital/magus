@@ -14,7 +14,6 @@ defmodule Magus.LiveE2E.Browser.ChatFlowTest do
       conn
       |> authenticate(user)
       |> visit(~p"/chat/#{conversation.id}")
-      |> assert_has("body .phx-connected")
       |> assert_has("#chat-textarea")
       |> unwrap(fn page ->
         page

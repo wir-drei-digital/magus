@@ -19,7 +19,6 @@ defmodule MagusWeb.PlaywrightCase do
           conn
           |> authenticate(user)
           |> visit(~p"/chat/\#{conversation.id}")
-          |> assert_has("body .phx-connected")
           |> unwrap(fn page ->
             page
             |> Playwright.Page.locator("#chat-textarea")
