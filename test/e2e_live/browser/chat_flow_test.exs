@@ -5,6 +5,8 @@ defmodule Magus.LiveE2E.Browser.ChatFlowTest do
   """
   use Magus.LiveE2EBrowserCase
 
+  import Fluffy.Locator, only: [by_css: 1]
+
   @moduletag :e2e_browser
 
   describe "live chat in browser" do
@@ -15,12 +17,11 @@ defmodule Magus.LiveE2E.Browser.ChatFlowTest do
       |> authenticate(user)
       |> visit(~p"/chat/#{conversation.id}")
       |> assert_has("#chat-textarea")
-      |> unwrap(fn page ->
-        page
-        |> Playwright.Page.locator("#chat-textarea")
-        |> Playwright.Locator.press_sequentially!("Say hello in one short sentence.")
-      end)
-      |> unwrap(&Playwright.Page.click!(&1, "button[title='Send message']"))
+      |> Fluffy.Playwright.press_sequentially(
+        by_css("#chat-textarea"),
+        "Say hello in one short sentence."
+      )
+      |> Fluffy.click(by_css("button[title='Send message']"))
       # Wait for real LLM response to appear (longer timeout than mocked tests)
       |> assert_has(".prose", timeout: 60_000)
     end

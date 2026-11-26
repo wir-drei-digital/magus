@@ -19,12 +19,8 @@ defmodule MagusWeb.PlaywrightCase do
           conn
           |> authenticate(user)
           |> visit(~p"/chat/\#{conversation.id}")
-          |> unwrap(fn page ->
-            page
-            |> Playwright.Page.locator("#chat-textarea")
-            |> Playwright.Locator.press_sequentially!("Hello!")
-          end)
-          |> unwrap(&Playwright.Page.click!(&1, "button[title='Send message']"))
+          |> Fluffy.Playwright.press_sequentially(Fluffy.Locator.by_css("#chat-textarea"), "Hello!")
+          |> Fluffy.click(Fluffy.Locator.by_css("button[title='Send message']"))
           |> assert_has(".prose", text: "AI response")
         end
       end
@@ -103,33 +99,7 @@ defmodule MagusWeb.PlaywrightCase do
               "Ensure the user was created via the :register_with_password action."
     end
 
-    put_session_cookie(conn, %{"user_token" => token})
-  end
-
-  @doc """
-  Adds the endpoint's signed session cookie with the given values to a Playwright session.
-  """
-  def put_session_cookie(conn, values) do
-    options = MagusWeb.Endpoint.session_options()
-
-    plug_conn =
-      Phoenix.ConnTest.build_conn()
-      |> Map.put(:secret_key_base, MagusWeb.Endpoint.config(:secret_key_base))
-      |> Plug.Session.call(Plug.Session.init(options))
-      |> Plug.Conn.fetch_session()
-
-    plug_conn =
-      values
-      |> Enum.reduce(plug_conn, fn {key, value}, acc -> Plug.Conn.put_session(acc, key, value) end)
-      |> Plug.Conn.send_resp(200, "")
-
-    cookie = %{
-      name: options[:key],
-      value: plug_conn.resp_cookies[options[:key]].value,
-      url: Fluffy.base_url(conn.session)
-    }
-
-    %{conn | session: Fluffy.add_cookies(conn.session, [cookie])}
+    Fluffy.add_session_cookie(conn, %{"user_token" => token})
   end
 
   @doc """

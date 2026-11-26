@@ -91,6 +91,6 @@ defmodule Magus.LiveE2EBrowserCase do
       raise "User has no authentication token. Ensure user was created via :register_with_password."
     end
 
-    MagusWeb.PlaywrightCase.put_session_cookie(conn, %{"user_token" => token})
+    Fluffy.add_session_cookie(conn, %{"user_token" => token})
   end
 end
