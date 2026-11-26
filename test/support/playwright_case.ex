@@ -1,41 +1,42 @@
 defmodule MagusWeb.PlaywrightCase do
   @moduledoc """
-  Test case for browser-based E2E tests using PhoenixTest.Playwright.
+  Test case for browser-based E2E tests using Fluffy.
 
   Uses shared Ecto sandbox mode so agent processes (children of InstanceManager)
   can access the test database. Forces `async: false`.
-
-  The sandbox is managed by `PhoenixTest.Playwright.Case` (with `shared: true`
-  when `async: false`), so we do NOT manually start a sandbox owner here.
 
   ## Usage
 
       defmodule MagusWeb.MyChatE2ETest do
         use MagusWeb.PlaywrightCase
 
+        import Fluffy.Locator, only: [by_css: 1, filter: 2, first: 1]
+
         @tag :e2e
-        test "user sends message", %{conn: conn} do
+        test "user sends message", %{session: session} do
           user = generate(user())
           setup_subscription_for_user(user)
           conversation = generate(conversation(actor: user))
 
-          conn
+          session
           |> authenticate(user)
-          |> visit(~p"/chat/\#{conversation.id}")
-          |> assert_has("body .phx-connected")
-          |> type("#chat-textarea", "Hello!")
-          |> click("button[title='Send message']")
-          |> assert_has(".prose", text: "AI response")
+          |> Fluffy.visit(~p"/chat/\#{conversation.id}")
+          |> Fluffy.Playwright.press_sequentially(by_css("#chat-textarea"), "Hello!")
+          |> Fluffy.click(by_css("button[title='Send message']"))
+          |> assert_has(by_css(".prose") |> filter(has_text: "AI response") |> first())
         end
       end
   """
 
   use ExUnit.CaseTemplate
+  use Playwright.Test
 
   using do
     quote do
-      use PhoenixTest.Playwright.Case, async: false
+      use Playwright.Test
       use MagusWeb, :verified_routes
+
+      import Fluffy.Assert, only: [assert_has: 2, refute_has: 2]
 
       import Magus.Generators
       import Mox
@@ -51,11 +52,12 @@ defmodule MagusWeb.PlaywrightCase do
     end
   end
 
-  setup _tags do
+  setup tags do
+    Magus.DataCase.setup_sandbox(tags)
+
     # Global Mox so agent processes in InstanceManager can access expectations
     Mox.set_mox_global()
 
-    # Sandbox is managed by PhoenixTest.Playwright.Case (shared: true for async: false).
     # We start a test-scoped InstanceManager for agent processing. This works because
     # the global InstanceManager is disabled in config/test.exs (:jido_instance_manager, enabled: false).
 
@@ -82,7 +84,7 @@ defmodule MagusWeb.PlaywrightCase do
       Magus.Test.MockResponses.generate_object_response(%{"operations" => []})
     end)
 
-    :ok
+    %{session: Fluffy.start_session(:playwright)}
   end
 
   @doc """
@@ -91,9 +93,7 @@ defmodule MagusWeb.PlaywrightCase do
   Sets the session cookie with the user's authentication token,
   matching what AshAuthentication stores (key: `"user_token"`).
   """
-  def authenticate(conn, user) do
-    import PhoenixTest.Playwright
-
+  def authenticate(session, user) do
     token = user.__metadata__.token
 
     unless is_binary(token) do
@@ -101,11 +101,7 @@ defmodule MagusWeb.PlaywrightCase do
               "Ensure the user was created via the :register_with_password action."
     end
 
-    add_session_cookie(
-      conn,
-      [value: %{"user_token" => token}],
-      MagusWeb.Endpoint.session_options()
-    )
+    Fluffy.add_session_cookie(session, %{"user_token" => token})
   end
 
   @doc """

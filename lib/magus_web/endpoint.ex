@@ -15,7 +15,7 @@ defmodule MagusWeb.Endpoint do
   def session_options, do: @session_options
 
   socket "/live", Phoenix.LiveView.Socket,
-    websocket: [connect_info: [session: @session_options]],
+    websocket: [connect_info: [:x_headers, session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
 
   # Channels for the SvelteKit workbench and future native/CLI clients.
@@ -73,7 +73,9 @@ defmodule MagusWeb.Endpoint do
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
 
   if Application.compile_env(:magus, :sql_sandbox) do
-    plug Phoenix.Ecto.SQL.Sandbox
+    plug Phoenix.Ecto.SQL.Sandbox,
+      header: Fluffy.Sandbox.header(),
+      sandbox: Fluffy.Sandbox.allowance()
   end
 
   plug Plug.Parsers,

@@ -96,7 +96,7 @@ mix ash.migrate              # Run migrations only
 mix test                     # Run all tests
 mix test path/to/test.exs    # Run specific test file
 mix test path/to/test.exs:42 # Run specific test at line
-mix test.e2e                 # Run browser-based E2E tests (requires Playwright)
+mix test.e2e                 # Run browser-based E2E tests (once: mix playwright.install chromium)
 
 # Code Quality
 mix precommit                # Format, compile with warnings, run tests

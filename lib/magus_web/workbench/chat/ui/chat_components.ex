@@ -197,8 +197,7 @@ defmodule MagusWeb.ChatLive.UI.ChatComponents do
       class={@class}
       phx-hook=".LocalTimestamp"
       data-utc={@utc_iso}
-    >
-    </span>
+    ></span>
     <script :type={Phoenix.LiveView.ColocatedHook} name=".LocalTimestamp">
       export default {
         mounted() { this.formatTime() },

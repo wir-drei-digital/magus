@@ -53,6 +53,10 @@ defmodule MagusWeb do
     quote do
       use Phoenix.LiveView
 
+      if Application.compile_env(:magus, :sql_sandbox) do
+        on_mount Fluffy.Sandbox
+      end
+
       unquote(html_helpers())
     end
   end
