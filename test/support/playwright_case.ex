@@ -1,6 +1,6 @@
 defmodule MagusWeb.PlaywrightCase do
   @moduledoc """
-  Test case for browser-based E2E tests using Fluffy's PhoenixTest facade.
+  Test case for browser-based E2E tests using Fluffy.
 
   Uses shared Ecto sandbox mode so agent processes (children of InstanceManager)
   can access the test database. Forces `async: false`.
@@ -10,18 +10,20 @@ defmodule MagusWeb.PlaywrightCase do
       defmodule MagusWeb.MyChatE2ETest do
         use MagusWeb.PlaywrightCase
 
+        import Fluffy.Locator, only: [by_css: 1, filter: 2, first: 1]
+
         @tag :e2e
-        test "user sends message", %{conn: conn} do
+        test "user sends message", %{session: session} do
           user = generate(user())
           setup_subscription_for_user(user)
           conversation = generate(conversation(actor: user))
 
-          conn
+          session
           |> authenticate(user)
-          |> visit(~p"/chat/\#{conversation.id}")
-          |> Fluffy.Playwright.press_sequentially(Fluffy.Locator.by_css("#chat-textarea"), "Hello!")
-          |> Fluffy.click(Fluffy.Locator.by_css("button[title='Send message']"))
-          |> assert_has(".prose", text: "AI response")
+          |> Fluffy.visit(~p"/chat/\#{conversation.id}")
+          |> Fluffy.Playwright.press_sequentially(by_css("#chat-textarea"), "Hello!")
+          |> Fluffy.click(by_css("button[title='Send message']"))
+          |> assert_has(by_css(".prose") |> filter(has_text: "AI response") |> first())
         end
       end
   """
@@ -34,7 +36,7 @@ defmodule MagusWeb.PlaywrightCase do
       use Playwright.Test
       use MagusWeb, :verified_routes
 
-      import Fluffy.PhoenixTest
+      import Fluffy.Assert, only: [assert_has: 2, refute_has: 2]
 
       import Magus.Generators
       import Mox
@@ -82,7 +84,7 @@ defmodule MagusWeb.PlaywrightCase do
       Magus.Test.MockResponses.generate_object_response(%{"operations" => []})
     end)
 
-    %{conn: Fluffy.PhoenixTest.start_session(:playwright)}
+    %{session: Fluffy.start_session(:playwright)}
   end
 
   @doc """
@@ -91,7 +93,7 @@ defmodule MagusWeb.PlaywrightCase do
   Sets the session cookie with the user's authentication token,
   matching what AshAuthentication stores (key: `"user_token"`).
   """
-  def authenticate(conn, user) do
+  def authenticate(session, user) do
     token = user.__metadata__.token
 
     unless is_binary(token) do
@@ -99,7 +101,7 @@ defmodule MagusWeb.PlaywrightCase do
               "Ensure the user was created via the :register_with_password action."
     end
 
-    Fluffy.add_session_cookie(conn, %{"user_token" => token})
+    Fluffy.add_session_cookie(session, %{"user_token" => token})
   end
 
   @doc """

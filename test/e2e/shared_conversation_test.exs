@@ -8,12 +8,14 @@ defmodule MagusWeb.E2E.SharedConversationTest do
   """
   use MagusWeb.PlaywrightCase
 
+  import Fluffy.Locator, only: [by_css: 1, filter: 2, first: 1]
+
   alias Magus.Chat.Message
 
   @moduletag :e2e
 
   describe "shared conversations" do
-    test "public share link shows read-only conversation with messages", %{conn: conn} do
+    test "public share link shows read-only conversation with messages", %{session: session} do
       model = create_default_model()
       user = generate(user()) |> confirm_user()
       setup_subscription_for_user(user)
@@ -41,20 +43,22 @@ defmodule MagusWeb.E2E.SharedConversationTest do
           actor: user
         )
 
-      # Visit share link as unauthenticated user (fresh conn, no authenticate call)
-      conn
-      |> visit(~p"/shared/#{share_link.token}")
+      body = by_css("body")
+
+      # Visit share link as unauthenticated user
+      session
+      |> Fluffy.visit(~p"/shared/#{share_link.token}")
       # Verify conversation info bar is shown
-      |> assert_has("body", text: "Shared conversation")
-      |> assert_has("body", text: "Read-only")
+      |> assert_has(filter(body, has_text: "Shared conversation"))
+      |> assert_has(filter(body, has_text: "Read-only"))
       # Verify both messages are visible
-      |> assert_has("body", text: "Hello from the owner!")
-      |> assert_has("body", text: "Hello! I am the AI assistant.")
-      # Assert no chat input is present (read-only view)
-      |> refute_has("#chat-textarea")
+      |> assert_has(filter(body, has_text: "Hello from the owner!"))
+      |> assert_has(filter(body, has_text: "Hello! I am the AI assistant."))
+      # The read-only view has no visible chat input.
+      |> refute_has(by_css("#chat-textarea"))
     end
 
-    test "shared view displays conversation title", %{conn: conn} do
+    test "shared view displays conversation title", %{session: session} do
       model = create_default_model()
       user = generate(user()) |> confirm_user()
       setup_subscription_for_user(user)
@@ -77,19 +81,21 @@ defmodule MagusWeb.E2E.SharedConversationTest do
           actor: user
         )
 
-      conn
-      |> visit(~p"/shared/#{share_link.token}")
-      |> assert_has("h1", text: "My Shared Discussion")
+      session
+      |> Fluffy.visit(~p"/shared/#{share_link.token}")
+      |> assert_has(by_css("h1") |> filter(has_text: "My Shared Discussion") |> first())
     end
 
-    test "invalid share token shows not found error", %{conn: conn} do
-      conn
-      |> visit(~p"/shared/invalid-nonexistent-token")
-      |> assert_has("body", text: "Link Not Found")
-      |> assert_has("body", text: "invalid or has been revoked")
+    test "invalid share token shows not found error", %{session: session} do
+      body = by_css("body")
+
+      session
+      |> Fluffy.visit(~p"/shared/invalid-nonexistent-token")
+      |> assert_has(filter(body, has_text: "Link Not Found"))
+      |> assert_has(filter(body, has_text: "invalid or has been revoked"))
     end
 
-    test "revoked share link shows not found error", %{conn: conn} do
+    test "revoked share link shows not found error", %{session: session} do
       model = create_default_model()
       user = generate(user()) |> confirm_user()
       setup_subscription_for_user(user)
@@ -107,14 +113,18 @@ defmodule MagusWeb.E2E.SharedConversationTest do
       # Revoke the link
       {:ok, _} = Chat.revoke_share_link(share_link, actor: user)
 
-      conn
-      |> visit(~p"/shared/#{share_link.token}")
-      |> assert_has("body", text: "Link Not Found")
+      body = by_css("body")
+
+      session
+      |> Fluffy.visit(~p"/shared/#{share_link.token}")
+      |> assert_has(filter(body, has_text: "Link Not Found"))
       # Ensure the message content is NOT visible
-      |> refute_has("body", text: "Secret message")
+      |> refute_has(filter(body, has_text: "Secret message"))
     end
 
-    test "authenticated share link requires login for unauthenticated visitor", %{conn: conn} do
+    test "authenticated share link requires login for unauthenticated visitor", %{
+      session: session
+    } do
       model = create_default_model()
       user = generate(user()) |> confirm_user()
       setup_subscription_for_user(user)
@@ -129,16 +139,18 @@ defmodule MagusWeb.E2E.SharedConversationTest do
           actor: user
         )
 
+      body = by_css("body")
+
       # Visit as unauthenticated user
-      conn
-      |> visit(~p"/shared/#{share_link.token}")
-      |> assert_has("body", text: "Login Required")
-      |> assert_has("a", text: "Sign In")
+      session
+      |> Fluffy.visit(~p"/shared/#{share_link.token}")
+      |> assert_has(filter(body, has_text: "Login Required"))
+      |> assert_has(by_css("a") |> filter(has_text: "Sign In") |> first())
       # Ensure the message content is NOT visible
-      |> refute_has("body", text: "Private content")
+      |> refute_has(filter(body, has_text: "Private content"))
     end
 
-    test "authenticated share link is accessible to logged-in user", %{conn: conn} do
+    test "authenticated share link is accessible to logged-in user", %{session: session} do
       model = create_default_model()
       owner = generate(user()) |> confirm_user()
       viewer = generate(user()) |> confirm_user()
@@ -157,13 +169,15 @@ defmodule MagusWeb.E2E.SharedConversationTest do
           actor: owner
         )
 
+      body = by_css("body")
+
       # Visit as a different authenticated user
-      conn
+      session
       |> authenticate(viewer)
-      |> visit(~p"/shared/#{share_link.token}")
-      |> assert_has("body", text: "Shared conversation")
-      |> assert_has("body", text: "Authenticated content")
-      |> refute_has("#chat-textarea")
+      |> Fluffy.visit(~p"/shared/#{share_link.token}")
+      |> assert_has(filter(body, has_text: "Shared conversation"))
+      |> assert_has(filter(body, has_text: "Authenticated content"))
+      |> refute_has(by_css("#chat-textarea"))
     end
   end
 end

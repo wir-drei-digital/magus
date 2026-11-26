@@ -14,7 +14,7 @@ defmodule Magus.LiveE2EBrowserCase do
       use Playwright.Test
       use MagusWeb, :verified_routes
 
-      import Fluffy.PhoenixTest
+      import Fluffy.Assert, only: [assert_has: 2, assert_has: 3]
 
       import Magus.Generators
       import Magus.LiveE2ECase
@@ -80,17 +80,17 @@ defmodule Magus.LiveE2EBrowserCase do
     user = Magus.LiveE2ECase.create_live_user()
     Magus.LiveE2ECase.setup_live_subscription(user)
 
-    %{model: model, user: user, conn: Fluffy.PhoenixTest.start_session(:playwright)}
+    %{model: model, user: user, session: Fluffy.start_session(:playwright)}
   end
 
   @doc "Authenticate a Playwright session (same as PlaywrightCase)."
-  def authenticate(conn, user) do
+  def authenticate(session, user) do
     token = user.__metadata__.token
 
     unless is_binary(token) do
       raise "User has no authentication token. Ensure user was created via :register_with_password."
     end
 
-    Fluffy.add_session_cookie(conn, %{"user_token" => token})
+    Fluffy.add_session_cookie(session, %{"user_token" => token})
   end
 end
